@@ -1,0 +1,67 @@
+INSTALL
+
+Extract the archive to a directory.
+
+IN THAT DIRECTORY
+
+Enter the following two commands (in this order)
+
+make
+make install
+
+This will install:
+   the library (libpigpio.a) in /usr/local/lib
+   the header file (pigpio.h) in /usr/local/include
+   the daemon (pigpiod) in /usr/local/bin
+   the socket interface (pigs) in /usr/local/bin
+   the utility pig2vcd in /usr/local/bin
+
+TEST
+
+To test the library do
+
+sudo ./checklib
+
+checklib.c, demolib.c, pig2vcd.c, pigpiod.c, and pigs.c  show examples
+of interfacing with the library.
+
+DAEMON
+
+To launch the daemon do
+
+sudo pigpiod (pigpiod -? for options)
+
+Once the daemon is launched the socket and fifo interfaces will be
+available.
+
+When the library starts it locks
+
+/var/run/pigpio.pid
+
+The file should be deleted when the library terminates.
+
+SOCKET INTERFACE
+
+Use pigs for the socket interface (pigs help for help).
+
+FIFO INTERFACE
+
+The fifo interface accepts commands written to /dev/pigpio.
+
+Results are read from /dev/pigout.
+
+Errors are output on /dev/pigerr.
+
+To test the fifo interface perhaps do
+
+cat /dev/pigout &
+cat /dev/pigerr &
+
+echo "help" >/dev/pigpio
+
+STOP DAEMON
+
+To stop the daemon
+
+sudo killall pigpiod
+
