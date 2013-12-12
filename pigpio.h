@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 7
+This version is for pigpio version 8
 */
 
 #ifndef PIGPIO_H
@@ -49,6 +49,8 @@ This version is for pigpio version 7
 / 7) notifications when any of gpios 0-31 change state.                     /
 / 8) the construction of arbitrary waveforms to give precise timing of      /
 /    output gpio level changes.                                             /
+/ 9) rudimentary permission control through the socket and pipe interfaces  /
+/    so users can be prevented from "updating" inappropriate gpios.         /
 /                                                                           /
 / NOTE:                                                                     /
 /                                                                           /
@@ -82,7 +84,7 @@ This version is for pigpio version 7
 
 #include <stdint.h>
 
-#define PIGPIO_VERSION 7
+#define PIGPIO_VERSION 8
 
 /*-------------------------------------------------------------------------*/
 
@@ -179,6 +181,7 @@ gpioCfgDMAchannel          Configure the DMA channel (DEPRECATED).
 gpioCfgDMAchannels         Configure the DMA channels.
 gpioCfgPermissions         Configure the gpio access permissions.
 gpioCfgInterfaces          Configure user interfaces.
+gpioCfgInternals           Configure miscellaneous internals.
 gpioCfgSocketPort          Configure socket port.
 
 */
@@ -1641,8 +1644,14 @@ int gpioCfgPermissions(uint64_t updateMask);
 /* Configures pigpio to only allow updates (writes or mode changes) for the
    gpios specified by the mask.
 
-   The default setting is to allow updates to gpios 0-31, i.e. an update mask
-   of 0x00000000FFFFFFFF.
+   The default setting depends upon the board revision (Type 1 or Type 2).
+   The user gpios are added to the mask.  If the board revision is not
+   recognised then the mask is formed by or'ing the bits for the two
+   board revisions.
+
+   Unknown board: PI_DEFAULT_UPDATE_MASK_R0        0xFBE6CF9F
+   Type 1 board:  PI_DEFAULT_UPDATE_MASK_R1        0x03E6CF93
+   Type 2 board:  PI_DEFAULT_UPDATE_MASK_R2        0xFBC6CF9C
 */
 
 

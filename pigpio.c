@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 7 */
+/* pigpio version 8 */
 
 #include <stdio.h>
 #include <string.h>
@@ -3176,7 +3176,7 @@ static void initClock(int mainClock)
 
 /* ----------------------------------------------------------------------- */
 
-static void initDMAgo(uint32_t  * dmaAddr, uint32_t cbAddr)
+static void initDMAgo(volatile uint32_t  * dmaAddr, uint32_t cbAddr)
 {
    DBG(DBG_STARTUP, "");
 

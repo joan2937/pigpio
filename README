@@ -60,10 +60,18 @@ cat /dev/pigerr &
 
 echo "help" >/dev/pigpio
 
-PYTHON INTERFACE
+PYTHON MODULE
+
+By default the Python pigpio module is installed to the
+default python location.  You can install it for additional
+Python versions by
+
+pythonx.y setup.py install
+
+where x.y is the Python version.
 
 If the pigpiod daemon is running you can test the Python
-interface by entering the following commands.
+module by entering the following commands.
 
 python
 
