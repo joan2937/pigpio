@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 4+
+This version is for pigpio version 7+
 */
 
 #include <sys/types.h>
@@ -54,8 +54,10 @@ static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
 static unsigned clockSource            = PI_DEFAULT_CLK_SOURCE;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
-static unsigned DMAchannelChannel      = PI_DEFAULT_DMA_CHANNEL;
+static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
+static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
+static uint64_t updateMask             = -1;
 
 static FILE * errFifo;
 
@@ -64,13 +66,15 @@ void usage()
    fprintf(stderr, "\n" \
       "Usage: sudo pigpiod [OPTION] ...\n" \
       "   -b value, gpio sample buffer in milliseconds, default 120\n" \
-      "   -d value, DMA channel, 0-14,                  default 14\n" \
+      "   -d value, primary DMA channel, 0-14,          default 14\n" \
+      "   -e value, secondary DMA channel, 0-6,         default 5\n" \
       "   -f,       disable fifo interface,             default enabled\n" \
       "   -k,       disable socket interface,           default enabled\n" \
       "   -p value, socket port, 1024-32000,            default 8888\n" \
       "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
       "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
       "   -u value, clock source, 0=OSC 1=PLLD,         default PLLD\n" \
+      "   -x mask,  gpios which may be updated,         default 0xFFFFFFFF\n" \
       "EXAMPLE\n" \
       "sudo pigpiod -s 2 -b 200 -f\n" \
       "  Set a sample rate of 2 microseconds with a 200 millisecond\n" \
@@ -81,8 +85,10 @@ void usage()
 static void initOpts(int argc, char *argv[])
 {
    int i, opt;
+   uint64_t mask;
+   char * endptr;
 
-   while ((opt = getopt(argc, argv, "b:d:fkp:s:t:u:")) != -1)
+   while ((opt = getopt(argc, argv, "b:d:e:fkp:s:t:u:x:")) != -1)
    {
       i = -1;
 
@@ -97,9 +103,16 @@ static void initOpts(int argc, char *argv[])
 
          case 'd':
             i = atoi(optarg);
-            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_DMA_CHANNEL))
-               DMAchannelChannel = i;
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_PRIMARY_CHANNEL))
+               DMAprimaryChannel = i;
             else cmdFatal("invalid -d option (%d)", i);
+            break;
+
+         case 'e':
+            i = atoi(optarg);
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_SECONDARY_CHANNEL))
+               DMAsecondaryChannel = i;
+            else cmdFatal("invalid -e option (%d)", i);
             break;
 
          case 'f':
@@ -149,6 +162,13 @@ static void initOpts(int argc, char *argv[])
             if ((i >= PI_CLOCK_OSC) && (i <= PI_CLOCK_PLLD))
                clockSource = i;
             else cmdFatal("invalid -u option (%d)", i);
+            break;
+
+         case 'x':
+            mask = strtoll(optarg, &endptr, 0);
+            printf("mask=%llx\n", mask);
+            if (!*endptr) updateMask = mask;
+            else cmdFatal("invalid -x option (%s)", optarg);
             break;
 
         default: /* '?' */
@@ -224,9 +244,11 @@ int main(int argc, char **argv)
 
    gpioCfgInterfaces(ifFlags);
 
-   gpioCfgDMAchannel(DMAchannelChannel);
+   gpioCfgDMAchannels(DMAprimaryChannel, DMAsecondaryChannel);
 
    gpioCfgSocketPort(socketPort);
+
+   if (updateMask != -1) gpioCfgPermissions(updateMask);
 
    /* start library */
 
@@ -275,4 +297,3 @@ int main(int argc, char **argv)
 
    return 0;
 }
-

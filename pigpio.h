@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 6
+This version is for pigpio version 7
 */
 
 #ifndef PIGPIO_H
@@ -82,7 +82,7 @@ This version is for pigpio version 6
 
 #include <stdint.h>
 
-#define PIGPIO_VERSION 6
+#define PIGPIO_VERSION 7
 
 /*-------------------------------------------------------------------------*/
 
@@ -175,7 +175,9 @@ gpioHardwareRevision       Get hardware version.
 
 gpioCfgBufferSize          Configure the gpio sample buffer size.
 gpioCfgClock               Configure the gpio sample rate.
-gpioCfgDMAchannel          Configure the DMA channel.
+gpioCfgDMAchannel          Configure the DMA channel (DEPRECATED).
+gpioCfgDMAchannels         Configure the DMA channels.
+gpioCfgPermissions         Configure the gpio access permissions.
 gpioCfgInterfaces          Configure user interfaces.
 gpioCfgSocketPort          Configure socket port.
 
@@ -482,7 +484,7 @@ int gpioSetPWMrange(unsigned user_gpio,
    to gpioPWM will use a dutycycle between 0 (off) and range (fully on).
 
    Returns the real range for the given gpio's frequency if OK,
-   otherwise PI_BAD_USER_GPIO or PI_BAD_DUTY_RANGE.
+   otherwise PI_BAD_USER_GPIO or PI_BAD_DUTYRANGE.
 
    EXAMPLE:
    ...
@@ -892,9 +894,12 @@ int gpioWaveAddSerial(unsigned user_gpio,
    the same waveform.
 */
 
+#define PI_WAVE_BLOCKS     3
+#define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
+#define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  256)
+
 #define PI_WAVE_MIN_BAUD      100
 #define PI_WAVE_MAX_BAUD      250000
-#define PI_WAVE_MAX_CHARS     256
 
 
 
@@ -1601,7 +1606,7 @@ int gpioCfgClock(unsigned micros,
 
 
 /*-------------------------------------------------------------------------*/
-int gpioCfgDMAchannel(unsigned channel);
+int gpioCfgDMAchannel(unsigned channel); /* DEPRECATED */
 /*-------------------------------------------------------------------------*/
 /* Configures pigpio to use the specified DMA channel.
 
@@ -1622,11 +1627,23 @@ int gpioCfgDMAchannels(unsigned primaryChannel,
 /* Configures pigpio to use the specified DMA channels.
 
    The default setting is to use channel 14 for the primary channel and
-   channel 6 for the secondary channel.
+   channel 5 for the secondary channel.
 */
 
 #define PI_MAX_PRIMARY_CHANNEL   14
 #define PI_MAX_SECONDARY_CHANNEL  6
+
+
+
+/*-------------------------------------------------------------------------*/
+int gpioCfgPermissions(uint64_t updateMask);
+/*-------------------------------------------------------------------------*/
+/* Configures pigpio to only allow updates (writes or mode changes) for the
+   gpios specified by the mask.
+
+   The default setting is to allow updates to gpios 0-31, i.e. an update mask
+   of 0x00000000FFFFFFFF.
+*/
 
 
 
@@ -1746,7 +1763,8 @@ after this command is issued.
 #define PI_BAD_CLK_SOURCE   -18 /* clock source not 0-1                    */
 #define PI_BAD_CLK_MICROS   -19 /* clock micros not 1, 2, 4, 5, 8, or 10   */
 #define PI_BAD_BUF_MILLIS   -20 /* buf millis not 100-10000                */
-#define PI_BAD_DUTY_RANGE   -21 /* dutycycle range not 25-40000            */
+#define PI_BAD_DUTYRANGE    -21 /* dutycycle range not 25-40000            */
+#define PI_BAD_DUTY_RANGE   -21 /* DEPRECATED (use PI_BAD_DUTYRANGE)       */
 #define PI_BAD_SIGNUM       -22 /* signum not 0-63                         */
 #define PI_BAD_PATHNAME     -23 /* can't open pathname                     */
 #define PI_NO_HANDLE        -24 /* no handle available                     */
@@ -1767,6 +1785,8 @@ after this command is issued.
 #define PI_NOT_SERIAL_GPIO  -38 /* no serial read in progress on gpio      */
 #define PI_BAD_SERIAL_STRUC -39 /* bad null serial structure parameter     */
 #define PI_BAD_SERIAL_BUF   -40 /* bad null serial buf parameter           */
+#define PI_NOT_PERMITTED    -41 /* gpio operation not permitted            */
+#define PI_SOME_PERMITTED   -42 /* one or more gpios not permitted         */
 
 
 /*-------------------------------------------------------------------------*/
@@ -1778,8 +1798,12 @@ after this command is issued.
 #define PI_DEFAULT_IF_FLAGS              0
 #define PI_DEFAULT_DMA_CHANNEL           14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL   14
-#define PI_DEFAULT_DMA_SECONDARY_CHANNEL 6
+#define PI_DEFAULT_DMA_SECONDARY_CHANNEL 5
 #define PI_DEFAULT_SOCKET_PORT           8888
+#define PI_DEFAULT_SOCKET_PORT_STR       "8888"
+#define PI_DEFAULT_SOCKET_ADDR_STR       "127.0.0.1"
+#define PI_DEFAULT_UPDATE_MASK_R0        0xFBE6CF9F
+#define PI_DEFAULT_UPDATE_MASK_R1        0x03E6CF93
+#define PI_DEFAULT_UPDATE_MASK_R2        0xFBC6CF9C
 
 #endif
-

@@ -15,6 +15,7 @@ This will install:
    the daemon (pigpiod) in /usr/local/bin
    the socket interface (pigs) in /usr/local/bin
    the utility pig2vcd in /usr/local/bin
+   the Python module pigpio.py
 
 TEST
 
@@ -22,8 +23,8 @@ To test the library do
 
 sudo ./checklib
 
-checklib.c, demolib.c, pig2vcd.c, pigpiod.c, and pigs.c  show examples
-of interfacing with the library.
+checklib.c, demolib.c, pig2vcd.c, pigpiod.c, pigs.c, and pigpio.py
+show examples of interfacing with the library.
 
 DAEMON
 
@@ -59,9 +60,30 @@ cat /dev/pigerr &
 
 echo "help" >/dev/pigpio
 
+PYTHON INTERFACE
+
+If the pigpiod daemon is running you can test the Python
+interface by entering the following commands.
+
+python
+
+import pigpio
+
+pigpio.start()
+
+print(pigpio.get_current_tick())
+
+print(hex(pigpio.read_bank_1()))
+
+pigpio.stop()
+
+help(pigpio)
+
+quit()
+
 STOP DAEMON
 
-To stop the daemon
+To stop the pigpiod daemon
 
 sudo killall pigpiod
 

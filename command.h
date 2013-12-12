@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 3+
+This version is for pigpio version 7+
 */
 
 #ifndef COMMAND_H
@@ -39,10 +39,10 @@ This version is for pigpio version 3+
 
 typedef struct
 {
-   int    cmd;
-   char * name;
-   int    vt;
-   int    rv;
+   int    cmd;  /* command number            */
+   char * name; /* command name              */
+   int    vt;   /* command verification type */
+   int    rv;   /* command return value type */
 } cmdInfo_t;
 
 extern cmdInfo_t cmdInfo[];

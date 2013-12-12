@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 6 */
+/* pigpio version 7 */
 
 #include <stdio.h>
 #include <string.h>
@@ -226,6 +226,13 @@ bit 0 READ_LAST_NOT_SET_ERROR
       fprintf(stderr, "%s %s: " format "\n",                       \
          myTimeStamp(), __FUNCTION__ , ## arg);                    \
       return x;                                                    \
+   }                                                               \
+   while (0)
+
+#define PERM_ERROR(format, arg...)                                 \
+   do                                                              \
+   {                                                               \
+      fprintf(stderr, "%s " format "\n", myTimeStamp(), ## arg);   \
    }                                                               \
    while (0)
 
@@ -519,8 +526,6 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define PI_WFRX_SERIAL 1
 #define PI_WF_MICROS   2
 
-#define PI_WAVE_MAX_PULSES 3000
-
 #define DATUMS 2000
 
 #define DEFAULT_PWM_IDX 5
@@ -704,11 +709,15 @@ static volatile gpioCfg_t gpioCfg =
 
 static volatile gpioStats_t gpioStats;
 
+static int gpioMaskSet = 0;
+
 /* initialise every gpioInitialise */
 
 static struct timespec libStarted;
 
 /* initialse if not libInitialised */
+
+static uint64_t gpioMask;
 
 static gpioPulse_t wf[3][PI_WAVE_MAX_PULSES];
 
@@ -732,7 +741,6 @@ static volatile uint32_t notifyBits   = 0;
 static volatile int DMAstarted = 0;
 
 static int      libInitialised   = 0;
-static unsigned hardwareRevision = 0;
 
 static int pthAlertRunning  = 0;
 static int pthFifoRunning   = 0;
@@ -947,6 +955,7 @@ static uint32_t myGetTick(int pos)
 static void myDoCommand(cmdCmd_t * cmd)
 {
    int p1, p2, res;
+   uint32_t mask;
 
    p1  = cmd->p1;
    p2  = cmd->p2;
@@ -956,7 +965,12 @@ static void myDoCommand(cmdCmd_t * cmd)
    switch (cmd->cmd)
    {
       case PI_CMD_MODES:
-         res = gpioSetMode(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetMode(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioSetMode: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_MODEG:
@@ -964,7 +978,12 @@ static void myDoCommand(cmdCmd_t * cmd)
          break;
 
       case PI_CMD_PUD:
-         res = gpioSetPullUpDown(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPullUpDown(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioSetPullUpDown: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_READ:
@@ -972,23 +991,48 @@ static void myDoCommand(cmdCmd_t * cmd)
          break;
 
       case PI_CMD_WRITE:
-         res = gpioWrite(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioWrite(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioWrite: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_PWM:
-         res = gpioPWM(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioPWM(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioPWM: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_PRS:
-         res = gpioSetPWMrange(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMrange(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioSetPWMrange: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_PFS:
-         res = gpioSetPWMfrequency(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMfrequency(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioSetPWMfrequency: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_SERVO:
-         res = gpioServo(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioServo(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioServo: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
          break;
 
       case PI_CMD_WDOG:
@@ -1004,19 +1048,55 @@ static void myDoCommand(cmdCmd_t * cmd)
          break;
 
       case PI_CMD_BC1:
-         gpioWrite_Bits_0_31_Clear(p1);
+         mask = gpioMask;
+
+         res = gpioWrite_Bits_0_31_Clear(p1&mask);
+
+         if ((mask | p1) != mask)
+         {
+            PERM_ERROR("gpioWrite_Bits_0_31_Clear: bad levels %08X (permissions %08X)",
+               p1, mask);
+            res = PI_SOME_PERMITTED;
+         }
          break;
 
       case PI_CMD_BC2:
-         gpioWrite_Bits_32_53_Clear(p1);
+         mask = gpioMask>>32;
+
+         res = gpioWrite_Bits_32_53_Clear(p1&mask);
+
+         if ((mask | p1) != mask)
+         {
+            PERM_ERROR("gpioWrite_Bits_32_53_Clear: bad levels %08X (permissions %08X)",
+               p1, mask);
+            res = PI_SOME_PERMITTED;
+         }
          break;
 
       case PI_CMD_BS1:
-         gpioWrite_Bits_0_31_Set(p1);
+         mask = gpioMask;
+
+         res = gpioWrite_Bits_0_31_Set(p1&mask);
+
+         if ((mask | p1) != mask)
+         {
+            PERM_ERROR("gpioWrite_Bits_0_31_Set: bad levels %08X (permissions %08X)",
+               p1, mask);
+            res = PI_SOME_PERMITTED;
+         }
          break;
 
       case PI_CMD_BS2:
-         gpioWrite_Bits_32_53_Set(p1);
+         mask = gpioMask>>32;
+
+         res = gpioWrite_Bits_32_53_Set(p1&mask);
+
+         if ((mask | p1) != mask)
+         {
+            PERM_ERROR("gpioWrite_Bits_32_53_Set: bad levels %08X (permissions %08X)",
+               p1, mask);
+            res = PI_SOME_PERMITTED;
+         }
          break;
 
       case PI_CMD_TICK:
@@ -1274,7 +1354,7 @@ static void waveCbOPrint(int pos)
 
    p = waveCbVOadr(pos);
 
-   fprintf(stderr, "i=%lx s=%lx d=%lx len=%lx s=%lx nxt=%lx",
+   fprintf(stderr, "i=%lx s=%lx d=%lx len=%lx s=%lx nxt=%lx\n",
       p->info, p->src, p->dst, p->length, p->stride, p->next);
 }
 
@@ -1669,7 +1749,7 @@ static void dmaCbPrint(int pos)
 
    p = dmaCB2adr(pos);
 
-   fprintf(stderr, "i=%lx s=%lx d=%lx len=%lx s=%lx nxt=%lx",
+   fprintf(stderr, "i=%lx s=%lx d=%lx len=%lx s=%lx nxt=%lx\n",
       p->info, p->src, p->dst, p->length, p->stride, p->next);
 }
 
@@ -1962,13 +2042,15 @@ static void sigHandler(int signum)
 
             DBG(DBG_USER, "Debug level %d\n", gpioCfg.dbgLevel);
          }
+         else if (signum == SIGPIPE)
+         {
+            DBG(DBG_USER, "SIGPIPE received");
+         }
          else
          {
-            /* close library safely and exit */
+            /* exit */
 
-            DBG(DBG_USER, "Unhandled signal %d, terminating\n", signum);
-
-            gpioTerminate();
+            DBG(DBG_MIN_LEVEL, "Unhandled signal %d, terminating\n", signum);
 
             exit(-1);
          }
@@ -1976,11 +2058,9 @@ static void sigHandler(int signum)
    }
    else
    {
-      /* close library safely and exit */
+      /* exit */
 
-      DBG(DBG_USER, "Unhandled signal %d, terminating\n", signum);
-
-      gpioTerminate();
+      DBG(DBG_MIN_LEVEL, "Unhandled signal %d, terminating\n", signum);
 
       exit(-1);
    }
@@ -2424,7 +2504,6 @@ static void * pthTimerTick(void *x)
    return 0;
 }
 
-
 /* ----------------------------------------------------------------------- */
 
 
@@ -2465,6 +2544,7 @@ static void * pthFifoThread(void *x)
                break;
 
             case 1:
+               fprintf(outFifo, "%d\n", cmd.res);
                break;
 
             case 2:
@@ -2860,7 +2940,7 @@ static int initDMAcbs(void)
    /* allocate memory for pointers to virtual and physical pages */
 
    dmaBloc = mmap(
-       0, (bufferBlocks+1)*sizeof(dmaPage_t *),
+       0, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
        PROT_READ|PROT_WRITE,
        MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
        -1, 0);
@@ -2869,7 +2949,7 @@ static int initDMAcbs(void)
       SOFT_ERROR(PI_INIT_FAILED, "mmap dma virtual failed (%m)");
 
    dmaVirt = mmap(
-       0, PAGES_PER_BLOCK*(bufferBlocks+1)*sizeof(dmaPage_t *),
+       0, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
        PROT_READ|PROT_WRITE,
        MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
        -1, 0);
@@ -2878,7 +2958,7 @@ static int initDMAcbs(void)
       SOFT_ERROR(PI_INIT_FAILED, "mmap dma virtual failed (%m)");
 
    dmaPhys = mmap(
-       0, PAGES_PER_BLOCK*(bufferBlocks+1)*sizeof(dmaPage_t *),
+       0, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
        PROT_READ|PROT_WRITE,
        MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
        -1, 0);
@@ -2901,7 +2981,7 @@ static int initDMAcbs(void)
    if (pagemapFd < 0)
       SOFT_ERROR(PI_INIT_FAILED, "open pagemap failed(%m)");
 
-   for (i=0; i<(bufferBlocks+1); i++) initDMAblock(pagemapFd, i);
+   for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++) initDMAblock(pagemapFd, i);
 
    close(pagemapFd);
 
@@ -2918,7 +2998,10 @@ static int initDMAcbs(void)
    dmaInitCbs();
 
    if (gpioCfg.dbgLevel >= DBG_DMACBS)
+   {
+      fprintf(stderr, "*** INPUT DMA CONTROL BLOCKS ***\n");
       for (i=0; i<NUM_CBS; i++) dmaCbPrint(i);
+   }
 
    return 0;
 }
@@ -3132,7 +3215,6 @@ static void initClearGlobals(void)
 
    libInitialised   = 0;
    DMAstarted       = 0;
-   hardwareRevision = 0;
 
    pthAlertRunning  = 0;
    pthFifoRunning   = 0;
@@ -3224,37 +3306,6 @@ static void initClearGlobals(void)
 
 /* ----------------------------------------------------------------------- */
 
-static unsigned initHardwareRevision(void)
-{
-   FILE * filp;
-   unsigned rev;
-   char buf[512];
-   char term;
-
-   rev = 0;
-
-   filp = fopen ("/proc/cpuinfo", "r");
-
-   if (filp != NULL)
-   {
-      while (fgets(buf, sizeof(buf), filp) != NULL)
-      {
-         if (!strncasecmp("revision\t", buf, 9))
-         {
-            if (sscanf(buf+strlen(buf)-5, "%x%c", &rev, &term) == 2)
-            {
-               if (term == '\n') break;
-               rev = 0;
-            }
-         }
-      }
-      fclose(filp);
-   }
-   return rev;
-}
-
-/* ----------------------------------------------------------------------- */
-
 static void initReleaseResources(void)
 {
    int i;
@@ -3299,7 +3350,7 @@ static void initReleaseResources(void)
    /* release mmap'd memory */
 
    if (clkReg  != MAP_FAILED) munmap((void *)clkReg,  CLK_LEN);
-   if (dmaReg  != MAP_FAILED) munmap((void *)dmaReg,   DMA_LEN);
+   if (dmaReg  != MAP_FAILED) munmap((void *)dmaReg,  DMA_LEN);
    if (gpioReg != MAP_FAILED) munmap((void *)gpioReg, GPIO_LEN);
    if (pcmReg  != MAP_FAILED) munmap((void *)pcmReg,  PCM_LEN);
    if (pwmReg  != MAP_FAILED) munmap((void *)pwmReg,  PWM_LEN);
@@ -3314,36 +3365,36 @@ static void initReleaseResources(void)
 
    if (dmaVirt != MAP_FAILED)
    {
-      for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+1); i++)
+      for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS); i++)
       {
          munmap(dmaVirt[i], PAGE_SIZE);
       }
 
-      munmap(dmaVirt, PAGES_PER_BLOCK*(bufferBlocks+1)*sizeof(dmaPage_t *));
+      munmap(dmaVirt, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
    }
 
    dmaVirt = MAP_FAILED;
 
    if (dmaPhys != MAP_FAILED)
    {
-      for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+1); i++)
+      for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS); i++)
       {
          munmap(dmaPhys[i], PAGE_SIZE);
       }
 
-      munmap(dmaPhys, PAGES_PER_BLOCK*(bufferBlocks+1)*sizeof(dmaPage_t *));
+      munmap(dmaPhys, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
    }
 
    dmaPhys = MAP_FAILED;
 
    if (dmaBloc != MAP_FAILED)
    {
-      for (i=0; i<(bufferBlocks+1); i++)
+      for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++)
       {
          munmap(dmaBloc[i], PAGES_PER_BLOCK*PAGE_SIZE);
       }
 
-      munmap(dmaBloc, (bufferBlocks+1)*sizeof(dmaPage_t *));
+      munmap(dmaBloc, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
    }
 
    dmaBloc = MAP_FAILED;
@@ -3403,6 +3454,17 @@ int gpioInitialise(void)
    if (fdLock < 0)
       SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
 
+   if (!gpioMaskSet)
+   {
+      i = gpioHardwareRevision();
+
+      if      (i == 0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
+      else if (i <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
+      else             gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+
+      gpioMaskSet = 1;
+   }
+
    sigSetHandler();
 
    if (initPeripherals() < 0) return PI_INIT_FAILED;
@@ -3450,8 +3512,6 @@ int gpioInitialise(void)
       pthSocketRunning = 1;
    }
 
-   hardwareRevision = initHardwareRevision();
-
    initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
 
    return PIGPIO_VERSION;
@@ -3465,6 +3525,7 @@ void gpioTerminate(void)
 
    DBG(DBG_USER, "");
 
+   gpioMaskSet = 0;
 
    if (libInitialised)
    {
@@ -3716,7 +3777,7 @@ int gpioSetPWMrange(unsigned gpio, unsigned range)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
    if ((range < PI_MIN_DUTYCYCLE_RANGE)  || (range > PI_MAX_DUTYCYCLE_RANGE))
-      SOFT_ERROR(PI_BAD_DUTY_RANGE, "gpio %d, bad range (%d)", gpio, range);
+      SOFT_ERROR(PI_BAD_DUTYRANGE, "gpio %d, bad range (%d)", gpio, range);
 
    oldWidth = gpioInfo[gpio].width;
 
@@ -4247,7 +4308,10 @@ int gpioWaveTxStart(unsigned mode)
    cb = wave2Cbs(mode);
 
    if (gpioCfg.dbgLevel >= DBG_SLOW_TICK)
+   {
+      fprintf(stderr, "*** OUTPUT DMA CONTROL BLOCKS ***\n");
       for (i=0; i<cb; i++) waveCbOPrint(i);
+   }
 
    initDMAgo((uint32_t *)dmaOut, (uint32_t)dmaOPhys[0]);
 
@@ -4899,11 +4963,34 @@ uint32_t gpioTick(void)
 
 unsigned gpioHardwareRevision(void)
 {
+   static unsigned rev = 0;
+
+   FILE * filp;
+   char buf[512];
+   char term;
+
    DBG(DBG_USER, "");
 
-   CHECK_INITED;
+   if (rev) return rev;
 
-   return hardwareRevision;
+   filp = fopen ("/proc/cpuinfo", "r");
+
+   if (filp != NULL)
+   {
+      while (fgets(buf, sizeof(buf), filp) != NULL)
+      {
+         if (!strncasecmp("revision\t", buf, 9))
+         {
+            if (sscanf(buf+strlen(buf)-5, "%x%c", &rev, &term) == 2)
+            {
+               if (term == '\n') break;
+               rev = 0;
+            }
+         }
+      }
+      fclose(filp);
+   }
+   return rev;
 }
 
 
@@ -4989,6 +5076,22 @@ int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel)
 
    gpioCfg.DMAprimaryChannel   = primaryChannel;
    gpioCfg.DMAsecondaryChannel = secondaryChannel;
+
+   return 0;
+}
+
+
+/*-------------------------------------------------------------------------*/
+
+int gpioCfgPermissions(uint64_t updateMask)
+{
+   DBG(DBG_USER, "gpio update mask=%llX", updateMask);
+
+   CHECK_NOT_INITED;
+
+   gpioMask = updateMask;
+
+   gpioMaskSet = 1;
 
    return 0;
 }

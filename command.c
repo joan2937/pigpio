@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 4+
+This version is for pigpio version 7+
 */
 
 #include <stdio.h>
@@ -141,7 +141,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_CLK_SOURCE   , "clock source not 0-1"},
    {PI_BAD_CLK_MICROS   , "clock micros not 1, 2, 4, 5, 8, or 10"},
    {PI_BAD_BUF_MILLIS   , "buf millis not 100-10000"},
-   {PI_BAD_DUTY_RANGE   , "dutycycle range not 25-40000"},
+   {PI_BAD_DUTYRANGE    , "dutycycle range not 25-40000"},
    {PI_BAD_SIGNUM       , "signum not 0-63"},
    {PI_BAD_PATHNAME     , "can't open pathname"},
    {PI_NO_HANDLE        , "no handle available"},
@@ -159,7 +159,8 @@ static errInfo_t errInfo[]=
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
    {PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"},
-
+   {PI_NOT_PERMITTED    , "no permission to update gpio"},
+   {PI_SOME_PERMITTED   , "no permission to update one or more gpios"},
 };
 
 static char * fmtMdeStr="RW540123";
@@ -289,4 +290,3 @@ char * cmdErrStr(int error)
    }
    return "unknown error";
 }
-

@@ -1,0 +1,1591 @@
+"""
+pigpio is a Python module for the Raspberry Pi which allows control
+of the general purpose input outputs (gpios).
+
+There are 54 gpios in total, arranged in two banks. Bank 1 contains
+gpios 0-31. Bank 2 contains gpios 32-54.
+
+Most of the gpios are dedicated to system use.
+
+A user should only manipulate gpios in bank 1.
+
+For a Rev.1 board only use gpios 0, 1, 4, 7, 8, 9, 10, 11, 14, 15, 17,
+18, 21, 22, 23, 24, 25.
+
+For a Rev.2 board only use gpios 2, 3, 4, 7, 8, 9, 10, 11, 14, 15, 17,
+18, 22, 23, 24, 25, 27, 28, 29, 30, 31.
+
+It is safe to read all the gpios. If you try to write a system gpio or
+change its mode you can crash the Pi or corrupt the data on the SD card.
+
+Features
+
+The pigpio module's main features are:
+
+- provision of PWM on any number of gpios 0-31 simultaneously.
+
+- provision of servo pulses on any number of gpios 0-31 simultaneously.
+
+- callbacks when any of gpios 0-31 change state.
+
+- reading/writing gpios and setting their modes (typically input
+  or output).
+
+- reading/writing all of the gpios in a bank (0-31, 32-53) as a single
+  operation.
+
+Notes
+
+ALL gpios are identified by their Broadcom number.
+
+This module uses the services of the C pigpio library.  That library
+must be running on the Pi whose gpios are to be manipulated.
+
+The normal way to start the library is as a daemon (during system
+start).
+
+sudo pigpiod
+
+Your Python program should wrap the use of the module up in calls
+to pigpio.start() and pigpio.stop().
+
+Settings
+
+A number of settings are determined when the pigpiod daemon is started.
+
+- the sample rate (1, 2, 4, 5, 8, or 10us, default 5us).
+
+- the set of gpios which may be updated (generally written to).  The
+  default set is those listed above for the Rev.1 or Rev.2 boards.
+
+- the available PWM frequencies (see set_PWM_frequency()).
+
+Exceptions
+
+By default a fatal exception is raised if you pass an invalid
+argument to a pigpio function.
+
+If you wish to handle the returned status yourself you should set
+pigpio.exceptions = False.
+
+"""
+import socket
+import struct
+import time
+import threading
+import os
+import atexit
+
+VERSION = "1.0"
+
+# gpio levels
+
+OFF   = 0
+LOW   = 0
+CLEAR = 0
+
+ON   = 1
+HIGH = 1
+SET  = 1
+
+TIMEOUT = 2
+
+# gpio edges
+
+EITHER_EDGE  = 0
+RISING_EDGE  = 1
+FALLING_EDGE = 2
+
+# gpio modes
+
+INPUT  = 0
+OUTPUT = 1
+ALT0   = 4
+ALT1   = 5
+ALT2   = 6
+ALT3   = 7
+ALT4   = 3
+ALT5   = 2
+
+# gpio Pull Up Down
+
+PUD_OFF  = 0
+PUD_DOWN = 1
+PUD_UP   = 2
+
+# pigpio command numbers
+
+_PI_CMD_MODES= 0
+_PI_CMD_MODEG= 1
+_PI_CMD_PUD=   2
+_PI_CMD_READ=  3
+_PI_CMD_WRITE= 4
+_PI_CMD_PWM=   5
+_PI_CMD_PRS=   6
+_PI_CMD_PFS=   7
+_PI_CMD_SERVO= 8
+_PI_CMD_WDOG=  9
+_PI_CMD_BR1=  10
+_PI_CMD_BR2=  11
+_PI_CMD_BC1=  12
+_PI_CMD_BC2=  13
+_PI_CMD_BS1=  14
+_PI_CMD_BS2=  15
+_PI_CMD_TICK= 16
+_PI_CMD_HWVER=17
+_PI_CMD_NO=   18
+_PI_CMD_NB=   19
+_PI_CMD_NP=   20
+_PI_CMD_NC=   21
+_PI_CMD_PRG=  22
+_PI_CMD_PFG=  23
+_PI_CMD_PRRG= 24
+_PI_CMD_NOIB= 99
+
+# pigpio error numbers
+
+_PI_INIT_FAILED     =-1
+PI_BAD_USER_GPIO    =-2
+PI_BAD_GPIO         =-3
+PI_BAD_MODE         =-4
+PI_BAD_LEVEL        =-5
+PI_BAD_PUD          =-6
+PI_BAD_PULSEWIDTH   =-7
+PI_BAD_DUTYCYCLE    =-8
+_PI_BAD_TIMER       =-9
+_PI_BAD_MS          =-10
+_PI_BAD_TIMETYPE    =-11
+_PI_BAD_SECONDS     =-12
+_PI_BAD_MICROS      =-13
+_PI_TIMER_FAILED    =-14
+PI_BAD_WDOG_TIMEOUT =-15
+_PI_NO_ALERT_FUNC   =-16
+_PI_BAD_CLK_PERIPH  =-17
+_PI_BAD_CLK_SOURCE  =-18
+_PI_BAD_CLK_MICROS  =-19
+_PI_BAD_BUF_MILLIS  =-20
+PI_BAD_DUTYRANGE    =-21
+_PI_BAD_SIGNUM      =-22
+_PI_BAD_PATHNAME    =-23
+PI_NO_HANDLE        =-24
+PI_BAD_HANDLE       =-25
+_PI_BAD_IF_FLAGS    =-26
+_PI_BAD_CHANNEL     =-27
+_PI_BAD_PRIM_CHANNEL=-27
+_PI_BAD_SOCKET_PORT =-28
+_PI_BAD_FIFO_COMMAND=-29
+_PI_BAD_SECO_CHANNEL=-30
+_PI_NOT_INITIALISED =-31
+_PI_INITIALISED     =-32
+_PI_BAD_WAVE_MODE   =-33
+_PI_BAD_CFG_INTERNAL=-34
+_PI_BAD_WAVE_BAUD   =-35
+_PI_TOO_MANY_PULSES =-36
+_PI_TOO_MANY_CHARS  =-37
+_PI_NOT_SERIAL_GPIO =-38
+_PI_BAD_SERIAL_STRUC=-39
+_PI_BAD_SERIAL_BUF  =-40
+PI_NOT_PERMITTED    =-41
+PI_SOME_PERMITTED   =-42
+
+# pigpio error text
+
+_errors=[
+   [_PI_INIT_FAILED      , "pigpio initialisation failed"],
+   [PI_BAD_USER_GPIO     , "gpio not 0-31"],
+   [PI_BAD_GPIO          , "gpio not 0-53"],
+   [PI_BAD_MODE          , "mode not 0-7"],
+   [PI_BAD_LEVEL         , "level not 0-1"],
+   [PI_BAD_PUD           , "pud not 0-2"],
+   [PI_BAD_PULSEWIDTH    , "pulsewidth not 0 or 500-2500"],
+   [PI_BAD_DUTYCYCLE     , "dutycycle not 0-255"],
+   [_PI_BAD_TIMER        , "timer not 0-9"],
+   [_PI_BAD_MS           , "ms not 10-60000"],
+   [_PI_BAD_TIMETYPE     , "timetype not 0-1"],
+   [_PI_BAD_SECONDS      , "seconds < 0"],
+   [_PI_BAD_MICROS       , "micros not 0-999999"],
+   [_PI_TIMER_FAILED     , "gpioSetTimerFunc failed"],
+   [PI_BAD_WDOG_TIMEOUT  , "timeout not 0-60000"],
+   [_PI_NO_ALERT_FUNC    , "DEPRECATED"],
+   [_PI_BAD_CLK_PERIPH   , "clock peripheral not 0-1"],
+   [_PI_BAD_CLK_SOURCE   , "clock source not 0-1"],
+   [_PI_BAD_CLK_MICROS   , "clock micros not 1, 2, 4, 5, 8, or 10"],
+   [_PI_BAD_BUF_MILLIS   , "buf millis not 100-10000"],
+   [PI_BAD_DUTYRANGE     , "dutycycle range not 25-40000"],
+   [_PI_BAD_SIGNUM       , "signum not 0-63"],
+   [_PI_BAD_PATHNAME     , "can't open pathname"],
+   [PI_NO_HANDLE         , "no handle available"],
+   [PI_BAD_HANDLE        , "unknown notify handle"],
+   [_PI_BAD_IF_FLAGS     , "ifFlags > 3"],
+   [_PI_BAD_CHANNEL      , "DMA channel not 0-14"],
+   [_PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"],
+   [_PI_BAD_FIFO_COMMAND , "unknown fifo command"],
+   [_PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-6"],
+   [_PI_NOT_INITIALISED  , "function called before gpioInitialise"],
+   [_PI_INITIALISED      , "function called after gpioInitialise"],
+   [_PI_BAD_WAVE_MODE    , "waveform mode not 0-1"],
+   [_PI_BAD_CFG_INTERNAL , "bad parameter in gpioCfgInternals call"],
+   [_PI_BAD_WAVE_BAUD    , "baud rate not 100-250000"],
+   [_PI_TOO_MANY_PULSES  , "waveform has too many pulses"],
+   [_PI_TOO_MANY_CHARS   , "waveform has too many chars"],
+   [_PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"],
+   [PI_NOT_PERMITTED     , "no permission to update gpio"],
+   [PI_SOME_PERMITTED    , "no permission to update one or more gpios"]
+]
+
+_control = None
+_notify  = None
+
+_host = ''
+_port = 8888
+
+exceptions = True
+
+class _pigpioError(Exception):
+   """pigpio module exception"""
+   def __init__(self, value):
+      self.value = value
+   def __str__(self):
+      return repr(self.value)
+
+def error(pigpio_error):
+   """Converts a pigpio error number to a text description.
+
+   pigpio_error: an error number (<0) returned by pigpio.
+
+   Example
+   ...
+   print(pigpio.error(-5))
+   level not 0-1
+   ...
+   """
+   for e in _errors:
+      if e[0] == pigpio_error:
+         return e[1]
+   return "unknown error"
+
+def tickDiff(tStart, tEnd):
+   """Calculate the time difference between two ticks.
+
+   tStart: the earlier tick.
+   tEnd:   the later tick.
+
+   The function handles wrap around as the tick overflows 32 bits.
+
+   The returned value is in microseconds.
+
+   Example
+   ...
+   print(pigpio.tickDiff(4294967272, 12))
+   36
+   ...
+   """
+   tDiff = tEnd - tStart
+   if tDiff < 0:
+      tDiff += (1 << 32)
+   return tDiff
+
+def _u2i(number):
+   """Converts a number from unsigned to signed.
+
+   number: a 32 bit unsigned number
+   """
+   mask = (2 ** 32) - 1
+   if number & (1 << 31):
+      v = number | ~mask
+   else:
+      v = number & mask
+   if v >= 0:
+      return v;
+   else:
+      if exceptions:
+         raise _pigpioError(error(v))
+      else:
+         return v
+
+def _pigpio_command(sock, cmd, p1, p2):
+   """Executes a pigpio socket command.
+
+   sock: command socket.
+   cmd:  the command to be executed.
+   p1:   command paramter 1 (if applicable).
+   p2:   command paramter 2 (if applicable).
+   """
+   if sock is not None:
+      sock.send(struct.pack('IIII', cmd, p1, p2, 0))
+      x, y, z, res = struct.unpack('IIII', sock.recv(16))
+      return res
+   else:
+      raise  _pigpioError("*** Module not started, call pigpio.start() ***")
+
+class _callback:
+   """An ADT class to hold callback information."""
+
+   def __init__(self, gpio, edge, func):
+      """Initialises a callback ADT.
+
+      gpio: Broadcom gpio number.
+      edge: EITHER_EDGE, RISING_EDGE, or FALLING_EDGE.
+      func: a user function taking three arguments (gpio, level, tick).
+      """
+      self.gpio = gpio
+      self.edge = edge
+      self.func = func
+      self.bit = 1<<gpio
+
+class _callback_thread(threading.Thread):
+   """A class to encapsulate pigpio notification callbacks."""
+   def __init__(self):
+      """Initialises notifications."""
+      threading.Thread.__init__(self)
+      self.daemon = True
+      self.monitor = 0
+      self.callbacks = []
+      self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.sock.connect((_host,_port))
+      self.handle = _pigpio_command(self.sock, _PI_CMD_NOIB, 0, 0)
+      self.start()
+
+   def stop(self):
+      """Stops notifications."""
+      if self.go:
+         self.go = False
+         self.sock.send(struct.pack('IIII', _PI_CMD_NC, self.handle, 0, 0))
+
+   def append(self, callb):
+      """Adds a callback to the notification thread.
+
+      callb:
+      """
+      self.callbacks.append(callb)
+      self.monitor = self.monitor | callb.bit
+      notify_begin(self.handle, self.monitor)
+
+   def remove(self, callb):
+      """Removes a callback from the notification thread.
+
+      callb:
+      """
+      if callb in self.callbacks:
+         self.callbacks.remove(callb)
+         newMonitor = 0
+         for c in self.callbacks:
+            newMonitor |= c.bit
+         if newMonitor != self.monitor:
+            self.monitor = newMonitor
+            notify_begin(self.handle, self.monitor)
+
+   def run(self):
+      """Execute the notification thread."""
+      self.go = True
+      lastLevel = 0
+      while self.go:
+         seq_no, flags, tick, level = (
+            struct.unpack('HHII', self.sock.recv(12, socket.MSG_WAITALL)))
+         if self.go:
+            if flags == 0:
+               changed = level ^ lastLevel
+               lastLevel = level
+               for cb in self.callbacks:
+                  if cb.bit & changed:
+                     newLevel = 0
+                     if cb.bit & level:
+                        newLevel = 1
+                     if (cb.edge == EITHER_EDGE or
+                         cb.edge == RISING_EDGE and newLevel == 1 or
+                         cb.edge == FALLING_EDGE and newLevel == 0):
+                         cb.func(cb.gpio, newLevel, tick)
+            else:
+               gpio = flags & 31
+               for cb in self.callbacks:
+                  if cb.gpio == gpio:
+                     cb.func(cb.gpio, TIMEOUT, tick)
+            
+      self.sock.close()
+
+class _wait_for_edge:
+   """A class to encapsulate waiting for gpio edges."""
+
+   def __init__(self, gpio, edge, timeout):
+      """Initialise a wait_for_edge.
+
+      gpio:
+      edge:
+      timeout:
+      """
+      self.callb = _callback(gpio, edge, self.func)
+      self.trigger = False
+      _notify.append(self.callb)
+      self.start = time.time()
+      while (self.trigger == False) and ((time.time()-self.start) < timeout):
+         time.sleep(0.1)
+      _notify.remove(self.callb)
+
+   def func(self, gpio, level, tick):
+      """Set wait_for_edge triggered.
+
+      gpio:
+      level:
+      tick:
+      """
+      self.trigger = True
+
+
+def set_mode(gpio, mode):
+   """Set the gpio mode.
+
+   gpio: 0-53.
+   mode: INPUT, OUTPUT, ALT0, ALT1, ALT2, ALT3, ALT4, ALT5.
+
+   Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_MODE,
+   or PI_NOT_PERMITTED.
+
+   Notes
+
+   Arduino style: pinMode.
+
+   Example
+   ...
+   pigpio.set_mode(4, pigpio.INPUT) # gpio 4 as input
+   pigpio.set_mode(7, pigpio.OUTPUT) # gpio 7 as output
+   pigpio.set_mode(10, pigpio.ALT2) # gpio 10 as ALT2
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_MODES, gpio, mode))
+   return r
+
+def get_mode(gpio):
+   """Get the gpio mode.
+
+   Returns the gpio mode if OK, otherwise PI_BAD_GPIO.
+
+   gpio: 0-53.
+
+   Example
+   ...
+   print(pigpio.get_mode(4))
+   0
+   print(pigpio.get_mode(7))
+   1
+   print(pigpio.get_mode(10))
+   6
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_MODEG, gpio, 0))
+   return r
+
+def set_pull_up_down(gpio, pud):
+   """Set or clear the gpio pull-up/down resistor.
+
+   Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_PUD,
+   or PI_NOT_PERMITTED.
+
+   gpio: 0-53.
+   pud:  PUD_UP, PUD_DOWN, PUD_OFF.
+
+   Example
+   ...
+   pigpio.set_mode(23, pigpio.INPUT)
+   pigpio.set_mode(24, pigpio.INPUT)
+
+   pigpio.set_pull_up_down(23, pigpio.PUD_UP)
+   pigpio.set_pull_up_down(24, pigpio.PUD_DOWN)
+
+   print(pigpio.read(23))
+   1
+   print(pigpio.read(24))
+   0
+
+   pigpio.set_pull_up_down(23, pigpio.PUD_DOWN)
+   pigpio.set_pull_up_down(24, pigpio.PUD_UP)
+
+   print(pigpio.read(23))
+   0
+   print(pigpio.read(24))
+   1
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PUD, gpio, pud))
+   return r
+
+def read(gpio):
+   """Read the gpio level.
+
+   Returns the gpio level if OK, otherwise PI_BAD_GPIO.
+
+   gpio:0-53.
+
+   Notes
+
+   Arduino style: digitalRead.
+
+   Example
+   ...
+   pigpio.set_mode(25, pigpio.INPUT)
+
+   pigpio.set_pull_up_down(25, pigpio.PUD_DOWN)
+
+   print(pigpio.read(25))
+   0
+
+   pigpio.set_pull_up_down(25, pigpio.PUD_UP)
+
+   print(pigpio.read(25))
+   1
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_READ, gpio, 0))
+   return r
+
+def write(gpio, level):
+   """Write the gpio level.
+
+   Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_LEVEL,
+   or PI_NOT_PERMITTED.
+
+   gpio:  0-53.
+   level: 0, 1.
+
+   Notes
+
+   If PWM or servo pulses are active on the gpio they are switched off.
+
+   Arduino style: digitalWrite
+
+   Example
+   ...
+   pigpio.set_mode(11, pigpio.OUTPUT)
+
+   pigpio.write(11,0)
+
+   print(pigpio.read(11))
+   0
+
+   pigpio.write(11,1)
+
+   print(pigpio.read(11))
+   1
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_WRITE, gpio, level))
+   return r
+
+def set_PWM_dutycycle(user_gpio, dutycycle):
+   """Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYCYCLE,
+   or PI_NOT_PERMITTED.
+
+   user_gpio: 0-31.
+   dutycycle: 0-range (range defaults to 255).
+
+   Notes
+
+   Arduino style: analogWrite
+
+   This and the servo functionality use the DMA and PWM or PCM
+   peripherals to control and schedule the pulse lengths and
+   duty cycles.
+
+   The set_PWM_range() function can change the default range of 255.
+
+   Example
+   ...
+   set_PWM_dutycycle(4,   0) # PWM off
+   set_PWM_dutycycle(4,  64) # PWM 1/4 on
+   set_PWM_dutycycle(4, 128) # PWM 1/2 on
+   set_PWM_dutycycle(4, 192) # PWM 3/4 on
+   set_PWM_dutycycle(4, 255) # PWM full on
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PWM, user_gpio, dutycycle))
+   return r
+
+def set_PWM_range(user_gpio, range_):
+   """Set the range of PWM values to be used on the gpio.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYRANGE,
+   or PI_NOT_PERMITTED.
+
+   user_gpio: 0-31.
+   range_:    25-40000.
+
+   Notes
+
+   If PWM is currently active on the gpio its dutycycle will be
+   scaled to reflect the new range.
+
+   The real range, the number of steps between fully off and fully on
+   for each of the 18 available gpio frequencies is
+
+   25(#1), 50(#2), 100(#3), 125(#4), 200(#5), 250(#6), 400(#7),
+   500(#8), 625(#9), 800(#10), 1000(#11), 1250(#12), 2000(#13),
+   2500(#14), 4000(#15), 5000(#16), 10000(#17), 20000(#18)
+
+   The real value set by set_PWM_range is
+   (dutycycle * real range) / range.
+
+   Example
+   ...
+   pigpio.set_PWM_range(9, 100) # now 25 1/4, 50 1/2, 75 3/4 on
+
+   pigpio.set_PWM_range(9, 500) # now 125 1/4, 250 1/2, 375 3/4 on
+
+   pigpio.set_PWM_range(9, 3000) # now 750 1/4, 1500 1/2, 2250 3/4 on
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PRS, user_gpio, range_))
+   return r
+
+def get_PWM_range(user_gpio):
+   """Get the range of PWM values being used on the gpio.
+
+   Returns the dutycycle range used for the gpio if OK,
+   otherwise PI_BAD_USER_GPIO.
+
+   user_gpio: 0-31.
+
+   Example
+   ...
+   print(pigpio.get_PWM_range(9))
+   255
+
+   pigpio.set_PWM_range(9, 100)
+   print(pigpio.get_PWM_range(9))
+   100
+
+   pigpio.set_PWM_range(9, 500)
+   print(pigpio.get_PWM_range(9))
+   500
+
+   pigpio.set_PWM_range(9, 3000)
+   print(pigpio.get_PWM_range(9))
+   3000
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PRG, user_gpio, 0))
+   return r
+
+def get_PWM_real_range(user_gpio):
+   """Get the real underlying range of PWM values being used on the gpio.
+
+   Returns the real range used for the gpio if OK,
+   otherwise PI_BAD_USER_GPIO.
+
+   user_gpio: 0-31.
+
+   Example
+   ...
+   pigpio.set_PWM_frequency(4,0)
+
+   print(pigpio.get_PWM_real_range(4))
+   20000
+
+   pigpio.set_PWM_frequency(4,800)
+   print(pigpio.get_PWM_real_range(4))
+   250
+
+   pigpio.set_PWM_frequency(4,100000)
+   print(pigpio.get_PWM_real_range(4))
+   25
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PRRG, user_gpio, 0))
+   return r
+
+def set_PWM_frequency(user_gpio, frequency):
+   """Set the frequency (in Hz) of the PWM to be used on the gpio.
+
+   Returns the numerically closest frequency if OK, otherwise
+   PI_BAD_USER_GPIO or PI_NOT_PERMITTED.
+
+   user_gpio: 0-31.
+   frequency: 0- (Hz).
+
+   The selectable frequencies depend upon the sample rate which
+   may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+   sample rate is set when the C pigpio library is started.
+
+   Each gpio can be independently set to one of 18 different
+   PWM frequencies.
+
+   If PWM is currently active on the gpio it will be switched
+   off and then back on at the new frequency.
+
+   1us 40000, 20000, 10000, 8000, 5000, 4000, 2500, 2000, 1600,
+       1250, 1000, 800, 500, 400, 250, 200, 100, 50
+
+   2us 20000, 10000,  5000, 4000, 2500, 2000, 1250, 1000, 800,
+       625, 500, 400, 250, 200, 125, 100, 50, 25
+
+   4us 10000, 5000, 2500, 2000, 1250, 1000, 625, 500, 400,
+       313, 250, 200, 125, 100, 63, 50, 25, 13
+
+   5us 8000, 4000, 2000, 1600, 1000, 800, 500, 400, 320,
+       250, 200, 160, 100, 80, 50, 40, 20, 10
+
+   8us 5000, 2500, 1250, 1000, 625, 500, 313, 250, 200,
+       156, 125, 100, 63, 50, 31, 25, 13, 6
+
+   10us 4000, 2000, 1000, 800, 500, 400, 250, 200, 160,
+        125, 100, 80, 50, 40, 25, 20, 10, 5
+
+   Example
+   ...
+   pigpio.set_PWM_frequency(4,0)
+
+   print(pigpio.get_PWM_frequency(4))
+   10
+
+   pigpio.set_PWM_frequency(4,800)
+
+   print(pigpio.get_PWM_frequency(4))
+   800
+
+   pigpio.set_PWM_frequency(4,100000)
+
+   print(pigpio.get_PWM_frequency(4))
+   8000
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PFS, user_gpio, frequency))
+   return r
+
+def get_PWM_frequency(user_gpio):
+   """Get the frequency of PWM being used on the gpio.
+
+   Returns the frequency (in hertz) used for the gpio if OK,
+   otherwise PI_BAD_USER_GPIO.
+
+   user_gpio: 0-31.
+
+   Example
+   ...
+   pigpio.set_PWM_frequency(4,0)
+
+   print(pigpio.get_PWM_frequency(4))
+   10
+
+   pigpio.set_PWM_frequency(4,800)
+
+   print(pigpio.get_PWM_frequency(4))
+   800
+
+   pigpio.set_PWM_frequency(4,100000)
+
+   print(pigpio.get_PWM_frequency(4))
+   8000
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_PFG, user_gpio, 0))
+   return r
+
+def set_servo_pulsewidth(user_gpio, pulsewidth):
+   """Start (500-2500) or stop (0) servo pulses on the gpio.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_PULSEWIDTH or
+   PI_NOT_PERMITTED.
+
+   user_gpio:  0-31.
+   pulsewidth: 0 (off), 500 (most anti-clockwise) - 2500 (most clockwise).
+
+   The selected pulsewidth will continue to be transmitted until
+   changed by a subsequent call to set_servo_pulsewidth().
+
+   The pulsewidths supported by servos varies and should probably be
+   determined by experiment. A value of 1500 should always be safe and
+   represents the mid-point of rotation.
+
+   You can DAMAGE a servo if you command it to move beyond its limits.
+
+   OTHER UPDATE RATES:
+
+   This function updates servos at 50Hz.  If you wish to use a different
+   update frequency you will have to use the PWM functions.
+
+   Update Rate (Hz) 50   100  200  400  500
+   1E6/Hz        20000 10000 5000 2500 2000
+
+   Firstly set the desired PWM frequency using set_PWM_frequency().
+
+   Then set the PWM range using set_PWM_range() to 1E6/Hz.
+   Doing this allows you to use units of microseconds when setting
+   the servo pulse width.
+
+   E.g. If you want to update a servo connected to gpio 25 at 400Hz
+
+   set_PWM_frequency(25, 400)
+   set_PWM_range(25, 2500)
+
+   Thereafter use the set_PWM_dutycycle() function to move the servo,
+   e.g. set_PWM_dutycycle(25, 1500) will set a 1500 us pulse. 
+
+   Example 1: standard 50 Hz hobby servo updates
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   moves = [[1000, 5],[1200,3],[1500,2],[2000,5],[1000,0]]
+
+   pigpio.start()
+
+   for m in moves:
+      pigpio.set_servo_pulsewidth(24, m[0]);
+      time.sleep(m[1])
+      message = str(m[1]) + " seconds @ " + str(m[0]) + " us"
+      print(message)
+
+   pigpio.stop()
+
+   will print lines
+
+   5 seconds @ 1000 us
+   3 seconds @ 1200 us
+   2 seconds @ 1500 us
+   5 seconds @ 2000 us
+   0 seconds @ 1000 us
+
+   Example 2: 400 Hz ESC type servo updates
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   moves = [[1000, 5],[1200,3],[1500,2],[2000,5],[1000,0]]
+
+   pigpio.start()
+
+   pigpio.set_PWM_frequency(25, 400)
+   pigpio.set_PWM_range(25, 2500)
+
+   for m in moves:
+      pigpio.set_PWM_dutycycle(25, m[0]);
+      time.sleep(m[1])
+      message = str(m[1]) + " seconds @ " + str(m[0]) + " us"
+      print(message)
+
+   pigpio.stop()
+
+   will print lines
+
+   5 seconds @ 1000 us
+   3 seconds @ 1200 us
+   2 seconds @ 1500 us
+   5 seconds @ 2000 us
+   0 seconds @ 1000 us
+"""
+   r=_u2i(_pigpio_command(_control, _PI_CMD_SERVO, user_gpio, pulsewidth))
+   return r
+
+def notify_open():
+   """Get a free notification handle.
+
+   Returns a handle greater than or equal to zero if OK,
+   otherwise PI_NO_HANDLE.
+
+   A notification is a method for being notified of gpio state
+   changes via a pipe.
+
+   Pipes are only accessible from the local machine so this function
+   serves no purpose if you are using Python from a remote machine.
+   The in-built (socket) notifications provided by callback()
+   should be used instead.
+
+   Notifications for handle x will be available at the pipe
+   named /dev/pigpiox (where x is the handle number).
+   E.g. if the function returns 15 then the notifications must be
+   read from /dev/pigpio15.
+
+   Example
+   ...
+   h = pigpio.notify_open()
+   if h >= 0:
+      pigpio.notify_begin(h, 1234)
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_NO, 0, 0))
+   return r
+
+def notify_begin(handle, bits):
+   """Start notifications on a previously opened handle.
+
+   Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+   handle: 0-31 (as returned by notify_open())
+   bits:   a mask indicating the gpios to be notified.
+
+   The notification sends state changes for each gpio whose
+   corresponding bit in bits is set.
+
+   Example
+   ...
+   h = pigpio.notify_open()
+   if h >= 0:
+      pigpio.notify_begin(h, 1234)
+   ...
+
+   This will start notifications for gpios 1, 4, 6, 7, 10
+   (1234 = 0x04D2 = 0b0000010011010010).
+
+   Notes
+
+   Each notification occupies 12 bytes in the fifo as follows:
+
+   H (16 bit) seqno
+   H (16 bit) flags
+   I (32 bit) tick
+   I (32 bit) level
+
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_NB, handle, bits))
+   return r
+
+def notify_pause(handle):
+   """Pause notifications on a previously opened handle.
+
+   Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+   handle: 0-31 (as returned by notify_open())
+
+   Notifications for the handle are suspended until
+   notify_begin() is called again.
+
+   Example
+   ...
+   h = pigpio.notify_open()
+   if h >= 0:
+      pigpio.notify_begin(h, 1234)
+      ...
+      pigpio.notify_pause(h)
+      ...
+      pigpio.notify_begin(h, 1234)
+      ...
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_NB, handle, 0))
+   return r
+
+def notify_close(handle):
+   """Stop notifications on a previously opened handle and
+   release the handle for reuse.
+
+   Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+   handle: 0-31 (as returned by notify_open())
+
+   Example
+   ...
+   h = pigpio.notify_open()
+   if h >= 0:
+      pigpio.notify_begin(h, 1234)
+      ...
+      pigpio.notify_close(h)
+      ...
+   ...
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_NC, handle, 0))
+   return r
+
+def set_watchdog(user_gpio, timeout):
+   """Sets a watchdog for a gpio.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO
+   or PI_BAD_WDOG_TIMEOUT.
+
+   user_gpio: 0-31.
+   timeout:   0-60000.
+
+   The watchdog is nominally in milliseconds.
+
+   Only one watchdog may be registered per gpio.
+
+   The watchdog may be cancelled by setting timeout to 0.
+
+   If no level change has been detected for the gpio for timeout
+   milliseconds any notification for the gpio has a report written
+   to the fifo with the flags set to indicate a watchdog timeout.
+
+   The callback() class interprets the flags and will
+   call registered callbacks for the gpio with level TIMEOUT.
+
+   Example
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   def cbf(g, L, t):
+      message = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
+      print(message)
+
+   pigpio.start()
+
+   cb = pigpio.callback(22, pigpio.EITHER_EDGE, cbf)
+
+   print("callback started, 5 second delay")
+
+   time.sleep(5)
+
+   pigpio.set_watchdog(22, 1000) # 1000ms watchdog
+
+   print("watchdog started, 5 second delay")
+
+   time.sleep(5)
+
+   pigpio.set_watchdog(22, 0) # cancel watchdog
+
+   print("watchdog cancelled, 5 second delay")
+
+   time.sleep(5)
+
+   cb.cancel()
+
+   pigpio.stop()
+
+   will print lines such as
+
+   callback started, 5 second delay
+   watchdog started, 5 second delay
+   gpio=22 level=2 at 3547411617
+   gpio=22 level=2 at 3548411254
+   gpio=22 level=2 at 3549411927
+   gpio=22 level=2 at 3550412060
+   gpio=22 level=2 at 3551411622
+   watchdog cancelled, 5 second delay
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_WDOG, user_gpio, timeout))
+   return r
+
+def read_bank_1():
+   """Read the levels of the bank 1 gpios (gpios 0-31).
+
+   The returned 32 bit integer has a bit set if the corresponding
+   gpio is logic 1.  Gpio n has bit value (1<<n).
+
+   Example
+   ...
+   print(bin(pigpio.read_bank_1()))
+   0b10010100000011100100001001111
+   ...
+   """
+   return _pigpio_command(_control, _PI_CMD_BR1, 0, 0)
+
+def read_bank_2():
+   """Read the levels of the bank 2 gpios (gpios 32-53).
+
+   The returned 32 bit integer has a bit set if the corresponding
+   gpio is logic 1.  Gpio n has bit value (1<<(n-32)).
+
+   Example
+   ...
+   print(bin(pigpio.read_bank_2()))
+   0b1111110000000000000000
+   ...
+   """
+   return _pigpio_command(_control, _PI_CMD_BR2, 0, 0)
+
+def clear_bank_1(levels):
+   """Clears gpios 0-31 if the corresponding bit in levels is set.
+
+   Returns 0 if OK, otherwise PI_SOME_PERMITTED.
+
+   A status of PI_SOME_PERMITTED indicates that the user is not
+   allowed to write to one or more of the gpios.
+
+   levels: a bit mask with 1 set if the corresponding gpio is
+           to be cleared.
+
+   Example
+
+   #!/usr/bin/python
+
+   import pigpio
+
+   pigpio.start()
+
+   pigpio.set_mode(4,  pigpio.OUTPUT)
+   pigpio.set_mode(7,  pigpio.OUTPUT)
+   pigpio.set_mode(8,  pigpio.OUTPUT)
+   pigpio.set_mode(9,  pigpio.OUTPUT)
+   pigpio.set_mode(10, pigpio.OUTPUT)
+   pigpio.set_mode(11, pigpio.OUTPUT)
+
+   pigpio.set_bank_1(int("111110010000",2))
+
+   # 0x1000 is added so that all numbers are aligned
+
+   b1 = (pigpio.read_bank_1() & 0xFFF) + 0x1000
+   print(bin(b1))
+
+   pigpio.clear_bank_1(int("111110010000",2))
+
+   b2 = (pigpio.read_bank_1() & 0xFFF) + 0x1000
+   print(bin(b2))
+
+   print(bin((b1^b2) + 0x1000))
+
+   pigpio.stop()
+
+   displays
+
+   0b1111111011111
+   0b1000001001111
+   0b1111110010000
+
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_BC1, levels, 0))
+   return r
+
+def clear_bank_2(levels):
+   """Clears gpios 32-53 if the corresponding bit (0-21) in levels is set.
+
+   Returns 0 if OK, otherwise PI_SOME_PERMITTED.
+
+   A status of PI_SOME_PERMITTED indicates that the user is not
+   allowed to write to one or more of the gpios.
+
+   levels: a bit mask with 1 set if the corresponding gpio is
+           to be cleared.
+
+   See clear_bank_1() for an example.
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_BC2, levels, 0))
+   return r
+
+def set_bank_1(levels):
+   """Sets gpios 0-31 if the corresponding bit in levels is set.
+
+   Returns 0 if OK, otherwise PI_SOME_PERMITTED.
+
+   A status of PI_SOME_PERMITTED indicates that the user is not
+   allowed to write to one or more of the gpios.
+
+   levels: a bit mask with 1 set if the corresponding gpio is
+           to be set.
+
+   Example
+
+   #!/usr/bin/python
+
+   import pigpio
+
+   pigpio.start()
+
+   pigpio.set_mode(4,  pigpio.OUTPUT)
+   pigpio.set_mode(7,  pigpio.OUTPUT)
+   pigpio.set_mode(8,  pigpio.OUTPUT)
+   pigpio.set_mode(9,  pigpio.OUTPUT)
+   pigpio.set_mode(10, pigpio.OUTPUT)
+   pigpio.set_mode(11, pigpio.OUTPUT)
+
+   pigpio.clear_bank_1(int("111110010000",2))
+
+   # 0x1000 is added so that all numbers are aligned
+
+   b1 = (pigpio.read_bank_1() & 0xFFF) + 0x1000
+   print(bin(b1))
+
+   pigpio.set_bank_1(int("111110010000",2))
+
+   b2 = (pigpio.read_bank_1() & 0xFFF) + 0x1000
+   print(bin(b2))
+
+   print(bin((b1^b2) + 0x1000))
+
+   pigpio.stop()
+
+   displays
+
+   0b1000001001111
+   0b1111111011111
+   0b1111110010000
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_BS1, levels, 0))
+   return r
+
+def set_bank_2(levels):
+   """Sets gpios 32-53 if the corresponding bit (0-21) in levels is set.
+
+   Returns 0 if OK, otherwise PI_SOME_PERMITTED.
+
+   A status of PI_SOME_PERMITTED indicates that the user is not
+   allowed to write to one or more of the gpios.
+
+   levels: a bit mask with 1 set if the corresponding gpio is
+           to be set.
+
+   See set_bank_1() for an example.
+   """
+   r=_u2i(_pigpio_command(_control, _PI_CMD_BS2, levels, 0))
+   return r
+
+def get_current_tick():
+   """Gets the current system tick.
+
+   Tick is the number of microseconds since system boot.
+
+   As tick is an unsigned 32 bit quantity it wraps around after
+   2**32 microseconds, which is approximately 1 hour 12 minutes.
+
+   Example
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   pigpio.start()
+
+   t1 = pigpio.get_current_tick()
+
+   time.sleep(5)
+
+   t2 = pigpio.get_current_tick()
+
+   message = "5 seconds is " + str(pigpio.tickDiff(t1, t2)) + " ticks"
+
+   print(message) 
+
+   pigpio.stop()
+
+   displays
+
+   5 seconds is 5003398 ticks
+   """
+   return _pigpio_command(_control, _PI_CMD_TICK, 0, 0)
+
+def get_hardware_revision():
+   """Get the Pi's hardware revision number.
+
+   It is unfortunate that Pi boards have been named Revision.1 and
+   Revision.2.  That use of the word revision is distinct from the
+   Pi's hardware revision number.'
+
+   The hardware revision is the last 4 characters on the Revision line
+   of /proc/cpuinfo.
+
+   The revision number can be used to determine the assignment of gpios
+   to pins.
+
+   There are at least two types of board.
+
+   Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13.
+   Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13, and
+   gpios 28-31 on P5.
+
+   Type 1 boards have hardware revision numbers of 2 and 3.
+
+   Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
+
+   If the hardware revision can not be found or is not a valid
+   hexadecimal number the function returns 0.
+
+   Example 1:
+   ...
+   print(pigpio.get_hardware_revision())
+   2
+   ...
+   Example 2:
+
+   for "Revision : 0002" the function returns 2.
+   for "Revision : 000f" the function returns 15.
+   for "Revision : 000g" the function returns 0.
+   """
+   return _pigpio_command(_control, _PI_CMD_HWVER, 0, 0)
+
+class callback:
+   """A class to provide gpio level change callbacks."""
+
+   def __init__(self, user_gpio, edge=RISING_EDGE, func=None):
+      """Initialise a callback and adds it to the notification thread.
+
+      user_gpio: 0-31.
+      edge:      EITHER_EDGE, RISING_EDGE (default), or FALLING_EDGE.
+      func:      user supplied callback function.
+
+      If a user callback is not specified a default tally callback is
+      provided which simply counts edges.
+
+      The user supplied callback receives three parameters, the gpio,
+      the level, and the tick.
+
+      Example 1: user supplied edge and callback
+
+      #!/usr/bin/python
+
+      import pigpio
+      import time
+
+      def cbf(g, L, t):
+         message = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
+         print(message)
+
+      pigpio.start()
+
+      cb = pigpio.callback(22, pigpio.EITHER_EDGE, cbf)
+
+      time.sleep(30)
+
+      cb.cancel()
+
+      pigpio.stop()
+
+      will print lines such as
+
+      gpio=22 level=1 at 548556842
+      gpio=22 level=0 at 551316679
+      gpio=22 level=1 at 553411795
+      gpio=22 level=0 at 555269219
+      gpio=22 level=1 at 557689701
+
+      Example 2: user supplied edge, default (tally) callback
+
+      #!/usr/bin/python
+
+      import pigpio
+      import time
+
+      pigpio.start()
+
+      pigpio.set_PWM_dutycycle(4, 0)
+
+      pigpio.set_PWM_frequency(4, 2000)
+
+      cb = pigpio.callback(4, pigpio.EITHER_EDGE)
+
+      pigpio.set_PWM_dutycycle(4, 128) # half power
+
+      tally_1 = cb.tally()
+
+      time.sleep(50)
+
+      tally_2 = cb.tally()
+
+      message = "counted " + str(tally_2 - tally_1) + " edges"
+
+      print(message)
+
+      cb.cancel()
+
+      pigpio.stop()
+
+      will print a line such as
+
+      counted 200200 edges
+
+      Example 3: default edge and (tally) callback
+
+      #!/usr/bin/python
+
+      import pigpio
+      import time
+
+      pigpio.start()
+
+      pigpio.set_PWM_dutycycle(17, 0)
+
+      pigpio.set_PWM_frequency(17, 2000)
+
+      cb = pigpio.callback(17)
+
+      pigpio.set_PWM_dutycycle(17, 64) # quarter power
+
+      tally_1 = cb.tally()
+
+      time.sleep(50)
+
+      tally_2 = cb.tally()
+
+      message = "counted " + str(tally_2 - tally_1) + " rising edges"
+
+      print(message)
+
+      cb.cancel()
+
+      pigpio.stop()
+
+      will print a line such as
+
+      counted 100101 rising edges
+
+      """
+      self.count=0
+      if func is None:
+         func=self._tally
+      self.callb = _callback(user_gpio, edge, func)
+      _notify.append(self.callb)
+
+   def cancel(self):
+      """Cancels a callback by removing it from the notification thread."""
+      _notify.remove(self.callb)
+
+   def _tally(self, user_gpio, level, tick):
+      """Increment the callback called count.
+
+      user_gpio:
+      level:
+      tick:
+      """
+      self.count += 1
+
+   def tally(self):
+      """Provides a count of how many times the default tally
+      callback has triggered.
+
+      The count will be zero if the user has supplied their own
+      callback function.
+      """
+      return self.count
+
+
+def wait_for_edge(user_gpio, edge=RISING_EDGE, timeout=60.0):
+   """Wait for an edge event on a gpio.
+
+   The function returns as soon as the edge is detected
+   or after the number of seconds specified by timeout has
+   expired.
+
+   user_gpio: 0-31.
+   edge:      EITHER_EDGE, RISING_EDGE (default), or FALLING_EDGE.
+   timeout:   0.0- (default 60.0).
+
+   The function returns True if the edge is detected,
+   otherwise False.
+
+   Example 1: default edge and timeout
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   pigpio.start()
+
+   if pigpio.wait_for_edge(23):
+      print("Rising edge detected")
+   else:
+      print("wait for edge timed out")
+
+   pigpio.stop()
+
+   will print
+
+   Rising edge detected
+
+   or
+
+   wait for edge timed out
+
+   Example 2: user supplied edge and timeout
+
+   #!/usr/bin/python
+
+   import pigpio
+   import time
+
+   pigpio.start()
+
+   if pigpio.wait_for_edge(23, pigpio.FALLING_EDGE, 5.0):
+      print("Falling edge detected")
+   else:
+      print("wait for falling edge timed out")
+
+   pigpio.stop()
+
+
+   will print
+
+   Falling edge detected
+
+   or
+
+   wait for falling edge timed out
+
+   """
+   a = _wait_for_edge(user_gpio, edge, timeout)
+   return a.trigger
+
+def start(host = os.getenv("PIGPIO_ADDR", ''),
+          port = os.getenv("PIGPIO_PORT", 8888)):
+   """Start the pigpio module.
+
+   host: the host name of the Pi on which the pigpio daemon is running.
+         The default is localhost unless overwritten by the PIGPIO_ADDR
+         environment variable.
+   port: the port number on which the pigpio daemon is listening.
+         The default is 8888 unless overwritten by the PIGPIO_PORT
+         environment variable.  The pigpiod must have been started
+         with the same port number.
+
+   The function connects to the pigpio daemon and reserves resources
+   to be used for sending commands and receiving notifications.
+
+   EXAMPLES:
+   ...
+   pigpio.start() # use defaults
+
+   pigpio.start('mypi') # specify host, default port
+
+   pigpio.start('mypi', 7777) # specify host and port
+   ...
+   """
+
+   global _control, _notify
+   global _host, _port
+
+   _host = host
+   _port = int(port)
+
+   _control = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+   try:
+      _control.connect((_host, _port))
+      _notify = _callback_thread()
+   except socket.error:
+      if _control is not None:
+         _control = None
+      if _host == '':
+         h = "localhost"
+      else:
+         h = _host
+      errStr = "Can't connect to pigpio on " + str(h) + "(" + str(_port) + ")"
+      print("********************************************************")
+      print(errStr)
+      print("")
+      print("Did you start the pigpio daemon?")
+      print("(sudo pigpiod)")
+      print("")
+      print("Did you specify the correct Pi host/port in the environment")
+      print("variables PIGPIO_ADDR/PIGPIO_PORT?")
+      print("(e.g. export PIGPIO_ADDR=soft, export PIGPIO_PORT=8888)")
+      print("")
+      print("Did you specify the correct Pi host/port in the")
+      print("pigpio.start() function")
+      print("(e.g. pigpio.start('soft', 8888))")
+      print("********************************************************")
+      raise
+
+def stop():
+   """Release pigpio resources.
+
+   Example
+   ...
+   pigpio.stop()
+   ...
+   """
+   global _control, _notify
+
+   if _notify is not None:
+      _notify.stop()
+      _notify = None
+
+   if _control is not None:
+      _control.close()
+      _control = None
+
+atexit.register(stop)
+
