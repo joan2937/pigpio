@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 8
+This version is for pigpio version 9
 */
 
 #ifndef PIGPIO_H
@@ -84,7 +84,7 @@ This version is for pigpio version 8
 
 #include <stdint.h>
 
-#define PIGPIO_VERSION 8
+#define PIGPIO_VERSION 9
 
 /*-------------------------------------------------------------------------*/
 
@@ -841,7 +841,7 @@ int gpioWaveClear(void);
    The fields specify
 
    1) the gpios to be switched on at the start of the pulse.
-   2) the gpios to be switched off at the end of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
    3) the delay in microseconds before the next pulse.
 
    Any or all the fields can be zero.  It doesn't make any sense to

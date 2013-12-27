@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 8 */
+/* pigpio version 9 */
 
 #include <stdio.h>
 #include <string.h>
@@ -583,7 +583,7 @@ typedef struct
    callbk_t func;
    unsigned ex;
    void *   userdata;
-   unsigned timeout;
+   int      timeout;
    uint32_t tick;
 } gpioAlert_t;
 
