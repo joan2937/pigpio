@@ -9,13 +9,16 @@ Enter the following two commands (in this order)
 make
 make install
 
-This will install:
-   the library (libpigpio.a) in /usr/local/lib
-   the header file (pigpio.h) in /usr/local/include
-   the daemon (pigpiod) in /usr/local/bin
-   the socket interface (pigs) in /usr/local/bin
-   the utility pig2vcd in /usr/local/bin
-   the Python module pigpio.py
+This will install
+
+o the library (libpigpio.a) in /usr/local/lib
+o the library (libpigpiod_if.a) in /usr/local/lib
+o the header file (pigpio.h) in /usr/local/include
+o the header file (pigpiod_if.h) in /usr/local/include
+o the daemon (pigpiod) in /usr/local/bin
+o the socket interface (pigs) in /usr/local/bin
+o the utility pig2vcd in /usr/local/bin
+o the Python module pigpio.py
 
 TEST
 
@@ -23,8 +26,13 @@ To test the library do
 
 sudo ./checklib
 
-checklib.c, demolib.c, pig2vcd.c, pigpiod.c, pigs.c, and pigpio.py
-show examples of interfacing with the library.
+EXAMPLE CODE
+
+checklib.c, pig2vcd.c, and pigpiod.c
+show examples of interfacing with the pigpio library.
+
+pigs.c, pigpio.py, and test_pigpiod_if.c
+show examples of interfacing with the pigpiod daemon.
 
 DAEMON
 
@@ -39,7 +47,7 @@ When the library starts it locks
 
 /var/run/pigpio.pid
 
-The file should be deleted when the library terminates.
+The file should be automatically deleted when the library terminates.
 
 SOCKET INTERFACE
 
@@ -62,16 +70,16 @@ echo "help" >/dev/pigpio
 
 PYTHON MODULE
 
-By default the Python pigpio module is installed to the
-default python location.  You can install it for additional
-Python versions by
+The Python pigpio module is installed to the default python location.
+
+You can install it for additional Python versions by
 
 pythonx.y setup.py install
 
 where x.y is the Python version.
 
-If the pigpiod daemon is running you can test the Python
-module by entering the following commands.
+If the pigpiod daemon is running you can test the Python module
+by entering the following commands.
 
 python
 
@@ -94,4 +102,38 @@ STOP DAEMON
 To stop the pigpiod daemon
 
 sudo killall pigpiod
+
+RUNNING ON NON Pi's
+
+You can access the pigpiod daemon running on the Pi from any machine which
+can access it over the network.  This access is via the socket interface.
+
+In particular this allows you to use the following on non-Pi's.
+
+o pigs
+o the pigpio Python module
+o the C socket I/F using libpigpiod_if (header file pigpiod_if.h)
+
+On a Linux machine
+
+make -f MakeRemote clean
+make -f MakeRemote
+make -f MakeRemote install
+
+This will install
+
+o the library (libpigpiod_if.a) in /usr/local/lib
+o the header file (pigpio.h) in /usr/local/include
+o the header file (pigpiod_if.h) in /usr/local/include
+o the socket interface (pigs) in /usr/local/bin
+o the Python module pigpio.py
+
+On Windows machines (and possibly Macs)
+
+The Python module should install with
+
+python setup.py install
+
+pigs and pigpiod_if.c will need minor mods to reflect the
+Window's/Mac's socket interface.
 

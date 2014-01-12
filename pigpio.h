@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 9
+This version is for pigpio version 10
 */
 
 #ifndef PIGPIO_H
@@ -51,6 +51,7 @@ This version is for pigpio version 9
 /    output gpio level changes.                                             /
 / 9) rudimentary permission control through the socket and pipe interfaces  /
 /    so users can be prevented from "updating" inappropriate gpios.         /
+/ 10) a simple interface to start and stop new threads.                     /
 /                                                                           /
 / NOTE:                                                                     /
 /                                                                           /
@@ -83,8 +84,9 @@ This version is for pigpio version 9
 ****************************************************************************/
 
 #include <stdint.h>
+#include <pthread.h>
 
-#define PIGPIO_VERSION 9
+#define PIGPIO_VERSION 10
 
 /*-------------------------------------------------------------------------*/
 
@@ -154,6 +156,9 @@ gpioSetGetSamplesFuncEx    Requests a gpio samples callback, extended.
 gpioSetTimerFunc           Request a regular timed callback.
 gpioSetTimerFuncEx         Request a regular timed callback, extended.
 
+gpioStartThread            Start a new thread.
+gpioStopThread             Stop a previously started thread.
+
 gpioSetSignalFunc          Request a signal callback.
 gpioSetSignalFuncEx        Request a signal callback, extended.
 
@@ -174,6 +179,8 @@ gpioDelay                  Delay for microseconds.
 gpioTick                   Get current tick (microseconds).
 
 gpioHardwareRevision       Get hardware version.
+
+gpioVersion                Get the pigpio version.
 
 gpioCfgBufferSize          Configure the gpio sample buffer size.
 gpioCfgClock               Configure the gpio sample rate.
@@ -264,11 +271,15 @@ typedef void (*gpioGetSamplesFuncEx_t) (const gpioSample_t * samples,
                                         int                  numSamples,
                                         void *               userdata);
 
+typedef void *(ThreadFunc_t) (void *);
+
+
+
 /*
    All the functions which return an int return < 0 on error.
 
-   If the library isn't initialised all but the gpioCfg* functions
-   will return error PI_NOT_INITIALISED.
+   If the library isn't initialised all but the gpioCfg*, gpioVersion,
+   and gpioHardwareRevision functions will return error PI_NOT_INITIALISED.
 
    If the library is initialised the gpioCfg* functions will
    return error PI_INITIALISED.  
@@ -381,9 +392,9 @@ int gpioSetPullUpDown(unsigned gpio,
 
 /* pud: 0-2 */
 
-#define	PI_PUD_OFF  0
-#define	PI_PUD_DOWN 1
-#define	PI_PUD_UP   2
+#define PI_PUD_OFF  0
+#define PI_PUD_DOWN 1
+#define PI_PUD_UP   2
 
 
 
@@ -406,14 +417,14 @@ int gpioRead (unsigned gpio);
 
 /* level: 0-1 */
 
-#define	PI_OFF   0
-#define	PI_ON    1
+#define PI_OFF   0
+#define PI_ON    1
 
-#define	PI_CLEAR 0
-#define	PI_SET   1
+#define PI_CLEAR 0
+#define PI_SET   1
 
-#define	PI_LOW   0
-#define	PI_HIGH  1
+#define PI_LOW   0
+#define PI_HIGH  1
 
 /* level: only reported for gpio timeout, see gpioSetWatchdogTimeout */
 
@@ -1255,6 +1266,68 @@ int gpioSetTimerFuncEx(unsigned          timer,
 
 
 
+/* ----------------------------------------------------------------------- */
+pthread_t *gpioStartThread(ThreadFunc_t func, void *arg);
+/*-------------------------------------------------------------------------*/
+/* Starts a new thread of execution with func as the main routine.
+
+   Returns a pointer to pthread_t if OK, otherwise NULL.
+
+   The function is passed the single argument arg.
+
+   The thread can be cancelled by passing the pointer to pthread_t to
+   gpioStopThread().
+
+   EXAMPLE:
+
+   #include <stdio.h>
+   #include <pigpio.h>
+
+   void *myfunc(void *arg)
+   {
+      while (1)
+      {
+         printf("%s\n", arg);
+         sleep(1);
+      }
+   }
+
+   int main(int argc, char *argv[])
+   {
+      pthread_t *p1, *p2, *p3;
+
+      if (gpioInitialise() < 0) return 1;
+
+      p1 = gpioStartThread(myfunc, "thread 1"); sleep(3);
+
+      p2 = gpioStartThread(myfunc, "thread 2"); sleep(3);
+
+      p3 = gpioStartThread(myfunc, "thread 3"); sleep(3);
+
+      gpioStopThread(p3); sleep(3);
+
+      gpioStopThread(p2); sleep(3);
+
+      gpioStopThread(p1); sleep(3);
+
+      gpioTerminate();
+   }
+*/
+
+
+
+/* ----------------------------------------------------------------------- */
+void gpioStopThread(pthread_t *pth);
+/*-------------------------------------------------------------------------*/
+/* Cancels the thread pointed at by pth.
+
+   No value is returned.
+
+   The thread to be stopped should have been started with gpioStartThread().
+*/
+
+
+
 /*-------------------------------------------------------------------------*/
 int gpioSetSignalFunc(unsigned         signum,
                       gpioSignalFunc_t f);
@@ -1518,9 +1591,17 @@ unsigned gpioHardwareRevision(void);
 
    EXAMPLES:
 
-   for "Revision	: 0002" the function returns 2.
-   for "Revision	: 000f" the function returns 15.
-   for "Revision	: 000g" the function returns 0.
+   for "Revision       : 0002" the function returns 2.
+   for "Revision       : 000f" the function returns 15.
+   for "Revision       : 000g" the function returns 0.
+*/
+
+
+
+/*-------------------------------------------------------------------------*/
+unsigned gpioVersion(void);
+/*-------------------------------------------------------------------------*/
+/* Returns the pigpio version.
 */
 
 
@@ -1734,6 +1815,7 @@ void gpioWaveDump(void);
 #define PI_CMD_PFG   23
 #define PI_CMD_PRRG  24
 #define PI_CMD_HELP  25
+#define PI_CMD_PIGPV 26
 
 /*
 The following command only works on the socket interface.
@@ -1792,8 +1874,8 @@ after this command is issued.
 #define PI_TOO_MANY_PULSES  -36 /* waveform has too many pulses            */
 #define PI_TOO_MANY_CHARS   -37 /* waveform has too many chars             */
 #define PI_NOT_SERIAL_GPIO  -38 /* no serial read in progress on gpio      */
-#define PI_BAD_SERIAL_STRUC -39 /* bad null serial structure parameter     */
-#define PI_BAD_SERIAL_BUF   -40 /* bad null serial buf parameter           */
+#define PI_BAD_SERIAL_STRUC -39 /* bad (null) serial structure parameter   */
+#define PI_BAD_SERIAL_BUF   -40 /* bad (null) serial buf parameter         */
 #define PI_NOT_PERMITTED    -41 /* gpio operation not permitted            */
 #define PI_SOME_PERMITTED   -42 /* one or more gpios not permitted         */
 
@@ -1816,3 +1898,4 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_R2        0xFBC6CF9C
 
 #endif
+

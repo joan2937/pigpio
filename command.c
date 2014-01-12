@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 7+
+This version is for pigpio version 10+
 */
 
 #include <stdio.h>
@@ -74,6 +74,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_TICK,  "T",     1, 4},
    {PI_CMD_HELP,  "HELP",  6, 5},
    {PI_CMD_HELP,  "H",     6, 5},
+   {PI_CMD_PIGPV, "PIGPV", 1, 4},
 };
 
 char * cmdUsage = "\
@@ -93,6 +94,7 @@ NC h         close notification\n\
 PWM/P u d    set PWM value for gpio\n\
 PFS u d      set PWM frequency for gpio\n\
 PFG u        get PWM frequency for gpio\n\
+PIGPV        return pigpio version\n\
 PRS u d      set PWM range for gpio\n\
 PRG u        get PWM range for gpio\n\
 PRRG u       get PWM real range for gpio\n\
@@ -159,6 +161,8 @@ static errInfo_t errInfo[]=
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
    {PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"},
+   {PI_BAD_SERIAL_STRUC , "bad (null) serial structure parameter"},
+   {PI_BAD_SERIAL_BUF   , "bad (null) serial buf parameter"}, 
    {PI_NOT_PERMITTED    , "no permission to update gpio"},
    {PI_SOME_PERMITTED   , "no permission to update one or more gpios"},
 };
@@ -200,7 +204,7 @@ int cmdParse(char * buf, cmdCmd_t * cmd)
 
    switch (cmdInfo[idx].vt)
    {
-      case 1: /* BR1 BR2 HWVER NO TICK */
+      case 1: /* BR1 BR2 HWVER PIGPV NO TICK */
          f = sscanf(buf, " %7s %c", str, &t);
          if (f == 1) valid = 1;
          break;

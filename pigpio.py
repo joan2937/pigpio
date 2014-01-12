@@ -76,7 +76,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # gpio levels
 
@@ -92,9 +92,9 @@ TIMEOUT = 2
 
 # gpio edges
 
-EITHER_EDGE  = 0
-RISING_EDGE  = 1
-FALLING_EDGE = 2
+RISING_EDGE  = 0
+FALLING_EDGE = 1
+EITHER_EDGE  = 2
 
 # gpio modes
 
@@ -338,12 +338,14 @@ class _callback_thread(threading.Thread):
    def __init__(self):
       """Initialises notifications."""
       threading.Thread.__init__(self)
+      self.go = False
       self.daemon = True
       self.monitor = 0
       self.callbacks = []
       self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       self.sock.connect((_host,_port))
       self.handle = _pigpio_command(self.sock, _PI_CMD_NOIB, 0, 0)
+      self.go = True
       self.start()
 
    def stop(self):
@@ -376,13 +378,23 @@ class _callback_thread(threading.Thread):
             notify_begin(self.handle, self.monitor)
 
    def run(self):
+
       """Execute the notification thread."""
-      self.go = True
+
       lastLevel = 0
+
+      MSG_SIZ = 12
+
       while self.go:
-         seq_no, flags, tick, level = (
-            struct.unpack('HHII', self.sock.recv(12, socket.MSG_WAITALL)))
+
+         buf = self.sock.recv(MSG_SIZ)
+
+         while self.go and len(buf) < MSG_SIZ:
+            buf += self.sock.recv(MSG_SIZ-len(buf))
+
          if self.go:
+            seq, flags, tick, level = (struct.unpack('HHII', buf))
+
             if flags == 0:
                changed = level ^ lastLevel
                lastLevel = level
@@ -391,19 +403,18 @@ class _callback_thread(threading.Thread):
                      newLevel = 0
                      if cb.bit & level:
                         newLevel = 1
-                     if (cb.edge == EITHER_EDGE or
-                         cb.edge == RISING_EDGE and newLevel == 1 or
-                         cb.edge == FALLING_EDGE and newLevel == 0):
+                     if (cb.edge ^ newLevel):
                          cb.func(cb.gpio, newLevel, tick)
             else:
                gpio = flags & 31
                for cb in self.callbacks:
                   if cb.gpio == gpio:
                      cb.func(cb.gpio, TIMEOUT, tick)
-            
+
       self.sock.close()
 
 class _wait_for_edge:
+
    """A class to encapsulate waiting for gpio edges."""
 
    def __init__(self, gpio, edge, timeout):
@@ -1553,20 +1564,18 @@ def start(host = os.getenv("PIGPIO_ADDR", ''),
       else:
          h = _host
       errStr = "Can't connect to pigpio on " + str(h) + "(" + str(_port) + ")"
-      print("********************************************************")
+      print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
       print(errStr)
       print("")
-      print("Did you start the pigpio daemon?")
-      print("(sudo pigpiod)")
+      print("Did you start the pigpio daemon? E.g. sudo pigpiod")
       print("")
       print("Did you specify the correct Pi host/port in the environment")
       print("variables PIGPIO_ADDR/PIGPIO_PORT?")
-      print("(e.g. export PIGPIO_ADDR=soft, export PIGPIO_PORT=8888)")
+      print("E.g. export PIGPIO_ADDR=soft, export PIGPIO_PORT=8888")
       print("")
       print("Did you specify the correct Pi host/port in the")
-      print("pigpio.start() function")
-      print("(e.g. pigpio.start('soft', 8888))")
-      print("********************************************************")
+      print("pigpio.start() function? E.g. pigpio.start('soft', 8888))")
+      print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
       raise
 
 def stop():

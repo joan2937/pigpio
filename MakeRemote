@@ -1,0 +1,47 @@
+CC	= gcc
+AR      = ar
+RANLIB  = ranlib
+SIZE    = size
+
+CFLAGS	= -O3 -Wall
+
+ALL     = libpigpiod_if.a pigs
+
+all:	$(ALL)
+
+pigs:		command.o
+	$(CC) -o pigs pigs.c command.c
+
+clean:
+	rm -f *.o *.i *.s *~ $(ALL)
+
+install:	$(LIB) 
+	sudo install -m 0755 -d              /usr/local/include
+	sudo install -m 0644 pigpio.h        /usr/local/include
+	sudo install -m 0644 pigpiod_if.h    /usr/local/include
+	sudo install -m 0755 -d              /usr/local/lib
+	sudo install -m 0644 libpigpiod_if.a /usr/local/lib
+	sudo install -m 0755 -d              /usr/local/bin
+	sudo install -m 0755 pigs            /usr/local/bin
+	sudo python setup.py install
+
+uninstall:
+	sudo rm -f /usr/local/include/pigpio.h
+	sudo rm -f /usr/local/lib/libpigpiod_if.a
+	sudo rm -f /usr/local/bin/pigs
+
+LIB     = libpigpiod_if.a
+OBJ     = pigpiod_if.o command.o
+
+$(LIB):	$(OBJ)
+	$(AR) rcs $(LIB) $(OBJ)
+	$(RANLIB) $(LIB)
+	$(SIZE)   $(LIB)
+
+# generated using gcc -MM *.c
+
+command.o: command.c pigpio.h command.h
+pigpiod.o: pigpiod.c pigpio.h command.h
+pigpiod_if.o: pigpiod_if.c pigpio.h pigpiod_if.h
+pigs.o: pigs.c pigpio.h command.h
+

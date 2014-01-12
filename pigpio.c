@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 9 */
+/* pigpio version 10 */
 
 #include <stdio.h>
 #include <string.h>
@@ -198,6 +198,31 @@ bit 0 READ_LAST_NOT_SET_ERROR
    }                                                               \
    while (0)
 
+#define CHECK_INITED_RET_NULL_PTR                                  \
+   do                                                              \
+   {                                                               \
+      if (!libInitialised)                                         \
+      {                                                            \
+         fprintf(stderr,                                           \
+            "%s %s: pigpio uninitialised, call gpioInitialise()\n",\
+            myTimeStamp(), __FUNCTION__);                          \
+         return (NULL);                                            \
+      }                                                            \
+   }                                                               \
+   while (0)
+
+#define CHECK_INITED_RET_NIL                                       \
+   do                                                              \
+   {                                                               \
+      if (!libInitialised)                                         \
+      {                                                            \
+         fprintf(stderr,                                           \
+            "%s %s: pigpio uninitialised, call gpioInitialise()\n",\
+            myTimeStamp(), __FUNCTION__);                          \
+      }                                                            \
+   }                                                               \
+   while (0)
+
 #define CHECK_NOT_INITED                                           \
    do                                                              \
    {                                                               \
@@ -322,16 +347,16 @@ bit 0 READ_LAST_NOT_SET_ERROR
 /* DMA CS Control and Status bits */
 #define DMA_CHANNEL_RESET       (1<<31)
 #define DMA_WAIT_ON_WRITES      (1<<28)
-#define	DMA_PANIC_PRIORITY(x) ((x)<<20)
-#define	DMA_PRIORITY(x)       ((x)<<16)
+#define DMA_PANIC_PRIORITY(x) ((x)<<20)
+#define DMA_PRIORITY(x)       ((x)<<16)
 #define DMA_INTERRUPT_STATUS    (1<< 2)
 #define DMA_END_FLAG            (1<< 1)
 #define DMA_ACTIVATE            (1<< 0)
 
 /* DMA control block "info" field bits */
 #define DMA_NO_WIDE_BURSTS          (1<<26)
-#define	DMA_PERIPHERAL_MAPPING(x) ((x)<<16)
-#define	DMA_BURST_LENGTH(x)       ((x)<<12)
+#define DMA_PERIPHERAL_MAPPING(x) ((x)<<16)
+#define DMA_BURST_LENGTH(x)       ((x)<<12)
 #define DMA_SRC_IGNORE              (1<<11)
 #define DMA_SRC_DREQ                (1<<10)
 #define DMA_SRC_INC                 (1<< 8)
@@ -981,7 +1006,8 @@ static void myDoCommand(cmdCmd_t * cmd)
          if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPullUpDown(p1, p2);
          else
          {
-            PERM_ERROR("gpioSetPullUpDown: gpio %d, no permission to update", p1);
+            PERM_ERROR(
+               "gpioSetPullUpDown: gpio %d, no permission to update", p1);
             res = PI_NOT_PERMITTED;
          }
          break;
@@ -1012,7 +1038,8 @@ static void myDoCommand(cmdCmd_t * cmd)
          if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMrange(p1, p2);
          else
          {
-            PERM_ERROR("gpioSetPWMrange: gpio %d, no permission to update", p1);
+            PERM_ERROR(
+               "gpioSetPWMrange: gpio %d, no permission to update", p1);
             res = PI_NOT_PERMITTED;
          }
          break;
@@ -1021,7 +1048,8 @@ static void myDoCommand(cmdCmd_t * cmd)
          if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMfrequency(p1, p2);
          else
          {
-            PERM_ERROR("gpioSetPWMfrequency: gpio %d, no permission to update", p1);
+            PERM_ERROR(
+               "gpioSetPWMfrequency: gpio %d, no permission to update", p1);
             res = PI_NOT_PERMITTED;
          }
          break;
@@ -1054,7 +1082,8 @@ static void myDoCommand(cmdCmd_t * cmd)
 
          if ((mask | p1) != mask)
          {
-            PERM_ERROR("gpioWrite_Bits_0_31_Clear: bad levels %08X (permissions %08X)",
+            PERM_ERROR(
+               "gpioWrite_Bits_0_31_Clear: bad levels %08X (permissions %08X)",
                p1, mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1067,7 +1096,8 @@ static void myDoCommand(cmdCmd_t * cmd)
 
          if ((mask | p1) != mask)
          {
-            PERM_ERROR("gpioWrite_Bits_32_53_Clear: bad levels %08X (permissions %08X)",
+            PERM_ERROR(
+               "gpioWrite_Bits_32_53_Clear: bad levels %08X (permissions %08X)",
                p1, mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1080,7 +1110,8 @@ static void myDoCommand(cmdCmd_t * cmd)
 
          if ((mask | p1) != mask)
          {
-            PERM_ERROR("gpioWrite_Bits_0_31_Set: bad levels %08X (permissions %08X)",
+            PERM_ERROR(
+               "gpioWrite_Bits_0_31_Set: bad levels %08X (permissions %08X)",
                p1, mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1093,7 +1124,8 @@ static void myDoCommand(cmdCmd_t * cmd)
 
          if ((mask | p1) != mask)
          {
-            PERM_ERROR("gpioWrite_Bits_32_53_Set: bad levels %08X (permissions %08X)",
+            PERM_ERROR(
+               "gpioWrite_Bits_32_53_Set: bad levels %08X (permissions %08X)",
                p1, mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1136,6 +1168,10 @@ static void myDoCommand(cmdCmd_t * cmd)
          break;
 
       case PI_CMD_HELP:
+         break;
+
+      case PI_CMD_PIGPV:
+         res = gpioVersion();
          break;
 
       }
@@ -4731,6 +4767,56 @@ int gpioSetTimerFuncEx(unsigned id, unsigned ms, gpioTimerFuncEx_t f,
    return 0;
 }
 
+/* ----------------------------------------------------------------------- */
+
+pthread_t *gpioStartThread(ThreadFunc_t func, void *arg)
+{
+   pthread_t *pth;
+   pthread_attr_t pthAttr;
+
+   DBG(DBG_USER, "func=%08X, arg=%08X", (uint32_t)func, (uint32_t)arg);
+
+   CHECK_INITED_RET_NULL_PTR;
+
+   pth = malloc(sizeof(pthread_t));
+
+   if (pth)
+   {
+      if (pthread_attr_init(&pthAttr))
+      {
+         free(pth);
+         SOFT_ERROR(NULL, "pthread_attr_init failed");
+      }
+
+      if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
+      {
+         free(pth);
+         SOFT_ERROR(NULL, "pthread_attr_setstacksize failed");
+      }
+
+      if (pthread_create(pth, &pthAttr, func, arg))
+      {
+         free(pth);
+         SOFT_ERROR(NULL, "pthread_create failed");
+      }
+   }
+   return pth;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void gpioStopThread(pthread_t *pth)
+{
+   DBG(DBG_USER, "pth=%08X", (uint32_t)pth);
+
+   CHECK_INITED_RET_NIL;
+
+   if (pth)
+   {
+      pthread_cancel(*pth);
+      pthread_join(*pth, NULL);
+   }
+}
 
 /* ----------------------------------------------------------------------- */
 
@@ -4956,6 +5042,16 @@ uint32_t gpioTick(void)
    CHECK_INITED;
 
    return systReg[SYST_CLO];
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+unsigned gpioVersion(void)
+{
+   DBG(DBG_USER, "");
+
+   return PIGPIO_VERSION;
 }
 
 
