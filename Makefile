@@ -72,7 +72,7 @@ checklib.o: checklib.c pigpio.h
 command.o: command.c pigpio.h command.h
 pig2vcd.o: pig2vcd.c pigpio.h
 pigpio.o: pigpio.c pigpio.h command.h
-pigpiod.o: pigpiod.c pigpio.h command.h
+pigpiod.o: pigpiod.c pigpio.h
 pigpiod_if.o: pigpiod_if.c pigpio.h command.h pigpiod_if.h
 pigs.o: pigs.c pigpio.h command.h
 

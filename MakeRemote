@@ -5,11 +5,11 @@ SIZE    = size
 
 CFLAGS	= -O3 -Wall
 
-ALL     = libpigpiod_if.a pigs
+ALL     = libpigpiod_if.a pigs pigpio.py setup.py
 
 all:	$(ALL)
 
-pigs:		command.o
+pigs:		command.o pigs.o
 	$(CC) -o pigs pigs.c command.c
 
 clean:
@@ -41,7 +41,7 @@ $(LIB):	$(OBJ)
 # generated using gcc -MM *.c
 
 command.o: command.c pigpio.h command.h
-pigpiod.o: pigpiod.c pigpio.h command.h
-pigpiod_if.o: pigpiod_if.c pigpio.h pigpiod_if.h
+pigpiod.o: pigpiod.c pigpio.h
+pigpiod_if.o: pigpiod_if.c pigpio.h pigpiod_if.h command.h
 pigs.o: pigs.c pigpio.h command.h
 

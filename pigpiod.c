@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 7+
+This version is for pigpio version 11+
 */
 
 #include <sys/types.h>
@@ -34,6 +34,7 @@ This version is for pigpio version 7+
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
@@ -43,7 +44,6 @@ This version is for pigpio version 7+
 #include <ctype.h>
 
 #include "pigpio.h"
-#include "command.h"
 
 /*
 This program starts the pigpio library as a daemon.
@@ -60,6 +60,22 @@ static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
 static uint64_t updateMask             = -1;
 
 static FILE * errFifo;
+
+void fatal(char *fmt, ...)
+{
+   char buf[128];
+   va_list ap;
+
+   va_start(ap, fmt);
+   vsnprintf(buf, sizeof(buf), fmt, ap);
+   va_end(ap);
+
+   fprintf(stderr, "%s\n", buf);
+
+   fflush(stderr);
+
+   exit(EXIT_FAILURE);
+}
 
 void usage()
 {
@@ -98,21 +114,21 @@ static void initOpts(int argc, char *argv[])
             i = atoi(optarg);
             if ((i >= PI_BUF_MILLIS_MIN) && (i <= PI_BUF_MILLIS_MAX))
                bufferSizeMilliseconds = i;
-            else cmdFatal("invalid -b option (%d)", i);
+            else fatal("invalid -b option (%d)", i);
             break;
 
          case 'd':
             i = atoi(optarg);
             if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_PRIMARY_CHANNEL))
                DMAprimaryChannel = i;
-            else cmdFatal("invalid -d option (%d)", i);
+            else fatal("invalid -d option (%d)", i);
             break;
 
          case 'e':
             i = atoi(optarg);
             if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_SECONDARY_CHANNEL))
                DMAsecondaryChannel = i;
-            else cmdFatal("invalid -e option (%d)", i);
+            else fatal("invalid -e option (%d)", i);
             break;
 
          case 'f':
@@ -127,7 +143,7 @@ static void initOpts(int argc, char *argv[])
             i = atoi(optarg);
             if ((i >= PI_MIN_SOCKET_PORT) && (i <= PI_MAX_SOCKET_PORT))
                socketPort = i;
-            else cmdFatal("invalid -p option (%d)", i);
+            else fatal("invalid -p option (%d)", i);
             break;
 
          case 's':
@@ -145,7 +161,7 @@ static void initOpts(int argc, char *argv[])
                   break;
 
                default:
-                  cmdFatal("invalid -s option (%d)", i);
+                  fatal("invalid -s option (%d)", i);
                   break;
             }
             break;
@@ -154,21 +170,21 @@ static void initOpts(int argc, char *argv[])
             i = atoi(optarg);
             if ((i >= PI_CLOCK_PWM) && (i <= PI_CLOCK_PCM))
                clockPeripheral = i;
-            else cmdFatal("invalid -t option (%d)", i);
+            else fatal("invalid -t option (%d)", i);
             break;
 
          case 'u':
             i = atoi(optarg);
             if ((i >= PI_CLOCK_OSC) && (i <= PI_CLOCK_PLLD))
                clockSource = i;
-            else cmdFatal("invalid -u option (%d)", i);
+            else fatal("invalid -u option (%d)", i);
             break;
 
          case 'x':
             mask = strtoll(optarg, &endptr, 0);
             printf("mask=%llx\n", mask);
             if (!*endptr) updateMask = mask;
-            else cmdFatal("invalid -x option (%s)", optarg);
+            else fatal("invalid -x option (%s)", optarg);
             break;
 
         default: /* '?' */
@@ -221,11 +237,11 @@ int main(int argc, char **argv)
    
    /* Create a new SID for the child process */
 
-   if (setsid() < 0) cmdFatal("setsid failed (%m)");
+   if (setsid() < 0) fatal("setsid failed (%m)");
 
    /* Change the current working directory */
 
-   if ((chdir("/")) < 0) cmdFatal("chdir failed (%m)");
+   if ((chdir("/")) < 0) fatal("chdir failed (%m)");
    
    /* check command line parameters */
 
@@ -252,7 +268,7 @@ int main(int argc, char **argv)
 
    /* start library */
 
-   if (gpioInitialise()< 0) cmdFatal("Can't initialise pigpio library");
+   if (gpioInitialise()< 0) fatal("Can't initialise pigpio library");
 
    /* create pipe for error reporting */
 
@@ -261,7 +277,7 @@ int main(int argc, char **argv)
    mkfifo(PI_ERRFIFO, 0664);
 
    if (chmod(PI_ERRFIFO, 0664) < 0)
-      cmdFatal("chmod %s failed (%m)", PI_ERRFIFO);
+      fatal("chmod %s failed (%m)", PI_ERRFIFO);
 
    errFifo = freopen(PI_ERRFIFO, "w+", stderr);
 

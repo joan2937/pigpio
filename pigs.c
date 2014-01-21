@@ -26,11 +26,12 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 7+
+This version is for pigpio version 11+
 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -42,9 +43,25 @@ This version is for pigpio version 7+
 #include "command.h"
 
 /*
-This program provides a socket interface
-to the commands available from pigpio.
+This program provides a socket interface to some of
+the commands available from pigpio.
 */
+
+void fatal(char *fmt, ...)
+{
+   char buf[128];
+   va_list ap;
+
+   va_start(ap, fmt);
+   vsnprintf(buf, sizeof(buf), fmt, ap);
+   va_end(ap);
+
+   fprintf(stderr, "%s\n", buf);
+
+   fflush(stderr);
+
+   exit(EXIT_FAILURE);
+}
 
 static int openSocket(void)
 {
@@ -88,9 +105,10 @@ static int openSocket(void)
 
 int main(int argc , char *argv[])
 {
-   int sock, r, idx;
+   int sock, r, idx, i;
    cmdCmd_t cmd;
-   char buf[128];
+   gpioExtent_t ext[3];
+   char buf[1024];
 
    sock = openSocket(); 
 
@@ -113,31 +131,48 @@ int main(int argc , char *argv[])
             sprintf(buf, "%10s %10s %10s", argv[1], argv[2], argv[3]);
             break;
 
+         case 5:
+            sprintf(buf, "%10s %10s %10s %10s",
+               argv[1], argv[2], argv[3], argv[4]);
+            break;
+
+         case 6:
+            sprintf(buf, "%10s %10s %10s %10s %10s",
+               argv[1], argv[2], argv[3], argv[4], argv[5]);
+            break;
+
          default:
-            cmdFatal("what?");
+            fatal("what? 'pigs h' for help");
       }
 
-      if ((idx=cmdParse(buf, &cmd)) >= 0)
+      if ((idx=cmdParse(buf, &cmd, argc, argv, ext)) >= 0)
       {
          if (send(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
          {
+            /* send extensions */
+
+            for (i=0; i<cmdInfo[idx].ext; i++)
+            {
+               send(sock, ext[i].ptr, ext[i].n, 0);
+            }
+
             if (recv(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
             {
                switch (cmdInfo[idx].rv)
                {
                   case 0:
                      r = cmd.res;
-                     if (r < 0) cmdFatal("ERROR: %s", cmdErrStr(r));
+                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
                      break;
 
                   case 1:
                      r = cmd.res;
-                     if (r < 0) cmdFatal("ERROR: %s", cmdErrStr(r));
+                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
                      break;
 
                   case 2:
                      r = cmd.res;
-                     if (r < 0) cmdFatal("ERROR: %s", cmdErrStr(r));
+                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
                      else printf("%d\n", r);
                      break;
 
@@ -154,13 +189,13 @@ int main(int argc , char *argv[])
                      break;
                }
             }
-            else cmdFatal("recv failed, %m");
+            else fatal("recv failed, %m");
          }
-         else cmdFatal("send failed, %m");
+         else fatal("send failed, %m");
       }
-      else cmdFatal("what?");
+      else fatal("what? 'pigs h' for help");
    }
-   else cmdFatal("connect failed, %m");
+   else fatal("connect failed, %m");
 
    close(sock);
 

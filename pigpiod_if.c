@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 1 */
+/* PIGPIOD_IF_VERSION 2 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,10 +97,34 @@ static int pigpio_command(int fd, int command, int p1, int p2)
    cmd.p2  = p2;
    cmd.res = 0;
 
-   if (send(fd, &cmd, sizeof(cmdCmd_t), 0) != sizeof(cmdCmd_t))
-      return pigif_bad_send;
+   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd)) return pigif_bad_send;
 
-   if (recv(fd, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) != sizeof(cmdCmd_t))
+   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+      return pigif_bad_recv;
+
+   return cmd.res;
+}
+
+static int pigpio_command_ext
+   (int fd, int command, int p1, int p2, int extents, gpioExtent_t *ext)
+{
+   int i;
+   cmdCmd_t cmd;
+
+   cmd.cmd = command;
+   cmd.p1  = p1;
+   cmd.p2  = p2;
+   cmd.res = 0;
+
+   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd)) return pigif_bad_send;
+
+   for (i=0; i<extents; i++)
+   {
+      if (send(fd, ext[i].ptr, ext[i].n, 0) != ext[i].n)
+         return pigif_bad_send;
+   }
+
+   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
       return pigif_bad_recv;
 
    return cmd.res;
@@ -390,7 +414,7 @@ unsigned pigpiod_if_version(void)
    return PIGPIOD_IF_VERSION;
 }
 
-pthread_t *start_thread(ThreadFunc_t func, void *arg)
+pthread_t *start_thread(gpioThreadFunc_t func, void *arg)
 {
    pthread_t *pth;
    pthread_attr_t pthAttr;
@@ -501,144 +525,219 @@ void pigpio_stop(void)
 }
 
 int set_mode(int gpio, int mode)
-{
-   return pigpio_command(gPigCommand, PI_CMD_MODES, gpio, mode);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_MODES, gpio, mode);}
 
 int get_mode(int gpio)
-{
-   return pigpio_command(gPigCommand, PI_CMD_MODEG, gpio, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_MODEG, gpio, 0);}
 
 int set_pull_up_down(int gpio, int pud)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PUD, gpio, pud);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PUD, gpio, pud);}
 
 int read_gpio(int gpio)
-{
-   return pigpio_command(gPigCommand, PI_CMD_READ, gpio, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_READ, gpio, 0);}
 
 int write_gpio(int gpio, int level)
-{
-   return pigpio_command(gPigCommand, PI_CMD_WRITE, gpio, level);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_WRITE, gpio, level);}
 
 int set_PWM_dutycycle(int user_gpio, int dutycycle)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PWM, user_gpio, dutycycle);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PWM, user_gpio, dutycycle);}
 
 int set_PWM_range(int user_gpio, int range_)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PRS, user_gpio, range_);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PRS, user_gpio, range_);}
 
 int get_PWM_range(int user_gpio)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PRG, user_gpio, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PRG, user_gpio, 0);}
 
 int get_PWM_real_range(int user_gpio)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PRRG, user_gpio, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PRRG, user_gpio, 0);}
 
 int set_PWM_frequency(int user_gpio, int frequency)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PFS, user_gpio, frequency);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PFS, user_gpio, frequency);}
 
 int get_PWM_frequency(int user_gpio)
-{
-   return pigpio_command(gPigCommand, PI_CMD_PFG, user_gpio, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_PFG, user_gpio, 0);}
 
 int set_servo_pulsewidth(int user_gpio, int pulsewidth)
-{
-   return pigpio_command(gPigCommand, PI_CMD_SERVO, user_gpio, pulsewidth);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_SERVO, user_gpio, pulsewidth);}
 
 int notify_open(void)
-{
-   return pigpio_command(gPigCommand, PI_CMD_NO, 0, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_NO, 0, 0);}
 
 int notify_begin(int handle, uint32_t bits)
-{
-   return pigpio_command(gPigCommand, PI_CMD_NB, handle, bits);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_NB, handle, bits);}
 
 int notify_pause(int handle)
-{
-   return pigpio_command(gPigCommand, PI_CMD_NB, handle, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_NB, handle, 0);}
 
 int notify_close(int handle)
-{
-   return pigpio_command(gPigCommand, PI_CMD_NC, handle, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_NC, handle, 0);}
 
 int set_watchdog(int user_gpio, int timeout)
-{
-   return pigpio_command(gPigCommand, PI_CMD_WDOG, user_gpio, timeout);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_WDOG, user_gpio, timeout);}
 
 uint32_t read_bank_1(void)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BR1, 0, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BR1, 0, 0);}
 
 uint32_t read_bank_2(void)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BR2, 0, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BR2, 0, 0);}
 
 int clear_bank_1(uint32_t levels)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BC1, levels, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BC1, levels, 0);}
 
 int clear_bank_2(uint32_t levels)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BC2, levels, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BC2, levels, 0);}
 
 int set_bank_1(uint32_t levels)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BS1, levels, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BS1, levels, 0);}
 
 int set_bank_2(uint32_t levels)
-{
-   return pigpio_command(gPigCommand, PI_CMD_BS2, levels, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_BS2, levels, 0);}
 
 uint32_t get_current_tick(void)
-{
-   return pigpio_command(gPigCommand, PI_CMD_TICK, 0, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_TICK, 0, 0);}
 
 uint32_t get_hardware_revision(void)
-{
-   return pigpio_command(gPigCommand, PI_CMD_HWVER, 0, 0);
-}
+   {return pigpio_command(gPigCommand, PI_CMD_HWVER, 0, 0);}
 
 unsigned get_pigpio_version(void)
+   {return pigpio_command(gPigCommand, PI_CMD_PIGPV, 0, 0);}
+
+int wave_clear(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVCLR, 0, 0);}
+
+int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
 {
-   return pigpio_command(gPigCommand, PI_CMD_PIGPV, 0, 0);
+   gpioExtent_t ext[1];
+   
+   /*
+   p1=numPulses
+   p2=0
+   ## extension ##
+   gpioPulse_t[] pulses
+   */
+
+   ext[0].n = numPulses * sizeof(gpioPulse_t);
+   ext[0].ptr = pulses;
+
+   return pigpio_command_ext(gPigCommand, PI_CMD_WVAG, numPulses, 0, 1, ext);
 }
+
+int wave_add_serial(
+   unsigned gpio, unsigned baud, unsigned offset, unsigned numChar, char *str)
+{
+   gpioExtent_t ext[3];
+
+   /*
+   p1=gpio
+   p2=numChar
+   ## extension ##
+   unsigned baud
+   unsigned offset
+   char[] str
+   */
+
+   ext[0].n = sizeof(unsigned);
+   ext[0].ptr = &baud;
+
+   ext[1].n = sizeof(unsigned);
+   ext[1].ptr = &offset;
+
+   ext[2].n = numChar;
+   ext[2].ptr = str;
+
+   return pigpio_command_ext(gPigCommand, PI_CMD_WVAS, gpio, numChar, 3, ext);
+}
+
+int wave_tx_busy(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVBSY, 0, 0);}
+
+int wave_tx_stop(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVHLT, 0, 0);}
+
+int wave_tx_start(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVGO, 0, 0);}
+
+int wave_tx_repeat(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVGOR, 0, 0);}
+
+int wave_get_micros(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSM, 0, 0);}
+
+int wave_get_high_micros(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSM, 1, 0);}
+
+int wave_get_max_micros(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSM, 2, 0);}
+
+int wave_get_pulses(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSP, 0, 0);}
+
+int wave_get_high_pulses(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSP, 1, 0);}
+
+int wave_get_max_pulses(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSP, 2, 0);}
+
+int wave_get_cbs(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSC, 0, 0);}
+
+int wave_get_high_cbs(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSC, 1, 0);}
+
+int wave_get_max_cbs(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVSC, 2, 0);}
+
+int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level)
+{
+   gpioExtent_t ext[1];
+   
+   /*
+   p1=gpio
+   p2=pulseLen
+   ## extension ##
+   unsigned level
+   */
+
+   ext[0].n = sizeof(level);
+   ext[0].ptr = &level;
+
+   return pigpio_command_ext(gPigCommand, PI_CMD_TRIG, gpio, pulseLen, 1, ext);
+}
+
+int store_script(char *script)
+{
+   unsigned len;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=script length
+   p2=0
+   ## extension ##
+   char[] script
+   */
+
+   len = strlen(script);
+
+   ext[0].n = len;
+   ext[0].ptr = script;
+
+   return pigpio_command_ext(gPigCommand, PI_CMD_PROC, len, 0, 1, ext);
+}
+
+int run_script(int script_id)
+   {return pigpio_command(gPigCommand, PI_CMD_PROCR, script_id, 0);}
+
+int stop_script(int script_id)
+   {return pigpio_command(gPigCommand, PI_CMD_PROCS, script_id, 0);}
+
+int delete_script(int script_id)
+   {return pigpio_command(gPigCommand, PI_CMD_PROCD, script_id, 0);}
 
 int callback(int gpio, int edge, CBFunc_t f)
-{
-   return intCallback(gpio, edge, f, 0, 0);
-}
+   {return intCallback(gpio, edge, f, 0, 0);}
 
 int callback_ex(int gpio, int edge, CBFuncEx_t f, void *user)
-{
-   return intCallback(gpio, edge, f, user, 1);
-}
+   {return intCallback(gpio, edge, f, user, 1);}
 
 int callback_cancel(int id)
 {

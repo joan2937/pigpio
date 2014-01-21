@@ -31,8 +31,7 @@ EXAMPLE CODE
 checklib.c, pig2vcd.c, and pigpiod.c
 show examples of interfacing with the pigpio library.
 
-pigs.c, pigpio.py, and test_pigpiod_if.c
-show examples of interfacing with the pigpiod daemon.
+pigs.c and pigpio.py show examples of interfacing with the pigpiod daemon.
 
 DAEMON
 

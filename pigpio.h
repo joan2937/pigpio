@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 10
+This version is for pigpio version 11
 */
 
 #ifndef PIGPIO_H
@@ -86,7 +86,7 @@ This version is for pigpio version 10
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 10
+#define PIGPIO_VERSION 11
 
 /*-------------------------------------------------------------------------*/
 
@@ -148,6 +148,8 @@ gpioWaveGetCbs             Length in cbs of the current waveform.
 gpioWaveGetHighCbs         Length of longest waveform so far.
 gpioWaveGetMaxCbs          Absolute maximum allowed cbs.
 
+gpioTrigger                Send a trigger pulse to a gpio.
+
 gpioSetWatchdog            Set a watchdog on a gpio.
 
 gpioSetGetSamplesFunc      Requests a gpio samples callback.
@@ -158,6 +160,11 @@ gpioSetTimerFuncEx         Request a regular timed callback, extended.
 
 gpioStartThread            Start a new thread.
 gpioStopThread             Stop a previously started thread.
+
+gpioStoreScript            Store a script.
+gpioRunScript              Run a stored script.
+gpioStopScript             Stop a running script.
+gpioDeleteScript           Delete a stored script.
 
 gpioSetSignalFunc          Request a signal callback.
 gpioSetSignalFuncEx        Request a signal callback, extended.
@@ -219,6 +226,13 @@ typedef struct
 
 typedef struct
 {
+   size_t n;
+   void *ptr;
+   int data;
+} gpioExtent_t;
+
+typedef struct
+{
    uint32_t tick;
    uint32_t level;
 } gpioSample_t;
@@ -271,8 +285,7 @@ typedef void (*gpioGetSamplesFuncEx_t) (const gpioSample_t * samples,
                                         int                  numSamples,
                                         void *               userdata);
 
-typedef void *(ThreadFunc_t) (void *);
-
+typedef void *(gpioThreadFunc_t) (void *);
 
 
 /*
@@ -881,7 +894,6 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t * pulses);
 
    If the added waveform is intended to start after or within the existing
    waveform then the first pulse should consist of a delay.
-
 */
 
 
@@ -889,15 +901,17 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t * pulses);
 /*-------------------------------------------------------------------------*/
 int gpioWaveAddSerial(unsigned user_gpio,
                       unsigned baud,
+                      unsigned offset,
                       unsigned numChar,
                       char *   str);
 /*-------------------------------------------------------------------------*/
 /* This function adds a waveform representing serial data to the
-   existing waveform (if any).
+   existing waveform (if any).  The serial data starts offset microseconds
+   from the start of the waveform.
 
    Returns the new total number of pulses in the current waveform if OK,
-   otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_TOO_MANY_CHARS, or
-   PI_TOO_MANY_PULSES.
+   otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_TOO_MANY_CHARS,
+   PI_BAD_SER_OFFSET, or PI_TOO_MANY_PULSES.
 
    NOTES:
 
@@ -915,6 +929,8 @@ int gpioWaveAddSerial(unsigned user_gpio,
 #define PI_WAVE_MIN_BAUD      100
 #define PI_WAVE_MAX_BAUD      250000
 
+#define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
+
 
 
 /*-------------------------------------------------------------------------*/
@@ -923,7 +939,8 @@ int gpioWaveTxStart(unsigned mode);
 /* This function transmits the current waveform.  The mode determines
    whether the waveform is sent once or cycles endlessly.
 
-   Returns 0 if OK, otherwise PI_BAD_WAVE_MODE.
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_MODE.
 */
 
 #define PI_WAVE_MODE_ONE_SHOT 0
@@ -1113,6 +1130,19 @@ int gpioWaveGetMaxCbs(void);
 
 
 /*-------------------------------------------------------------------------*/
+int gpioTrigger(unsigned user_gpio, unsigned pulseLen, unsigned level);
+/*-------------------------------------------------------------------------*/
+/* This function sends a trigger pulse to a gpio.  The gpio is set to
+   level for pulseLen microseconds and then reset to not level.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_LEVEL,
+   or PI_BAD_PULSELEN.
+*/
+
+#define PI_MAX_PULSELEN 100
+
+
+/*-------------------------------------------------------------------------*/
 int gpioSetWatchdog(unsigned user_gpio,
                     unsigned timeout);
 /*-------------------------------------------------------------------------*/
@@ -1267,7 +1297,7 @@ int gpioSetTimerFuncEx(unsigned          timer,
 
 
 /* ----------------------------------------------------------------------- */
-pthread_t *gpioStartThread(ThreadFunc_t func, void *arg);
+pthread_t *gpioStartThread(gpioThreadFunc_t func, void *arg);
 /*-------------------------------------------------------------------------*/
 /* Starts a new thread of execution with func as the main routine.
 
@@ -1324,6 +1354,46 @@ void gpioStopThread(pthread_t *pth);
    No value is returned.
 
    The thread to be stopped should have been started with gpioStartThread().
+*/
+
+
+/* ----------------------------------------------------------------------- */
+int gpioStoreScript(char *script);
+/* ----------------------------------------------------------------------- */
+/* This function stores a null terminated script for later execution.
+
+   The function returns a script id if the script is valid,
+   otherwise PI_BAD_SCRIPT.
+*/
+
+
+
+/* ----------------------------------------------------------------------- */
+int gpioRunScript(int script_id);
+/* ----------------------------------------------------------------------- */
+/* This function runs a stored script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+*/
+
+
+
+/* ----------------------------------------------------------------------- */
+int gpioStopScript(int script_id);
+/* ----------------------------------------------------------------------- */
+/* This function stops a running script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+*/
+
+
+
+/* ----------------------------------------------------------------------- */
+int gpioDeleteScript(int script_id);
+/* ----------------------------------------------------------------------- */
+/* This function deletes a stored script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 */
 
 
@@ -1816,6 +1886,21 @@ void gpioWaveDump(void);
 #define PI_CMD_PRRG  24
 #define PI_CMD_HELP  25
 #define PI_CMD_PIGPV 26
+#define PI_CMD_WVCLR 27
+#define PI_CMD_WVAG  28
+#define PI_CMD_WVAS  29
+#define PI_CMD_WVGO  30
+#define PI_CMD_WVGOR 31
+#define PI_CMD_WVBSY 32
+#define PI_CMD_WVHLT 33
+#define PI_CMD_WVSM  34
+#define PI_CMD_WVSP  35
+#define PI_CMD_WVSC  36
+#define PI_CMD_TRIG  37
+#define PI_CMD_PROC  38
+#define PI_CMD_PROCD 39
+#define PI_CMD_PROCR 40
+#define PI_CMD_PROCS 41
 
 /*
 The following command only works on the socket interface.
@@ -1841,7 +1926,7 @@ after this command is issued.
 #define PI_BAD_LEVEL         -5 /* level not 0-1                           */
 #define PI_BAD_PUD           -6 /* pud not 0-2                             */
 #define PI_BAD_PULSEWIDTH    -7 /* pulsewidth not 0 or 500-2500            */
-#define PI_BAD_DUTYCYCLE     -8 /* dutycycle not 0-255                     */
+#define PI_BAD_DUTYCYCLE     -8 /* dutycycle outside set range             */
 #define PI_BAD_TIMER         -9 /* timer not 0-9                           */
 #define PI_BAD_MS           -10 /* ms not 10-60000                         */
 #define PI_BAD_TIMETYPE     -11 /* timetype not 0-1                        */
@@ -1878,6 +1963,13 @@ after this command is issued.
 #define PI_BAD_SERIAL_BUF   -40 /* bad (null) serial buf parameter         */
 #define PI_NOT_PERMITTED    -41 /* gpio operation not permitted            */
 #define PI_SOME_PERMITTED   -42 /* one or more gpios not permitted         */
+#define PI_BAD_WVSC_COMMND  -43 /* bad WVSC subcommand                     */
+#define PI_BAD_WVSM_COMMND  -44 /* bad WVSM subcommand                     */
+#define PI_BAD_WVSP_COMMND  -45 /* bad WVSP subcommand                     */
+#define PI_BAD_PULSELEN     -46 /* trigger pulse length > 100              */
+#define PI_BAD_SCRIPT       -47 /* invalid script                          */
+#define PI_BAD_SCRIPT_ID    -48 /* unknown script id                       */
+#define PI_BAD_SER_OFFSET   -49 /* add serial data offset > 30 minutes     */
 
 
 /*-------------------------------------------------------------------------*/

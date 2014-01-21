@@ -76,7 +76,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 # gpio levels
 
@@ -140,7 +140,27 @@ _PI_CMD_NC=   21
 _PI_CMD_PRG=  22
 _PI_CMD_PFG=  23
 _PI_CMD_PRRG= 24
+_PI_CMD_HELP= 25
+_PI_CMD_PIGPV=26
+_PI_CMD_WVCLR=27
+_PI_CMD_WVAG= 28
+_PI_CMD_WVAS= 29
+_PI_CMD_WVGO= 30
+_PI_CMD_WVGOR=31
+_PI_CMD_WVBSY=32
+_PI_CMD_WVHLT=33
+_PI_CMD_WVSM= 34
+_PI_CMD_WVSP= 35
+_PI_CMD_WVSC= 36
+_PI_CMD_TRIG= 37
+_PI_CMD_PROC= 38
+_PI_CMD_PROCD=39
+_PI_CMD_PROCR=40
+_PI_CMD_PROCS=41
+
+
 _PI_CMD_NOIB= 99
+
 
 # pigpio error numbers
 
@@ -179,14 +199,21 @@ _PI_NOT_INITIALISED =-31
 _PI_INITIALISED     =-32
 _PI_BAD_WAVE_MODE   =-33
 _PI_BAD_CFG_INTERNAL=-34
-_PI_BAD_WAVE_BAUD   =-35
-_PI_TOO_MANY_PULSES =-36
-_PI_TOO_MANY_CHARS  =-37
+PI_BAD_WAVE_BAUD    =-35
+PI_TOO_MANY_PULSES  =-36
+PI_TOO_MANY_CHARS   =-37
 _PI_NOT_SERIAL_GPIO =-38
 _PI_BAD_SERIAL_STRUC=-39
 _PI_BAD_SERIAL_BUF  =-40
 PI_NOT_PERMITTED    =-41
 PI_SOME_PERMITTED   =-42
+PI_BAD_WVSC_COMMND  =-43
+PI_BAD_WVSM_COMMND  =-44
+PI_BAD_WVSP_COMMND  =-45
+PI_BAD_PULSELEN     =-46
+PI_BAD_SCRIPT       =-47
+PI_BAD_SCRIPT_ID    =-48
+PI_BAD_SER_OFFSET   =-49
 
 # pigpio error text
 
@@ -225,12 +252,19 @@ _errors=[
    [_PI_INITIALISED      , "function called after gpioInitialise"],
    [_PI_BAD_WAVE_MODE    , "waveform mode not 0-1"],
    [_PI_BAD_CFG_INTERNAL , "bad parameter in gpioCfgInternals call"],
-   [_PI_BAD_WAVE_BAUD    , "baud rate not 100-250000"],
-   [_PI_TOO_MANY_PULSES  , "waveform has too many pulses"],
-   [_PI_TOO_MANY_CHARS   , "waveform has too many chars"],
+   [PI_BAD_WAVE_BAUD    , "baud rate not 100-250000"],
+   [PI_TOO_MANY_PULSES  , "waveform has too many pulses"],
+   [PI_TOO_MANY_CHARS   , "waveform has too many chars"],
    [_PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"],
    [PI_NOT_PERMITTED     , "no permission to update gpio"],
-   [PI_SOME_PERMITTED    , "no permission to update one or more gpios"]
+   [PI_SOME_PERMITTED    , "no permission to update one or more gpios"],
+   [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
+   [PI_BAD_WVSM_COMMND   , "bad WVSM subcommand"],
+   [PI_BAD_WVSP_COMMND   , "bad WVSP subcommand"],
+   [PI_BAD_PULSELEN      , "trigger pulse length > 100"],
+   [PI_BAD_SCRIPT        , "invalid script"],
+   [PI_BAD_SCRIPT_ID     , "unknown script id"],
+   [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
 ]
 
 _control = None
@@ -262,7 +296,7 @@ def error(pigpio_error):
    for e in _errors:
       if e[0] == pigpio_error:
          return e[1]
-   return "unknown error"
+   return "unknown error ({})".format(pigpio_error)
 
 def tickDiff(tStart, tEnd):
    """Calculate the time difference between two ticks.
@@ -304,7 +338,8 @@ def _u2i(number):
          return v
 
 def _pigpio_command(sock, cmd, p1, p2):
-   """Executes a pigpio socket command.
+   """
+   Executes a pigpio socket command.
 
    sock: command socket.
    cmd:  the command to be executed.
@@ -313,6 +348,27 @@ def _pigpio_command(sock, cmd, p1, p2):
    """
    if sock is not None:
       sock.send(struct.pack('IIII', cmd, p1, p2, 0))
+      x, y, z, res = struct.unpack('IIII', sock.recv(16))
+      return res
+   else:
+      raise  _pigpioError("*** Module not started, call pigpio.start() ***")
+
+def _pigpio_command_ext(sock, cmd, p1, p2, extents):
+   """
+   Executes an extended pigpio socket command.
+
+   sock: command socket.
+   cmd:  the command to be executed.
+   p1:   command paramter 1 (if applicable).
+   p2:   command paramter 2 (if applicable).
+   extents: additional data blocks
+   """
+   if sock is not None:
+      sock.send(struct.pack('IIII', cmd, p1, p2, 0))
+
+      for ext in extents:
+         sock.sendall(ext)
+
       x, y, z, res = struct.unpack('IIII', sock.recv(16))
       return res
    else:
@@ -462,8 +518,7 @@ def set_mode(gpio, mode):
    pigpio.set_mode(10, pigpio.ALT2) # gpio 10 as ALT2
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_MODES, gpio, mode))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_MODES, gpio, mode))
 
 def get_mode(gpio):
    """Get the gpio mode.
@@ -482,8 +537,7 @@ def get_mode(gpio):
    6
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_MODEG, gpio, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_MODEG, gpio, 0))
 
 def set_pull_up_down(gpio, pud):
    """Set or clear the gpio pull-up/down resistor.
@@ -516,8 +570,7 @@ def set_pull_up_down(gpio, pud):
    1
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PUD, gpio, pud))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PUD, gpio, pud))
 
 def read(gpio):
    """Read the gpio level.
@@ -545,8 +598,7 @@ def read(gpio):
    1
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_READ, gpio, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_READ, gpio, 0))
 
 def write(gpio, level):
    """Write the gpio level.
@@ -578,8 +630,7 @@ def write(gpio, level):
    1
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_WRITE, gpio, level))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_WRITE, gpio, level))
 
 def set_PWM_dutycycle(user_gpio, dutycycle):
    """Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
@@ -609,8 +660,7 @@ def set_PWM_dutycycle(user_gpio, dutycycle):
    set_PWM_dutycycle(4, 255) # PWM full on
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PWM, user_gpio, dutycycle))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PWM, user_gpio, dutycycle))
 
 def set_PWM_range(user_gpio, range_):
    """Set the range of PWM values to be used on the gpio.
@@ -645,8 +695,7 @@ def set_PWM_range(user_gpio, range_):
    pigpio.set_PWM_range(9, 3000) # now 750 1/4, 1500 1/2, 2250 3/4 on
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PRS, user_gpio, range_))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PRS, user_gpio, range_))
 
 def get_PWM_range(user_gpio):
    """Get the range of PWM values being used on the gpio.
@@ -674,8 +723,7 @@ def get_PWM_range(user_gpio):
    3000
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PRG, user_gpio, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PRG, user_gpio, 0))
 
 def get_PWM_real_range(user_gpio):
    """Get the real underlying range of PWM values being used on the gpio.
@@ -701,8 +749,7 @@ def get_PWM_real_range(user_gpio):
    25
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PRRG, user_gpio, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PRRG, user_gpio, 0))
 
 def set_PWM_frequency(user_gpio, frequency):
    """Set the frequency (in Hz) of the PWM to be used on the gpio.
@@ -759,8 +806,7 @@ def set_PWM_frequency(user_gpio, frequency):
    8000
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PFS, user_gpio, frequency))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PFS, user_gpio, frequency))
 
 def get_PWM_frequency(user_gpio):
    """Get the frequency of PWM being used on the gpio.
@@ -788,8 +834,7 @@ def get_PWM_frequency(user_gpio):
    8000
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_PFG, user_gpio, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_PFG, user_gpio, 0))
 
 def set_servo_pulsewidth(user_gpio, pulsewidth):
    """Start (500-2500) or stop (0) servo pulses on the gpio.
@@ -845,8 +890,8 @@ def set_servo_pulsewidth(user_gpio, pulsewidth):
    for m in moves:
       pigpio.set_servo_pulsewidth(24, m[0]);
       time.sleep(m[1])
-      message = str(m[1]) + " seconds @ " + str(m[0]) + " us"
-      print(message)
+      s = str(m[1]) + " seconds @ " + str(m[0]) + " us"
+      print(s)
 
    pigpio.stop()
 
@@ -875,8 +920,8 @@ def set_servo_pulsewidth(user_gpio, pulsewidth):
    for m in moves:
       pigpio.set_PWM_dutycycle(25, m[0]);
       time.sleep(m[1])
-      message = str(m[1]) + " seconds @ " + str(m[0]) + " us"
-      print(message)
+      s = str(m[1]) + " seconds @ " + str(m[0]) + " us"
+      print(s)
 
    pigpio.stop()
 
@@ -888,8 +933,7 @@ def set_servo_pulsewidth(user_gpio, pulsewidth):
    5 seconds @ 2000 us
    0 seconds @ 1000 us
 """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_SERVO, user_gpio, pulsewidth))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_SERVO, user_gpio, pulsewidth))
 
 def notify_open():
    """Get a free notification handle.
@@ -917,8 +961,7 @@ def notify_open():
       pigpio.notify_begin(h, 1234)
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_NO, 0, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_NO, 0, 0))
 
 def notify_begin(handle, bits):
    """Start notifications on a previously opened handle.
@@ -951,8 +994,7 @@ def notify_begin(handle, bits):
    I (32 bit) level
 
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_NB, handle, bits))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_NB, handle, bits))
 
 def notify_pause(handle):
    """Pause notifications on a previously opened handle.
@@ -976,8 +1018,7 @@ def notify_pause(handle):
       ...
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_NB, handle, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_NB, handle, 0))
 
 def notify_close(handle):
    """Stop notifications on a previously opened handle and
@@ -997,8 +1038,7 @@ def notify_close(handle):
       ...
    ...
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_NC, handle, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_NC, handle, 0))
 
 def set_watchdog(user_gpio, timeout):
    """Sets a watchdog for a gpio.
@@ -1030,8 +1070,8 @@ def set_watchdog(user_gpio, timeout):
    import time
 
    def cbf(g, L, t):
-      message = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
-      print(message)
+      s = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
+      print(s)
 
    pigpio.start()
 
@@ -1068,8 +1108,7 @@ def set_watchdog(user_gpio, timeout):
    gpio=22 level=2 at 3551411622
    watchdog cancelled, 5 second delay
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_WDOG, user_gpio, timeout))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_WDOG, user_gpio, timeout))
 
 def read_bank_1():
    """Read the levels of the bank 1 gpios (gpios 0-31).
@@ -1148,8 +1187,7 @@ def clear_bank_1(levels):
    0b1111110010000
 
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_BC1, levels, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_BC1, levels, 0))
 
 def clear_bank_2(levels):
    """Clears gpios 32-53 if the corresponding bit (0-21) in levels is set.
@@ -1164,8 +1202,7 @@ def clear_bank_2(levels):
 
    See clear_bank_1() for an example.
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_BC2, levels, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_BC2, levels, 0))
 
 def set_bank_1(levels):
    """Sets gpios 0-31 if the corresponding bit in levels is set.
@@ -1215,8 +1252,7 @@ def set_bank_1(levels):
    0b1111111011111
    0b1111110010000
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_BS1, levels, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_BS1, levels, 0))
 
 def set_bank_2(levels):
    """Sets gpios 32-53 if the corresponding bit (0-21) in levels is set.
@@ -1231,8 +1267,7 @@ def set_bank_2(levels):
 
    See set_bank_1() for an example.
    """
-   r=_u2i(_pigpio_command(_control, _PI_CMD_BS2, levels, 0))
-   return r
+   return _u2i(_pigpio_command(_control, _PI_CMD_BS2, levels, 0))
 
 def get_current_tick():
    """Gets the current system tick.
@@ -1257,9 +1292,9 @@ def get_current_tick():
 
    t2 = pigpio.get_current_tick()
 
-   message = "5 seconds is " + str(pigpio.tickDiff(t1, t2)) + " ticks"
+   s = "5 seconds is " + str(pigpio.tickDiff(t1, t2)) + " ticks"
 
-   print(message) 
+   print(s) 
 
    pigpio.stop()
 
@@ -1308,6 +1343,365 @@ def get_hardware_revision():
    """
    return _pigpio_command(_control, _PI_CMD_HWVER, 0, 0)
 
+def get_pigpio_version():
+   """
+   Returns the pigpio software version.
+   """
+   return _pigpio_command(_control, _PI_CMD_PIGPV, 0, 0)
+
+class pulse:
+   """
+   An ADT class to hold pulse information.
+   """
+
+   def __init__(self, gpio_on, gpio_off, delay):
+      """
+      Initialises a pulse ADT.
+
+      gpio_on: the gpios to switch on at the start of the pulse.
+      gpio_off: the gpios to switch off at the start of the pulse.
+      delay: the delay in microseconds before the next pulse.
+      """
+      self.gpio_on = gpio_on
+      self.gpio_off = gpio_off
+      self.delay = delay
+
+def wave_clear():
+   """
+   Initialises a new waveform.
+
+   Returns 0 if OK.
+
+   A waveform comprises one of more pulses.
+
+   A pulse specifies
+
+   1) the gpios to be switched on at the start of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
+   3) the delay in microseconds before the next pulse.
+
+   Any or all the fields can be zero.  It doesn't make any sense
+   to set all the fields to zero (the pulse will be ignored).
+
+   When a waveform is started each pulse is executed in order with
+   the specified delay between the pulse and the next.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVCLR, 0, 0))
+
+def wave_add_generic(pulses):
+   """
+   Adds a list of pulses to the current waveform.
+
+   Returns the new total number of pulses in the current waveform
+   if OK, otherwise PI_TOO_MANY_PULSES.
+
+   pulses: list of pulses to add to the waveform.
+
+   The pulses are interleaved in time order within the existing
+   waveform (if any).
+
+   Merging allows the waveform to be built in parts, that is the
+   settings for gpio#1 can be added, and then gpio#2 etc.
+
+   If the added waveform is intended to start after or within
+   the existing waveform then the first pulse should consist
+   solely of a delay.
+
+   Example
+
+   #!/usr/bin/env python
+
+   import time
+   import pigpio
+
+   class stepper:
+
+      def __init__(self, g1, g2, g3, g4):
+         self.g1 = g1
+         self.g2 = g2
+         self.g3 = g3
+         self.g4 = g4
+         self.all = (1<<g1 | 1<<g2 | 1<<g3 | 1<<g4)
+
+         pigpio.set_mode(g1, pigpio.OUTPUT)
+         pigpio.set_mode(g2, pigpio.OUTPUT)
+         pigpio.set_mode(g3, pigpio.OUTPUT)
+         pigpio.set_mode(g4, pigpio.OUTPUT)
+
+      def step_on(self, pos):
+         if   pos == 0: return (1<<self.g4)
+         elif pos == 1: return (1<<self.g3 | 1<<self.g4)
+         elif pos == 2: return (1<<self.g3)
+         elif pos == 3: return (1<<self.g2 | 1<<self.g3)
+         elif pos == 4: return (1<<self.g2)
+         elif pos == 5: return (1<<self.g1 | 1<<self.g2)
+         elif pos == 6: return (1<<self.g1)
+         elif pos == 7: return (1<<self.g1 | 1<<self.g4)
+         else:          return 0
+
+      def step_off(self, pos):
+         return self.step_on(pos) ^ self.all
+
+   pigpio.start()
+
+   s1 = stepper(14, 15, 18, 17)
+   s2 = stepper(24, 25,  8,  7)
+
+   f1=[] # pulses to drive stepper 1 forward
+   b2=[] # pulses to drive stepper 2 backward
+
+   for i in range(8):
+      f1.append(pigpio.pulse(s1.step_on(i), s1.step_off(i), 1200))
+      b2.append(pigpio.pulse(s2.step_on(7-i), s2.step_off(7-i), 1200))
+
+   pigpio.wave_clear() # initialise a new waveform
+
+   pigpio.wave_add_generic(f1) # add stepper 1 forward
+   pigpio.wave_add_generic(b2) # add stepper 2 backward
+
+   pigpio.wave_tx_repeat() # repeately transmit pulses
+
+   time.sleep(10)
+
+   pigpio.wave_tx_stop() # stop waveform
+
+   pigpio.stop()
+   """
+   # pigpio message format
+
+   # I p1 number of pulses
+   # I p2 0
+   ## extension ##
+   # III on/off/delay * number of pulses
+   msg = ""
+   for p in pulses:
+      msg += struct.pack("III", p.gpio_on, p.gpio_off, p.delay)
+   extents = [msg]
+   return _u2i(_pigpio_command_ext(
+      _control, _PI_CMD_WVAG, len(pulses), 0, extents))
+
+def wave_add_serial(user_gpio, baud, offset, data):
+   """
+   Adds a waveform representing serial data to the existing waveform
+   (if any).  The serial data starts offset microseconds from the
+   start of the waveform.
+
+   Returns the new total number of pulses in the current waveform
+   if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
+   PI_TOO_MANY_CHARS, PI_BAD_SER_OFFSET, or PI_TOO_MANY_PULSES.
+
+   user_gpio: gpio to transmit data.  You must set the gpio mode
+              to output.
+   baud: baud rate to use.
+   offset: number of microseconds from the starts of the waveform.
+   data: the data to transmit.
+
+   The serial data is formatted as one start bit, eight data bits,
+   and one stop bit.
+
+   It is legal to add serial data streams with different baud rates
+   to the same waveform.
+
+   Example
+
+   #!/usr/bin/env python
+
+   import time
+
+   import pigpio
+
+   GPIO=24
+
+   pigpio.start()
+
+   pigpio.set_mode(TX_GPIO, pigpio.OUTPUT)
+
+   pigpio.wave_clear() # initialise waveform
+
+   for i in range(10):
+      pigpio.wave_add_serial(
+         GPIO, 9600, i*2000000, "{} seconds in.\r\n".format(i*2))
+
+   pigpio.wave_tx_start()
+
+   time.sleep(22)
+
+   pigpio.stop()
+   """
+   # pigpio message format
+
+   # I p1 user_gpio
+   # I p2 len(data)
+   ## extension ##
+   # I baud
+   # I offset
+   # s data
+   extents = [struct.pack("I", baud),struct.pack("I", offset), data]
+   return _u2i(_pigpio_command_ext(
+      _control, _PI_CMD_WVAS, user_gpio, len(data), extents))
+
+def wave_tx_busy():
+   """
+   Checks to see if a waveform is currently being transmitted.
+
+   Returns 1 if a waveform is currently being transmitted, otherwise 0.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVBSY, 0, 0))
+
+def wave_tx_stop():
+   """
+   Stops the transmission of the current waveform.
+
+   Returns 0 if OK.
+
+   This function is intended to stop a waveform started with
+   wave_tx_repeat().
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVHLT, 0, 0))
+
+def wave_tx_start():
+   """
+   Transmits the current waveform.  The waveform is sent once.
+
+   Returns the number of cbs in the waveform if OK,
+   otherwise PI_BAD_WAVE_MODE.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVGO, 0, 0))
+
+def wave_tx_repeat():
+   """
+   Transmits the current waveform.  The waveform repeats until
+   wave_tx_stop is called.
+
+   Returns the number of cbs in the waveform if OK,
+   otherwise PI_BAD_WAVE_MODE.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVGOR, 0, 0))
+
+def wave_get_micros():
+   """
+   Returns the length in microseconds of the current waveform.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSM, 0, 0))
+
+def wave_get_max_micros():
+   """
+   Returns the maximum possible size of a waveform in microseconds.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSM, 2, 0))
+
+def wave_get_pulses():
+   """
+   Returns the length in pulses of the current waveform.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSP, 0, 0))
+
+def wave_get_max_pulses():
+   """
+   Returns the maximum possible size of a waveform in pulses.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSP, 2, 0))
+
+def wave_get_cbs():
+   """
+   Returns the length in DMA control blocks of the current waveform.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSC, 0, 0))
+
+def wave_get_max_cbs():
+   """
+   Returns the maximum possible size of a waveform in DMA control blocks.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVSC, 2, 0))
+
+def gpio_trigger(user_gpio, pulse_len=10, level=1):
+   """
+   Send a trigger pulse to a gpio.  The gpio is set to
+   level for pulse_len microseconds and then reset to not level.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_LEVEL,
+   PI_BAD_PULSELEN, or PI_NOT_PERMITTED.
+
+   user_gpio: gpio to pulse.
+   pulse_len: length of pulse in microseconds.
+   level: whether the pulse should be high or low.
+
+   Example
+
+   #!/usr/bin/env python
+
+   import time
+
+   import pigpio
+
+   GPIO=24
+
+   pigpio.start()
+
+   for i in range(10):
+      pigpio.gpio_trigger(GPIO, (i*5)+10, 1)
+      time.sleep(1)
+
+   pigpio.stop()
+
+   """
+   # pigpio message format
+
+   # I p1 user_gpio
+   # I p2 pulse_len
+   ## extension ##
+   # I level
+
+   extents = [struct.pack("I", level)]
+
+   return _u2i(_pigpio_command_ext(
+      _control, _PI_CMD_TRIG, user_gpio, pulse_len, extents))
+
+def store_script(script):
+   """
+   Store a script for later execution.
+
+   Returns a script id if OK, otherwise PI_BAD_SCRIPT.
+   """
+   # I p1 script length
+   # I p2 0
+   ## extension ##
+   # s script
+
+   return _u2i(_pigpio_command_ext(
+      _control, _PI_CMD_PROC, len(script), 0, script))
+
+def run_script(script_id):
+   """
+   Runs a stored script.
+
+   Returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+
+   script_id: script_id of stored script.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_PROCR, script_id, 0))
+
+def stop_script(script_id):
+   """
+   Stops a running script.
+
+   Returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+
+   script_id: script_id of stored script.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_PROCS, script_id, 0))
+
+def delete_script(script_id):
+   """
+   Deletes a stored script.
+
+   Returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+
+   script_id: script_id of stored script.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_PROCD, script_id, 0))
+
+
 class callback:
    """A class to provide gpio level change callbacks."""
 
@@ -1332,8 +1726,8 @@ class callback:
       import time
 
       def cbf(g, L, t):
-         message = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
-         print(message)
+         s = "gpio=" + str(g) + " level=" + str(L) + " at " + str(t)
+         print(s)
 
       pigpio.start()
 
@@ -1376,9 +1770,9 @@ class callback:
 
       tally_2 = cb.tally()
 
-      message = "counted " + str(tally_2 - tally_1) + " edges"
+      s = "counted " + str(tally_2 - tally_1) + " edges"
 
-      print(message)
+      print(s)
 
       cb.cancel()
 
@@ -1411,9 +1805,9 @@ class callback:
 
       tally_2 = cb.tally()
 
-      message = "counted " + str(tally_2 - tally_1) + " rising edges"
+      s = "counted " + str(tally_2 - tally_1) + " rising edges"
 
-      print(message)
+      print(s)
 
       cb.cancel()
 

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 1
+#define PIGPIOD_IF_VERSION 2
 
 typedef enum
 {
@@ -70,7 +70,7 @@ const char *pigpio_error(int error);
 unsigned pigpiod_if_version(void);
 /* Return the pigpiod_if version. */
 
-pthread_t *start_thread(ThreadFunc_t func, void *arg);
+pthread_t *start_thread(gpioThreadFunc_t func, void *arg);
 /* Starts a new thread of execution with func as the main routine.
 
    Returns a pointer to pthread_t if OK, otherwise NULL.
@@ -198,7 +198,6 @@ int set_PWM_range(int user_gpio, int range_);
 
    The real value set by set_PWM_range is
    (dutycycle * real range) / range.
-
 */
 
 int get_PWM_range(int user_gpio);
@@ -507,20 +506,213 @@ uint32_t get_hardware_revision(void);
    hexadecimal number the function returns 0.
 */
 
+int wave_clear(void);
+/* This function initialises a new waveform.
+
+   Returns 0 if OK.
+
+   A waveform comprises one of more pulses.  Each pulse consists of a
+   gpioPulse_t structure.
+
+   typedef struct
+   {
+      uint32_t gpioOn;
+      uint32_t gpioOff;
+      uint32_t usDelay;
+   } gpioPulse_t;
+
+   The fields specify
+
+   1) the gpios to be switched on at the start of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
+   3) the delay in microseconds before the next pulse.
+
+   Any or all the fields can be zero.  It doesn't make any sense to
+   set all the fields to zero (the pulse will be ignored).
+
+   When a waveform is started each pulse is executed in order with the
+   specified delay between the pulse and the next.
+*/
+
+int wave_tx_busy(void);
+/* This function checks to see if a waveform is currently being
+   transmitted.
+
+   Returns 1 if a waveform is currently being transmitted, otherwise 0.
+*/
+
+int wave_tx_stop(void);
+/* This function stops the transmission of the current waveform.
+
+   Returns 0 if OK.
+
+   This function is intended to stop a waveform started with the repeat mode.
+*/
+
+int wave_tx_start(void);
+/* This function transmits the current waveform.  The waveform is
+   sent once.
+
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_MODE.
+*/
+
+int wave_tx_repeat(void);
+/* This function transmits the current waveform.  The waveform repeats
+   endlessly until wave_tx_stop is called.
+
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_MODE.
+*/
+
+int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses);
+/* This function adds a number of pulses to the current waveform.
+
+   Returns the new total number of pulses in the current waveform if OK,
+   otherwise PI_TOO_MANY_PULSES.
+
+   The   pulses are interleaved in time order within the existing waveform
+   (if any).
+
+   Merging allows the waveform to be built in parts, that is the settings
+   for gpio#1 can be added, and then gpio#2 etc.
+
+   If the added waveform is intended to start after or within the existing
+   waveform then the first pulse should consist solely of a delay.
+*/
+
+int wave_add_serial
+   (unsigned gpio, unsigned baud, unsigned offset, unsigned numChar, char *str);
+/* This function adds a waveform representing serial data to the
+   existing waveform (if any).  The serial data starts offset microseconds
+   from the start of the waveform.
+
+   Returns the new total number of pulses in the current waveform if OK,
+   otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_TOO_MANY_CHARS, or
+   PI_TOO_MANY_PULSES.
+
+   NOTES:
+
+   The serial data is formatted as one start bit, eight data bits, and one
+   stop bit.
+
+   It is legal to add serial data streams with different baud rates to
+   the same waveform.
+*/
+
+int wave_get_micros(void);
+/* This function returns the length in microseconds of the current
+   waveform.
+*/
+
+int wave_get_high_micros(void);
+/* This function returns the length in microseconds of the longest waveform
+   created since the pigpio daemon was started..
+*/
+
+int wave_get_max_micros(void);
+/* This function returns the maximum possible size of a waveform in 
+   microseconds.
+*/
+
+int wave_get_pulses(void);
+/* This function returns the length in pulses of the current waveform.
+*/
+
+int wave_get_high_pulses(void);
+/* This function returns the length in pulses of the longest waveform
+   created since the pigpio daemon was started..
+*/
+
+int wave_get_max_pulses(void);
+/* This function returns the maximum possible size of a waveform in pulses.
+*/
+
+int wave_get_cbs(void);
+/* This function returns the length in DMA control blocks of the current
+   waveform.
+*/
+
+int wave_get_high_cbs(void);
+/* This function returns the length in DMA control blocks of the longest
+   waveform created since the pigpio daemon was started..
+*/
+
+int wave_get_max_cbs(void);
+/* This function returns the maximum possible size of a waveform in DMA
+   control blocks.
+*/
+
+int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level);
+/* This function sends a trigger pulse to a gpio.  The gpio is set to
+   level for pulseLen microseconds and then reset to not level.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_LEVEL,
+   PI_BAD_PULSELEN, or PI_NOT_PERMITTED.
+*/
+
+int store_script(char *script);
+/* This function stores a script for later execution.
+
+   The function returns a script id if the script is valid,
+   otherwise PI_BAD_SCRIPT.
+*/
+
+int run_script(int script_id);
+/* This function runs a stored script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+*/
+
+int stop_script(int script_id);
+/* This function stops a running script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+*/
+
+int delete_script(int script_id);
+/* This function deletes a stored script.
+
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+*/
+
 int callback(int gpio, int edge, CBFunc_t f);
 /*
+   This function initialises a new callback.
+
+   The function returns a callback id if OK, otherwise pigif_bad_malloc,
+   pigif_duplicate_callback, or pigif_bad_callback.
+
+   The callback is called with the gpio, edge, and tick, whenever the
+   gpio has the identified edge.
 */
 
 int callback_ex(int gpio, int edge, CBFuncEx_t f, void *user);
 /*
+   This function initialises a new callback.
+
+   The function returns a callback id if OK, otherwise pigif_bad_malloc,
+   pigif_duplicate_callback, or pigif_bad_callback.
+
+   The callback is called with the gpio, edge, tick, and user, whenever
+   the gpio has the identified edge.
 */
 
 int callback_cancel(int id);
 /*
+   This function cancels a callback identified by its id.
+
+   The function returns 0 if OK, otherwise pigif_callback_not_found.
 */
 
 int wait_for_edge(int gpio, int edge, double timeout);
 /*
+   This function waits for edge on the gpio for up to timeout
+   seconds.
+
+   The function returns 1 if the edge occurred, otherwise 0.
+
+   The function returns when the edge occurs or after the timeout.
 */
 
 #endif
