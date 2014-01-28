@@ -5,9 +5,9 @@ SIZE    = size
 
 CFLAGS	= -O3 -Wall
 
-ALL     = libpigpiod_if.a pigs pigpio.py setup.py
+ALL     = libpigpiod_if.a pigs
 
-all:	$(ALL)
+all:	$(ALL) pigpio.py setup.py
 
 pigs:		command.o pigs.o
 	$(CC) -o pigs pigs.c command.c

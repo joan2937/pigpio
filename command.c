@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 11+
+This version is for pigpio version 12+
 */
 
 #include <stdio.h>
@@ -46,6 +46,7 @@ This version is for pigpio version 11+
 3 %08X          %08X
 4 %u            %u
 5 HELP          HELP
+6 %s   <0 ERR
 */
 
 /* vfyt
@@ -58,6 +59,7 @@ This version is for pigpio version 11+
  8 MODES %d %c
  9 PUD   %d %c
 10 PROG  %s
+11 WVAS  %d %d %d %s
 */
 
 cmdInfo_t cmdInfo[]=
@@ -98,6 +100,9 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_READ,  "READ",  2, 2,  0},
    {PI_CMD_SERVO, "S",     3, 0,  0},
    {PI_CMD_SERVO, "SERVO", 3, 0,  0},
+   {PI_CMD_SLR,   "SLR",   3, 6,  0},
+   {PI_CMD_SLRC,  "SLRC",  2, 2,  0},
+   {PI_CMD_SLRO,  "SLRO",  3, 2,  0},
    {PI_CMD_WDOG,  "WDOG",  3, 0,  0},
    {PI_CMD_WRITE, "W",     3, 0,  0},
    {PI_CMD_WRITE, "WRITE", 3, 0,  0},
@@ -116,68 +121,72 @@ cmdInfo_t cmdInfo[]=
 };
 
 char * cmdUsage = "\
-BC1 x        clear gpios in bank 1\n\
-BC2 x        clear gpios in bank 2\n\
-BR1          read gpios bank 1\n\
-BR2          read gpios bank 2\n\
-BS1 x        set gpios in bank 1\n\
-BS2 x        set gpios in bank 2\n\
-H            displays command help\n\
-HELP         displays command help\n\
-HWVER        return hardware version\n\
-M g m        set gpio mode\n\
-MG g         get gpio mode\n\
-MODEG g      get gpio mode\n\
-MODES g m    set gpio mode\n\
-NB h x       start notification\n\
-NC h         close notification\n\
-NO           request notification handle\n\
-NP h         pause notification\n\
-P u d        set PWM value for gpio\n\
-PFG u        get PWM frequency for gpio\n\
-PFS u d      set PWM frequency for gpio\n\
-PIGPV        return pigpio version\n\
-PRG u        get PWM range for gpio\n\
-PROC t       validate and store script\n\
-PROCD s      delete script\n\
-PROCR s      run script\n\
-PROCS s      stop script\n\
-PRRG u       get PWM real range for gpio\n\
-PRS u d      set PWM range for gpio\n\
-PUD g p      set gpio pull up/down\n\
-PWM u d      set PWM value for gpio\n\
-R g          read gpio\n\
-READ g       read gpio\n\
-S u d        set servo value for gpio\n\
-SERVO u d    set servo value for gpio\n\
-T            return current tick\n\
-TICK         return current tick\n\
-TRIG u pl l  trigger level l for pl micros on gpio\n\
-W g l        write level to gpio\n\
-WDOG u d     set watchdog on gpio\n\
-WRITE g l    write level to gpio\n\
-WVAS u b t   wave add serial data\n\
-WVBSY        check if wave busy\n\
-WVCLR        wave clear\n\
-WVGO         wave transmit\n\
-WVGOR        wave transmit repeat\n\
-WVHLT        wave stop\n\
-WVSC ws      wave get cbs stats\n\
-WVSM ws      wave get micros stats\n\
-WVSP ws      wave get pulses stats\n\
-\n\
-b = baud rate\n\
-d = decimal value\n\
-g = gpio (0-53)\n\
-h = handle (0-31)\n\
-l = level (0-1)\n\
-m = mode (RW540123)\n\
-p = pud (ODU)\n\
-pl = pulse length (0-100)\n\
-s = script id\n\
-t = text\n\
-u = user gpio (0-31)\n\
-x = hex value\n\
+BC1 x        Clear gpios x in bank 1.\n\
+BC2 x        Clear gpios x in bank 2.\n\
+BR1          Read gpios bank 1.\n\
+BR2          Read gpios bank 2.\n\
+BS1 x        Set gpios x in bank 1.\n\
+BS2 x        Set gpios x in bank 2.\n\
+H            Displays command help.\n\
+HELP         Displays command help.\n\
+HWVER        Return hardware version.\n\
+M g m        Set gpio g to mode m.\n\
+MG g         Get gpio g mode.\n\
+MODEG g      Get gpio g mode.\n\
+MODES g m    Set gpio g to mode m.\n\
+NB h x       Start notifications on handle h with x.\n\
+NC h         Close notification handle h.\n\
+NO           Request notification handle.\n\
+NP h         Pause notifications on handle h.\n\
+P u d        Set PWM value for user gpio u to d.\n\
+PFG u        Get PWM frequency for user gpio u.\n\
+PFS u d      Set PWM frequency for user gpio u to d.\n\
+PIGPV        Return pigpio version.\n\
+PRG u        Get PWM range for user gpio u.\n\
+PROC t       Store text t of script.\n\
+PROCD s      Delete script s.\n\
+PROCR s      Run script s.\n\
+PROCS s      Stop script s.\n\
+PRRG u       Get PWM real range for user gpio u.\n\
+PRS u d      Set PWM range for user gpio u to d.\n\
+PUD g p      Set gpio pull up/down for gpio g to p.\n\
+PWM u d      Set PWM value for user gpio u to d.\n\
+R g          Read gpio g.\n\
+READ g       Read gpio g.\n\
+S u d        Set servo value for user gpio u to d microseconds.\n\
+SERVO u d    Set servo value for user gpio u to d microseconds.\n\
+SLR u d      Read up to d bytes of serial data from user gpio u.\n\
+SLRC u       Close user gpio u for serial data.\n\
+SLRO u b     Open user gpio u for serial data at b baud.\n\
+T            Return current tick.\n\
+TICK         Return current tick.\n\
+TRIG u pl L  Trigger level L for pl micros on user gpio u.\n\
+W g L        Write level L to gpio g.\n\
+WDOG u d     Set watchdog of d milliseconds on user gpio u.\n\
+WRITE g L    Write level L to gpio g.\n\
+WVAS u b o t Wave add serial data t to user gpio u at b baud.\n\
+WVBSY        Check if wave busy.\n\
+WVCLR        Wave clear.\n\
+WVGO         Wave transmit.\n\
+WVGOR        Wave transmit repeatedly.\n\
+WVHLT        Wave stop.\n\
+WVSC ws      Wave get DMA control block stats.\n\
+WVSM ws      Wave get micros stats.\n\
+WVSP ws      Wave get pulses stats.\n\
+.\n\
+b = baud rate.\n\
+d = decimal value.\n\
+g = gpio (0-53).\n\
+h = handle (0-31).\n\
+L = level (0-1).\n\
+m = mode (RW540123).\n\
+o = offset (0-).\n\
+p = pud (ODU).\n\
+pl = pulse length (0-100).\n\
+s = script id.\n\
+t = text.\n\
+u = user gpio (0-31).\n\
+x = hex value.\n\
 ";
 
 typedef struct
@@ -237,6 +246,8 @@ static errInfo_t errInfo[]=
    {PI_BAD_SCRIPT       , "invalid script"},
    {PI_BAD_SCRIPT_ID    , "unknown script id"},
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},
+   {PI_GPIO_IN_USE      , "gpio already in use"},
+   {PI_BAD_SERIAL_COUNT , "must read at least a byte at a time"},
 };
 
 static char * fmtMdeStr="RW540123";
@@ -256,7 +267,7 @@ static int cmdMatch(char * str)
 int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext)
 {
    char str[8];
-   int f, valid, idx, val;
+   int f, valid, idx, val, p;
    char *ptr;
    char c, t;
 
@@ -276,21 +287,21 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
 
    switch (cmdInfo[idx].vt)
    {
-      case 1: /* BR1   BR2   HWVER NO    PIGPV TICK  WVBSY WVCLR WVGO WVGOR
-                 WVHLT
+      case 1: /* BR1  BR2  HWVER NO  PIGPV  TICK  WVBSY  WVCLR  WVGO
+                 WVGOR  WVHLT
               */
          f = sscanf(buf, " %7s %c", str, &t);
          if (f == 1) valid = 1;
          break;
 
-      case 2: /* MODEG NC    NP    PFG   PRG   PROCD PROCR PROCS PRRG  READ
-                 WVSC  WVSM  WVSP
+      case 2: /* MODEG  NC  NP  PFG  PRG  PROCD  PROCR  PROCS  PRRG
+                 SLRC  READ  WVSC  WVSM  WVSP
               */
          f = sscanf(buf, " %7s %d %c", str, &cmd->p1, &t);
          if (f == 2) valid = 1;
          break;
 
-      case 3: /* PFS   PRS   PWM   SERVO WDOG  WRITE
+      case 3: /* PFS  PRS  PWM  SERVO  SLR  SLRO  WDOG  WRITE
               */
          f = sscanf(buf, " %7s %d %d %c", str, &cmd->p1, &cmd->p2, &t);
          if (f == 3) valid = 1;
@@ -308,7 +319,7 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
             str, &cmd->p1, &cmd->p2, &ext[0].data, &t);
          if (f == 4)
          {
-            ext[0].n = sizeof(unsigned);
+            ext[0].size = sizeof(unsigned);
             ext[0].ptr = &ext[0].data;
             valid = 1;
          }
@@ -319,7 +330,7 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
          valid = 1;
          break;
 
-      case 7: /* BC1   BC2   BS1   BS2
+      case 7: /* BC1  BC2  BS1  BS2
               */
          f = sscanf(buf, " %7s %x %c", str, &cmd->p1, &t);
          if (f == 2) valid = 1;
@@ -359,38 +370,56 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
 
       case 10: /* PROC
                */
-         if (argc == 3)
+         if ((argc == 0) || (argc == 3))
          {
-            cmd->p1 = strlen(argv[2]);
-            ext[0].n = cmd->p1;
-            ext[0].ptr = argv[2];
+            if (argc == 3)
+            {
+               cmd->p1 = strlen(argv[2]);
+               ext[0].ptr = argv[2];
+            }
+            else /* pipe i/f */
+            {
+               sscanf(buf, "%*s %n", &p);
+               cmd->p1 = strlen(buf+p);
+               ext[0].ptr = buf+p;
+            }
+            ext[0].size = cmd->p1;
             valid = 1;
          }
          break;
 
       case 11: /* WVAS
                */
-         if (argc == 6)
+         if ((argc == 0) || (argc == 6))
          {
-            f = sscanf(buf, " %7s %d %d %d ",
-               str, &cmd->p1, &ext[0].data, &ext[1].data);
-            if (f == 4)
+            f = sscanf(buf, " %*s %d %d %d %n",
+               &cmd->p1, &ext[0].data, &ext[1].data, &p);
+            if (f == 3)
             {
-               ext[0].n = sizeof(unsigned);
+               ext[0].size = sizeof(unsigned);
                ext[0].ptr = &ext[0].data;
-               ext[1].n = sizeof(unsigned);
+               ext[1].size = sizeof(unsigned);
                ext[1].ptr = &ext[1].data;
-               cmd->p2 = strlen(argv[5]);
-               ext[2].n = cmd->p2;
-               ext[2].ptr = argv[5];
+
+               if (argc) /* pigs */
+               {
+                  cmd->p2 = strlen(argv[5]);
+                  ext[2].ptr = argv[5];
+               }
+               else /* pipe i/f */
+               {
+                  cmd->p2 = strlen(buf+p);
+                  ext[2].ptr = buf+p;
+               }
+
+               ext[2].size = cmd->p2;
                valid = 1;
             }
          }
          break;
    }
 
-   if (valid) return idx;
-   else       return -1;
+   if (valid) return idx; else return -1;
 }
 
 char * cmdErrStr(int error)

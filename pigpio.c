@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 11 */
+/* pigpio version 12 */
 
 #include <stdio.h>
 #include <string.h>
@@ -557,6 +557,9 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define MAX_EMITS (PIPE_BUF / sizeof(gpioReport_t))
 
+#define SRX_BUF_SIZE 8192
+#define CMD_BUF_SIZE 2048
+
 /* --------------------------------------------------------------- */
 
 typedef void (*callbk_t) ();
@@ -701,16 +704,21 @@ typedef struct
 
 typedef struct
 {
-   gpioRx_t * rxp;
-   uint32_t   baud;
-   uint32_t   fullBit;
-   uint32_t   halfBit;
-   uint32_t   startBitTick;
-   uint32_t   nextBitDiff;
-   int        bit;
-   int        byte;
-   int        level;
-   int        mode;
+   int      gpio;
+   char   * buf;
+   uint32_t bufSize;
+   int      readPos;
+   int      writePos;
+   uint32_t baud;
+   uint32_t fullBit;
+   uint32_t halfBit;
+   int      timeout;
+   uint32_t startBitTick;
+   uint32_t nextBitDiff;
+   int      bit;
+   int      byte;
+   int      level;
+   int      mode;
 } wfRx_t;
 
 
@@ -757,7 +765,7 @@ static wfStats_t wfStats=
    0, 0, (PAGES_PER_BLOCK * CBS_PER_OPAGE)
 };
 
-static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
+static volatile wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
 static volatile uint32_t alertBits    = 0;
 static volatile uint32_t monitorBits  = 0;
@@ -977,7 +985,8 @@ static uint32_t myGetTick(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-static void myDoCommand(cmdCmd_t *cmd, gpioExtent_t *ext)
+static void myDoCommand
+   (cmdCmd_t *cmd, gpioExtent_t *iExt, gpioExtent_t *oExt)
 {
    int p1, p2, res, i;
    uint32_t mask, tmp;
@@ -1090,7 +1099,7 @@ static void myDoCommand(cmdCmd_t *cmd, gpioExtent_t *ext)
       case PI_CMD_PRG: res = gpioGetPWMrange(p1); break;
 
       case PI_CMD_PROC:
-         res = gpioStoreScript(ext[0].ptr);
+         res = gpioStoreScript(iExt[0].ptr);
          break;
 
       case PI_CMD_PROCD: res = gpioDeleteScript(p1); break;
@@ -1132,6 +1141,36 @@ static void myDoCommand(cmdCmd_t *cmd, gpioExtent_t *ext)
 
       case PI_CMD_READ: res = gpioRead(p1); break;
 
+      case PI_CMD_SERVO:
+         if (gpioMask & (uint64_t)(1<<p1)) res = gpioServo(p1, p2);
+         else
+         {
+            PERM_ERROR("gpioServo: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
+         break;
+
+      case PI_CMD_SLRO: res = gpioSerialReadOpen(p1, p2); break;
+
+      case PI_CMD_SLR:
+         if (p2 < oExt[0].size) oExt[0].size = p2;
+         res = gpioSerialRead(p1, oExt[0].ptr, oExt[0].size);
+         break;
+
+      case PI_CMD_SLRC: res = gpioSerialReadClose(p1); break;
+
+      case PI_CMD_TICK: res = gpioTick(); break;
+
+      case PI_CMD_TRIG:
+         if (gpioMask & (uint64_t)(1<<p1))
+            res = gpioTrigger(p1, p2, *(int *) (iExt[0].ptr));
+         else
+         {
+            PERM_ERROR("gpioTrigger: gpio %d, no permission to update", p1);
+            res = PI_NOT_PERMITTED;
+         }
+         break;
+
       case PI_CMD_WDOG: res = gpioSetWatchdog(p1, p2); break;
 
       case PI_CMD_WRITE:
@@ -1143,33 +1182,12 @@ static void myDoCommand(cmdCmd_t *cmd, gpioExtent_t *ext)
          }
          break;
 
-      case PI_CMD_SERVO:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioServo(p1, p2);
-         else
-         {
-            PERM_ERROR("gpioServo: gpio %d, no permission to update", p1);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_TICK: res = gpioTick(); break;
-
-      case PI_CMD_TRIG:
-         if (gpioMask & (uint64_t)(1<<p1))
-            res = gpioTrigger(p1, p2, *(int *) (ext[0].ptr));
-         else
-         {
-            PERM_ERROR("gpioTrigger: gpio %d, no permission to update", p1);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
       case PI_CMD_WVAG:
 
          /* need to mask off any non permitted gpios */
 
          mask = gpioMask;
-         pulse = ext[0].ptr;
+         pulse = iExt[0].ptr;
          masked = 0;
 
          for (i=0; i<p1; i++)
@@ -1200,10 +1218,10 @@ static void myDoCommand(cmdCmd_t *cmd, gpioExtent_t *ext)
          if (gpioMask & (uint64_t)(1<<p1))
             res = gpioWaveAddSerial
                (p1,
-                *(int *)(ext[0].ptr),
-                *(int *)(ext[1].ptr),
+                *(int *)(iExt[0].ptr),
+                *(int *)(iExt[1].ptr),
                 p2,
-                ext[2].ptr);
+                iExt[2].ptr);
          else
          {
             PERM_ERROR
@@ -1655,9 +1673,10 @@ static int wave2Cbs(unsigned mode)
 
 /* ----------------------------------------------------------------------- */
 
-static void waveRxSerial(wfRx_t * s, int level, uint32_t tick)
+static void waveRxSerial(volatile wfRx_t *s, int level, uint32_t tick)
 {
    int diffTicks;
+   int newWritePos;
 
    if (s->bit >= 0)
    {
@@ -1680,9 +1699,15 @@ static void waveRxSerial(wfRx_t * s, int level, uint32_t tick)
 
       if (s->bit == 9)
       {
-         s->rxp->buf[s->rxp->writePos] = s->byte;
+         s->buf[s->writePos] = s->byte;
 
-         if (++s->rxp->writePos >= s->rxp->bufSize) s->rxp->writePos = 0;
+         /* don't let writePos catch readPos */
+
+         newWritePos = s->writePos;
+
+         if (++newWritePos >= s->bufSize) newWritePos = 0;
+
+         if (newWritePos != s->readPos) s->writePos = newWritePos;
 
          if (level == 0) /* true transition high->low, not a timeout */
          {
@@ -1690,7 +1715,11 @@ static void waveRxSerial(wfRx_t * s, int level, uint32_t tick)
             s->startBitTick = tick;
             s->nextBitDiff  = s->halfBit;
          }
-         else s->bit = -1;
+         else
+         {
+            s->bit = -1;
+            gpioSetWatchdog(s->gpio, 0);
+         }
       }
    }
    else
@@ -1699,6 +1728,7 @@ static void waveRxSerial(wfRx_t * s, int level, uint32_t tick)
 
       if (level == 0)
       {
+         gpioSetWatchdog(s->gpio, s->timeout);
          s->level        = 0;
          s->bit          = 0;
          s->startBitTick = tick;
@@ -2621,10 +2651,12 @@ static void * pthTimerTick(void *x)
 
 static void * pthFifoThread(void *x)
 {
-   char inBuf[256];
-   int idx, flags;
+   char buf[CMD_BUF_SIZE];
+   int idx, flags, len;
    cmdCmd_t cmd;
-   gpioExtent_t ext[3];
+   gpioExtent_t iExt[3];
+   gpioExtent_t oExt[3];
+   char *p;
 
    myCreatePipe(PI_INPFIFO, 0662);
 
@@ -2643,12 +2675,23 @@ static void * pthFifoThread(void *x)
 
    while (1)
    {
-      if (fgets(inBuf, sizeof(inBuf), inpFifo) == NULL)
+      if (fgets(buf, sizeof(buf), inpFifo) == NULL)
          SOFT_ERROR((void*)PI_INIT_FAILED, "fifo fgets failed (%m)");
 
-      if ((idx=cmdParse(inBuf, &cmd, 0, NULL, ext)) >= 0)
+      len = strlen(buf);
+
+      if (len)
       {
-         myDoCommand(&cmd, NULL);
+        --len;
+        buf[len] = 0; /* replace terminating */
+      }
+
+      if ((idx=cmdParse(buf, &cmd, 0, NULL, iExt)) >= 0)
+      {
+         oExt[0].ptr = buf;
+         oExt[0].size = CMD_BUF_SIZE-1;
+
+         myDoCommand(&cmd, iExt, oExt);
 
          switch (cmdInfo[idx].rv)
          {
@@ -2675,6 +2718,17 @@ static void * pthFifoThread(void *x)
             case 5:
                fprintf(outFifo, cmdUsage);
                break;
+
+            case 6:
+               if (cmd.res < 0) fprintf(outFifo, "%d\n", cmd.res);
+               else if (cmd.res > 0)
+               {
+                  p = oExt[0].ptr;
+                  p[cmd.res] = 0;
+                  fprintf(outFifo, "%s", (char *)oExt[0].ptr);
+               }
+               break;
+
          }
 
       }
@@ -2694,8 +2748,13 @@ static void *pthSocketThreadHandler(void *fdC)
    cmdCmd_t cmd;
    unsigned bytes;
    char *memPtr;
-   gpioExtent_t ext[3];
+   gpioExtent_t iExt[3];
+   gpioExtent_t oExt[3];
    unsigned tmp;
+   char buf[CMD_BUF_SIZE];
+
+   oExt[0].size = CMD_BUF_SIZE-1;
+   oExt[0].ptr = buf;
 
    free(fdC);
 
@@ -2719,13 +2778,14 @@ static void *pthSocketThreadHandler(void *fdC)
             bytes = cmd.p1 * sizeof(gpioPulse_t);
 
             memPtr = malloc(bytes);
+
             if (memPtr)
             {
                if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
                {
-                  ext[0].n = bytes;
-                  ext[0].ptr = memPtr;
-                  myDoCommand(&cmd, ext);
+                  iExt[0].size = bytes;
+                  iExt[0].ptr = memPtr;
+                  myDoCommand(&cmd, iExt, oExt);
                   free(memPtr);
                }
                else
@@ -2756,14 +2816,14 @@ static void *pthSocketThreadHandler(void *fdC)
             {
                if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
                {
-                  ext[0].n = sizeof(unsigned);
-                  ext[0].ptr = memPtr;
-                  ext[1].n = sizeof(unsigned);
-                  ext[1].ptr = memPtr + sizeof(unsigned);
-                  ext[2].n = cmd.p2;
-                  ext[2].ptr = memPtr + sizeof(unsigned) + sizeof(unsigned);
+                  iExt[0].size = sizeof(unsigned);
+                  iExt[0].ptr = memPtr;
+                  iExt[1].size = sizeof(unsigned);
+                  iExt[1].ptr = memPtr + sizeof(unsigned);
+                  iExt[2].size = cmd.p2;
+                  iExt[2].ptr = memPtr + sizeof(unsigned) + sizeof(unsigned);
                   memPtr[bytes] = 0; /* may be duplicate terminator */
-                  myDoCommand(&cmd, ext);
+                  myDoCommand(&cmd, iExt, oExt);
                   free(memPtr);
                }
                else
@@ -2787,24 +2847,24 @@ static void *pthSocketThreadHandler(void *fdC)
             bytes = cmd.p1;
 
             memPtr = malloc(bytes+1); /* add 1 for a nul terminator */
+
             if (memPtr)
             {
-               if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
+               if (bytes) /* script appended */
                {
-                  ext[0].n = bytes;
-                  ext[0].ptr = memPtr;
-                  memPtr[bytes] = 0; /* may be duplicate terminator */
-                  myDoCommand(&cmd, ext);
-                  free(memPtr);
+                  if (recv(sock, memPtr, bytes, MSG_WAITALL) != bytes)
+                  {
+                     free(memPtr);
+                     break;
+                  }
                }
-               else
-               {
-                  free(memPtr);
-                  break;
-               }
+               iExt[0].size = bytes;
+               iExt[0].ptr = memPtr;
+               memPtr[bytes] = 0; /* may be duplicate terminator */
+               myDoCommand(&cmd, iExt, oExt);
+               free(memPtr);
             }
             else break;
-
          }
          else
          {
@@ -2817,8 +2877,8 @@ static void *pthSocketThreadHandler(void *fdC)
                   ## extension ##
                   unsigned level
                   */
-                  ext[0].n = 4;
-                  ext[0].ptr = &tmp;
+                  iExt[0].size = 4;
+                  iExt[0].ptr = &tmp;
 
                   if (recv(sock, &tmp, sizeof(unsigned), MSG_WAITALL) !=
                      sizeof(unsigned))
@@ -2831,10 +2891,25 @@ static void *pthSocketThreadHandler(void *fdC)
                default:
                   break;
             }
-            myDoCommand(&cmd, ext);
+            myDoCommand(&cmd, iExt, oExt);
          }
 
          write(sock, &cmd, sizeof(cmdCmd_t));
+
+         switch (cmd.cmd)
+         {
+            case PI_CMD_SLR: /* extension */
+
+               if (cmd.res > 0)
+               {
+                  write(sock, oExt[0].ptr, cmd.res);
+               }
+               break;
+
+            default:
+               break;
+         }
+
 
       }
       else break;
@@ -4347,6 +4422,9 @@ int gpioWaveAddSerial(unsigned gpio,
    DBG(DBG_USER, "gpio=%d baud=%d offset=%d numChar=%d str=%s",
       gpio, baud, offset, numChar, str);
 
+   DBG(DBG_USER, "l=%d s=%X e=%X",
+      strlen(str), str[0], str[strlen(str)-1]);
+
    CHECK_INITED;
 
    if (gpio > PI_MAX_USER_GPIO)
@@ -4439,13 +4517,11 @@ int gpioWaveAddSerial(unsigned gpio,
 
 /*-------------------------------------------------------------------------*/
 
-int gpioWaveSerialReadStart(unsigned gpio,
-                            unsigned baud,
-                            gpioRx_t *rxp)
+int gpioSerialReadOpen(unsigned gpio, unsigned baud)
 {
-   int bitTime, timeoutMs;
+   int bitTime, timeout;
 
-   DBG(DBG_USER, "gpio=%d baud=%d rxp*=%08X", gpio, baud, (uint32_t)rxp);
+   DBG(DBG_USER, "gpio=%d baud=%d", gpio, baud);
 
    CHECK_INITED;
 
@@ -4456,37 +4532,75 @@ int gpioWaveSerialReadStart(unsigned gpio,
       SOFT_ERROR(PI_BAD_WAVE_BAUD,
          "gpio %d, bad baud rate (%d)", gpio, baud);
 
-   if (rxp == NULL)
-      SOFT_ERROR(PI_BAD_SERIAL_STRUC, "Null structure pointer");
-
-   if (rxp->buf == NULL)
-      SOFT_ERROR(PI_BAD_SERIAL_BUF, "Null buffer pointer");
+   if (wfRx[gpio].mode != PI_WFRX_NONE)
+      SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", gpio);
 
    bitTime = MILLION / baud;
 
-   timeoutMs = ((12 * bitTime)+1000)/1000;
+   timeout  = (10 * bitTime)/1000;
+   if (timeout < 1) timeout = 1;
 
+   wfRx[gpio].gpio     = gpio;
+   wfRx[gpio].buf      = malloc(SRX_BUF_SIZE);
+   wfRx[gpio].bufSize  = SRX_BUF_SIZE;
    wfRx[gpio].mode     = PI_WFRX_SERIAL;
    wfRx[gpio].baud     = baud;
-   wfRx[gpio].rxp      = rxp;
-   wfRx[gpio].baud     = baud;
+   wfRx[gpio].timeout  = timeout;
    wfRx[gpio].fullBit  = bitTime;
    wfRx[gpio].halfBit  = bitTime/2;
-   wfRx[gpio].rxp->readPos  = 0;
-   wfRx[gpio].rxp->writePos = 0;
+   wfRx[gpio].readPos  = 0;
+   wfRx[gpio].writePos = 0;
    wfRx[gpio].bit      = -1;
-
-   gpioSetWatchdog(gpio, timeoutMs); /* get a nudge if no change */
 
    gpioSetAlertFunc(gpio, waveRxBit);
 
    return 0;
 }
 
+/*-------------------------------------------------------------------------*/
+
+int gpioSerialRead(unsigned gpio, void *buf, size_t bufSize)
+{
+   unsigned bytes=0, wpos;
+   volatile wfRx_t *p;
+
+   DBG(DBG_USER, "gpio=%d buf=%08X bufSize=%d", gpio, (int)buf, bufSize);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (bufSize == 0)
+      SOFT_ERROR(PI_BAD_SERIAL_COUNT, "buffer size can't be zero");
+
+   if (wfRx[gpio].mode != PI_WFRX_SERIAL)
+      SOFT_ERROR(PI_NOT_SERIAL_GPIO, "no serial read on gpio (%d)", gpio);
+
+   p = &wfRx[gpio];
+
+   if (p->readPos != p->writePos)
+   {
+      wpos = p->writePos;
+
+      if (wpos > p->readPos) bytes = wpos - p->readPos;
+      else                   bytes = p->bufSize - p->readPos;
+
+      if (bytes > bufSize) bytes = bufSize;
+
+      memcpy(buf, p->buf+p->readPos, bytes);
+
+      p->readPos += bytes;
+
+      if (p->readPos >= p->bufSize) p->readPos = 0;
+   }
+   return bytes;
+}
+
 
 /*-------------------------------------------------------------------------*/
 
-int gpioWaveSerialReadStop(unsigned gpio)
+int gpioSerialReadClose(unsigned gpio)
 {
    DBG(DBG_USER, "gpio=%d", gpio);
 
@@ -4504,6 +4618,8 @@ int gpioWaveSerialReadStop(unsigned gpio)
          break;
 
       case PI_WFRX_SERIAL:
+
+         free(wfRx[gpio].buf);
 
          gpioSetWatchdog(gpio, 0); /* switch off timeouts */
 
@@ -5067,6 +5183,8 @@ void gpioStopThread(pthread_t *pth)
 int gpioStoreScript(char *script)
 {
    DBG(DBG_USER, "script=%s", script);
+   DBG(DBG_USER, "l=%d s=%X e=%X",
+      strlen(script), script[0], script[strlen(script)-1]);
 
    CHECK_INITED;
 

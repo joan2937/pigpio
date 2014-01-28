@@ -76,7 +76,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # gpio levels
 
@@ -157,6 +157,9 @@ _PI_CMD_PROC= 38
 _PI_CMD_PROCD=39
 _PI_CMD_PROCR=40
 _PI_CMD_PROCS=41
+_PI_CMD_SLRO= 42
+_PI_CMD_SLR=  43
+_PI_CMD_SLRC= 44
 
 
 _PI_CMD_NOIB= 99
@@ -202,7 +205,7 @@ _PI_BAD_CFG_INTERNAL=-34
 PI_BAD_WAVE_BAUD    =-35
 PI_TOO_MANY_PULSES  =-36
 PI_TOO_MANY_CHARS   =-37
-_PI_NOT_SERIAL_GPIO =-38
+PI_NOT_SERIAL_GPIO =-38
 _PI_BAD_SERIAL_STRUC=-39
 _PI_BAD_SERIAL_BUF  =-40
 PI_NOT_PERMITTED    =-41
@@ -214,6 +217,7 @@ PI_BAD_PULSELEN     =-46
 PI_BAD_SCRIPT       =-47
 PI_BAD_SCRIPT_ID    =-48
 PI_BAD_SER_OFFSET   =-49
+PI_GPIO_IN_USE      =-50
 
 # pigpio error text
 
@@ -252,10 +256,10 @@ _errors=[
    [_PI_INITIALISED      , "function called after gpioInitialise"],
    [_PI_BAD_WAVE_MODE    , "waveform mode not 0-1"],
    [_PI_BAD_CFG_INTERNAL , "bad parameter in gpioCfgInternals call"],
-   [PI_BAD_WAVE_BAUD    , "baud rate not 100-250000"],
-   [PI_TOO_MANY_PULSES  , "waveform has too many pulses"],
-   [PI_TOO_MANY_CHARS   , "waveform has too many chars"],
-   [_PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"],
+   [PI_BAD_WAVE_BAUD     , "baud rate not 100-250000"],
+   [PI_TOO_MANY_PULSES   , "waveform has too many pulses"],
+   [PI_TOO_MANY_CHARS    , "waveform has too many chars"],
+   [PI_NOT_SERIAL_GPIO   , "no serial read in progress on gpio"],
    [PI_NOT_PERMITTED     , "no permission to update gpio"],
    [PI_SOME_PERMITTED    , "no permission to update one or more gpios"],
    [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
@@ -265,6 +269,7 @@ _errors=[
    [PI_BAD_SCRIPT        , "invalid script"],
    [PI_BAD_SCRIPT_ID     , "unknown script id"],
    [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
+   [PI_GPIO_IN_USE       , "gpio already in use"],
 ]
 
 _control = None
@@ -1700,6 +1705,46 @@ def delete_script(script_id):
    script_id: script_id of stored script.
    """
    return _u2i(_pigpio_command(_control, _PI_CMD_PROCD, script_id, 0))
+
+def serial_read_open(user_gpio, baud):
+   """
+   This function opens a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
+   or PI_GPIO_IN_USE.
+
+   The serial data is held in a cyclic buffer and is read using
+   gpioSerialRead().
+
+   It is the caller's responsibility to read data from the cyclic buffer
+   in a timely fashion.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_SLRO, user_gpio, baud))
+
+def serial_read(user_gpio):
+   """
+   This function returns data from the serial cyclic buffer.
+
+   It returns a tuple of status and string.  The status will be the
+   length, possibly 0, of the returned string if OK.  Otherwise a
+   negative error code will be returned in which case the string
+   will be null.
+   """
+   bytes = _u2i(_pigpio_command(_control, _PI_CMD_SLR, user_gpio, 10000))
+   if bytes > 0:
+      buf = ""
+      while len(buf) < bytes: buf += _control.recv(bytes-len(buf))
+      return bytes, buf
+   return bytes, ""
+
+
+def serial_read_close(user_gpio):
+   """
+   This function closes a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_SLRC, user_gpio, 0))
 
 
 class callback:

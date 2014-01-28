@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 2
+#define PIGPIOD_IF_VERSION 3
 
 typedef enum
 {
@@ -45,12 +45,13 @@ typedef enum
    pigif_bad_callback       = -2008,
    pigif_notify_failed      = -2009,
    pigif_callback_not_found = -2010,
-} piscopeError_t;
+} pigifError_t;
 
 
-typedef void (*CBFunc_t)  (int gpio, int level, uint32_t tick);
+typedef void (*CBFunc_t)  (unsigned gpio, unsigned level, uint32_t tick);
 
-typedef void (*CBFuncEx_t)(int gpio, int level, uint32_t tick, void * user);
+typedef void (*CBFuncEx_t)
+   (unsigned gpio, unsigned level, uint32_t tick, void * user);
 
 typedef struct callback_s callback_t;
 
@@ -110,7 +111,7 @@ void pigpio_stop(void);
    resources used by the library.
 */
 
-int set_mode(int gpio, int mode);
+int set_mode(unsigned gpio, unsigned mode);
 /* Set the gpio mode.
 
    gpio: 0-53.
@@ -120,7 +121,7 @@ int set_mode(int gpio, int mode);
    or PI_NOT_PERMITTED.
 */
 
-int get_mode(int gpio);
+int get_mode(unsigned gpio);
 /* Get the gpio mode.
 
    Returns the gpio mode if OK, otherwise PI_BAD_GPIO.
@@ -128,7 +129,7 @@ int get_mode(int gpio);
    gpio: 0-53.
 */
 
-int set_pull_up_down(int gpio, int pud);
+int set_pull_up_down(unsigned gpio, unsigned pud);
 /* Set or clear the gpio pull-up/down resistor.
 
    Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_PUD,
@@ -138,7 +139,7 @@ int set_pull_up_down(int gpio, int pud);
    pud:  PUD_UP, PUD_DOWN, PUD_OFF.
 */
 
-int read_gpio(int gpio);
+int read_gpio(unsigned gpio);
 /* Read the gpio level.
 
    Returns the gpio level if OK, otherwise PI_BAD_GPIO.
@@ -146,7 +147,7 @@ int read_gpio(int gpio);
    gpio:0-53.
 */
 
-int write_gpio(int gpio, int level);
+int write_gpio(unsigned gpio, unsigned level);
 /*
    Write the gpio level.
 
@@ -161,7 +162,7 @@ int write_gpio(int gpio, int level);
    If PWM or servo pulses are active on the gpio they are switched off.
 */
 
-int set_PWM_dutycycle(int user_gpio, int dutycycle);
+int set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle);
 /* Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYCYCLE,
@@ -175,7 +176,7 @@ int set_PWM_dutycycle(int user_gpio, int dutycycle);
    The set_PWM_range() function can change the default range of 255.
 */
 
-int set_PWM_range(int user_gpio, int range_);
+int set_PWM_range(unsigned user_gpio, unsigned range_);
 /* Set the range of PWM values to be used on the gpio.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYRANGE,
@@ -200,7 +201,7 @@ int set_PWM_range(int user_gpio, int range_);
    (dutycycle * real range) / range.
 */
 
-int get_PWM_range(int user_gpio);
+int get_PWM_range(unsigned user_gpio);
 /* Get the range of PWM values being used on the gpio.
 
    Returns the dutycycle range used for the gpio if OK,
@@ -209,7 +210,7 @@ int get_PWM_range(int user_gpio);
    user_gpio: 0-31.
 */
 
-int get_PWM_real_range(int user_gpio);
+int get_PWM_real_range(unsigned user_gpio);
 /* Get the real underlying range of PWM values being used on the gpio.
 
    Returns the real range used for the gpio if OK,
@@ -218,7 +219,7 @@ int get_PWM_real_range(int user_gpio);
    user_gpio: 0-31.
 */
 
-int set_PWM_frequency(int user_gpio, int frequency);
+int set_PWM_frequency(unsigned user_gpio, unsigned frequency);
 /*
    Set the frequency (in Hz) of the PWM to be used on the gpio.
 
@@ -257,7 +258,7 @@ int set_PWM_frequency(int user_gpio, int frequency);
         125, 100, 80, 50, 40, 25, 20, 10, 5
 */
 
-int get_PWM_frequency(int user_gpio);
+int get_PWM_frequency(unsigned user_gpio);
 /*
    Get the frequency of PWM being used on the gpio.
 
@@ -267,7 +268,7 @@ int get_PWM_frequency(int user_gpio);
    user_gpio: 0-31.
 */
 
-int set_servo_pulsewidth(int user_gpio, int pulsewidth);
+int set_servo_pulsewidth(unsigned user_gpio, unsigned pulsewidth);
 /*
    Start (500-2500) or stop (0) servo pulses on the gpio.
 
@@ -330,7 +331,7 @@ int notify_open(void);
    read from /dev/pigpio15.
 */
 
-int notify_begin(int handle, uint32_t bits);
+int notify_begin(unsigned handle, uint32_t bits);
 /*
    Start notifications on a previously opened handle.
 
@@ -352,7 +353,7 @@ int notify_begin(int handle, uint32_t bits);
    I (32 bit) level
 */
 
-int notify_pause(int handle);
+int notify_pause(unsigned handle);
 /*
    Pause notifications on a previously opened handle.
 
@@ -364,7 +365,7 @@ int notify_pause(int handle);
    notify_begin() is called again.
 */
 
-int notify_close(int handle);
+int notify_close(unsigned handle);
 /*
    Stop notifications on a previously opened handle and
    release the handle for reuse.
@@ -374,7 +375,7 @@ int notify_close(int handle);
    handle: 0-31 (as returned by notify_open())
 */
 
-int set_watchdog(int user_gpio, int timeout);
+int set_watchdog(unsigned user_gpio, unsigned timeout);
 /*
    Sets a watchdog for a gpio.
 
@@ -658,25 +659,52 @@ int store_script(char *script);
    otherwise PI_BAD_SCRIPT.
 */
 
-int run_script(int script_id);
+int run_script(unsigned script_id);
 /* This function runs a stored script.
 
    The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 */
 
-int stop_script(int script_id);
+int stop_script(unsigned script_id);
 /* This function stops a running script.
 
    The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 */
 
-int delete_script(int script_id);
+int delete_script(unsigned script_id);
 /* This function deletes a stored script.
 
    The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 */
 
-int callback(int gpio, int edge, CBFunc_t f);
+int serial_read_open(unsigned user_gpio, unsigned baud);
+/* This function opens a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
+   or PI_GPIO_IN_USE.
+
+   The serial data is returned in a cyclic buffer and is read using
+   gpioSerialRead().
+
+   It is the caller's responsibility to read data from the cyclic buffer
+   in a timely fashion.
+*/
+
+int serial_read(unsigned user_gpio, void *buf, size_t bufSize);
+/* This function copies up to bufSize bytes of data read from the
+   serial cyclic buffer to the buffer starting at buf.
+
+   Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
+   or PI_NOT_SERIAL_GPIO.
+*/
+
+int serial_read_close(unsigned user_gpio);
+/* This function closes a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+*/
+
+int callback(unsigned gpio, unsigned edge, CBFunc_t f);
 /*
    This function initialises a new callback.
 
@@ -687,7 +715,7 @@ int callback(int gpio, int edge, CBFunc_t f);
    gpio has the identified edge.
 */
 
-int callback_ex(int gpio, int edge, CBFuncEx_t f, void *user);
+int callback_ex(unsigned gpio, unsigned edge, CBFuncEx_t f, void *user);
 /*
    This function initialises a new callback.
 
@@ -698,14 +726,14 @@ int callback_ex(int gpio, int edge, CBFuncEx_t f, void *user);
    the gpio has the identified edge.
 */
 
-int callback_cancel(int id);
+int callback_cancel(unsigned id);
 /*
    This function cancels a callback identified by its id.
 
    The function returns 0 if OK, otherwise pigif_callback_not_found.
 */
 
-int wait_for_edge(int gpio, int edge, double timeout);
+int wait_for_edge(unsigned gpio, unsigned edge, double timeout);
 /*
    This function waits for edge on the gpio for up to timeout
    seconds.

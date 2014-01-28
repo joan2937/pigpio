@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 11+
+This version is for pigpio version 12+
 */
 
 #include <stdio.h>
@@ -153,10 +153,11 @@ int main(int argc , char *argv[])
 
             for (i=0; i<cmdInfo[idx].ext; i++)
             {
-               send(sock, ext[i].ptr, ext[i].n, 0);
+               send(sock, ext[i].ptr, ext[i].size, 0);
             }
 
-            if (recv(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
+            if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
+               sizeof(cmdCmd_t))
             {
                switch (cmdInfo[idx].rv)
                {
@@ -186,6 +187,17 @@ int main(int argc , char *argv[])
 
                   case 5:
                      printf(cmdUsage);
+                     break;
+
+                  case 6:
+                     r = cmd.res;
+                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+                     else if (r > 0)
+                     {
+                        recv(sock, &buf, r, MSG_WAITALL);
+                        buf[r] = 0;
+                        printf("%s", buf);
+                     }
                      break;
                }
             }

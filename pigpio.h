@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 11
+This version is for pigpio version 12
 */
 
 #ifndef PIGPIO_H
@@ -86,7 +86,7 @@ This version is for pigpio version 11
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 11
+#define PIGPIO_VERSION 12
 
 /*-------------------------------------------------------------------------*/
 
@@ -133,8 +133,9 @@ gpioWaveTxStart            Transmits the waveform.
 gpioWaveTxBusy             Checks to see if the waveform has ended.
 gpioWaveTxStop             Aborts the current waveform.
 
-gpioWaveSerialReadStart    Reads serial data from a user gpio.
-gpioWaveSerialReadStop     Stops reading serial data from a user gpio.
+gpioSerialReadOpen         Opens a gpio for reading serial data.
+gpioSerialRead             Reads serial data from a gpio.
+gpioSerialReadClose        Closes a gpio for reading serial data.
 
 gpioWaveGetMicros          Length in microseconds of the current waveform.
 gpioWaveGetHighMicros      Length of longest waveform so far.
@@ -226,7 +227,7 @@ typedef struct
 
 typedef struct
 {
-   size_t n;
+   size_t size;
    void *ptr;
    int data;
 } gpioExtent_t;
@@ -251,14 +252,6 @@ typedef struct
    uint32_t gpioOff;
    uint32_t usDelay;
 } gpioPulse_t;
-
-typedef struct
-{
-   char   * buf;
-   uint32_t bufSize;
-   int      readPos;
-   int      writePos;
-} gpioRx_t;
 
 typedef void (*gpioAlertFunc_t)    (int      gpio,
                                     int      level,
@@ -974,76 +967,38 @@ int gpioWaveTxStop(void);
 
 
 /*-------------------------------------------------------------------------*/
-int gpioWaveSerialReadStart(unsigned   user_gpio,
-                            unsigned   baud,
-                            gpioRx_t * rxp);
+int gpioSerialReadOpen(unsigned user_gpio, unsigned baud);
 /*-------------------------------------------------------------------------*/
-/* This function starts the reception of serial data with the
-   specified baud rate on a gpio.
+/* This function opens a gpio for reading serial data.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
-   PI_BAD_SERIAL_STRUC, or PI_BAD_SERIAL_BUF.
+   or PI_GPIO_IN_USE.
 
-   NOTES:
-
-   typedef struct
-   {
-      char   * buf;
-      uint32_t bufSize;
-      int      readPos;
-      int      writePos;
-   } gpioRx_t;
-
-   The serial data is returned in a cyclic buffer which MUST be allocated
-   by the caller.  The caller specifies the location and size of the
-   buffer in buf and bufSize.
+   The serial data is returned in a cyclic buffer and is read using
+   gpioSerialRead().
 
    It is the caller's responsibility to read data from the cyclic buffer
-   in a timely fashion.  Data is available when readPos is not equal to
-   writePos.
-
-   EXAMPLE:
-
-   #define BUFSIZE 1000
-
-   char buf[BUFSIZE];
-   int bytes, wpos;
-   FILE * outFile;
-
-   gpioRx_t rx;
-
-   ...
-
-   rx.buf = buf;
-   rx.bufSize = sizeof(buf);
-
-   if (gpioWaveSerialReadStart(4, 38400, &rx) == 0)
-   {
-      ...
-
-      while (rx.readPos != rx.writePos)
-      {
-         wpos = rx.writePos;
-
-         if (wpos > rx.readPos) bytes = wpos - rx.readPos;
-         else                   bytes = rx.bufSize - rx.readPos;
-
-         fwrite(rx.buf+rx.readPos, 1, bytes, outFile);
-
-         rx.readPos += bytes;
-
-         if (rx.readPos >= rx.bufSize) rx.readPos = 0;
-      }
-      ...
-   }
+   in a timely fashion.
 */
 
 
 
 /*-------------------------------------------------------------------------*/
-int gpioWaveSerialReadStop(unsigned user_gpio);
+int gpioSerialRead(unsigned user_gpio, void *buf, size_t bufSize);
 /*-------------------------------------------------------------------------*/
-/* This function stops reading serial data from a gpio.
+/* This function copies up to bufSize bytes of data read from the
+   serial cyclic buffer to the buffer starting at buf.
+
+   Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
+   or PI_NOT_SERIAL_GPIO.
+*/
+
+
+
+/*-------------------------------------------------------------------------*/
+int gpioSerialReadClose(unsigned user_gpio);
+/*-------------------------------------------------------------------------*/
+/* This function closes a gpio for reading serial data.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 */
@@ -1901,6 +1856,9 @@ void gpioWaveDump(void);
 #define PI_CMD_PROCD 39
 #define PI_CMD_PROCR 40
 #define PI_CMD_PROCS 41
+#define PI_CMD_SLRO  42
+#define PI_CMD_SLR   43
+#define PI_CMD_SLRC  44
 
 /*
 The following command only works on the socket interface.
@@ -1970,6 +1928,8 @@ after this command is issued.
 #define PI_BAD_SCRIPT       -47 /* invalid script                          */
 #define PI_BAD_SCRIPT_ID    -48 /* unknown script id                       */
 #define PI_BAD_SER_OFFSET   -49 /* add serial data offset > 30 minutes     */
+#define PI_GPIO_IN_USE      -50 /* gpio already in use                     */
+#define PI_BAD_SERIAL_COUNT -51 /* must read at least a byte at a time     */
 
 
 /*-------------------------------------------------------------------------*/
