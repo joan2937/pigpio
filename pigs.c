@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 12+
+This version is for pigpio version 13+
 */
 
 #include <stdio.h>
@@ -46,6 +46,9 @@ This version is for pigpio version 12+
 This program provides a socket interface to some of
 the commands available from pigpio.
 */
+
+char command_buf[8192];
+char response_buf[8192];
 
 void fatal(char *fmt, ...)
 {
@@ -103,109 +106,226 @@ static int openSocket(void)
    return sock;
 }
 
+void print_result(int sock, int rv, cmdCmd_t cmd)
+{
+   int i, r;
+   uint32_t *p;
+
+   r = cmd.res;
+
+   switch (rv)
+   {
+      case 0:
+         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         break;
+
+      case 1:
+         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         break;
+
+      case 2:
+         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         else printf("%d\n", r);
+         break;
+
+      case 3:
+         printf("%08X\n", cmd.res);
+         break;
+
+      case 4:
+         printf("%u\n", cmd.res);
+         break;
+
+      case 5:
+         printf(cmdUsage);
+         break;
+
+      case 6: /* SLR */
+         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         else if (r > 0)
+         {
+            printf("%s", response_buf);
+         }
+         break;
+
+      case 7: /* PROCP */
+         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         else
+         {
+            printf("%d", r);
+
+            p = (uint32_t *)response_buf;
+
+            for (i=0; i<MAX_SCRIPT_PARAMS; i++)
+            {
+               printf(" %d", p[i]);
+            }
+
+            printf("\n");
+         }
+         break;
+   }
+}
+
+void get_extensions(int sock, int command, int res)
+{
+   switch (command)
+   {
+      case PI_CMD_PROCP: /* PROCP */
+         if (res >= 0)
+         {
+            recv(sock,
+                 response_buf,
+                 sizeof(uint32_t)*MAX_SCRIPT_PARAMS,
+                 MSG_WAITALL);
+         }
+         break;
+
+      case PI_CMD_SLR: /* SLR */
+         if (res > 0)
+         {
+            recv(sock, response_buf, res, MSG_WAITALL);
+            response_buf[res] = 0;
+         }
+         break;
+   }
+}
+
+void put_extensions(int sock, int command, uint32_t *p, void *v[])
+{
+   switch (command)
+   {
+      case PI_CMD_PROC:
+         /*
+         p1=script length w[1]
+         p2=0
+         ## extension ##
+         char[] script    v[1]
+         */
+         send(sock, v[1], p[1], 0);
+         break;
+
+      case PI_CMD_PROCR:
+         /*
+         p1=script id     w[1]
+         p2=numParam      w[2]
+         ## extension ##
+         int[] param      v[1]
+         */
+         if (p[2]) send(sock, v[1], p[2]*sizeof(uint32_t), 0);
+         break;
+
+      case PI_CMD_TRIG:
+         /*
+         p1=user_gpio      w[1]
+         p2=pulseLen       w[2]
+         ## extension ##
+         unsigned level    w[3]
+         */
+         send(sock, &p[3], 4, 0);
+         break;
+
+      case PI_CMD_WVAG:
+         /*
+         p1=pulses        w[1]
+         p2=0
+         ## extension ##
+         int[] param      v[1]
+         */
+         if (p[1]) send(sock, v[1], p[1]*sizeof(gpioPulse_t), 0);
+         break;
+
+      case PI_CMD_WVAS:
+         /*
+         p1=user_gpio       w[1]
+         p2=numChar         w[4]
+         ## extension ##
+         unsigned baud      w[2]
+         unsigned offset    w[3]
+         char[] str         v[1]
+         */
+         send(sock, &p[2], 4, 0);
+         send(sock, &p[3], 4, 0);
+         send(sock, v[1], p[4], 0);
+         break;
+   }
+
+}
+
 int main(int argc , char *argv[])
 {
-   int sock, r, idx, i;
+   int sock, command;
+   int idx, i, pp, l, len;
    cmdCmd_t cmd;
-   gpioExtent_t ext[3];
-   char buf[1024];
+   uint32_t p[10];
+   void *v[10];
+   gpioCtlParse_t ctl;
 
    sock = openSocket(); 
 
    if (sock != -1)
    {
-      switch(argc)
+      command_buf[0] = 0;
+      l = 0;
+      pp = 0;
+
+      for (i=1; i<argc; i++)
       {
-         case 1:
-            exit(0);
-
-         case 2:
-            sprintf(buf, "%10s", argv[1]);
-            break;
-
-         case 3:
-            sprintf(buf, "%10s %10s", argv[1], argv[2]);
-            break;
-
-         case 4:
-            sprintf(buf, "%10s %10s %10s", argv[1], argv[2], argv[3]);
-            break;
-
-         case 5:
-            sprintf(buf, "%10s %10s %10s %10s",
-               argv[1], argv[2], argv[3], argv[4]);
-            break;
-
-         case 6:
-            sprintf(buf, "%10s %10s %10s %10s %10s",
-               argv[1], argv[2], argv[3], argv[4], argv[5]);
-            break;
-
-         default:
-            fatal("what? 'pigs h' for help");
+         l += (strlen(argv[i]) + 1);
+         if (l < sizeof(command_buf))
+            {sprintf(command_buf+pp, "%s ", argv[i]); pp=l;}
       }
 
-      if ((idx=cmdParse(buf, &cmd, argc, argv, ext)) >= 0)
+      if (pp) {command_buf[--pp] = 0;}
+
+      ctl.flags = 0;
+      ctl.eaten = 0;
+
+      len = strlen(command_buf);
+      idx = 0;
+
+      while ((idx >= 0) && (ctl.eaten < len))
       {
-         if (send(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
+         if ((idx=cmdParse(command_buf, p, v, &ctl)) >= 0)
          {
-            /* send extensions */
+            command = p[0];
 
-            for (i=0; i<cmdInfo[idx].ext; i++)
+            if (command < PI_CMD_SCRIPT)
             {
-               send(sock, ext[i].ptr, ext[i].size, 0);
-            }
+               cmd.cmd = command;
+               cmd.p1 = p[1];
+               cmd.p2 = p[2];
 
-            if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
-               sizeof(cmdCmd_t))
-            {
-               switch (cmdInfo[idx].rv)
+               switch (command)
                {
-                  case 0:
-                     r = cmd.res;
-                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-                     break;
+                  case PI_CMD_WVAS:
+                     cmd.p2 = p[4];
+                    break;
 
-                  case 1:
-                     r = cmd.res;
-                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-                     break;
-
-                  case 2:
-                     r = cmd.res;
-                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-                     else printf("%d\n", r);
-                     break;
-
-                  case 3:
-                     printf("%08X\n", cmd.res);
-                     break;
-
-                  case 4:
-                     printf("%u\n", cmd.res);
-                     break;
-
-                  case 5:
-                     printf(cmdUsage);
-                     break;
-
-                  case 6:
-                     r = cmd.res;
-                     if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-                     else if (r > 0)
-                     {
-                        recv(sock, &buf, r, MSG_WAITALL);
-                        buf[r] = 0;
-                        printf("%s", buf);
-                     }
+                  case PI_CMD_PROC:
+                     cmd.p2 = 0;
                      break;
                }
+
+               if (send(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
+               {
+                  put_extensions(sock, command, p, v);
+
+                  if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
+                     sizeof(cmdCmd_t))
+                  {
+                     get_extensions(sock, command, cmd.res);
+
+                     print_result(sock, cmdInfo[idx].rv, cmd);
+                  }
+                  else fatal("recv failed, %m");
+               }
+               else fatal("send failed, %m");
             }
-            else fatal("recv failed, %m");
+            else fatal("%s only allowed within a script", cmdInfo[idx].name);
          }
-         else fatal("send failed, %m");
+         else fatal("%s? pigs h for help", cmdStr());
       }
-      else fatal("what? 'pigs h' for help");
    }
    else fatal("connect failed, %m");
 

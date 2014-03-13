@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 12+
+This version is for pigpio version 13+
 */
 
 #include <stdio.h>
@@ -58,135 +58,204 @@ This version is for pigpio version 12+
  7 cmd   %x
  8 MODES %d %c
  9 PUD   %d %c
-10 PROG  %s
+10 PROC  %s
 11 WVAS  %d %d %d %s
+12 PROCR %d [%d]*10
+13 WVAG  %d %d %d [%d %d %d]*160
+
+
+20 cmd m(0-150)
+21 cmd v
+22 cmd L
+23 cmd
+24 cmd m1(0-150) m2(0-150)
+25 cmd p(0-9)
 */
 
 cmdInfo_t cmdInfo[]=
 {
-   /* num         str   vfyt retv ext */
+   /* num         str   vfyt retv */
 
-   {PI_CMD_BC1,   "BC1",   7, 1,  0},
-   {PI_CMD_BC2,   "BC2",   7, 1,  0},
-   {PI_CMD_BR1,   "BR1",   1, 3,  0},
-   {PI_CMD_BR2,   "BR2",   1, 3,  0},
-   {PI_CMD_BS1,   "BS1",   7, 1,  0},
-   {PI_CMD_BS2,   "BS2",   7, 1,  0},
-   {PI_CMD_HELP,  "H",     6, 5,  0},
-   {PI_CMD_HELP,  "HELP",  6, 5,  0},
-   {PI_CMD_HWVER, "HWVER", 1, 4,  0},
-   {PI_CMD_MODEG, "MG"   , 2, 2,  0},
-   {PI_CMD_MODEG, "MODEG", 2, 2,  0},
-   {PI_CMD_MODES, "M",     8, 0,  0},
-   {PI_CMD_MODES, "MODES", 8, 0,  0},
-   {PI_CMD_NB,    "NB",    4, 0,  0},
-   {PI_CMD_NC,    "NC",    2, 0,  0},
-   {PI_CMD_NO,    "NO",    1, 2,  0},
-   {PI_CMD_NP,    "NP",    2, 0,  0},
-   {PI_CMD_PFG,   "PFG",   2, 2,  0},
-   {PI_CMD_PFS,   "PFS",   3, 2,  0},
-   {PI_CMD_PIGPV, "PIGPV", 1, 4,  0},
-   {PI_CMD_PRG,   "PRG",   2, 2,  0},
-   {PI_CMD_PROC,  "PROC", 10, 2,  1},
-   {PI_CMD_PROCD, "PROCD", 2, 2,  0},
-   {PI_CMD_PROCR, "PROCR", 2, 2,  0},
-   {PI_CMD_PROCS, "PROCS", 2, 2,  0},
-   {PI_CMD_PRRG,  "PRRG",  2, 2,  0},
-   {PI_CMD_PRS,   "PRS",   3, 2,  0},
-   {PI_CMD_PUD,   "PUD",   9, 0,  0},
-   {PI_CMD_PWM,   "P",     3, 0,  0},
-   {PI_CMD_PWM,   "PWM",   3, 0,  0},
-   {PI_CMD_READ,  "R",     2, 2,  0},
-   {PI_CMD_READ,  "READ",  2, 2,  0},
-   {PI_CMD_SERVO, "S",     3, 0,  0},
-   {PI_CMD_SERVO, "SERVO", 3, 0,  0},
-   {PI_CMD_SLR,   "SLR",   3, 6,  0},
-   {PI_CMD_SLRC,  "SLRC",  2, 2,  0},
-   {PI_CMD_SLRO,  "SLRO",  3, 2,  0},
-   {PI_CMD_WDOG,  "WDOG",  3, 0,  0},
-   {PI_CMD_WRITE, "W",     3, 0,  0},
-   {PI_CMD_WRITE, "WRITE", 3, 0,  0},
-   {PI_CMD_TICK,  "T",     1, 4,  0},
-   {PI_CMD_TICK,  "TICK",  1, 4,  0},
-   {PI_CMD_TRIG,  "TRIG",  5, 0,  1},
-   {PI_CMD_WVAS,  "WVAS", 11, 2,  3},
-   {PI_CMD_WVBSY, "WVBSY", 1, 2,  0},
-   {PI_CMD_WVCLR, "WVCLR", 1, 2,  0},
-   {PI_CMD_WVGO,  "WVGO" , 1, 2,  0},
-   {PI_CMD_WVGOR, "WVGOR", 1, 2,  0},
-   {PI_CMD_WVHLT, "WVHLT", 1, 2,  0},
-   {PI_CMD_WVSC,  "WVSC",  2, 2,  0},
-   {PI_CMD_WVSM,  "WVSM",  2, 2,  0},
-   {PI_CMD_WVSP,  "WVSP",  2, 2,  0},
+   {PI_CMD_BC1,   "BC1",   7, 1},
+   {PI_CMD_BC2,   "BC2",   7, 1},
+   {PI_CMD_BR1,   "BR1",   1, 3},
+   {PI_CMD_BR2,   "BR2",   1, 3},
+   {PI_CMD_BS1,   "BS1",   7, 1},
+   {PI_CMD_BS2,   "BS2",   7, 1},
+   {PI_CMD_HELP,  "H",     6, 5},
+   {PI_CMD_HELP,  "HELP",  6, 5},
+   {PI_CMD_HWVER, "HWVER", 1, 4},
+   {PI_CMD_MICRO, "MICRO", 21, 0},
+   {PI_CMD_MILLI, "MILLI", 21, 0},
+   {PI_CMD_MODEG, "MG"   , 2, 2},
+   {PI_CMD_MODEG, "MODEG", 2, 2},
+   {PI_CMD_MODES, "M",     8, 0},
+   {PI_CMD_MODES, "MODES", 8, 0},
+   {PI_CMD_NB,    "NB",    4, 0},
+   {PI_CMD_NC,    "NC",    2, 0},
+   {PI_CMD_NO,    "NO",    1, 2},
+   {PI_CMD_NP,    "NP",    2, 0},
+   {PI_CMD_PFG,   "PFG",   2, 2},
+   {PI_CMD_PFS,   "PFS",   3, 2},
+   {PI_CMD_PIGPV, "PIGPV", 1, 4},
+   {PI_CMD_PRG,   "PRG",   2, 2},
+   {PI_CMD_PROC,  "PROC", 10, 2},
+   {PI_CMD_PROCD, "PROCD", 2, 2},
+   {PI_CMD_PROCP, "PROCP", 2, 7},
+   {PI_CMD_PROCR, "PROCR",12, 2},
+   {PI_CMD_PROCS, "PROCS", 2, 2},
+   {PI_CMD_PRRG,  "PRRG",  2, 2},
+   {PI_CMD_PRS,   "PRS",   3, 2},
+   {PI_CMD_PUD,   "PUD",   9, 0},
+   {PI_CMD_PWM,   "P",     3, 0},
+   {PI_CMD_PWM,   "PWM",   3, 0},
+   {PI_CMD_READ,  "R",     2, 2},
+   {PI_CMD_READ,  "READ",  2, 2},
+   {PI_CMD_SERVO, "S",     3, 0},
+   {PI_CMD_SERVO, "SERVO", 3, 0},
+   {PI_CMD_SLR,   "SLR",   3, 6},
+   {PI_CMD_SLRC,  "SLRC",  2, 2},
+   {PI_CMD_SLRO,  "SLRO",  3, 2},
+   {PI_CMD_TICK,  "T",     1, 4},
+   {PI_CMD_TICK,  "TICK",  1, 4},
+   {PI_CMD_TRIG,  "TRIG",  5, 0},
+   {PI_CMD_WDOG,  "WDOG",  3, 0},
+   {PI_CMD_WRITE, "W",     3, 0},
+   {PI_CMD_WRITE, "WRITE", 3, 0},
+   {PI_CMD_WVAG,  "WVAG", 13, 2},
+   {PI_CMD_WVAS,  "WVAS", 11, 2},
+   {PI_CMD_WVBSY, "WVBSY", 1, 2},
+   {PI_CMD_WVCLR, "WVCLR", 1, 2},
+   {PI_CMD_WVGO,  "WVGO" , 1, 2},
+   {PI_CMD_WVGOR, "WVGOR", 1, 2},
+   {PI_CMD_WVHLT, "WVHLT", 1, 2},
+   {PI_CMD_WVSC,  "WVSC",  2, 2},
+   {PI_CMD_WVSM,  "WVSM",  2, 2},
+   {PI_CMD_WVSP,  "WVSP",  2, 2},
+
+   {PI_CMD_ADDI , "ADDI" , 21, 0},
+   {PI_CMD_ADDV , "ADDV" , 20, 0},
+   {PI_CMD_ANDI , "ANDI" , 21, 0},
+   {PI_CMD_ANDV , "ANDV" , 20, 0},
+   {PI_CMD_CALL , "CALL" , 22, 0},
+   {PI_CMD_CMPI , "CMPI" , 21, 0},
+   {PI_CMD_CMPV , "CMPV" , 20, 0},
+   {PI_CMD_DCRA , "DCRA" , 23, 0},
+   {PI_CMD_DCRV , "DCRV" , 20, 0},
+   {PI_CMD_HALT , "HALT" , 23, 0},
+   {PI_CMD_INRA , "INRA" , 23, 0},
+   {PI_CMD_INRV , "INRV" , 20, 0},
+   {PI_CMD_JM   , "JM"   , 22, 0},
+   {PI_CMD_JMP  , "JMP"  , 22, 0},
+   {PI_CMD_JNZ  , "JNZ"  , 22, 0},
+   {PI_CMD_JP   , "JP"   , 22, 0},
+   {PI_CMD_JZ   , "JZ"   , 22, 0},
+   {PI_CMD_LABEL, "LABEL", 22, 0},
+   {PI_CMD_LDAI , "LDAI" , 21, 0},
+   {PI_CMD_LDAP , "LDAP" , 25, 0},
+   {PI_CMD_LDAV , "LDAV" , 20, 0},
+   {PI_CMD_LDPA , "LDPA" , 25, 0},
+   {PI_CMD_LDVA , "LDVA" , 20, 0},
+   {PI_CMD_LDVI , "LDVI" , 28, 0},
+   {PI_CMD_LDVV , "LDVV" , 24, 0},
+   {PI_CMD_ORI  , "ORI"  , 21, 0},
+   {PI_CMD_ORV  , "ORV"  , 20, 0},
+   {PI_CMD_POPA , "POPA" , 23, 0},
+   {PI_CMD_POPV , "POPV" , 20, 0},
+   {PI_CMD_PUSHA, "PUSHA", 23, 0},
+   {PI_CMD_PUSHV, "PUSHV", 20, 0},
+   {PI_CMD_RET  , "RET"  , 23, 0},
+   {PI_CMD_RAL  , "RAL"  , 21, 0},
+   {PI_CMD_RAR  , "RAR"  , 21, 0},
+   {PI_CMD_SUBI , "SUBI" , 21, 0},
+   {PI_CMD_SUBV , "SUBV" , 20, 0},
+   {PI_CMD_SWAPA, "SWAPA", 20, 0},
+   {PI_CMD_SWAPV, "SWAPV", 24, 0},
+   {PI_CMD_SYS  , "SYS"  , 27, 0},
+   {PI_CMD_WAITI, "WAITI", 21, 0},
+   {PI_CMD_WAITV, "WAITV", 20, 0},
+   {PI_CMD_XORI , "XORI" , 21, 0},
+   {PI_CMD_XORV , "XORV" , 20, 0},
+
 };
 
 char * cmdUsage = "\
-BC1 x        Clear gpios x in bank 1.\n\
-BC2 x        Clear gpios x in bank 2.\n\
-BR1          Read gpios bank 1.\n\
-BR2          Read gpios bank 2.\n\
-BS1 x        Set gpios x in bank 1.\n\
-BS2 x        Set gpios x in bank 2.\n\
-H            Displays command help.\n\
-HELP         Displays command help.\n\
-HWVER        Return hardware version.\n\
-M g m        Set gpio g to mode m.\n\
-MG g         Get gpio g mode.\n\
-MODEG g      Get gpio g mode.\n\
-MODES g m    Set gpio g to mode m.\n\
-NB h x       Start notifications on handle h with x.\n\
-NC h         Close notification handle h.\n\
-NO           Request notification handle.\n\
-NP h         Pause notifications on handle h.\n\
-P u d        Set PWM value for user gpio u to d.\n\
-PFG u        Get PWM frequency for user gpio u.\n\
-PFS u d      Set PWM frequency for user gpio u to d.\n\
-PIGPV        Return pigpio version.\n\
-PRG u        Get PWM range for user gpio u.\n\
-PROC t       Store text t of script.\n\
-PROCD s      Delete script s.\n\
-PROCR s      Run script s.\n\
-PROCS s      Stop script s.\n\
-PRRG u       Get PWM real range for user gpio u.\n\
-PRS u d      Set PWM range for user gpio u to d.\n\
-PUD g p      Set gpio pull up/down for gpio g to p.\n\
-PWM u d      Set PWM value for user gpio u to d.\n\
-R g          Read gpio g.\n\
-READ g       Read gpio g.\n\
-S u d        Set servo value for user gpio u to d microseconds.\n\
-SERVO u d    Set servo value for user gpio u to d microseconds.\n\
-SLR u d      Read up to d bytes of serial data from user gpio u.\n\
-SLRC u       Close user gpio u for serial data.\n\
-SLRO u b     Open user gpio u for serial data at b baud.\n\
-T            Return current tick.\n\
-TICK         Return current tick.\n\
-TRIG u pl L  Trigger level L for pl micros on user gpio u.\n\
-W g L        Write level L to gpio g.\n\
-WDOG u d     Set watchdog of d milliseconds on user gpio u.\n\
-WRITE g L    Write level L to gpio g.\n\
-WVAS u b o t Wave add serial data t to user gpio u at b baud.\n\
-WVBSY        Check if wave busy.\n\
-WVCLR        Wave clear.\n\
-WVGO         Wave transmit.\n\
-WVGOR        Wave transmit repeatedly.\n\
-WVHLT        Wave stop.\n\
-WVSC ws      Wave get DMA control block stats.\n\
-WVSM ws      Wave get micros stats.\n\
-WVSP ws      Wave get pulses stats.\n\
-.\n\
+BC1 v         Clear gpios defined by mask v in bank 1.\n\
+BC2 v         Clear gpios defined by mask v in bank 2.\n\
+BR1           Read gpios bank 1.\n\
+BR2           Read gpios bank 2.\n\
+BS1 v         Set gpios defined by mask v in bank 1.\n\
+BS2 v         Set gpios defined by mask v in bank 2.\n\
+H             Displays command help.\n\
+HELP          Displays command help.\n\
+HWVER         Return hardware version.\n\
+M g m         Set gpio g to mode m.\n\
+MG g          Get gpio g mode.\n\
+MICRO v       Delay for v microseconds.\n\
+MILLI v       Delay for v milliseconds.\n\
+MODEG g       Get gpio g mode.\n\
+MODES g m     Set gpio g to mode m.\n\
+NB h v        Start notifications on handle h for gpios defined by mask v.\n\
+NC h          Close notification handle h.\n\
+NO            Request notification handle.\n\
+NP h          Pause notifications on handle h.\n\
+P u v         Set PWM value for user gpio u to d.\n\
+PFG u         Get PWM frequency for user gpio u.\n\
+PFS u v       Set PWM frequency for user gpio u to d.\n\
+PIGPV         Return pigpio version.\n\
+PRG u         Get PWM range for user gpio u.\n\
+PROC t        Store text t of script.\n\
+PROCD s       Delete script s.\n\
+PROCP s       Get current status and parameter values for script s.\n\
+PROCR s pars  Run script s with up to 10 optional parameters.\n\
+PROCS s       Stop script s.\n\
+PRRG u        Get PWM real range for user gpio u.\n\
+PRS u v       Set PWM range for user gpio u to d.\n\
+PUD g p       Set gpio pull up/down for gpio g to p.\n\
+PWM u v       Set PWM value for user gpio u to d.\n\
+R g           Read gpio g.\n\
+READ g        Read gpio g.\n\
+S u v         Set servo value for user gpio u to d microseconds.\n\
+SERVO u v     Set servo value for user gpio u to d microseconds.\n\
+SLR u v       Read up to d bytes of serial data from user gpio u.\n\
+SLRC u        Close user gpio u for serial data.\n\
+SLRO u b      Open user gpio u for serial data at b baud.\n\
+T             Return current tick.\n\
+TICK          Return current tick.\n\
+TRIG u pl L   Trigger level L for pl micros on user gpio u.\n\
+W g L         Write level L to gpio g.\n\
+WDOG u v      Set watchdog of d milliseconds on user gpio u.\n\
+WRITE g L     Write level L to gpio g.\n\
+WVAG pulses   Wave add generic pulses.\n\
+WVAS u b o t  Wave add serial data t to user gpio u at b baud.\n\
+WVBSY         Check if wave busy.\n\
+WVCLR         Wave clear.\n\
+WVGO          Wave transmit.\n\
+WVGOR         Wave transmit repeatedly.\n\
+WVHLT         Wave stop.\n\
+WVSC ws       Wave get DMA control block stats.\n\
+WVSM ws       Wave get micros stats.\n\
+WVSP ws       Wave get pulses stats.\n\
+\n\
 b = baud rate.\n\
-d = decimal value.\n\
-g = gpio (0-53).\n\
+g = any gpio (0-53).\n\
 h = handle (0-31).\n\
 L = level (0-1).\n\
 m = mode (RW540123).\n\
+mask = a bit mask where (1<<g) is set for each gpio g of interest.\n\
 o = offset (0-).\n\
 p = pud (ODU).\n\
+pars = 0 to 10 parameters for script.\n\
 pl = pulse length (0-100).\n\
-s = script id.\n\
+pulses = 1 or more triplets of gpios on, gpios off, delay.\n\
+s = script id (0-31).\n\
 t = text.\n\
 u = user gpio (0-31).\n\
-x = hex value.\n\
+v = value.\n\
+ws = 0=now, 1=high, 2=max.\n\
+\n\
+Numbers may be entered as hex (prefix 0x), octal (prefix 0),\n\
+otherwise they are assumed to be decimal.\n\
 ";
 
 typedef struct
@@ -248,12 +317,24 @@ static errInfo_t errInfo[]=
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},
    {PI_GPIO_IN_USE      , "gpio already in use"},
    {PI_BAD_SERIAL_COUNT , "must read at least a byte at a time"},
+   {PI_BAD_PARAM_NUM    , "script parameter must be 0-9"},
+   {PI_DUP_LABEL        , "script has duplicate label"},
+   {PI_TOO_MANY_LABELS  , "script has too many labels"},
+   {PI_BAD_SCRIPT_CMD   , "illegal script command"},
+   {PI_BAD_VAR_NUM      , "script variable must be 0-149"},
+   {PI_NO_SCRIPT_ROOM   , "no more room for scripts"},
+   {PI_NO_MEMORY        , "can't allocate temporary memory"},
+   {PI_SOCK_READ_FAILED , "socket read failed"},
+   {PI_SOCK_WRIT_FAILED , "socket write failed"},
+   {PI_TOO_MANY_PARAM   , "too many script parameters > 10"},
+   {PI_NOT_HALTED       , "script already running or failed"},
+
 };
 
 static char * fmtMdeStr="RW540123";
 static char * fmtPudStr="ODU";
 
-static int cmdMatch(char * str)
+static int cmdMatch(char *str)
 {
    int i;
 
@@ -264,65 +345,117 @@ static int cmdMatch(char * str)
    return -1;
 }
 
-int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext)
+static int getNum(char *str, unsigned *val, uint8_t *opt, int flags)
 {
-   char str[8];
-   int f, valid, idx, val, p;
+   int f, n, v;
+
+   *opt = 0;
+
+   f = sscanf(str, " %i %n", &v, &n);
+
+   if (f == 1)
+   {
+      *val = v;
+      *opt = CMD_NUMERIC;
+      return n;
+   }
+
+   if (flags & PARSE_FLAGS_PARAMS)
+   {
+      f = sscanf(str, " p%i %n", &v, &n);
+
+      if (f == 1)
+      {
+         *val = v;
+         *opt = CMD_PARAM;
+         return n;
+      }
+   }
+
+   if (flags & PARSE_FLAGS_VARS)
+   {
+      f = sscanf(str, " v%i %n", &v, &n);
+
+      if (f == 1)
+      {
+         *val = v;
+         *opt = CMD_VAR;
+         return n;
+      }
+   }
+
+   return 0;
+}
+
+static char intCmdStr[32];
+
+char *cmdStr(void)
+{
+   return intCmdStr;
+}
+
+int cmdParse(char *buf, uint32_t *p, void **v, gpioCtlParse_t *ctl)
+{
+   int f, valid, idx, val, pp, pars, n, n2, i;
    char *ptr;
-   char c, t;
+   char c;
+   int param[MAX_PARAM];
 
-   sscanf(buf, " %7s", str);
+   bzero(&ctl->opt, sizeof(ctl->opt));
 
-   cmd->cmd = -1;
+   sscanf(buf+ctl->eaten, " %31s", intCmdStr);
 
-   idx = cmdMatch(str);
+   p[0] = -1;
+
+   idx = cmdMatch(intCmdStr);
 
    if (idx < 0) return idx;
 
+   sscanf(buf+ctl->eaten, " %*31s %n", &pp);
+
+   ctl->eaten += pp;
+
    valid = 0;
 
-   cmd->cmd = cmdInfo[idx].cmd;
-   cmd->p1  = 0;
-   cmd->p2  = 0;
+   p[0] = cmdInfo[idx].cmd;
+   p[1]  = 0;
+   p[2]  = 0;
 
    switch (cmdInfo[idx].vt)
    {
-      case 1: /* BR1  BR2  HWVER NO  PIGPV  TICK  WVBSY  WVCLR  WVGO
+      case 1: /* BR1  BR2  HWVER  NO  PIGPV  TICK  WVBSY  WVCLR  WVGO
                  WVGOR  WVHLT
               */
-         f = sscanf(buf, " %7s %c", str, &t);
-         if (f == 1) valid = 1;
+         valid = 1;
          break;
 
-      case 2: /* MODEG  NC  NP  PFG  PRG  PROCD  PROCR  PROCS  PRRG
+      case 2: /* MODEG  NC  NP  PFG  PRG  PROCD  PROCS  PRRG
                  SLRC  READ  WVSC  WVSM  WVSP
               */
-         f = sscanf(buf, " %7s %d %c", str, &cmd->p1, &t);
-         if (f == 2) valid = 1;
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         if (ctl->opt[0]) valid = 1;
          break;
 
       case 3: /* PFS  PRS  PWM  SERVO  SLR  SLRO  WDOG  WRITE
               */
-         f = sscanf(buf, " %7s %d %d %c", str, &cmd->p1, &cmd->p2, &t);
-         if (f == 3) valid = 1;
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1], ctl->flags);
+         if (ctl->opt[0] && ctl->opt[1]) valid = 1;
          break;
 
       case 4: /* NB
               */
-         f = sscanf(buf, " %7s %d %x %c", str, &cmd->p1, &cmd->p2, &t);
-         if (f == 3) valid = 1;
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1], ctl->flags);
+         if (ctl->opt[0] && ctl->opt[1]) valid = 1;
          break;
 
       case 5: /* TRIG
               */
-         f = sscanf(buf, " %7s %d %d %d %c",
-            str, &cmd->p1, &cmd->p2, &ext[0].data, &t);
-         if (f == 4)
-         {
-            ext[0].size = sizeof(unsigned);
-            ext[0].ptr = &ext[0].data;
-            valid = 1;
-         }
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[3], &ctl->opt[2], ctl->flags);
+         if (ctl->opt[0] && ctl->opt[1] && ctl->opt[2]) valid = 1;
          break;
 
       case 6: /* HELP
@@ -332,21 +465,23 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
 
       case 7: /* BC1  BC2  BS1  BS2
               */
-         f = sscanf(buf, " %7s %x %c", str, &cmd->p1, &t);
-         if (f == 2) valid = 1;
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         if (ctl->opt[0]) valid = 1;
          break;
 
       case 8: /* MODES
               */
-         f = sscanf(buf, " %7s %d %c %c", str, &cmd->p1, &c, &t);
-         if (f == 3)
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         f = sscanf(buf+ctl->eaten, " %c %n", &c, &n);
+         if (ctl->opt[0] && (f >= 1))
          {
+            ctl->eaten += n;
             val = toupper(c);
             ptr = strchr(fmtMdeStr, val);
             if (ptr != NULL)
             {
                val = ptr - fmtMdeStr;
-               cmd->p2 = val;
+               p[2] = val;
                valid = 1;
             }
          }
@@ -354,15 +489,17 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
 
       case 9: /* PUD
               */
-         f = sscanf(buf, " %7s %d %c %c", str, &cmd->p1, &c, &t);
-         if (f == 3)
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         f = sscanf(buf+ctl->eaten, " %c %n", &c, &n);
+         if (ctl->opt[0] && (f >= 1))
          {
+            ctl->eaten += n;
             val = toupper(c);
             ptr = strchr(fmtPudStr, val);
             if (ptr != NULL)
             {
                val = ptr - fmtPudStr;
-               cmd->p2 = val;
+               p[2] = val;
                valid = 1;
             }
          }
@@ -370,51 +507,167 @@ int cmdParse(char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t *ext
 
       case 10: /* PROC
                */
-         if ((argc == 0) || (argc == 3))
-         {
-            if (argc == 3)
-            {
-               cmd->p1 = strlen(argv[2]);
-               ext[0].ptr = argv[2];
-            }
-            else /* pipe i/f */
-            {
-               sscanf(buf, "%*s %n", &p);
-               cmd->p1 = strlen(buf+p);
-               ext[0].ptr = buf+p;
-            }
-            ext[0].size = cmd->p1;
-            valid = 1;
-         }
+         p[1] = strlen(buf+ctl->eaten);
+         v[1] = buf+ctl->eaten;
+         ctl->eaten += p[1];
+         valid = 1;
          break;
 
       case 11: /* WVAS
                */
-         if ((argc == 0) || (argc == 6))
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1], ctl->flags);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[3], &ctl->opt[2], ctl->flags);
+
+         if (ctl->opt[0] && ctl->opt[1] && ctl->opt[2])
          {
-            f = sscanf(buf, " %*s %d %d %d %n",
-               &cmd->p1, &ext[0].data, &ext[1].data, &p);
-            if (f == 3)
+            p[4] = strlen(buf+ctl->eaten);
+            v[1] = buf+ctl->eaten;
+            ctl->eaten += p[4];
+            valid = 1;
+         }
+         break;
+
+      case 12: /* PROCR
+               */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], 0);
+
+         pars = 0;
+
+         while (pars < 10)
+         {
+            ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1], 0);
+            if (ctl->opt[1]) param[pars++] = p[2];
+            else break;
+         }
+
+         p[2] = pars;
+
+         v[1] = param;
+
+         if (ctl->opt[0]) valid = 1;
+         break;
+
+      case 13: /* WVAG
+               */
+         pars = 0;
+
+         while (pars < MAX_PARAM)
+         {
+            ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0], 0);
+            if (ctl->opt[0]) param[pars++] = p[1];
+            else break;
+         }
+
+         p[1] = pars/3;
+
+         v[1] = param;
+
+         if (pars && ((pars%3)==0)) valid = 1;
+         break;
+
+      case 20: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %n", &p[1], &n);
+         if ((f >= 1) && (p[1] >= 0) && (p[1] < MAX_SCRIPT_VARS))
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 21: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %n", &p[1], &n);
+         if (f == 1)
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 22: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %n", &p[1], &n);
+         if (f == 1)
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 23: /*
+              */
+         valid = 1;
+         break;
+
+      case 24: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %d %n", &p[1], &p[2], &n);
+         if ((f >= 2) &&
+             (p[1] >= 0) && (p[1] < MAX_SCRIPT_VARS) &&
+             (p[2] >= 0) && (p[2] < MAX_SCRIPT_VARS))
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 25: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %n", &p[1], &n);
+         if ((f >= 1) && (p[1] >= 0) && (p[1] < MAX_SCRIPT_PARAMS))
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 26: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %n", &p[1], &n);
+         if (f >= 1)
+         {
+            ctl->eaten += n;
+            valid = 1;
+         }
+         break;
+
+      case 27: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+         if ((f >= 0) && n)
+         {
+            valid = 1;
+
+            for (i=0; i<n; i++)
             {
-               ext[0].size = sizeof(unsigned);
-               ext[0].ptr = &ext[0].data;
-               ext[1].size = sizeof(unsigned);
-               ext[1].ptr = &ext[1].data;
+               c = buf[ctl->eaten+i];
 
-               if (argc) /* pigs */
+               if ((!isalnum(c)) && (c != '_') && (c != '-'))
                {
-                  cmd->p2 = strlen(argv[5]);
-                  ext[2].ptr = argv[5];
+                  valid = 0;
+                  break;
                }
-               else /* pipe i/f */
-               {
-                  cmd->p2 = strlen(buf+p);
-                  ext[2].ptr = buf+p;
-               }
-
-               ext[2].size = cmd->p2;
-               valid = 1;
             }
+
+            if (valid)
+            {
+               p[1] = n;
+               ctl->opt[0] = CMD_NUMERIC;
+               v[1]=buf+ctl->eaten;
+               ctl->eaten += n2;
+            }
+         }
+         break;
+
+      case 28: /*
+              */
+         f = sscanf(buf+ctl->eaten, " %d %d %n", &p[1], &p[2], &n);
+         if ((f >= 2) && (p[1] >= 0) && (p[1] < MAX_SCRIPT_VARS))
+         {
+            ctl->eaten += n;
+            valid = 1;
          }
          break;
    }
@@ -432,3 +685,4 @@ char * cmdErrStr(int error)
    }
    return "unknown error";
 }
+

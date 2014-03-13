@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 12
+This version is for pigpio version 13
 */
 
 #ifndef PIGPIO_H
@@ -86,7 +86,7 @@ This version is for pigpio version 12
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 12
+#define PIGPIO_VERSION 13
 
 /*-------------------------------------------------------------------------*/
 
@@ -164,6 +164,7 @@ gpioStopThread             Stop a previously started thread.
 
 gpioStoreScript            Store a script.
 gpioRunScript              Run a stored script.
+gpioScriptStatus           Get script status and parameters.
 gpioStopScript             Stop a running script.
 gpioDeleteScript           Delete a stored script.
 
@@ -219,6 +220,12 @@ extern "C" {
 
 typedef struct
 {
+   uint16_t func;
+   uint16_t size;
+} gpioHeader_t;
+
+typedef struct
+{
    uint32_t cmd;
    uint32_t p1;
    uint32_t p2;
@@ -229,7 +236,7 @@ typedef struct
 {
    size_t size;
    void *ptr;
-   int data;
+   uint32_t data;
 } gpioExtent_t;
 
 typedef struct
@@ -252,6 +259,29 @@ typedef struct
    uint32_t gpioOff;
    uint32_t usDelay;
 } gpioPulse_t;
+
+#define WAVE_FLAG_READ 1
+#define WAVE_FLAG_TICK 2
+
+typedef struct
+{
+   uint32_t gpioOn;
+   uint32_t gpioOff;
+   uint32_t usDelay;
+   uint32_t flags;
+} gpioWave_t;
+
+typedef struct
+{
+   int clk;     /* gpio for clock           */
+   int mosi;    /* gpio for MOSI            */
+   int miso;    /* gpio for MISO            */
+   int ss_pol;  /* slave select off state   */
+   int ss_us;   /* delay after slave select */
+   int clk_pol; /* clock off state          */
+   int clk_pha; /* clock phase              */
+   int clk_us;  /* clock micros             */
+} gpioSPI_t;
 
 typedef void (*gpioAlertFunc_t)    (int      gpio,
                                     int      level,
@@ -768,6 +798,8 @@ int gpioNotifyOpen(void);
    handle.
 */
 
+#define PI_NOTIFY_SLOTS  32
+
 
 
 /*-------------------------------------------------------------------------*/
@@ -915,7 +947,7 @@ int gpioWaveAddSerial(unsigned user_gpio,
    the same waveform.
 */
 
-#define PI_WAVE_BLOCKS     3
+#define PI_WAVE_BLOCKS     4
 #define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
 #define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  256)
 
@@ -923,8 +955,6 @@ int gpioWaveAddSerial(unsigned user_gpio,
 #define PI_WAVE_MAX_BAUD      250000
 
 #define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
-
-
 
 /*-------------------------------------------------------------------------*/
 int gpioWaveTxStart(unsigned mode);
@@ -1321,15 +1351,50 @@ int gpioStoreScript(char *script);
    otherwise PI_BAD_SCRIPT.
 */
 
+#define MAX_SCRIPT_LABELS  50
+#define MAX_SCRIPT_VARS   150
+#define MAX_SCRIPT_PARAMS  10
 
 
 /* ----------------------------------------------------------------------- */
-int gpioRunScript(int script_id);
+int gpioRunScript(int script_id, unsigned numParam, uint32_t *param);
 /* ----------------------------------------------------------------------- */
 /* This function runs a stored script.
 
-   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+   PI_TOO_MANY_PARAM.
+
+   param is an array of up to 10 parameters which may be referenced in
+   the script as param 0 to param 9.
 */
+
+
+
+/* ----------------------------------------------------------------------- */
+int gpioScriptStatus(int script_id, uint32_t *param);
+/* ----------------------------------------------------------------------- */
+/* This function returns the run status of a stored script as well as
+   the current values of parameters 0 to 9.
+
+   The function returns greater than or equal to 0 if OK,
+   otherwise PI_BAD_SCRIPT_ID.
+
+   The run status may be
+
+   PI_SCRIPT_HALTED
+   PI_SCRIPT_RUNNING
+   PI_SCRIPT_WAITING
+   PI_SCRIPT_FAILED
+
+   The current value of script parameters 0 to 9 are returned in param.
+*/
+
+/* script status */
+
+#define PI_SCRIPT_HALTED  0
+#define PI_SCRIPT_RUNNING 1
+#define PI_SCRIPT_WAITING 2
+#define PI_SCRIPT_FAILED  3
 
 
 
@@ -1798,12 +1863,98 @@ int gpioCfgInternals(unsigned what,
    Not intended for general use.
 */
 
+/*-------------------------------------------------------------------------*/
+int gpioWaveAddSPI(
+   gpioSPI_t *spi,
+   unsigned offset,
+   unsigned ss,
+   uint8_t *tx_bits,
+   unsigned num_tx_bits,
+   unsigned rx_bit_first,
+   unsigned rx_bit_last,
+   unsigned bits);
+/*-------------------------------------------------------------------------*/
+/* This function adds a waveform representing SPI data to the
+   existing waveform (if any).  The SPI data starts offset microseconds
+   from the start of the waveform.  ss is the slave select gpio.  bits bits
+   are transferred.  num_tx_bits are transmitted starting at the first bit.
+   The bits to transmit are read, most significant bit first, from tx_bits.
+   Gpio reads are made from rx_bit_first to rx_bit_last.
+
+   Returns the new total number of pulses in the current waveform if OK,
+   otherwise PI_BAD_USER_GPIO, PI_BAD_SER_OFFSET, or PI_TOO_MANY_PULSES.
+*/
+
+
+/* ----------------------------------------------------------------------- */
+uint32_t waveGetRawOut(int pos);
+/* ----------------------------------------------------------------------- */
+/* Gets the wave output parameter stored at pos.
+   Not intended for general use.
+*/
+
+
+/* ----------------------------------------------------------------------- */
+void waveSetRawOut(int pos, uint32_t value);
+/* ----------------------------------------------------------------------- */
+/* Sets the wave output parameter stored at pos to value.
+   Not intended for general use.
+*/
+
+/* ----------------------------------------------------------------------- */
+uint32_t waveGetRawIn(int pos);
+/* ----------------------------------------------------------------------- */
+/* Gets the wave input value parameter stored at pos.
+   Not intended for general use.
+*/
+
+
+/* ----------------------------------------------------------------------- */
+void waveSetRawIn(int pos, uint32_t value);
+/* ----------------------------------------------------------------------- */
+/* Sets the wave input value stored at pos to value.
+   Not intended for general use.
+*/
+
+/*-------------------------------------------------------------------------*/
+int getBitInBytes(int bitPos, uint8_t *buf, int numBits);
+/*-------------------------------------------------------------------------*/
+/* Returns the value of the bit bitPos bits from the start of buf.  Returns
+   0 if bitPos is greater than or equal to numBits.
+*/
+
+/* ----------------------------------------------------------------------- */
+void putBitInBytes(int bitPos, uint8_t *buf, int val);
+/*-------------------------------------------------------------------------*/
+/* Sets the bit bitPos bits from the start of buf to val.
+*/
+
+/*-------------------------------------------------------------------------*/
+double time_time(void);
+/*-------------------------------------------------------------------------*/
+/* Return the current time in seconds since the Epoch.
+*/
 
 
 /*-------------------------------------------------------------------------*/
-void gpioWaveDump(void);
+void time_sleep(double seconds);
 /*-------------------------------------------------------------------------*/
-/* Used to print a readable version of the current waveform to stdout.
+/* Delay execution for a given number of seconds
+*/
+
+
+/*-------------------------------------------------------------------------*/
+void gpioDumpWave(void);
+/*-------------------------------------------------------------------------*/
+/* Used to print a readable version of the current waveform to stderr.
+   Not intended for general use.
+*/
+
+
+/*-------------------------------------------------------------------------*/
+void gpioDumpScript(int s);
+/*-------------------------------------------------------------------------*/
+/* Used to print a readable version of a script to stderr.
    Not intended for general use.
 */
 
@@ -1859,6 +2010,10 @@ void gpioWaveDump(void);
 #define PI_CMD_SLRO  42
 #define PI_CMD_SLR   43
 #define PI_CMD_SLRC  44
+#define PI_CMD_PROCP 45
+#define PI_CMD_MICRO 46
+#define PI_CMD_MILLI 47
+
 
 /*
 The following command only works on the socket interface.
@@ -1872,6 +2027,53 @@ after this command is issued.
 
 #define PI_CMD_NOIB  99
 
+/* pseudo commands */
+
+#define PI_CMD_SCRIPT 800
+
+#define PI_CMD_ADDI  800
+#define PI_CMD_ADDV  801
+#define PI_CMD_ANDI  802
+#define PI_CMD_ANDV  803
+#define PI_CMD_CALL  804
+#define PI_CMD_CMPI  805
+#define PI_CMD_CMPV  806
+#define PI_CMD_DCRA  807
+#define PI_CMD_DCRV  808
+#define PI_CMD_HALT  809
+#define PI_CMD_INRA  810
+#define PI_CMD_INRV  811
+#define PI_CMD_JM    812
+#define PI_CMD_JMP   813
+#define PI_CMD_JNZ   814
+#define PI_CMD_JP    815
+#define PI_CMD_JZ    816
+#define PI_CMD_LABEL 817
+#define PI_CMD_LDAI  818
+#define PI_CMD_LDAP  819
+#define PI_CMD_LDAV  820
+#define PI_CMD_LDPA  821
+#define PI_CMD_LDVA  822
+#define PI_CMD_LDVI  823
+#define PI_CMD_LDVV  824
+#define PI_CMD_ORI   827
+#define PI_CMD_ORV   828
+#define PI_CMD_POPA  829
+#define PI_CMD_POPV  830
+#define PI_CMD_PUSHA 831
+#define PI_CMD_PUSHV 832
+#define PI_CMD_RET   833
+#define PI_CMD_RAL   834
+#define PI_CMD_RAR   835
+#define PI_CMD_SUBI  836
+#define PI_CMD_SUBV  837
+#define PI_CMD_SWAPA 838
+#define PI_CMD_SWAPV 839
+#define PI_CMD_SYS   840
+#define PI_CMD_WAITI 841
+#define PI_CMD_WAITV 842
+#define PI_CMD_XORI  843
+#define PI_CMD_XORV  844
 
 /*-------------------------------------------------------------------------*/
 
@@ -1930,7 +2132,17 @@ after this command is issued.
 #define PI_BAD_SER_OFFSET   -49 /* add serial data offset > 30 minutes     */
 #define PI_GPIO_IN_USE      -50 /* gpio already in use                     */
 #define PI_BAD_SERIAL_COUNT -51 /* must read at least a byte at a time     */
-
+#define PI_BAD_PARAM_NUM    -52 /* script parameter must be 0-9            */
+#define PI_DUP_LABEL        -53 /* script has duplicate label              */
+#define PI_TOO_MANY_LABELS  -54 /* script has too many labels              */
+#define PI_BAD_SCRIPT_CMD   -55 /* illegal script command                  */
+#define PI_BAD_VAR_NUM      -56 /* script variable must be 0-149           */
+#define PI_NO_SCRIPT_ROOM   -57 /* no more room for scripts                */
+#define PI_NO_MEMORY        -58 /* can't allocate temporary memory         */
+#define PI_SOCK_READ_FAILED -59 /* socket read failed                      */
+#define PI_SOCK_WRIT_FAILED -60 /* socket write failed                     */
+#define PI_TOO_MANY_PARAM   -61 /* too many script parameters > 10         */
+#define PI_NOT_HALTED       -62 /* script already running or failed        */
 
 /*-------------------------------------------------------------------------*/
 

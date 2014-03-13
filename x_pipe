@@ -1,0 +1,373 @@
+#!/bin/bash
+
+GPIO=4
+
+#
+# This script serves as a confidence check that the pipe interface to
+# the pigpio library is ok.
+#
+# The script uses gpio 4 (P1-7).  Make sure that nothing (or only a LED)
+# is connected to gpio 4 before running the script.
+#
+# To run the script
+# sudo pigpiod # if not already running
+# ./x_pipe # on the Pi running pigpiod
+#
+
+echo "bc1 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "BC1 ok"; else echo "BC1 fail ($s)"; fi
+
+echo "bc2 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "BC2 ok"; else echo "BC2 fail ($s)"; fi
+
+echo "br1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ ${#s} = 8 ]]
+then echo "BR1 ok"
+else echo "BR1 fail ($s)"
+fi
+
+echo "br2" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ ${#s} = 8 ]]
+then echo "BR2 ok"
+else echo "BR2 fail ($s)"
+fi
+
+echo "bs1 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "BS1 ok"; else echo "BS1 fail ($s)"; fi
+
+echo "bs2 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
+
+echo "h" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = "BC1 v         Clear gpios defined by mask v in bank 1." ]]
+then echo "HELP-a ok"
+else echo "HELP-a fail ($s)"
+fi
+read -t 1 -N 9000 </dev/pigout # dump rest of help
+echo "help" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = "BC1 v         Clear gpios defined by mask v in bank 1." ]]
+then echo "HELP-b ok"
+else echo "HELP-b fail ($s)"
+fi
+read -t 1 -N 9000 </dev/pigout # dump rest of help
+
+echo "hwver" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
+
+echo "micro 1000" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "MICRO ok"; else echo "MICRO fail ($s)"; fi
+
+echo "milli 10" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "MILLI ok"; else echo "MILLI fail ($s)"; fi
+
+echo "modes $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+echo "modeg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 4 ]]; then echo "MODEG ok"; else echo "MODEG fail ($s)"; fi
+echo "m $GPIO r" >/dev/pigpio
+read -t 1 s </dev/pigout
+echo "mg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "MODES ok"; else echo "MODES fail ($s)"; fi
+
+echo "no" >/dev/pigpio
+read -t 1 h </dev/pigout
+if [[ $h -ge 0 && $h -le 31 ]]
+then echo "NO($h) ok"
+else echo "NO fail ($s)"
+fi
+
+echo "nb $h 0xabcd" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "NB($h) ok"; else echo "NB fail ($s)"; fi
+
+echo "np $h" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "NP($h) ok"; else echo "NP fail ($s)"; fi
+
+echo "nc $h" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "NC($h) ok"; else echo "NC fail ($s)"; fi
+
+echo "pfs $GPIO 800" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 800 ]]; then echo "PFG-a ok"; else echo "PFG-a fail ($s)"; fi
+
+echo "pfg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 800 ]]; then echo "PFG-b ok"; else echo "PFG-b fail ($s)"; fi
+
+echo "pfs $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 10 ]]; then echo "PFS-a ok"; else echo "PFS-a fail ($s)"; fi
+
+echo "pfs $GPIO 800" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
+
+echo "pigpv" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 13 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+
+echo "prs $GPIO 255" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi
+echo "prg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 255 ]]; then echo "PRG-b ok"; else echo "PRG-b fail ($s)"; fi
+
+echo "proc ldap 0 ldpa 1 ldai 29 ldpa 0 label 9 milli 1000 jmp 9" >/dev/pigpio
+read -t 1 p </dev/pigout
+if [[ $p -ge 0 && $p -le 31 ]]
+then echo "PROC($p) ok"
+else echo "PROC($p) fail ($s)"
+fi
+
+echo "procr $p 9876" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PROCR($p) ok"; else echo "PROCR($p) fail ($s)"; fi
+
+echo "procp $p" >/dev/pigpio
+read -t 1 -a v </dev/pigout
+if [[ ${v[0]} = 1 && ${v[1]} = 29 && ${v[2]} = 9876 ]]
+then echo "PROCP($p) ok"
+else echo "PROCP($p) fail ($s)"
+fi
+
+echo "procs $p" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PROCS($p) ok"; else echo "PROCS($p) fail ($s)"; fi
+
+echo "procd $p" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PROCD($p) ok"; else echo "PROCD($p) fail ($s)"; fi
+
+echo "prrg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 250 ]]; then echo "PRRG ok"; else echo "PRRG fail ($s)"; fi
+
+echo "prs $GPIO 1000" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 250 ]]; then echo "PRS-a ok"; else echo "PRS-a fail ($s)"; fi
+echo "prg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1000 ]]; then echo "PRS-b ok"; else echo "PRS-b fail ($s)"; fi
+echo "prs $GPIO 255" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 250 ]]; then echo "PRS-c ok"; else echo "PRS-c fail ($s)"; fi
+echo "prg $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 255 ]]; then echo "PRS-d ok"; else echo "PRS-d fail ($s)"; fi
+
+echo "pud $GPIO u" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PUD-a ok"; else echo "PUD-a fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "PUD-b ok"; else echo "PUD-b fail ($s)"; fi
+echo "pud $GPIO d" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PUD-c ok"; else echo "PUD-c fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PUD-d ok"; else echo "PUD-d fail ($s)"; fi
+echo "pud $GPIO o" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PUD-e ok"; else echo "PUD-e fail ($s)"; fi
+
+echo "p $GPIO 128" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PWM-a ok"; else echo "PWM-a fail ($s)"; fi
+echo "pwm $GPIO 64" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PWM-b ok"; else echo "PWM-b fail ($s)"; fi
+echo "pwm $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PWM-c ok"; else echo "PWM-c fail ($s)"; fi
+echo "m $GPIO r" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "PWM-d ok"; else echo "PWM-d fail ($s)"; fi
+
+echo "pud $GPIO u" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "READ-a ok"; else echo "READ-a fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "READ-b ok"; else echo "READ-b fail ($s)"; fi
+echo "pud $GPIO d" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "READ-c ok"; else echo "READ-c fail ($s)"; fi
+echo "read $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "READ-d ok"; else echo "READ-d fail ($s)"; fi
+echo "pud $GPIO o" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "READ-e ok"; else echo "READ-e fail ($s)"; fi
+
+echo "s $GPIO 500" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SERVO-a ok"; else echo "SERVO-a fail ($s)"; fi
+echo "servo $GPIO 2500" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SERVO-b ok"; else echo "SERVO-b fail ($s)"; fi
+echo "servo $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SERVO-c ok"; else echo "SERVO-c fail ($s)"; fi
+echo "w $GPIO 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
+
+echo "wvclr" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
+echo "slro $GPIO 1200" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
+echo "wvas $GPIO 1200 0 my name is joan¬" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 105 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
+echo "m $GPIO w" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
+echo "wvgo" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 211 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
+sleep 0.2
+echo "slr $GPIO 100" >/dev/pigpio
+read -t 1 -d ¬ s </dev/pigout
+if [[ $s = "my name is joan" ]]
+then echo "SLR-f ok"
+else echo "SLR-f fail with ($s)"
+fi
+read -t 1 s </dev/pigout # dump any junk
+echo "slrc $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "SLR-g ok"; else echo "SLR-g fail ($s)"; fi
+
+echo "t" >/dev/pigpio
+echo "tick" >/dev/pigpio
+read -t 1 t1 </dev/pigout
+read -t 1 t2 </dev/pigout
+s=$((t2-t1))
+if [[ $s -gt 0 && $s -lt 5000 ]]
+then echo "TICK ok"
+else echo "TICK fail ($s)"
+fi
+
+pigs w $GPIO 1 # put in known state
+echo "trig $GPIO 10 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "TRIG-a ok"; else echo "TRIG-a fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "TRIG-b ok"; else echo "TRIG-b fail ($s)"; fi
+echo "trig $GPIO 10 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "TRIG-c ok"; else echo "TRIG-c fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "TRIG-d ok"; else echo "TRIG-d fail ($s)"; fi
+
+echo "wdog $GPIO 1000" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WDOG-a ok"; else echo "WDOG-a fail ($s)"; fi
+echo "wdog $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WDOG-b ok"; else echo "WDOG-b fail ($s)"; fi
+
+echo "w $GPIO 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WRITE-a ok"; else echo "WRITE-a fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "WRITE-b ok"; else echo "WRITE-b fail ($s)"; fi
+echo "write $GPIO 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WRITE-c ok"; else echo "WRITE-c fail ($s)"; fi
+echo "r $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WRITE-d ok"; else echo "WRITE-d fail ($s)"; fi
+
+echo "wvclr" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WVCLR ok"; else echo "WVCLR fail ($s)"; fi
+echo "wvas $GPIO 300 0 this is the winter of my discontent" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 215 ]]; then echo "WVAS ok"; else echo "WVAS fail ($s)"; fi
+echo "wvag 16 0 5000000 0 16 5000000" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 216 ]]; then echo "WVAG ok"; else echo "WVAG fail ($s)"; fi
+echo "wvgo" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 433 ]]; then echo "WVGO ok"; else echo "WVGO fail ($s)"; fi
+echo "wvbsy" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
+sleep 1
+echo "wvbsy" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "WVBSY-b ok"; else echo "WVBSY-b fail ($s)"; fi
+echo "wvhlt" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+echo "wvbsy" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
+echo "wvgor" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 433 ]]; then echo "WVGOR ok"; else echo "WVGOR fail ($s)"; fi
+echo "wvbsy" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
+echo "wvhlt" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+echo "wvbsy" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "WVBSY-e ok"; else echo "WVBSY-e fail ($s)"; fi
+
+echo "wvsc 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 432 ]]; then echo "WVSC-a ok"; else echo "WVSC-a fail ($s)"; fi
+echo "wvsc 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s -ge 432 ]]; then echo "WVSC-b ok"; else echo "WVSC-b fail ($s)"; fi
+echo "wvsc 2" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 25016 ]]; then echo "WVSC-c ok"; else echo "WVSC-c fail ($s)"; fi
+
+echo "wvsm 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 10000000 ]]; then echo "WVSM-a ok"; else echo "WVSM-a fail ($s)"; fi
+echo "wvsm 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s -ge 10000000 ]]; then echo "WVSM-b ok"; else echo "WVSM-b fail ($s)"; fi
+echo "wvsm 2" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 1800000000 ]]
+then echo "WVSM-c ok"
+else echo "WVSM-c fail ($s)"
+fi
+
+echo "wvsp 0" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 216 ]]; then echo "WVSP-a ok"; else echo "WVSP-a fail ($s)"; fi
+echo "wvsp 1" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s -ge 216 ]]; then echo "WVSP-b ok"; else echo "WVSP-b fail ($s)"; fi
+echo "wvsp 2" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 12000 ]]; then echo "WVSP-c ok"; else echo "WVSP-c fail ($s)"; fi
+

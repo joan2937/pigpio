@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 3
+#define PIGPIOD_IF_VERSION 4
 
 typedef enum
 {
@@ -79,7 +79,7 @@ pthread_t *start_thread(gpioThreadFunc_t func, void *arg);
    The function is passed the single argument arg.
 
    The thread can be cancelled by passing the pointer to pthread_t to
-   gpioStopThread().
+   stop_thread().
 */
 
 void stop_thread(pthread_t *pth);
@@ -87,7 +87,7 @@ void stop_thread(pthread_t *pth);
 
    No value is returned.
 
-   The thread to be stopped should have been started with gpioStartThread().
+   The thread to be stopped should have been started with start_thread().
 */
 
 int pigpio_start(char *addrStr, char *portStr);
@@ -139,7 +139,7 @@ int set_pull_up_down(unsigned gpio, unsigned pud);
    pud:  PUD_UP, PUD_DOWN, PUD_OFF.
 */
 
-int read_gpio(unsigned gpio);
+int gpio_read(unsigned gpio);
 /* Read the gpio level.
 
    Returns the gpio level if OK, otherwise PI_BAD_GPIO.
@@ -147,7 +147,7 @@ int read_gpio(unsigned gpio);
    gpio:0-53.
 */
 
-int write_gpio(unsigned gpio, unsigned level);
+int gpio_write(unsigned gpio, unsigned level);
 /*
    Write the gpio level.
 
@@ -507,6 +507,12 @@ uint32_t get_hardware_revision(void);
    hexadecimal number the function returns 0.
 */
 
+uint32_t get_pigpio_version(void);
+/*
+   Returns the pigpio version.
+*/
+
+
 int wave_clear(void);
 /* This function initialises a new waveform.
 
@@ -659,10 +665,31 @@ int store_script(char *script);
    otherwise PI_BAD_SCRIPT.
 */
 
-int run_script(unsigned script_id);
+int run_script(unsigned script_id, unsigned numPar, uint32_t *param);
 /* This function runs a stored script.
 
-   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+   The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+   PI_TOO_MANY_PARAM
+
+   param is an array of up to 10 parameters which may be referenced in
+   the script as param 0 to param 9..
+*/
+
+int script_status(int script_id, uint32_t *param);
+/* This function returns the run status of a stored script as well
+   as the current values of parameters 0 to 9.
+
+   The function returns greater than or equal to 0 if OK,
+   otherwise PI_BAD_SCRIPT_ID.
+
+   The run status may be
+
+   PI_SCRIPT_HALTED
+   PI_SCRIPT_RUNNING
+   PI_SCRIPT_WAITING
+   PI_SCRIPT_FAILED
+
+   The current value of script parameters 0 to 9 are returned in param.
 */
 
 int stop_script(unsigned script_id);
@@ -684,7 +711,7 @@ int serial_read_open(unsigned user_gpio, unsigned baud);
    or PI_GPIO_IN_USE.
 
    The serial data is returned in a cyclic buffer and is read using
-   gpioSerialRead().
+   serial_read().
 
    It is the caller's responsibility to read data from the cyclic buffer
    in a timely fashion.

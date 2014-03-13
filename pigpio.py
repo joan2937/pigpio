@@ -76,7 +76,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.3"
+VERSION = "1.4"
 
 # gpio levels
 
@@ -112,6 +112,13 @@ ALT5   = 2
 PUD_OFF  = 0
 PUD_DOWN = 1
 PUD_UP   = 2
+
+# script run status
+
+PI_SCRIPT_HALTED =0
+PI_SCRIPT_RUNNING=1
+PI_SCRIPT_WAITING=2
+PI_SCRIPT_FAILED =3
 
 # pigpio command numbers
 
@@ -160,6 +167,7 @@ _PI_CMD_PROCS=41
 _PI_CMD_SLRO= 42
 _PI_CMD_SLR=  43
 _PI_CMD_SLRC= 44
+_PI_CMD_PROCP=45
 
 
 _PI_CMD_NOIB= 99
@@ -205,7 +213,7 @@ _PI_BAD_CFG_INTERNAL=-34
 PI_BAD_WAVE_BAUD    =-35
 PI_TOO_MANY_PULSES  =-36
 PI_TOO_MANY_CHARS   =-37
-PI_NOT_SERIAL_GPIO =-38
+PI_NOT_SERIAL_GPIO  =-38
 _PI_BAD_SERIAL_STRUC=-39
 _PI_BAD_SERIAL_BUF  =-40
 PI_NOT_PERMITTED    =-41
@@ -218,6 +226,18 @@ PI_BAD_SCRIPT       =-47
 PI_BAD_SCRIPT_ID    =-48
 PI_BAD_SER_OFFSET   =-49
 PI_GPIO_IN_USE      =-50
+PI_BAD_SERIAL_COUNT =-51
+PI_BAD_PARAM_NUM    =-52
+PI_DUP_LABEL        =-53
+PI_TOO_MANY_LABELS  =-54
+PI_BAD_SCRIPT_CMD   =-55
+PI_BAD_VAR_NUM      =-56
+PI_NO_SCRIPT_ROOM   =-57
+PI_NO_MEMORY        =-58
+PI_SOCK_READ_FAILED =-59
+PI_SOCK_WRIT_FAILED =-60
+PI_TOO_MANY_PARAM   =-61
+PI_NOT_HALTED       =-62
 
 # pigpio error text
 
@@ -270,6 +290,19 @@ _errors=[
    [PI_BAD_SCRIPT_ID     , "unknown script id"],
    [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
    [PI_GPIO_IN_USE       , "gpio already in use"],
+   [PI_BAD_SERIAL_COUNT  , "must read at least a byte at a time"],
+   [PI_BAD_PARAM_NUM     , "script parameter must be 0-9"],
+   [PI_DUP_LABEL         , "script has duplicate label"],
+   [PI_TOO_MANY_LABELS   , "script has too many labels"],
+   [PI_BAD_SCRIPT_CMD    , "illegal script command"],
+   [PI_BAD_VAR_NUM       , "script variable must be 0-149"],
+   [PI_NO_SCRIPT_ROOM    , "no more room for scripts"],
+   [PI_NO_MEMORY         , "can't allocate temporary memory"],
+   [PI_SOCK_READ_FAILED  , "socket read failed"],
+   [PI_SOCK_WRIT_FAILED  , "socket write failed"],
+   [PI_TOO_MANY_PARAM    , "too many script parameters (> 10)"],
+   [PI_NOT_HALTED        , "script already running or failed"],
+
 ]
 
 _control = None
@@ -348,8 +381,8 @@ def _pigpio_command(sock, cmd, p1, p2):
 
    sock: command socket.
    cmd:  the command to be executed.
-   p1:   command paramter 1 (if applicable).
-   p2:   command paramter 2 (if applicable).
+   p1:   command parameter 1 (if applicable).
+   p2:   command parameter 2 (if applicable).
    """
    if sock is not None:
       sock.send(struct.pack('IIII', cmd, p1, p2, 0))
@@ -364,8 +397,8 @@ def _pigpio_command_ext(sock, cmd, p1, p2, extents):
 
    sock: command socket.
    cmd:  the command to be executed.
-   p1:   command paramter 1 (if applicable).
-   p2:   command paramter 2 (if applicable).
+   p1:   command parameter 1 (if applicable).
+   p2:   command parameter 2 (if applicable).
    extents: additional data blocks
    """
    if sock is not None:
@@ -1676,15 +1709,57 @@ def store_script(script):
    return _u2i(_pigpio_command_ext(
       _control, _PI_CMD_PROC, len(script), 0, script))
 
-def run_script(script_id):
+def run_script(script_id, params=None):
    """
    Runs a stored script.
 
    Returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 
    script_id: script_id of stored script.
+   params: up to 10 parameters required by the script.
    """
-   return _u2i(_pigpio_command(_control, _PI_CMD_PROCR, script_id, 0))
+   # I p1 script id
+   # I p2 number of parameters (0-10)
+   ## (optional) extension ##
+   # I[] params
+
+   if params is not None:
+      msg = ""
+      for p in params:
+         msg += struct.pack("I", p)
+      nump = len(params)
+      extents = [msg]
+   else:
+      nump = 0
+      extents = []
+
+   return _u2i(_pigpio_command_ext(
+      _control, _PI_CMD_PROCR, script_id, nump, extents))
+
+def script_status(script_id):
+   """
+   This function returns the run status of a stored script as well as
+   the current values of parameters 0 to 9.
+
+   The function returns greater than or equal to 0 if OK,
+   otherwise PI_BAD_SCRIPT_ID.
+
+   The run status may be
+
+   PI_SCRIPT_HALTED
+   PI_SCRIPT_RUNNING
+   PI_SCRIPT_WAITING
+   PI_SCRIPT_FAILED
+
+   It returns a tuple of run status and a parameter list tuple. If the script
+   does not exist a negative error code will be returned in which
+   case the parameter tuple will be empty.
+   """
+   status = _u2i(_pigpio_command(_control, _PI_CMD_PROCP, script_id, 0))
+   if status >= 0:
+      param = struct.unpack('IIIIIIIIII', _control.recv(40))
+      return status, param
+   return status, ()
 
 def stop_script(script_id):
    """
@@ -2015,7 +2090,8 @@ def start(host = os.getenv("PIGPIO_ADDR", ''),
       print("Did you specify the correct Pi host/port in the")
       print("pigpio.start() function? E.g. pigpio.start('soft', 8888))")
       print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-      raise
+      return False
+   return True
 
 def stop():
    """Release pigpio resources.

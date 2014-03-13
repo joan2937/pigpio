@@ -20,18 +20,28 @@ o the socket interface (pigs) in /usr/local/bin
 o the utility pig2vcd in /usr/local/bin
 o the Python module pigpio.py
 
-TEST
+TEST (optional)
 
 To test the library do
 
-sudo ./checklib
+sudo ./x_pigpio
+
+To text the pigpio daemon do
+
+sudo pigpiod
+
+./x_pigpiod_if # test the C I/F to the pigpio daemon
+./x_pigpio.py  # test the Python I/F to the pigpio daemon
+./x_pigs       # test the socket I/F to the pigpio daemon
+./x_pipe       # test the pipe I/F to the pigpio daemon
 
 EXAMPLE CODE
 
-checklib.c, pig2vcd.c, and pigpiod.c
-show examples of interfacing with the pigpio library.
+x_pigpio.c, pig2vcd.c, and pigpiod.c show examples of interfacing
+with the pigpio library.
 
-pigs.c and pigpio.py show examples of interfacing with the pigpiod daemon.
+pigs.c, pigpio.py, x_pigpiod_if.c, x_pigpio.py, x_pigs, and x_pipe
+show examples of interfacing with the pigpiod daemon.
 
 DAEMON
 
@@ -77,25 +87,6 @@ pythonx.y setup.py install
 
 where x.y is the Python version.
 
-If the pigpiod daemon is running you can test the Python module
-by entering the following commands.
-
-python
-
-import pigpio
-
-pigpio.start()
-
-print(pigpio.get_current_tick())
-
-print(hex(pigpio.read_bank_1()))
-
-pigpio.stop()
-
-help(pigpio)
-
-quit()
-
 STOP DAEMON
 
 To stop the pigpiod daemon
@@ -105,7 +96,7 @@ sudo killall pigpiod
 RUNNING ON NON Pi's
 
 You can access the pigpiod daemon running on the Pi from any machine which
-can access it over the network.  This access is via the socket interface.
+is connected to it over the network.  This access is via the socket interface.
 
 In particular this allows you to use the following on non-Pi's.
 

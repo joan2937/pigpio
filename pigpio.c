@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 12 */
+/* pigpio version 13 */
 
 #include <stdio.h>
 #include <string.h>
@@ -251,13 +251,6 @@ bit 0 READ_LAST_NOT_SET_ERROR
       fprintf(stderr, "%s %s: " format "\n",                       \
          myTimeStamp(), __FUNCTION__ , ## arg);                    \
       return x;                                                    \
-   }                                                               \
-   while (0)
-
-#define PERM_ERROR(format, arg...)                                 \
-   do                                                              \
-   {                                                               \
-      fprintf(stderr, "%s " format "\n", myTimeStamp(), ## arg);   \
    }                                                               \
    while (0)
 
@@ -491,20 +484,20 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define TIMED_DMA(x)  (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
 
 #define DBG_MIN_LEVEL 0
+#define DBG_ALWAYS    0
 #define DBG_STARTUP   1
 #define DBG_DMACBS    2
-#define DBG_USER      3
-#define DBG_INTERNAL  4
-#define DBG_SLOW_TICK 5
-#define DBG_FAST_TICK 6
-#define DBG_MAX_LEVEL 6
+#define DBG_SCRIPT    3
+#define DBG_USER      4
+#define DBG_INTERNAL  5
+#define DBG_SLOW_TICK 6
+#define DBG_FAST_TICK 7
+#define DBG_MAX_LEVEL 8
 
 #define GPIO_UNDEFINED 0
-#define GPIO_INPUT     1
-#define GPIO_OUTPUT    2
-#define GPIO_PWM       3
-#define GPIO_SERVO     4
-#define GPIO_ALTERNATE 5
+#define GPIO_WRITE     1
+#define GPIO_PWM       2
+#define GPIO_SERVO     3
 
 #define STACK_SIZE (256*1024)
 
@@ -515,16 +508,17 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define CYCLES_PER_BLOCK 80
 #define PULSE_PER_CYCLE  25
 
-#define PAGES_PER_BLOCK   53
+#define PAGES_PER_BLOCK 53
 
-#define CBS_PER_IPAGE    117
-#define LVS_PER_IPAGE     38
-#define OFF_PER_IPAGE     38
-#define TCK_PER_IPAGE      2
-#define ON_PER_IPAGE       2
+#define CBS_PER_IPAGE 117
+#define LVS_PER_IPAGE  38
+#define OFF_PER_IPAGE  38
+#define TCK_PER_IPAGE   2
+#define ON_PER_IPAGE    2
+#define PAD_PER_IPAGE   7
 
-#define CBS_PER_OPAGE    118
-#define ONOFF_PER_OPAGE   79
+#define CBS_PER_OPAGE 118
+#define OOL_PER_OPAGE  79
 
 #define CBS_PER_CYCLE ((PULSE_PER_CYCLE*3)+2)
 
@@ -535,11 +529,13 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define BLOCK_SIZE (PAGES_PER_BLOCK*PAGE_SIZE)
 
-#define DMA_PAGES (PAGES_PER_BLOCK * bufferBlocks)
+#define DMAI_PAGES (PAGES_PER_BLOCK * bufferBlocks)
+
+#define DMAO_PAGES (PAGES_PER_BLOCK * PI_WAVE_BLOCKS)
+
+#define NUM_OOL (DMAO_PAGES * OOL_PER_OPAGE)
 
 #define TICKSLOTS 50
-
-#define PI_NOTIFY_SLOTS  32
 
 #define PI_NOTIFY_CLOSED  0
 #define PI_NOTIFY_CLOSING 1
@@ -549,7 +545,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define PI_WFRX_NONE   0
 #define PI_WFRX_SERIAL 1
-#define PI_WF_MICROS   2
+#define PI_WF_MICROS   1
 
 #define DATUMS 2000
 
@@ -558,7 +554,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define MAX_EMITS (PIPE_BUF / sizeof(gpioReport_t))
 
 #define SRX_BUF_SIZE 8192
-#define CMD_BUF_SIZE 2048
+#define CMD_BUF_SIZE 4096
 
 /* --------------------------------------------------------------- */
 
@@ -587,13 +583,13 @@ typedef struct
    uint32_t tick         [TCK_PER_IPAGE];
    uint32_t gpioOn       [ON_PER_IPAGE];
    uint32_t periphData;
-   uint32_t pad[7];
+   uint32_t pad          [PAD_PER_IPAGE];
 } dmaIPage_t;
 
 typedef struct
 {
-   dmaCbs_t cb           [CBS_PER_OPAGE];
-   uint32_t gpioOnOff    [ONOFF_PER_OPAGE];
+   dmaCbs_t cb     [CBS_PER_OPAGE];
+   uint32_t OOL    [OOL_PER_OPAGE];
    uint32_t periphData;
 } dmaOPage_t;
 
@@ -632,6 +628,12 @@ typedef struct
 
 typedef struct
 {
+   uint32_t label;
+   int      step;
+} gpioLabelStep_t;
+
+typedef struct
+{
    callbk_t        func;
    unsigned        ex;
    void *          userdata;
@@ -641,6 +643,51 @@ typedef struct
    struct timespec nextTick;
    pthread_t       pthId;
 } gpioTimer_t;
+
+#define PI_SCRIPT_FREE     0
+#define PI_SCRIPT_RESERVED 1
+#define PI_SCRIPT_IN_USE   2
+#define PI_SCRIPT_DYING    3
+
+#define PI_SCRIPT_HALT   0
+#define PI_SCRIPT_RUN    1
+#define PI_SCRIPT_DELETE 2
+
+#define PI_SCRIPT_SLOTS 32
+
+#define PI_SCRIPT_STACK_SIZE 256
+
+typedef struct
+{
+   uint32_t p[6];
+   uint8_t opt[8];
+} gpioInstr_t;
+
+typedef struct
+{
+   unsigned id;
+   unsigned state;
+   unsigned request;
+   unsigned run_state;
+   uint32_t waitBits;
+   uint32_t changedBits;
+   pthread_t *pthIdp;
+   pthread_mutex_t pthMutex;
+   pthread_cond_t pthCond;
+/*
+  +-----------+---------+---------+----------------+
+  | PARAMS... | VARS... | CMDS... | STRING AREA... |
+  +-----------+---------+---------+----------------+
+*/
+   int *param;
+   int *var;
+   gpioInstr_t *instr;
+   int instrs;
+   char *str_area;
+   int str_area_len;
+   int str_area_pos;
+} gpioScript_t;
+
 
 typedef struct
 {
@@ -752,7 +799,7 @@ static struct timespec libStarted;
 
 static uint64_t gpioMask;
 
-static gpioPulse_t wf[3][PI_WAVE_MAX_PULSES];
+static gpioWave_t wf[3][PI_WAVE_MAX_PULSES];
 
 static int wfc[3]={0, 0, 0};
 
@@ -762,14 +809,15 @@ static wfStats_t wfStats=
 {
    0, 0, PI_WAVE_MAX_MICROS,
    0, 0, PI_WAVE_MAX_PULSES,
-   0, 0, (PAGES_PER_BLOCK * CBS_PER_OPAGE)
+   0, 0, (DMAO_PAGES * CBS_PER_OPAGE)
 };
 
 static volatile wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
-static volatile uint32_t alertBits    = 0;
-static volatile uint32_t monitorBits  = 0;
-static volatile uint32_t notifyBits   = 0;
+static volatile uint32_t alertBits   = 0;
+static volatile uint32_t monitorBits = 0;
+static volatile uint32_t notifyBits  = 0;
+static volatile uint32_t scriptBits  = 0;
 
 static volatile int DMAstarted = 0;
 
@@ -786,6 +834,8 @@ static gpioGetSamples_t gpioGetSamples;
 static gpioInfo_t       gpioInfo   [PI_MAX_USER_GPIO+1];
 
 static gpioNotify_t     gpioNotify [PI_NOTIFY_SLOTS];
+
+static gpioScript_t     gpioScript [PI_SCRIPT_SLOTS];
 
 static gpioSignal_t     gpioSignal [PI_MAX_SIGNUM+1];
 
@@ -864,9 +914,14 @@ static const uint16_t pwmRealRange[PWM_FREQS]=
  
 /* ======================================================================= */
 
-static void intNotifyBits(void);
+/* Internal prototypes.
+*/
 
+static void intNotifyBits(void);
+static void intScriptBits(void);
 static int  gpioNotifyOpenInBand(int fd);
+
+/* ======================================================================= */
 
 static void myGpioSleep(int seconds, int micros)
 {
@@ -878,10 +933,11 @@ static void myGpioSleep(int seconds, int micros)
    while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem))
    {
       /* copy remaining time to ts */
-      ts.tv_sec  = rem.tv_sec;
-      ts.tv_nsec = rem.tv_nsec;
+      ts = rem;
    }
 }
+
+/* ----------------------------------------------------------------------- */
 
 static uint32_t myGpioDelay(uint32_t micros)
 {
@@ -895,6 +951,8 @@ static uint32_t myGpioDelay(uint32_t micros)
 
    return (systReg[SYST_CLO] - start);
 }
+
+/* ----------------------------------------------------------------------- */
 
 static char * myTimeStamp()
 {
@@ -926,7 +984,7 @@ static void myCreatePipe(char * name, int perm)
 
    if (chmod(name, perm) < 0)
    {
-      DBG(DBG_MIN_LEVEL, "Can't set permissions (%d) for %s, %m", perm, name);
+      DBG(DBG_ALWAYS, "Can't set permissions (%d) for %s, %m", perm, name);
       return;
    }
 }
@@ -985,30 +1043,176 @@ static uint32_t myGetTick(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-static void myDoCommand
-   (cmdCmd_t *cmd, gpioExtent_t *iExt, gpioExtent_t *oExt)
+static int myParseScript(char *script, gpioScript_t *s)
 {
-   int p1, p2, res, i;
-   uint32_t mask, tmp;
+   int idx, len, b, i, j, labels, resolved, pos;
+   int status;
+   uint32_t p[10];
+   void *v[10];
+   gpioInstr_t instr;
+   gpioCtlParse_t ctl;
+
+   ctl.flags = PARSE_FLAGS_PARAMS | PARSE_FLAGS_VARS;
+   ctl.eaten = 0;
+
+   status = 0;
+
+   gpioLabelStep_t label_step[MAX_SCRIPT_LABELS];
+
+   len = strlen(script);
+
+   /* calloc space for PARAMS, VARS, CMDS, and STRINGS */
+
+   b = (sizeof(int) * (MAX_SCRIPT_PARAMS + MAX_SCRIPT_VARS)) +
+       (sizeof(gpioInstr_t) * (len + 2) / 2) + len;
+
+   s->param = calloc(b, 1);
+
+   if (s->param == NULL) return -1;
+
+   s->var = s->param + MAX_SCRIPT_PARAMS;
+
+   s->instr = (gpioInstr_t *)(s->var + MAX_SCRIPT_VARS);
+
+   s->str_area = (char *)(s->instr + ((len + 2) / 2));
+
+   s->str_area_len = len;
+   s->str_area_pos = 0;
+
+   s->instrs = 0;
+
+   labels = 0;
+
+   idx = 0;
+
+   while (!status && ((ctl.eaten)<len) && (idx >= 0))
+   {
+      pos = ctl.eaten;
+
+      idx = cmdParse(script, p, v, &ctl);
+
+      memcpy(&instr.p, p, sizeof(instr.p));
+
+      if (idx >= 0)
+      {
+         switch (instr.p[0])
+         {
+            case PI_CMD_LABEL:
+
+               if (labels < MAX_SCRIPT_LABELS)
+               {
+                  /* check label not already used */
+                  for (j=0; j<labels; j++)
+                  {
+                     if (label_step[j].label == instr.p[1])
+                     {
+                        DBG(DBG_USER, "duplicate label: %s", script+pos);
+                        status = PI_DUP_LABEL;
+                        idx = -1;
+                     }
+                  }
+
+                  label_step[labels].label = instr.p[1];
+                  label_step[labels].step = s->instrs;
+                  labels++;
+               }
+               else
+               {
+                  DBG(DBG_USER, "too many labels: %s", script+pos);
+                  status = PI_TOO_MANY_LABELS;
+                  idx = -1;
+               }
+
+               break;
+
+            case PI_CMD_SYS:
+
+               strncpy(s->str_area+s->str_area_pos, v[1], p[1]);
+               s->str_area[s->str_area_pos+p[1]] = 0;
+               instr.p[1] = (int) s->str_area+s->str_area_pos;
+               s->str_area_pos += (p[1] + 1);
+
+               break;
+
+            case PI_CMD_TRIG:
+               break;
+
+         }
+      }
+      else
+      {
+         DBG(DBG_USER, "invalid command: %s", script+pos);
+         status = PI_BAD_SCRIPT_CMD;
+      }
+
+      if (idx >= 0)
+      {
+         if (instr.p[0] != PI_CMD_LABEL)
+         {
+            memcpy(instr.opt, &ctl.opt, sizeof(instr.opt));
+            s->instr[s->instrs++] = instr;
+         }
+      }
+   }
+
+   DBG(DBG_SCRIPT, "status=%d eaten=%d len=%d idx=%d",
+      status, ctl.eaten, len, idx);
+
+   for (i=0; i<s->instrs; i++)
+   {
+      instr = s->instr[i];
+
+      /* resolve jumps */
+
+      if ((instr.p[0] == PI_CMD_JMP) || (instr.p[0] == PI_CMD_CALL) ||
+          (instr.p[0] == PI_CMD_JZ)  || (instr.p[0] == PI_CMD_JNZ)  ||
+          (instr.p[0] == PI_CMD_JM)  || (instr.p[0] == PI_CMD_JP))
+      {
+         resolved = 0;
+
+         for (j=0; j<labels; j++)
+         {
+            if (instr.p[1] == label_step[j].label)
+            {
+               s->instr[i].p[1] = label_step[j].step;
+               resolved = 1;
+               break;
+            }
+         }
+
+         if (!resolved)
+         {
+            DBG(DBG_USER, "can't resolve label %d\n", instr.p[1]);
+            status = PI_BAD_SCRIPT;
+         }
+      }
+   }
+   return status;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
+{
+   int res, i, tmp;
+   uint32_t mask;
    gpioPulse_t *pulse;
    int masked;
 
-   p1  = cmd->p1;
-   p2  = cmd->p2;
-   res = cmd->res;
+   res = 0;
 
-   switch (cmd->cmd)
+   switch (p[0])
    {
       case PI_CMD_BC1:
          mask = gpioMask;
 
-         res = gpioWrite_Bits_0_31_Clear(p1&mask);
+         res = gpioWrite_Bits_0_31_Clear(p[1]&mask);
 
-         if ((mask | p1) != mask)
+         if ((mask | p[1]) != mask)
          {
-            PERM_ERROR(
+            DBG(DBG_USER, 
                "gpioWrite_Bits_0_31_Clear: bad levels %08X (permissions %08X)",
-               p1, mask);
+               p[1], mask);
             res = PI_SOME_PERMITTED;
          }
          break;
@@ -1016,13 +1220,13 @@ static void myDoCommand
       case PI_CMD_BC2:
          mask = gpioMask>>32;
 
-         res = gpioWrite_Bits_32_53_Clear(p1&mask);
+         res = gpioWrite_Bits_32_53_Clear(p[1]&mask);
 
-         if ((mask | p1) != mask)
+         if ((mask | p[1]) != mask)
          {
-            PERM_ERROR(
+            DBG(DBG_USER, 
                "gpioWrite_Bits_32_53_Clear: bad levels %08X (permissions %08X)",
-               p1, mask);
+               p[1], mask);
             res = PI_SOME_PERMITTED;
          }
          break;
@@ -1034,13 +1238,13 @@ static void myDoCommand
       case PI_CMD_BS1:
          mask = gpioMask;
 
-         res = gpioWrite_Bits_0_31_Set(p1&mask);
+         res = gpioWrite_Bits_0_31_Set(p[1]&mask);
 
-         if ((mask | p1) != mask)
+         if ((mask | p[1]) != mask)
          {
-            PERM_ERROR(
+            DBG(DBG_USER, 
                "gpioWrite_Bits_0_31_Set: bad levels %08X (permissions %08X)",
-               p1, mask);
+               p[1], mask);
             res = PI_SOME_PERMITTED;
          }
          break;
@@ -1048,13 +1252,13 @@ static void myDoCommand
       case PI_CMD_BS2:
          mask = gpioMask>>32;
 
-         res = gpioWrite_Bits_32_53_Set(p1&mask);
+         res = gpioWrite_Bits_32_53_Set(p[1]&mask);
 
-         if ((mask | p1) != mask)
+         if ((mask | p[1]) != mask)
          {
-            PERM_ERROR(
+            DBG(DBG_USER, 
                "gpioWrite_Bits_32_53_Set: bad levels %08X (permissions %08X)",
-               p1, mask);
+               p[1], mask);
             res = PI_SOME_PERMITTED;
          }
          break;
@@ -1063,121 +1267,129 @@ static void myDoCommand
 
       case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
 
-      case PI_CMD_MODEG: res = gpioGetMode(p1); break;
+      case PI_CMD_MICRO: myGpioDelay(p[1]); break;
+
+      case PI_CMD_MILLI: myGpioDelay(p[1] * 1000); break;
+
+      case PI_CMD_MODEG: res = gpioGetMode(p[1]); break;
 
       case PI_CMD_MODES:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetMode(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioSetMode(p[1], p[2]);
          else
          {
-            PERM_ERROR("gpioSetMode: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, "gpioSetMode: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
-      case PI_CMD_NB: res = gpioNotifyBegin(p1, p2); break;
+      case PI_CMD_NB: res = gpioNotifyBegin(p[1], p[2]); break;
 
-      case PI_CMD_NC: res = gpioNotifyClose(p1); break;
+      case PI_CMD_NC: res = gpioNotifyClose(p[1]); break;
 
       case PI_CMD_NO: res = gpioNotifyOpen();  break;
 
-      case PI_CMD_NP: res = gpioNotifyPause(p1); break;
+      case PI_CMD_NP: res = gpioNotifyPause(p[1]); break;
 
-      case PI_CMD_PFG: res = gpioGetPWMfrequency(p1); break;
+      case PI_CMD_PFG: res = gpioGetPWMfrequency(p[1]); break;
 
       case PI_CMD_PFS:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMfrequency(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioSetPWMfrequency(p[1], p[2]);
          else
          {
-            PERM_ERROR(
-               "gpioSetPWMfrequency: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, 
+               "gpioSetPWMfrequency: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
       case PI_CMD_PIGPV: res = gpioVersion(); break;
 
-      case PI_CMD_PRG: res = gpioGetPWMrange(p1); break;
+      case PI_CMD_PRG: res = gpioGetPWMrange(p[1]); break;
 
       case PI_CMD_PROC:
-         res = gpioStoreScript(iExt[0].ptr);
+         res = gpioStoreScript((char *)p[2]);
          break;
 
-      case PI_CMD_PROCD: res = gpioDeleteScript(p1); break;
+      case PI_CMD_PROCD: res = gpioDeleteScript(p[1]); break;
 
-      case PI_CMD_PROCR: res = gpioRunScript(p1); break;
+      case PI_CMD_PROCP: res = gpioScriptStatus(p[1], oExt[0].ptr); break;
 
-      case PI_CMD_PROCS: res = gpioStopScript(p1); break;
+      case PI_CMD_PROCR:
+         res = gpioRunScript(p[1], p[2], (uint32_t *)p[3]);
+         break;
 
-      case PI_CMD_PRRG: res = gpioGetPWMrealRange(p1); break;
+      case PI_CMD_PROCS: res = gpioStopScript(p[1]); break;
+
+      case PI_CMD_PRRG: res = gpioGetPWMrealRange(p[1]); break;
 
       case PI_CMD_PRS:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPWMrange(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioSetPWMrange(p[1], p[2]);
          else
          {
-            PERM_ERROR(
-               "gpioSetPWMrange: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, 
+               "gpioSetPWMrange: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
       case PI_CMD_PUD:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioSetPullUpDown(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioSetPullUpDown(p[1], p[2]);
          else
          {
-            PERM_ERROR(
-               "gpioSetPullUpDown: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, 
+               "gpioSetPullUpDown: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
       case PI_CMD_PWM:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioPWM(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioPWM(p[1], p[2]);
          else
          {
-            PERM_ERROR("gpioPWM: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, "gpioPWM: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
-      case PI_CMD_READ: res = gpioRead(p1); break;
+      case PI_CMD_READ: res = gpioRead(p[1]); break;
 
       case PI_CMD_SERVO:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioServo(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioServo(p[1], p[2]);
          else
          {
-            PERM_ERROR("gpioServo: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, "gpioServo: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
-      case PI_CMD_SLRO: res = gpioSerialReadOpen(p1, p2); break;
+      case PI_CMD_SLRO: res = gpioSerialReadOpen(p[1], p[2]); break;
 
       case PI_CMD_SLR:
-         if (p2 < oExt[0].size) oExt[0].size = p2;
-         res = gpioSerialRead(p1, oExt[0].ptr, oExt[0].size);
+         if (p[2] < oExt[0].size) oExt[0].size = p[2];
+         res = gpioSerialRead(p[1], oExt[0].ptr, oExt[0].size);
          break;
 
-      case PI_CMD_SLRC: res = gpioSerialReadClose(p1); break;
+      case PI_CMD_SLRC: res = gpioSerialReadClose(p[1]); break;
 
       case PI_CMD_TICK: res = gpioTick(); break;
 
       case PI_CMD_TRIG:
-         if (gpioMask & (uint64_t)(1<<p1))
-            res = gpioTrigger(p1, p2, *(int *) (iExt[0].ptr));
+         if (gpioMask & (uint64_t)(1<<p[1]))
+            res = gpioTrigger(p[1], p[2], p[3]);
          else
          {
-            PERM_ERROR("gpioTrigger: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, "gpioTrigger: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
 
-      case PI_CMD_WDOG: res = gpioSetWatchdog(p1, p2); break;
+      case PI_CMD_WDOG: res = gpioSetWatchdog(p[1], p[2]); break;
 
       case PI_CMD_WRITE:
-         if (gpioMask & (uint64_t)(1<<p1)) res = gpioWrite(p1, p2);
+         if (gpioMask & (uint64_t)(1<<p[1])) res = gpioWrite(p[1], p[2]);
          else
          {
-            PERM_ERROR("gpioWrite: gpio %d, no permission to update", p1);
+            DBG(DBG_USER, "gpioWrite: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
@@ -1187,10 +1399,10 @@ static void myDoCommand
          /* need to mask off any non permitted gpios */
 
          mask = gpioMask;
-         pulse = iExt[0].ptr;
+         pulse = (gpioPulse_t *)p[2];
          masked = 0;
 
-         for (i=0; i<p1; i++)
+         for (i=0; i<p[1]; i++)
          {
             tmp = pulse[i].gpioOn & mask;
             if (tmp != pulse[i].gpioOn)
@@ -1205,9 +1417,11 @@ static void myDoCommand
                pulse[i].gpioOff = tmp;
                masked = 1;
             }
+            DBG(DBG_SCRIPT, "on=%X off=%X delay=%d",
+               pulse[i].gpioOn, pulse[i].gpioOff, pulse[i].usDelay);
          }
 
-         res = gpioWaveAddGeneric(p1, pulse);
+         res = gpioWaveAddGeneric(p[1], pulse);
 
          /* report permission error unless another error occurred */
          if (masked && (res >= 0)) res = PI_SOME_PERMITTED;
@@ -1215,17 +1429,13 @@ static void myDoCommand
          break;
 
       case PI_CMD_WVAS:
-         if (gpioMask & (uint64_t)(1<<p1))
-            res = gpioWaveAddSerial
-               (p1,
-                *(int *)(iExt[0].ptr),
-                *(int *)(iExt[1].ptr),
-                p2,
-                iExt[2].ptr);
+         if (gpioMask & (uint64_t)(1<<p[1]))
+            res = gpioWaveAddSerial(p[1], p[2], p[3], p[4], (char *)p[5]);
          else
          {
-            PERM_ERROR
-               ("gpioWaveAddSerial: gpio %d, no permission to update", p1);
+            DBG(
+               DBG_USER,
+               "gpioWaveAddSerial: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
          break;
@@ -1241,7 +1451,7 @@ static void myDoCommand
       case PI_CMD_WVHLT: res = gpioWaveTxStop(); break;
 
       case PI_CMD_WVSC:
-         switch(p1)
+         switch(p[1])
          {
             case 0: res = gpioWaveGetCbs();     break;
             case 1: res = gpioWaveGetHighCbs(); break;
@@ -1251,7 +1461,7 @@ static void myDoCommand
          break;
 
       case PI_CMD_WVSM:
-         switch(p1)
+         switch(p[1])
          {
             case 0: res = gpioWaveGetMicros();     break;
             case 1: res = gpioWaveGetHighMicros(); break;
@@ -1261,7 +1471,7 @@ static void myDoCommand
          break;
 
       case PI_CMD_WVSP:
-         switch(p1)
+         switch(p[1])
          {
             case 0: res = gpioWaveGetPulses();     break;
             case 1: res = gpioWaveGetHighPulses(); break;
@@ -1270,7 +1480,7 @@ static void myDoCommand
          }
          break;
    }
-   cmd->res = res;
+   return (res);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1390,8 +1600,8 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 
    switchGpioOff = 0;
 
-   realRange = pwmRealRange[gpioInfo[gpio].freqIdx];
-   cycles    = pwmCycles   [gpioInfo[gpio].freqIdx];
+   realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
+   cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
 
    newOff = (newVal * realRange)/20000;
    oldOff = (oldVal * realRange)/20000;
@@ -1462,17 +1672,35 @@ static uint32_t waveCbPOadr(int pos)
    return (uint32_t) &dmaOPhys[page]->cb[slot];
 }
 
+/* ----------------------------------------------------------------------- */
+
+static void waveOOLPageSlot(int pos, int *page, int *slot)
+{
+   *page = pos/OOL_PER_OPAGE;
+   *slot = pos%OOL_PER_OPAGE;
+}
+
 
 /* ----------------------------------------------------------------------- */
 
-static uint32_t waveOnOffPOadr(int pos)
+static void waveSetOOL(int pos, uint32_t OOL)
 {
    int page, slot;
 
-   page = pos/ONOFF_PER_OPAGE;
-   slot = pos%ONOFF_PER_OPAGE;
+   waveOOLPageSlot(pos, &page, &slot);
 
-   return (uint32_t) &dmaOPhys[page]->gpioOnOff[slot];
+   dmaOVirt[page]->OOL[slot] = OOL;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static uint32_t waveOOLPOadr(int pos)
+{
+   int page, slot;
+
+   waveOOLPageSlot(pos, &page, &slot);
+
+   return (uint32_t) &dmaOPhys[page]->OOL[slot];
 }
 
 
@@ -1491,7 +1719,7 @@ static void waveCbOPrint(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-void waveBitDelay(unsigned baud, unsigned * bitDelay)
+static void waveBitDelay(unsigned baud, unsigned * bitDelay)
 {
    unsigned fullBit, halfBit, s, e, d, m, i, err;
 
@@ -1530,45 +1758,20 @@ void waveBitDelay(unsigned baud, unsigned * bitDelay)
 
 /* ----------------------------------------------------------------------- */
 
-void gpioWaveDump(void)
-{
-   int i;
-
-   unsigned numPulses, t;
-
-   gpioPulse_t * pulses;
-
-   numPulses = wfc[wfcur];
-   pulses    = wf [wfcur];
-
-   t = 0;
-
-   for (i=0; i<numPulses; i++)
-   {
-      printf("%10u %08X %08X %10u\n",
-         t, pulses[i].gpioOn, pulses[i].gpioOff, pulses[i].usDelay);
-      t += pulses[i].usDelay;
-   }
-}
-
-
-
-/* ----------------------------------------------------------------------- */
-
 static int wave2Cbs(unsigned mode)
 {
-   int cb=0, onoff=0;
+   int cb=0, onoff=0, level=NUM_OOL;
 
-   dmaCbs_t * p=NULL;
+   dmaCbs_t *p=NULL;
 
    unsigned i, half, repeatCb;
 
-   unsigned numPulses;
+   unsigned numWaves;
 
-   gpioPulse_t * pulses;
+   gpioWave_t * waves;
 
-   numPulses = wfc[wfcur];
-   pulses    = wf [wfcur];
+   numWaves = wfc[wfcur];
+   waves    = wf [wfcur];
 
    half = PI_WF_MICROS/2;
 
@@ -1601,37 +1804,57 @@ static int wave2Cbs(unsigned mode)
 
    repeatCb = cb;
 
-   for (i=0; i<numPulses; i++)
+   for (i=0; i<numWaves; i++)
    {
-      if (pulses[i].gpioOn)
+      if (waves[i].gpioOn)
       {
-         dmaOVirt[onoff/ONOFF_PER_OPAGE]->gpioOnOff[onoff%ONOFF_PER_OPAGE] =
-            pulses[i].gpioOn;
+         waveSetOOL(onoff, waves[i].gpioOn);
 
          p = waveCbVOadr(cb++);
 
          p->info   = NORMAL_DMA;
-         p->src    = waveOnOffPOadr(onoff++) | DMA_BUS_ADR;
+         p->src    = waveOOLPOadr(onoff++) | DMA_BUS_ADR;
          p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | 0x7e000000;
          p->length = 4;
          p->next   = waveCbPOadr(cb) | DMA_BUS_ADR;
       }
 
-      if (pulses[i].gpioOff)
+      if (waves[i].gpioOff)
       {
-         dmaOVirt[onoff/ONOFF_PER_OPAGE]->gpioOnOff[onoff%ONOFF_PER_OPAGE] =
-            pulses[i].gpioOff;
+         waveSetOOL(onoff, waves[i].gpioOff);
 
          p = waveCbVOadr(cb++);
 
          p->info   = NORMAL_DMA;
-         p->src    = waveOnOffPOadr(onoff++) | DMA_BUS_ADR;
+         p->src    = waveOOLPOadr(onoff++) | DMA_BUS_ADR;
          p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | 0x7e000000;
          p->length = 4;
          p->next   = waveCbPOadr(cb) | DMA_BUS_ADR;
       }
 
-      if (pulses[i].usDelay)
+      if (waves[i].flags & WAVE_FLAG_READ)
+      {
+         p = waveCbVOadr(cb++);
+
+         p->info   = NORMAL_DMA;
+         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | 0x7e000000;
+         p->dst    = waveOOLPOadr(--level) | DMA_BUS_ADR;
+         p->length = 4;
+         p->next   = waveCbPOadr(cb) | DMA_BUS_ADR;
+      }
+
+      if (waves[i].flags & WAVE_FLAG_TICK)
+      {
+         p = waveCbVOadr(cb++);
+
+         p->info   = NORMAL_DMA;
+         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | 0x7e000000;
+         p->dst    = waveOOLPOadr(--level) | DMA_BUS_ADR;
+         p->length = 4;
+         p->next   = waveCbPOadr(cb) | DMA_BUS_ADR;
+      }
+
+      if (waves[i].usDelay)
       {
          p = waveCbVOadr(cb++);
 
@@ -1655,7 +1878,7 @@ static int wave2Cbs(unsigned mode)
          }
 
          p->src    = (uint32_t) (&dmaOPhys[0]->periphData) | DMA_BUS_ADR;
-         p->length = 4 * ((pulses[i].usDelay+half)/PI_WF_MICROS);
+         p->length = 4 * ((waves[i].usDelay+half)/PI_WF_MICROS);
          p->next   = waveCbPOadr(cb) | DMA_BUS_ADR;
       }
    }
@@ -1755,9 +1978,9 @@ static void waveRxBit(int gpio, int level, uint32_t tick)
 
 /* ----------------------------------------------------------------------- */
 
-static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
+static int waveMerge(unsigned numIn1, gpioWave_t *in1)
 {
-   unsigned inPos1=0, inPos2=0, outPos=0;
+   unsigned inPos1=0, inPos2=0, outPos=0, level = NUM_OOL;
 
    unsigned cbs=0;
 
@@ -1765,7 +1988,7 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
    uint32_t tNow, tNext1, tNext2, tDelay;
 
-   gpioPulse_t * in2, * out;
+   gpioWave_t *in2, *out;
 
    numIn2 = wfc[wfcur];
    in2    = wf[wfcur];
@@ -1793,6 +2016,7 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
          out[outPos].gpioOn  = in1[inPos1].gpioOn;
          out[outPos].gpioOff = in1[inPos1].gpioOff;
+         out[outPos].flags   = in1[inPos1].flags;
 
          tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
       }
@@ -1809,6 +2033,7 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
          out[outPos].gpioOn  = in2[inPos2].gpioOn;
          out[outPos].gpioOff = in2[inPos2].gpioOff;
+         out[outPos].flags   = in2[inPos2].flags;
 
          tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
       }
@@ -1825,6 +2050,7 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
          out[outPos].gpioOn  = in1[inPos1].gpioOn  | in2[inPos2].gpioOn;
          out[outPos].gpioOff = in1[inPos1].gpioOff | in2[inPos2].gpioOff;
+         out[outPos].flags   = in1[inPos1].flags   | in2[inPos2].flags;
 
          tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
          tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
@@ -1841,6 +2067,18 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
       if (out[outPos].gpioOff) cbs++; /* one cb if gpio off */
 
+      if (out[outPos].flags & WAVE_FLAG_READ)
+      {
+         cbs++; /* one cb if read */
+         --level;
+      }
+
+      if (out[outPos].flags & WAVE_FLAG_TICK)
+      {
+         cbs++; /* one cb if tick */
+         --level;
+      }
+
       outPos++;
 
       if (inPos1 >= numIn1) tNext1 = -1;
@@ -1848,7 +2086,7 @@ static int waveMerge(unsigned numIn1, gpioPulse_t * in1)
 
    }
 
-   if (outPos < numOut)
+   if ((outPos < numOut) && (outPos < level))
    {
       wfStats.micros = tNow;
 
@@ -1897,7 +2135,7 @@ static void dmaCbPrint(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-static unsigned dmaCurrentCb(void)
+static unsigned dmaNowAtICB(void)
 {
    unsigned cb;
    static unsigned lastPage=0;
@@ -1932,7 +2170,43 @@ static unsigned dmaCurrentCb(void)
          return (page*CBS_PER_IPAGE) + cb;
       }
 
-      if (page++ >= DMA_PAGES) page=0;
+      if (page++ >= DMAI_PAGES) page=0;
+
+      if (page == lastPage) break;
+   }
+
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+unsigned dmaNowAtOCB(void)
+{
+   unsigned cb;
+   static unsigned lastPage=0;
+   unsigned page;
+   uint32_t cbAddr;
+
+   cbAddr = dmaOut[DMA_CONBLK_AD];
+
+   if (!cbAddr) return -1;
+
+   page = lastPage;
+
+   /* which page are we dma'ing? */
+
+   while (1)
+   {
+      cb = (cbAddr - ((int)dmaOPhys[page] | DMA_BUS_ADR)) / 32;
+
+      if (cb < CBS_PER_OPAGE)
+      {
+         lastPage = page;
+
+         return (page*CBS_PER_OPAGE) + cb;
+      }
+
+      if (page++ >= DMAO_PAGES) page=0;
 
       if (page == lastPage) break;
    }
@@ -1960,6 +2234,8 @@ static uint32_t dmaPwmDataAdr(int pos)
 {
    return (uint32_t) &dmaIPhys[pos]->periphData;
 }
+
+/* ----------------------------------------------------------------------- */
 
 static uint32_t dmaGpioOnAdr(int pos)
 {
@@ -2095,7 +2371,7 @@ static void dmaDelayCb(int b)
       p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | 0x7e000000;
    }
 
-   p->src    = dmaPwmDataAdr(b%DMA_PAGES) | DMA_BUS_ADR;
+   p->src    = dmaPwmDataAdr(b%DMAI_PAGES) | DMA_BUS_ADR;
    p->length = 4;
    p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
 }
@@ -2186,13 +2462,19 @@ static void sigHandler(int signum)
          }
          else if (signum == SIGPIPE)
          {
+            /* can happen when pipe/socket is remote closed */
             DBG(DBG_USER, "SIGPIPE received");
+         }
+         else if (signum == SIGCHLD)
+         {
+            /* happens when system call is made */
+            DBG(DBG_USER, "SIGCHLD received");
          }
          else
          {
             /* exit */
 
-            DBG(DBG_MIN_LEVEL, "Unhandled signal %d, terminating\n", signum);
+            DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
 
             exit(-1);
          }
@@ -2202,7 +2484,7 @@ static void sigHandler(int signum)
    {
       /* exit */
 
-      DBG(DBG_MIN_LEVEL, "Unhandled signal %d, terminating\n", signum);
+      DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
 
       exit(-1);
    }
@@ -2256,7 +2538,7 @@ static void * pthAlertThread(void *x)
 
    gpioStats.startTick = tick;
 
-   oldSlot = dmaCurrentSlot(dmaCurrentCb());
+   oldSlot = dmaCurrentSlot(dmaNowAtICB());
 
    cycle = (oldSlot/PULSE_PER_CYCLE);
    pulse = (oldSlot%PULSE_PER_CYCLE);
@@ -2273,7 +2555,7 @@ static void * pthAlertThread(void *x)
          req.tv_nsec = rem.tv_nsec;
       }
 
-      newSlot = dmaCurrentSlot(dmaCurrentCb());
+      newSlot = dmaCurrentSlot(dmaNowAtICB());
 
       numSamples = 0;
 
@@ -2581,6 +2863,28 @@ static void * pthAlertThread(void *x)
          }
       }
 
+      if (changedBits & scriptBits)
+      {
+         for (n=0; n<PI_SCRIPT_SLOTS; n++)
+         {
+            if ((gpioScript[n].state     == PI_SCRIPT_IN_USE)  &&
+                (gpioScript[n].run_state == PI_SCRIPT_WAITING) &&
+                (gpioScript[n].waitBits & changedBits))
+            {
+               pthread_mutex_lock(&gpioScript[n].pthMutex);
+
+               if (gpioScript[n].run_state == PI_SCRIPT_WAITING)
+               {
+                  gpioScript[n].changedBits =
+                     gpioScript[n].waitBits & changedBits;
+                  pthread_cond_signal(&gpioScript[n].pthCond);
+               }
+
+               pthread_mutex_unlock(&gpioScript[n].pthMutex);
+            }
+         }
+      }
+
       /* once all outputs have been emitted set reported level */
 
       if (numSamples) reportedLevel = gpioSample[numSamples-1].level;
@@ -2589,6 +2893,260 @@ static void * pthAlertThread(void *x)
          gpioStats.maxSamples = numSamples;
       
       gpioStats.numSamples += numSamples;
+   }
+
+   return 0;
+}
+
+/* ======================================================================= */
+
+static int scrPop(gpioScript_t *s, int *SP, int *S)
+{
+   if ((*SP) > 0)
+   {
+      return S[--(*SP)];
+   }
+   else
+   {
+      s->run_state = PI_SCRIPT_FAILED;
+      DBG(DBG_ALWAYS, "script %d too many pops", s->id);
+      return 0;
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void scrPush(gpioScript_t *s, int *SP, int *S, int val)
+{
+   if ((*SP) < PI_SCRIPT_STACK_SIZE)
+   {
+      S[(*SP)++] = val;
+   }
+   else
+   {
+      s->run_state = PI_SCRIPT_FAILED;
+      DBG(DBG_ALWAYS, "script %d too many pushes", s->id);
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void scrSwap(int *v1, int *v2)
+{
+   int t;
+
+   t=*v1; *v1=*v2; *v2= t;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static int scrWait(gpioScript_t *s, uint32_t bits)
+{
+   pthread_mutex_lock(&s->pthMutex);
+
+   if (s->request == PI_SCRIPT_RUN)
+   {
+      s->run_state = PI_SCRIPT_WAITING;
+      s->waitBits = bits;
+      intScriptBits();
+
+      pthread_cond_wait(&s->pthCond, &s->pthMutex);
+
+      s->waitBits = 0;
+      intScriptBits();
+      s->run_state = PI_SCRIPT_RUNNING;
+   }
+
+   pthread_mutex_unlock(&s->pthMutex);
+
+   return s->changedBits;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static int scrSys(char *cmd, int param)
+{
+   char buf[256];
+   char par[16];
+
+   sprintf(par, " %d", param);
+   strcpy(buf, "/opt/pigpio/cgi/");
+   strncat(buf, cmd, 200);
+   strcat(buf, par);
+
+   DBG(DBG_USER, "sys %s", buf);
+
+   return system(buf);
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void *pthScript(void *x)
+{
+   gpioScript_t *s;
+   gpioExtent_t oExt[3];
+   char buf[CMD_BUF_SIZE];
+   gpioInstr_t instr;
+   int p1, p2;
+
+   int PC, A, F, SP;
+   int S[PI_SCRIPT_STACK_SIZE];
+
+   S[0] = 0; /* to prevent compiler warning */
+
+   s = x;
+
+   s->run_state = PI_SCRIPT_HALTED;
+
+   while (s->request != PI_SCRIPT_DELETE)
+   {
+      pthread_mutex_lock(&s->pthMutex);
+      pthread_cond_wait(&s->pthCond, &s->pthMutex);
+      pthread_mutex_unlock(&s->pthMutex);
+
+      s->run_state = PI_SCRIPT_RUNNING;
+
+      A  = 0;
+      F  = 0;
+      PC = 0;
+      SP = 0;
+
+      while ((s->request   == PI_SCRIPT_RUN    ) &&
+             (s->run_state == PI_SCRIPT_RUNNING))
+      {
+         instr = s->instr[PC];
+
+         p1 = instr.p[1];
+         p2 = instr.p[2];
+
+         if (instr.p[0] < 100)
+         {
+            oExt[0].ptr = buf;
+            oExt[0].size = CMD_BUF_SIZE-1;
+
+            if (instr.opt[0] == CMD_PARAM)
+            {
+               instr.p[1] = s->param[p1];
+            }
+            else if (instr.opt[0] == CMD_VAR)
+            {
+               instr.p[1] = s->var[p1];
+            }
+
+            if (instr.opt[1] == CMD_PARAM)
+            {
+               instr.p[2] = s->param[p2];
+            }
+            else if (instr.opt[1] == CMD_VAR)
+            {
+               instr.p[2] = s->var[p2];
+            }
+
+            A = myDoCommand(instr.p, oExt);
+
+            F = A;
+
+            PC++;
+         }
+         else
+         {
+            switch (instr.p[0])
+            {
+               case PI_CMD_ADDI:  A+=p1; F=A;                      PC++; break;
+
+               case PI_CMD_ADDV:  A+=s->var[p1]; F=A;              PC++; break;
+
+               case PI_CMD_ANDI:  A&=p1; F=A;                      PC++; break;
+
+               case PI_CMD_ANDV:  A&=s->var[p1]; F=A;              PC++; break;
+
+               case PI_CMD_CALL:  scrPush(s, S, &SP, PC+1);     PC = p1; break;
+
+               case PI_CMD_CMPI:  F=A-p1;                          PC++; break;
+
+               case PI_CMD_CMPV:  F=A-s->var[p1];                  PC++; break;
+
+               case PI_CMD_DCRA:  --A; F=A;                        PC++; break;
+
+               case PI_CMD_DCRV:  --s->var[p1]; F=s->var[p1];      PC++; break;
+
+               case PI_CMD_HALT:  s->run_state = PI_SCRIPT_HALTED;       break;
+
+               case PI_CMD_INRA:  ++A; F=A;                        PC++; break;
+
+               case PI_CMD_INRV:  ++s->var[p1]; F=s->var[p1];      PC++; break;
+
+               case PI_CMD_JM:    if (F<0)  PC=p1; else PC++;            break;
+
+               case PI_CMD_JMP:   PC=p1;                                 break;
+
+               case PI_CMD_JNZ:   if (F)    PC=p1; else PC++;            break;
+
+               case PI_CMD_JP:    if (F>=0) PC=p1; else PC++;            break;
+
+               case PI_CMD_JZ:    if (!F)   PC=p1; else PC++;            break;
+
+               case PI_CMD_LABEL:                                  PC++; break;
+
+               case PI_CMD_LDAI:  A=p1;                            PC++; break;
+
+               case PI_CMD_LDAP:  A=s->param[p1];                  PC++; break;
+
+               case PI_CMD_LDAV:  A=s->var[p1];                    PC++; break;
+
+               case PI_CMD_LDPA:  s->param[p1]=A;                  PC++; break;
+
+               case PI_CMD_LDVA:  s->var[p1]=A;                    PC++; break;
+
+               case PI_CMD_LDVI:  s->var[p1] = p2;                 PC++; break;
+
+               case PI_CMD_LDVV:  s->var[p1]=s->var[p2];           PC++; break;
+
+               case PI_CMD_ORI:   A|=p1; F=A;                      PC++; break;
+
+               case PI_CMD_ORV:   A|=s->var[p1]; F=A;              PC++; break;
+
+               case PI_CMD_POPA:  A=scrPop(s, S, &SP);             PC++; break;
+
+               case PI_CMD_POPV:  s->var[p1]=scrPop(s, S, &SP);    PC++; break;
+
+               case PI_CMD_PUSHA: scrPush(s, S, &SP, A);           PC++; break;
+
+               case PI_CMD_PUSHV: scrPush(s, S, &SP, s->var[p1]);  PC++; break;
+
+               case PI_CMD_RET:   PC=scrPop(s, S, &SP);                  break;
+
+               case PI_CMD_RAL:   A<<=p1; F=A;                     PC++; break;
+
+               case PI_CMD_RAR:   A>>=p1; F=A;                     PC++; break;
+
+               case PI_CMD_SUBI:  A-=p1; F=A;                      PC++; break;
+
+               case PI_CMD_SUBV:  A-=s->var[p1]; F=A;              PC++; break;
+
+               case PI_CMD_SWAPA: scrSwap(&s->var[p1], &A);        PC++; break;
+
+               case PI_CMD_SWAPV: scrSwap(&s->var[p1], &s->var[p2]);PC++; break;
+
+               case PI_CMD_SYS:   A=scrSys((char*)p1, A); F=A;     PC++; break;
+
+               case PI_CMD_WAITI: A=scrWait(s, p1); F=A;           PC++; break;
+
+               case PI_CMD_WAITV: A=scrWait(s, s->var[p1]); F=A;   PC++; break;
+
+               case PI_CMD_XORI:  A^=p1; F=A;                      PC++; break;
+
+               case PI_CMD_XORV:  A^=s->var[p1]; F=A;              PC++; break;
+
+            }
+         }
+
+         if (PC >= s->instrs) s->run_state = PI_SCRIPT_HALTED;
+
+      }
+
+      if (s->request == PI_SCRIPT_HALT) s->run_state = PI_SCRIPT_HALTED;
+
    }
 
    return 0;
@@ -2652,11 +3210,15 @@ static void * pthTimerTick(void *x)
 static void * pthFifoThread(void *x)
 {
    char buf[CMD_BUF_SIZE];
-   int idx, flags, len;
-   cmdCmd_t cmd;
-   gpioExtent_t iExt[3];
+   int idx, flags, len, res, i;
+   uint32_t p[10];
+   void *v[10];
    gpioExtent_t oExt[3];
-   char *p;
+   gpioCtlParse_t ctl;
+   char *pp;
+   uint32_t *param;
+
+   ctl.flags = 0;
 
    myCreatePipe(PI_INPFIFO, 0662);
 
@@ -2686,53 +3248,79 @@ static void * pthFifoThread(void *x)
         buf[len] = 0; /* replace terminating */
       }
 
-      if ((idx=cmdParse(buf, &cmd, 0, NULL, iExt)) >= 0)
+      ctl.eaten = 0;
+      idx = 0;
+
+      while (((ctl.eaten)<len) && (idx >= 0))
       {
-         oExt[0].ptr = buf;
-         oExt[0].size = CMD_BUF_SIZE-1;
-
-         myDoCommand(&cmd, iExt, oExt);
-
-         switch (cmdInfo[idx].rv)
+         if ((idx=cmdParse(buf, p, v, &ctl)) >= 0)
          {
-            case 0:
-               fprintf(outFifo, "%d\n", cmd.res);
-               break;
+            oExt[0].ptr = buf;
+            oExt[0].size = CMD_BUF_SIZE-1;
 
-            case 1:
-               fprintf(outFifo, "%d\n", cmd.res);
-               break;
+            switch (p[0])
+            {
+               case PI_CMD_PROC:  p[2] = (uint32_t)v[1]; break;
+               case PI_CMD_PROCR: p[3] = (uint32_t)v[1]; break;
+               case PI_CMD_WVAG:  p[2] = (uint32_t)v[1]; break;
+               case PI_CMD_WVAS:  p[5] = (uint32_t)v[1]; break;
+            }
 
-            case 2:
-               fprintf(outFifo, "%d\n", cmd.res);
-               break;
+            res = myDoCommand(p, oExt);
 
-            case 3:
-               fprintf(outFifo, "%08X\n", cmd.res);
-               break;
+            switch (cmdInfo[idx].rv)
+            {
+               case 0:
+                  fprintf(outFifo, "%d\n", res);
+                  break;
 
-            case 4:
-               fprintf(outFifo, "%u\n", cmd.res);
-               break;
+               case 1:
+                  fprintf(outFifo, "%d\n", res);
+                  break;
 
-            case 5:
-               fprintf(outFifo, cmdUsage);
-               break;
+               case 2:
+                  fprintf(outFifo, "%d\n", res);
+                  break;
 
-            case 6:
-               if (cmd.res < 0) fprintf(outFifo, "%d\n", cmd.res);
-               else if (cmd.res > 0)
-               {
-                  p = oExt[0].ptr;
-                  p[cmd.res] = 0;
-                  fprintf(outFifo, "%s", (char *)oExt[0].ptr);
-               }
-               break;
+               case 3:
+                  fprintf(outFifo, "%08X\n", res);
+                  break;
 
+               case 4:
+                  fprintf(outFifo, "%u\n", res);
+                  break;
+
+               case 5:
+                  fprintf(outFifo, cmdUsage);
+                  break;
+
+               case 6:
+                  if (res < 0) fprintf(outFifo, "%d\n", res);
+                  else if (res > 0)
+                  {
+                     pp = oExt[0].ptr;
+                     pp[res] = 0;
+                     fprintf(outFifo, "%s", (char *)oExt[0].ptr);
+                  }
+                  break;
+
+               case 7:
+                  if (res < 0) fprintf(outFifo, "%d\n", res);
+                  else
+                  {
+                     fprintf(outFifo, "%d", res);
+                     param = oExt[0].ptr;
+                     for (i=0; i<MAX_SCRIPT_PARAMS; i++)
+                     {
+                        fprintf(outFifo, " %d", param[i]);
+                     }
+                     fprintf(outFifo, "\n");
+                  }
+                  break;
+            }
          }
-
+         else fprintf(outFifo, "%d\n", PI_BAD_FIFO_COMMAND);
       }
-      else fprintf(outFifo, "%d\n", PI_BAD_FIFO_COMMAND);
 
       fflush(outFifo);
    }
@@ -2745,12 +3333,11 @@ static void * pthFifoThread(void *x)
 static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
-   cmdCmd_t cmd;
+   int res;
+   uint32_t p[10];
    unsigned bytes;
    char *memPtr;
-   gpioExtent_t iExt[3];
    gpioExtent_t oExt[3];
-   unsigned tmp;
    char buf[CMD_BUF_SIZE];
 
    oExt[0].size = CMD_BUF_SIZE-1;
@@ -2758,16 +3345,100 @@ static void *pthSocketThreadHandler(void *fdC)
 
    free(fdC);
 
-   while(1)
+   while (1)
    {
-      if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) == sizeof(cmdCmd_t))
+      res = 0;
+
+      if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
+
+      switch (p[0])
       {
-         if (cmd.cmd == PI_CMD_NOIB)
-         {
-            cmd.res = gpioNotifyOpenInBand(sock);
-         }
-         else if (cmd.cmd == PI_CMD_WVAG)
-         {
+         case PI_CMD_NOIB:
+            res = gpioNotifyOpenInBand(sock);
+            break;
+
+         case PI_CMD_PROC:
+            /*
+            p1=script length
+            p2=0
+            ## extension ##
+            char[] script
+            */
+            if (p[1]) /* script appended */
+            {
+               memPtr = malloc(p[1]+1); /* add null terminator */
+
+               if (memPtr)
+               {
+                  if (recv(sock, memPtr, p[1], MSG_WAITALL) == p[1])
+                  {
+                     p[2] = (uint32_t)memPtr;
+                     memPtr[p[1]] = 0;
+                     res = myDoCommand(p, oExt);
+                     free(memPtr);
+                  }
+                  else
+                  {
+                     free(memPtr);
+                     close(sock);
+                     return 0;
+                  }
+               }
+            }
+            else res = PI_BAD_SCRIPT_CMD;
+            break;
+
+         case PI_CMD_PROCR:
+            /*
+            p1=script id
+            p2=numParam
+            ## extension ##
+            int[] param
+            */
+            if (p[2]) /* parameters appended */
+            {
+               memPtr = malloc(p[2]*sizeof(uint32_t));
+
+               if (memPtr)
+               {
+                  if (recv(sock, memPtr, p[2]*sizeof(uint32_t), MSG_WAITALL) ==
+                     p[2]*sizeof(uint32_t))
+                  {
+                     p[3] = (uint32_t)memPtr;
+                     res = myDoCommand(p, oExt);
+                     free(memPtr);
+                  }
+                  else
+                  {
+                     free(memPtr);
+                     close(sock);
+                     return 0;
+                  }
+               }
+            }
+            else res = myDoCommand(p, oExt);
+            break;
+
+         case PI_CMD_TRIG:
+            /*
+            p1=user_gpio
+            p2=pulseLen
+            ## extension ##
+            unsigned level
+            */
+            if (recv(sock, &p[3], sizeof(unsigned), MSG_WAITALL) ==
+               sizeof(unsigned))
+            {
+               res = myDoCommand(p, oExt);
+            }
+            else
+            {
+               close(sock);
+               return 0;
+            }
+            break;
+
+         case PI_CMD_WVAG:
             /*
             p1=numPulses
             p2=0
@@ -2775,7 +3446,7 @@ static void *pthSocketThreadHandler(void *fdC)
             gpioPulse_t[] pulses
             */
 
-            bytes = cmd.p1 * sizeof(gpioPulse_t);
+            bytes = p[1] * sizeof(gpioPulse_t);
 
             memPtr = malloc(bytes);
 
@@ -2783,22 +3454,21 @@ static void *pthSocketThreadHandler(void *fdC)
             {
                if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
                {
-                  iExt[0].size = bytes;
-                  iExt[0].ptr = memPtr;
-                  myDoCommand(&cmd, iExt, oExt);
+                  p[2] = (uint32_t)memPtr;
+                  res = myDoCommand(p, oExt);
                   free(memPtr);
                }
                else
                {
                   free(memPtr);
-                  break;
+                  close(sock);
+                  return 0;
                }
             }
-            else break;
+            else res = PI_NO_MEMORY;
+            break;
 
-         }
-         else if (cmd.cmd == PI_CMD_WVAS)
-         {
+         case PI_CMD_WVAS:
             /*
             p1=user_gpio
             p2=numChar
@@ -2808,7 +3478,7 @@ static void *pthSocketThreadHandler(void *fdC)
             char[] str
             */
 
-            bytes = sizeof(unsigned) + sizeof(unsigned) + cmd.p2;
+            bytes = sizeof(unsigned) + sizeof(unsigned) + p[2];
 
             memPtr = malloc(bytes+1); /* add 1 for a nul terminator */
 
@@ -2816,103 +3486,55 @@ static void *pthSocketThreadHandler(void *fdC)
             {
                if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
                {
-                  iExt[0].size = sizeof(unsigned);
-                  iExt[0].ptr = memPtr;
-                  iExt[1].size = sizeof(unsigned);
-                  iExt[1].ptr = memPtr + sizeof(unsigned);
-                  iExt[2].size = cmd.p2;
-                  iExt[2].ptr = memPtr + sizeof(unsigned) + sizeof(unsigned);
+                  p[4] = p[2];
+                  memcpy(&p[2], memPtr, 4);
+                  memcpy(&p[3], memPtr+4, 4);
+                  p[5] =
+                     (uint32_t)(memPtr + sizeof(unsigned) + sizeof(unsigned));
                   memPtr[bytes] = 0; /* may be duplicate terminator */
-                  myDoCommand(&cmd, iExt, oExt);
+                  res = myDoCommand(p, oExt);
                   free(memPtr);
                }
                else
                {
                   free(memPtr);
-                  break;
+                  close(sock);
+                  return 0;
                }
             }
-            else break;
+            else res = PI_NO_MEMORY;
+            break;
 
-         }
-         else if (cmd.cmd == PI_CMD_PROC)
-         {
-            /*
-            p1=script length
-            p2=0
-            ## extension ##
-            char[] script
-            */
-
-            bytes = cmd.p1;
-
-            memPtr = malloc(bytes+1); /* add 1 for a nul terminator */
-
-            if (memPtr)
-            {
-               if (bytes) /* script appended */
-               {
-                  if (recv(sock, memPtr, bytes, MSG_WAITALL) != bytes)
-                  {
-                     free(memPtr);
-                     break;
-                  }
-               }
-               iExt[0].size = bytes;
-               iExt[0].ptr = memPtr;
-               memPtr[bytes] = 0; /* may be duplicate terminator */
-               myDoCommand(&cmd, iExt, oExt);
-               free(memPtr);
-            }
-            else break;
-         }
-         else
-         {
-            switch (cmd.cmd)
-            {
-               case PI_CMD_TRIG:
-                  /*
-                  p1=user_gpio
-                  p2=pulseLen
-                  ## extension ##
-                  unsigned level
-                  */
-                  iExt[0].size = 4;
-                  iExt[0].ptr = &tmp;
-
-                  if (recv(sock, &tmp, sizeof(unsigned), MSG_WAITALL) !=
-                     sizeof(unsigned))
-                  {
-                     close(sock);
-                     return 0;
-                  }
-                  break;
-
-               default:
-                  break;
-            }
-            myDoCommand(&cmd, iExt, oExt);
-         }
-
-         write(sock, &cmd, sizeof(cmdCmd_t));
-
-         switch (cmd.cmd)
-         {
-            case PI_CMD_SLR: /* extension */
-
-               if (cmd.res > 0)
-               {
-                  write(sock, oExt[0].ptr, cmd.res);
-               }
-               break;
-
-            default:
-               break;
-         }
-
-
+         default:
+            res = myDoCommand(p, oExt);
+            break;
       }
-      else break;
+
+      p[3] = res;
+
+      write(sock, p, 16);
+
+      switch (p[0])
+      {
+         case PI_CMD_SLR: /* extension */
+
+            if (res > 0)
+            {
+               write(sock, oExt[0].ptr, res);
+            }
+            break;
+
+         case PI_CMD_PROCP: /* extension */
+
+            if (res >= 0)
+            {
+               write(sock, oExt[0].ptr, sizeof(uint32_t)*MAX_SCRIPT_PARAMS);
+            }
+            break;
+
+         default:
+           break;
+      }
    }
 
    close(sock);
@@ -3291,7 +3913,7 @@ static int initDMAcbs(void)
       (uint32_t)gpioReg, (uint32_t)pwmReg,
       (uint32_t)pcmReg,  (uint32_t)clkReg); 
 
-   for (i=0; i<DMA_PAGES; i++)
+   for (i=0; i<DMAI_PAGES; i++)
       DBG(DBG_STARTUP, "dmaIPhys[%d]=%08X", i, (uint32_t)dmaIPhys[i]);
 
    dmaInitCbs();
@@ -3404,6 +4026,7 @@ static void initPCM(unsigned bits)
 
 static void initClock(int mainClock)
 {
+   int clockPWM;
    unsigned clkCtl, clkDiv, clkSrc, clkDivI, clkDivF, clkMash, clkBits;
    char * per, * src;
    unsigned micros;
@@ -3413,17 +4036,19 @@ static void initClock(int mainClock)
    if (mainClock) micros = gpioCfg.clockMicros;
    else           micros = PI_WF_MICROS;
 
-   if ((gpioCfg.clockPeriph == PI_CLOCK_PCM) && mainClock)
-   {
-      clkCtl = CLK_PCMCTL;
-      clkDiv = CLK_PCMDIV;
-      per = "PCM";
-   }
-   else
+   clockPWM = mainClock ^ (gpioCfg.clockPeriph == PI_CLOCK_PCM);
+
+   if (clockPWM)
    {
       clkCtl = CLK_PWMCTL;
       clkDiv = CLK_PWMDIV;
       per = "PWM";
+   }
+   else
+   {
+      clkCtl = CLK_PCMCTL;
+      clkDiv = CLK_PCMDIV;
+      per = "PCM";
    }
 
    if (gpioCfg.clockSource == PI_CLOCK_PLLD)
@@ -3466,16 +4091,15 @@ static void initClock(int mainClock)
 
    myGpioDelay(10);
 
-   if ((gpioCfg.clockPeriph == PI_CLOCK_PCM) && mainClock)
-        initPCM(clkBits);
-   else initPWM(clkBits);
+   if (clockPWM) initPWM(clkBits);
+   else          initPCM(clkBits);
 
    myGpioDelay(2000);
 }
 
 /* ----------------------------------------------------------------------- */
 
-static void initDMAgo(volatile uint32_t  * dmaAddr, uint32_t cbAddr)
+static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
 {
    DBG(DBG_STARTUP, "");
 
@@ -3508,9 +4132,10 @@ static void initClearGlobals(void)
 
    DBG(DBG_STARTUP, "");
 
-   alertBits    = 0;
-   monitorBits  = 0;
-   notifyBits   = 0;
+   alertBits   = 0;
+   monitorBits = 0;
+   notifyBits  = 0;
+   scriptBits  = 0;
 
    libInitialised   = 0;
    DMAstarted       = 0;
@@ -3535,7 +4160,7 @@ static void initClearGlobals(void)
 
    wfStats.cbs        = 0;
    wfStats.highCbs    = 0;
-   wfStats.maxCbs     = (PAGES_PER_BLOCK * CBS_PER_OPAGE);
+   wfStats.maxCbs     = (PI_WAVE_BLOCKS * PAGES_PER_BLOCK * CBS_PER_OPAGE);
 
    gpioGetSamples.func     = NULL;
    gpioGetSamples.ex       = 0;
@@ -3736,6 +4361,179 @@ static void initReleaseResources(void)
 
 /* ======================================================================= */
 
+int getBitInBytes(int bitPos, uint8_t *buf, int numBits)
+{
+   int bitp, bufp;
+
+   if (bitPos < numBits)
+   {
+      bufp =      bitPos / 8;
+      bitp = 7 - (bitPos % 8);
+      if (buf[bufp] & (1<<bitp)) return 1;
+   }
+
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void putBitInBytes(int bitPos, uint8_t *buf, int val)
+{
+   int bitp, bufp;
+
+   bufp =      bitPos / 8;
+   bitp = 7 - (bitPos % 8);
+
+   if (val) buf[bufp] |=   (1<<bitp);
+   else     buf[bufp] &= (~(1<<bitp));
+}
+
+/* ----------------------------------------------------------------------- */
+
+uint32_t waveGetRawOut(int pos)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_OOL))
+   {
+      waveOOLPageSlot(pos, &page, &slot);
+      return (dmaOVirt[page]->OOL[slot]);
+   }
+
+   return -1;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void waveSetRawOut(int pos, uint32_t value)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_OOL))
+   {
+      waveOOLPageSlot(pos, &page, &slot);
+      dmaOVirt[page]->OOL[slot] = value;
+   }
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+uint32_t waveGetRawIn(int pos)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_OOL))
+   {
+      waveOOLPageSlot((NUM_OOL-1)-pos, &page, &slot);
+      return (dmaOVirt[page]->OOL[slot]);
+   }
+
+   return -1;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void waveSetRawIn(int pos, uint32_t value)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_OOL))
+   {
+      waveOOLPageSlot((NUM_OOL-1)-pos, &page, &slot);
+      dmaOVirt[page]->OOL[slot] = value;
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+double time_time(void)
+{
+   struct timeval tv;
+   double t;
+
+   gettimeofday(&tv, 0);
+
+   t = (double)tv.tv_sec + ((double)tv.tv_usec / 1E6);
+
+   return t;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void time_sleep(double seconds)
+{
+   struct timespec ts, rem;
+
+   if (seconds > 0.0)
+   {
+      ts.tv_sec = seconds;
+      ts.tv_nsec = (seconds-(double)ts.tv_sec) * 1E9;
+
+      while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem))
+      {
+         /* copy remaining time to ts */
+         ts.tv_sec  = rem.tv_sec;
+         ts.tv_nsec = rem.tv_nsec;
+      }
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+void gpioDumpWave(void)
+{
+   int i;
+
+   unsigned numWaves, t;
+
+   gpioWave_t *waves;
+
+   numWaves = wfc[wfcur];
+   waves    = wf [wfcur];
+
+   t = 0;
+
+   for (i=0; i<numWaves; i++)
+   {
+      fprintf(stderr, "%10u %08X %08X %08X %10u\n",
+         t, waves[i].gpioOn, waves[i].gpioOff,
+         waves[i].flags, waves[i].usDelay);
+      t += waves[i].usDelay;
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+void gpioDumpScript(int s)
+{
+   int i;
+
+   for (i=0; i<MAX_SCRIPT_PARAMS; i++)
+   {
+      fprintf(stderr, "p%d=%d ", i, gpioScript[s].param[i]);
+   }
+
+   fprintf(stderr, "\n");
+
+   for (i=0; i<MAX_SCRIPT_VARS; i++)
+   {
+      fprintf(stderr, "v%d=%d ", i, gpioScript[s].var[i]);
+   }
+
+   fprintf(stderr, "\n");
+
+   for (i=0; i<gpioScript[s].instrs; i++)
+   {
+      fprintf(stderr, "c%d=[%d, %d(%d), %d(%d)]\n",
+         i, gpioScript[s].instr[i].p[0],
+         gpioScript[s].instr[i].p[1], gpioScript[s].instr[i].opt[0],
+         gpioScript[s].instr[i].p[2], gpioScript[s].instr[i].opt[1]);
+   }
+}
+
+/* ======================================================================= */
+
 int gpioInitialise(void)
 {
    int i;
@@ -3920,7 +4718,6 @@ int gpioSetMode(unsigned gpio, unsigned mode)
                /* switch pwm off */
                myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
                break;
-
          }
 
          gpioInfo[gpio].is = GPIO_UNDEFINED;
@@ -4015,10 +4812,12 @@ int gpioWrite(unsigned gpio, unsigned level)
 
    if (gpio <= PI_MAX_USER_GPIO)
    {
-      if (gpioInfo[gpio].is != GPIO_OUTPUT)
+      if (gpioInfo[gpio].is != GPIO_WRITE)
       {
          if (gpioInfo[gpio].is == GPIO_UNDEFINED)
          {
+            if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
+            else                 *(gpioReg + GPSET0 + BANK) = BIT;
             gpioSetMode(gpio, PI_OUTPUT);
          }
          else if (gpioInfo[gpio].is == GPIO_PWM)
@@ -4033,7 +4832,7 @@ int gpioWrite(unsigned gpio, unsigned level)
                gpio, gpioInfo[gpio].width/gpioCfg.clockMicros, 0);
          }
 
-         gpioInfo[gpio].is=GPIO_OUTPUT;
+         gpioInfo[gpio].is=GPIO_WRITE;
          gpioInfo[gpio].width=0;
       }
    }
@@ -4070,7 +4869,6 @@ int gpioPWM(unsigned gpio, unsigned val)
          /* switch servo off */
          myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
          gpioInfo[gpio].width = 0;
-         gpioInfo[gpio].freqIdx = DEFAULT_PWM_IDX; /* default frequency */
       }
       gpioInfo[gpio].is = GPIO_PWM;
    }
@@ -4251,7 +5049,6 @@ int gpioServo(unsigned gpio, unsigned val)
          gpioInfo[gpio].width=0;
       }
       gpioInfo[gpio].is = GPIO_SERVO;
-      gpioInfo[gpio].freqIdx = clkCfg[gpioCfg.clockMicros].servoIdx;
    }
 
    myGpioSetServo(gpio, gpioInfo[gpio].width, val);
@@ -4394,8 +5191,10 @@ int gpioWaveClear(void)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t * pulses)
+int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
 {
+   int p;
+
    DBG(DBG_USER, "numPulses=%u pulses=%08X", numPulses, (uint32_t)pulses);
 
    CHECK_INITED;
@@ -4403,7 +5202,15 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t * pulses)
    if (numPulses > PI_WAVE_MAX_PULSES)
       SOFT_ERROR(PI_TOO_MANY_PULSES, "bad number of pulses (%d)", numPulses);
 
-   return waveMerge(numPulses, pulses);
+   for (p=0; p<numPulses; p++)
+   {
+      wf[2][p].gpioOff = pulses[p].gpioOff;
+      wf[2][p].gpioOn  = pulses[p].gpioOn;
+      wf[2][p].usDelay = pulses[p].usDelay;
+      wf[2][p].flags   = 0;
+   }
+
+   return waveMerge(numPulses, wf[2]);
 }
 
 
@@ -4419,7 +5226,7 @@ int gpioWaveAddSerial(unsigned gpio,
 
    unsigned bitDelay[10];
 
-   DBG(DBG_USER, "gpio=%d baud=%d offset=%d numChar=%d str=%s",
+   DBG(DBG_USER, "gpio=%d baud=%d offset=%d numChar=%d str=[%s]",
       gpio, baud, offset, numChar, str);
 
    DBG(DBG_USER, "l=%d s=%X e=%X",
@@ -4448,6 +5255,7 @@ int gpioWaveAddSerial(unsigned gpio,
 
    wf[2][p].gpioOn  = (1<<gpio);
    wf[2][p].gpioOff = 0;
+   wf[2][p].flags   = 0;
 
    if (offset > bitDelay[0]) wf[2][p].usDelay = offset;
    else                      wf[2][p].usDelay = bitDelay[0];
@@ -4461,6 +5269,7 @@ int gpioWaveAddSerial(unsigned gpio,
       wf[2][p].gpioOn = 0;
       wf[2][p].gpioOff = (1<<gpio);
       wf[2][p].usDelay = bitDelay[0];
+      wf[2][p].flags   = 0;
 
       lev = 0;
 
@@ -4479,13 +5288,15 @@ int gpioWaveAddSerial(unsigned gpio,
 
             if (lev)
             {
-               wf[2][p].gpioOn = (1<<gpio);
+               wf[2][p].gpioOn  = (1<<gpio);
                wf[2][p].gpioOff = 0;
+               wf[2][p].flags   = 0;
             }
             else
             {
-               wf[2][p].gpioOn = 0;
+               wf[2][p].gpioOn  = 0;
                wf[2][p].gpioOff = (1<<gpio);
+               wf[2][p].flags   = 0;
             }
 
             wf[2][p].usDelay = bitDelay[b+1];
@@ -4499,9 +5310,10 @@ int gpioWaveAddSerial(unsigned gpio,
       {
          p++;
 
-         wf[2][p].gpioOn = (1<<gpio);
+         wf[2][p].gpioOn  = (1<<gpio);
          wf[2][p].gpioOff = 0;
          wf[2][p].usDelay = bitDelay[9];
+         wf[2][p].flags   = 0;
       }
    }
 
@@ -4510,10 +5322,150 @@ int gpioWaveAddSerial(unsigned gpio,
    wf[2][p].gpioOn  = (1<<gpio);
    wf[2][p].gpioOff = 0;
    wf[2][p].usDelay = bitDelay[0];
+   wf[2][p].flags   = 0;
 
    return waveMerge(p, wf[2]);
 }
 
+/* ----------------------------------------------------------------------- */
+
+int gpioWaveAddSPI(
+   gpioSPI_t *spi,
+   unsigned offset,
+   unsigned ss,
+   uint8_t *tx_bits,
+   unsigned num_tx_bits,
+   unsigned rx_bit_first,
+   unsigned rx_bit_last,
+   unsigned bits)
+{
+   int p, dbv, bit, halfbit;
+   int rising_edge[2], read_cycle[2];
+   uint32_t on_bits, off_bits;
+   int tx_bit_pos;
+
+   DBG(DBG_USER, "spi=%08X off=%d ss=%d tx=%08X, num=%d fb=%d lb=%d bits=%d",
+      (uint32_t)spi, offset, ss, (uint32_t)tx_bits, num_tx_bits,
+      rx_bit_first, rx_bit_last, bits);
+
+   CHECK_INITED;
+
+   if (ss > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", ss);
+
+   /*
+   CPOL CPHA
+    0    0   read rising/write falling
+    0    1   read falling/write rising
+    1    0   read falling/write rising
+    1    1   read rising/write falling
+   */
+
+   if (spi->clk_pol) {rising_edge[0] = 0; rising_edge[1] = 1;}
+   else              {rising_edge[0] = 1; rising_edge[1] = 0;}
+
+   if (spi->clk_pha) {read_cycle[0] = 0; read_cycle[1] = 1;}
+   else              {read_cycle[0] = 1; read_cycle[1] = 0;}
+
+   p = 0;
+
+   if (offset)
+   {
+      wf[2][p].gpioOn  = 0;
+      wf[2][p].gpioOff = 0;
+      wf[2][p].flags   = 0;
+      wf[2][p].usDelay = offset;
+      p++;
+   }
+
+   /* preset initial mosi bit in case it's read at leading clock bit */
+
+   on_bits = 0;
+   off_bits = 0;
+
+   tx_bit_pos = 0;
+
+   if (getBitInBytes(tx_bit_pos, tx_bits, num_tx_bits))
+   {
+      dbv = 1;
+      on_bits  |= (1<<(spi->mosi));
+   }
+   else
+   {
+      dbv = 0;
+      off_bits  |= (1<<(spi->mosi));
+   }
+
+   if (spi->ss_pol) off_bits |= (1<<ss);
+   else             on_bits  |= (1<<ss);
+
+   wf[2][p].gpioOn  = on_bits;
+   wf[2][p].gpioOff = off_bits;
+   wf[2][p].flags   = 0;
+
+   if (spi->clk_us > spi->ss_us) wf[2][p].usDelay = spi->clk_us;
+   else                          wf[2][p].usDelay = spi->ss_us;
+
+   p++;
+
+   for (bit=1; bit<=bits; bit++)
+   {
+      for (halfbit=0; halfbit<2; halfbit++)
+      {
+         wf[2][p].usDelay = spi->clk_us;
+         wf[2][p].flags = 0;
+
+         on_bits = 0;
+         off_bits = 0;
+
+         if (read_cycle[halfbit])
+         {
+            if ((bit>=rx_bit_first) && (bit<=rx_bit_last))
+               wf[2][p].flags = WAVE_FLAG_READ;
+
+;
+         }
+         else
+         {
+            if (getBitInBytes(tx_bit_pos, tx_bits, num_tx_bits))
+            {
+               if (!dbv) on_bits |= (1<<(spi->mosi));
+               dbv = 1;
+            }
+            else
+            {
+               if (dbv) off_bits |= (1<<(spi->mosi));
+               dbv = 0;
+            }
+
+            ++tx_bit_pos;
+         }
+
+         if (rising_edge[halfbit]) on_bits  |= (1<<(spi->clk));
+         else                      off_bits |= (1<<(spi->clk));
+
+         wf[2][p].gpioOn = on_bits;
+         wf[2][p].gpioOff = off_bits;
+
+         p++;
+      }
+   }
+
+   on_bits = 0;
+   off_bits = 0;
+
+   if (spi->ss_pol) on_bits  |= (1<<ss);
+   else             off_bits |= (1<<ss);
+
+   wf[2][p].gpioOn  = on_bits;
+   wf[2][p].gpioOff = off_bits;
+   wf[2][p].flags   = 0;
+   wf[2][p].usDelay = 0;
+
+   p++;
+
+   return waveMerge(p, wf[2]);
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -4672,6 +5624,10 @@ int gpioWaveTxStart(unsigned mode)
       secondaryClockInited = 1;
    }
 
+   dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
+
+   dmaOut[DMA_CONBLK_AD] = 0;
+
    cb = wave2Cbs(mode);
 
    if (gpioCfg.dbgLevel >= DBG_SLOW_TICK)
@@ -4727,7 +5683,7 @@ static int intGpioSetAlertFunc(
       alertBits &= ~BIT;
    }
 
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
+   monitorBits = alertBits | notifyBits | scriptBits | gpioGetSamples.bits;
 
    return 0;
 }
@@ -4784,6 +5740,7 @@ int gpioNotifyOpen(void)
    {
       if (gpioNotify[i].state == PI_NOTIFY_CLOSED)
       {
+         gpioNotify[i].state = PI_NOTIFY_OPENED;
          slot = i;
          break;
       }
@@ -4799,9 +5756,11 @@ int gpioNotifyOpen(void)
    fd = open(name, O_RDWR|O_NONBLOCK);
 
    if (fd < 0)
+   {
+      gpioNotify[slot].state = PI_NOTIFY_CLOSED;
       SOFT_ERROR(PI_BAD_PATHNAME, "open %s failed (%m)", name);
+   }
 
-   gpioNotify[slot].state = PI_NOTIFY_OPENED;
    gpioNotify[slot].seqno = 0;
    gpioNotify[slot].bits  = 0;
    gpioNotify[slot].fd    = fd;
@@ -4846,6 +5805,27 @@ static int gpioNotifyOpenInBand(int fd)
 
 /* ----------------------------------------------------------------------- */
 
+static void intScriptBits(void)
+{
+   int i;
+   uint32_t bits;
+
+   bits = 0;
+
+   for (i=0; i<PI_SCRIPT_SLOTS; i++)
+   {
+      if (gpioScript[i].state == PI_SCRIPT_IN_USE)
+      {
+         bits |= gpioScript[i].waitBits;
+      }
+   }
+
+   scriptBits = bits;
+
+   monitorBits = alertBits | notifyBits | scriptBits | gpioGetSamples.bits;
+}
+
+
 static void intNotifyBits(void)
 {
    int i;
@@ -4863,7 +5843,7 @@ static void intNotifyBits(void)
 
    notifyBits = bits;
 
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
+   monitorBits = alertBits | notifyBits | scriptBits | gpioGetSamples.bits;
 }
 
 
@@ -5006,7 +5986,7 @@ int gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits)
    if (f) gpioGetSamples.bits = bits;
    else   gpioGetSamples.bits = 0;
 
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
+   monitorBits = alertBits | notifyBits | scriptBits | gpioGetSamples.bits;
 
    return 0;
 }
@@ -5029,7 +6009,7 @@ int gpioSetGetSamplesFuncEx(gpioGetSamplesFuncEx_t f,
    if (f) gpioGetSamples.bits = bits;
    else   gpioGetSamples.bits = 0;
 
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
+   monitorBits = alertBits | notifyBits | scriptBits | gpioGetSamples.bits;
 
    return 0;
 }
@@ -5182,28 +6162,123 @@ void gpioStopThread(pthread_t *pth)
 
 int gpioStoreScript(char *script)
 {
-   DBG(DBG_USER, "script=%s", script);
-   DBG(DBG_USER, "l=%d s=%X e=%X",
-      strlen(script), script[0], script[strlen(script)-1]);
+   gpioScript_t *s;
+   int status, slot, i;
+
+   DBG(DBG_USER, "script=[%s]", script);
 
    CHECK_INITED;
 
-   return PI_BAD_SCRIPT;
-}
+   slot = -1;
 
+   for (i=0; i<PI_SCRIPT_SLOTS; i++)
+   {
+      if (gpioScript[i].state == PI_SCRIPT_FREE)
+      {
+         gpioScript[i].state = PI_SCRIPT_RESERVED;
+         slot = i;
+         break;
+      }
+   }
+
+   if (slot < 0)
+      SOFT_ERROR(PI_NO_SCRIPT_ROOM, "no room for scripts");
+
+   s = &gpioScript[slot];
+
+   status = myParseScript(script, s);
+
+   if (status == 0)
+   {
+      s->request   = PI_SCRIPT_HALT;
+      s->run_state = PI_SCRIPT_HALTED;
+
+      pthread_cond_init(&s->pthCond, NULL);
+      pthread_mutex_init(&s->pthMutex, NULL);
+
+      s->id = slot;
+
+      gpioScript[slot].state = PI_SCRIPT_IN_USE;
+
+      s->pthIdp = gpioStartThread(pthScript, s);
+
+      status = slot;
+
+   }
+   else
+   {
+      if (s->param) free(s->param);
+      s->param = NULL;
+      gpioScript[slot].state = PI_SCRIPT_FREE;
+   }
+
+   return status;
+}
 
 
 /* ----------------------------------------------------------------------- */
 
-int gpioRunScript(int script_id)
+int gpioRunScript(int script_id, unsigned numParam, uint32_t *param)
 {
-   DBG(DBG_USER, "script_id=%d", script_id);
+   int status = 0;
+
+   DBG(DBG_USER, "script_id=%d numParam=%d param=%08X",
+      script_id, numParam, (uint32_t)param);
 
    CHECK_INITED;
 
-   return PI_BAD_SCRIPT_ID;
+   if (numParam > MAX_SCRIPT_PARAMS)
+      SOFT_ERROR(PI_TOO_MANY_PARAM, "bad number of parameters(%d)", numParam);
+
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
+   {
+      pthread_mutex_lock(&gpioScript[script_id].pthMutex);
+
+      if (gpioScript[script_id].run_state == PI_SCRIPT_HALTED)
+      {
+         if ((numParam > 0) && (param != 0))
+         {
+            memcpy(gpioScript[script_id].param, param,
+               sizeof(uint32_t) * numParam);
+         }
+
+         gpioScript[script_id].request = PI_SCRIPT_RUN;
+
+         pthread_cond_signal(&gpioScript[script_id].pthCond);
+      }
+      else
+      {
+         status = PI_NOT_HALTED;
+      }
+
+      pthread_mutex_unlock(&gpioScript[script_id].pthMutex);
+
+      return status;
+   }
+   else return PI_BAD_SCRIPT_ID;
 }
 
+
+/* ----------------------------------------------------------------------- */
+
+int gpioScriptStatus(int script_id, uint32_t *param)
+{
+   DBG(DBG_USER, "script_id=%d param=%08X", script_id, (uint32_t)param);
+
+   CHECK_INITED;
+
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
+   {
+      if (param != 0)
+      {
+         memcpy(param, gpioScript[script_id].param,
+            sizeof(uint32_t) * MAX_SCRIPT_PARAMS);
+      }
+
+      return gpioScript[script_id].run_state;
+   }
+   else return PI_BAD_SCRIPT_ID;
+}
 
 
 /* ----------------------------------------------------------------------- */
@@ -5214,10 +6289,23 @@ int gpioStopScript(int script_id)
 
    CHECK_INITED;
 
-   return PI_BAD_SCRIPT_ID;
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
+   {
+      pthread_mutex_lock(&gpioScript[script_id].pthMutex);
+
+      gpioScript[script_id].request = PI_SCRIPT_HALT;
+
+      if (gpioScript[script_id].run_state == PI_SCRIPT_WAITING)
+      {
+         pthread_cond_signal(&gpioScript[script_id].pthCond);
+      }
+
+      pthread_mutex_unlock(&gpioScript[script_id].pthMutex);
+
+      return 0;
+   }
+   else return PI_BAD_SCRIPT_ID;
 }
-
-
 
 /* ----------------------------------------------------------------------- */
 
@@ -5227,7 +6315,37 @@ int gpioDeleteScript(int script_id)
 
    CHECK_INITED;
 
-   return PI_BAD_SCRIPT_ID;
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
+   {
+      gpioScript[script_id].state = PI_SCRIPT_DYING;
+
+      pthread_mutex_lock(&gpioScript[script_id].pthMutex);
+
+      gpioScript[script_id].request = PI_SCRIPT_HALT;
+
+      if (gpioScript[script_id].run_state == PI_SCRIPT_WAITING)
+      {
+         pthread_cond_signal(&gpioScript[script_id].pthCond);
+      }
+
+      pthread_mutex_unlock(&gpioScript[script_id].pthMutex);
+
+      while (gpioScript[script_id].run_state == PI_SCRIPT_RUNNING)
+      {
+         myGpioSleep(0, 5000); /* give script time to halt */
+      }
+
+      gpioStopThread(gpioScript[script_id].pthIdp);
+
+      if (gpioScript[script_id].param) free(gpioScript[script_id].param);
+
+      gpioScript[script_id].param = NULL;
+
+      gpioScript[script_id].state = PI_SCRIPT_FREE;
+
+      return 0;
+   }
+   else return PI_BAD_SCRIPT_ID;
 }
 
 
@@ -5441,7 +6559,7 @@ uint32_t gpioDelay(uint32_t micros)
 
    start = systReg[SYST_CLO];
 
-   if (micros < 100) while ((systReg[SYST_CLO] - start) <= micros) ;
+   if (micros < 101) while ((systReg[SYST_CLO] - start) <= micros) ;
 
    else gpioSleep(PI_TIME_RELATIVE, (micros/MILLION), (micros%MILLION));
 
@@ -5672,7 +6790,7 @@ int gpioCfgInternals(unsigned what, int value)
 
          gpioCfg.showStats = value;
 
-         DBG(DBG_MIN_LEVEL, "showStats is %u", value);
+         DBG(DBG_ALWAYS, "showStats is %u", value);
 
          retVal = 0;
 
@@ -5680,13 +6798,13 @@ int gpioCfgInternals(unsigned what, int value)
 
       case 984762879:
 
-         if (value < DBG_MIN_LEVEL) value = DBG_MIN_LEVEL;
+         if (value < DBG_ALWAYS) value = DBG_ALWAYS;
 
          if (value > DBG_MAX_LEVEL) value = DBG_MAX_LEVEL;
 
          gpioCfg.dbgLevel = value;
 
-         DBG(DBG_MIN_LEVEL, "Debug level is %u", value);
+         DBG(DBG_ALWAYS, "Debug level is %u", value);
 
          retVal = 0;
 

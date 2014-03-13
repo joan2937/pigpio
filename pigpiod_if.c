@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 3 */
+/* PIGPIOD_IF_VERSION 4 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -534,10 +534,10 @@ int get_mode(unsigned gpio)
 int set_pull_up_down(unsigned gpio, unsigned pud)
    {return pigpio_command(gPigCommand, PI_CMD_PUD, gpio, pud);}
 
-int read_gpio(unsigned gpio)
+int gpio_read(unsigned gpio)
    {return pigpio_command(gPigCommand, PI_CMD_READ, gpio, 0);}
 
-int write_gpio(unsigned gpio, unsigned level)
+int gpio_write(unsigned gpio, unsigned level)
    {return pigpio_command(gPigCommand, PI_CMD_WRITE, gpio, level);}
 
 int set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle)
@@ -600,7 +600,7 @@ uint32_t get_current_tick(void)
 uint32_t get_hardware_revision(void)
    {return pigpio_command(gPigCommand, PI_CMD_HWVER, 0, 0);}
 
-unsigned get_pigpio_version(void)
+uint32_t get_pigpio_version(void)
    {return pigpio_command(gPigCommand, PI_CMD_PIGPV, 0, 0);}
 
 int wave_clear(void)
@@ -725,8 +725,41 @@ int store_script(char *script)
    return pigpio_command_ext(gPigCommand, PI_CMD_PROC, len, 0, 1, ext);
 }
 
-int run_script(unsigned script_id)
-   {return pigpio_command(gPigCommand, PI_CMD_PROCR, script_id, 0);}
+int run_script(unsigned script_id, unsigned numPar, uint32_t *param)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=script id
+   p2=number of parameters
+   ## extension ##
+   uint32_t[] parameters
+   */
+
+   ext[0].size = sizeof(uint32_t)*numPar;
+   ext[0].ptr = param;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_PROCR, script_id, numPar, 1, ext);
+}
+
+int script_status(int script_id, uint32_t *param)
+{
+   int status;
+   uint32_t p[MAX_SCRIPT_PARAMS];
+
+   status = pigpio_command(gPigCommand, PI_CMD_PROCP, script_id, 0);
+
+   if (status >= 0)
+   {
+      /* get the data */
+      recv(gPigCommand, p, sizeof(p), MSG_WAITALL);
+
+      if (param) memcpy(param, p, sizeof(p));
+   }
+
+   return status;
+}
 
 int stop_script(unsigned script_id)
    {return pigpio_command(gPigCommand, PI_CMD_PROCS, script_id, 0);}

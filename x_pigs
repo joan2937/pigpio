@@ -1,0 +1,271 @@
+#!/bin/bash
+
+GPIO=4
+
+#
+# This script serves as a confidence check that the socket interface to
+# the pigpio library is ok.
+#
+# The script uses gpio 4 (P1-7).  Make sure that nothing (or only a LED)
+# is connected to gpio 4 before running the script.
+#
+# To run the script
+# sudo pigpiod # if not already running on the Pi
+# export PIGPIO_ADDR=pi_host # to specify the Pi if testing remotely
+# ./x_pigs
+#
+
+s=$(pigs bc1 0)
+if [[ $s = "" ]]; then echo "BC1 ok"; else echo "BC1 fail ($s)"; fi
+
+s=$(pigs bc2 0)
+if [[ $s = "" ]]; then echo "BC2 ok"; else echo "BC2 fail ($s)"; fi
+
+s=$(pigs br1)
+if [[ ${#s} = 8 ]]
+then echo "BR1 ok"
+else echo "BR1 fail ($s)"
+fi
+
+s=$(pigs br2)
+if [[ ${#s} = 8 ]]
+then echo "BR2 ok"
+else echo "BR2 fail ($s)"
+fi
+
+s=$(pigs bs1 0)
+if [[ $s = "" ]]; then echo "BS1 ok"; else echo "BS1 fail ($s)"; fi
+
+s=$(pigs bs2 0)
+if [[ $s = "" ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
+
+s=$(pigs h)
+if [[ ${#s} = 2999 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
+
+s=$(pigs hwver)
+if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
+
+s=$(pigs micro 1000)
+if [[ $s = "" ]]; then echo "MICRO ok"; else echo "MICRO fail ($s)"; fi
+
+s=$(pigs milli 10)
+if [[ $s = "" ]]; then echo "MILLI ok"; else echo "MILLI fail ($s)"; fi
+
+s=$(pigs modes $GPIO 0)
+s=$(pigs modeg $GPIO)
+if [[ $s = 4 ]]; then echo "MODEG ok"; else echo "MODEG fail ($s)"; fi
+s=$(pigs m $GPIO r)
+s=$(pigs mg $GPIO)
+if [[ $s = 0 ]]; then echo "MODES ok"; else echo "MODES fail ($s)"; fi
+
+h=$(pigs no)
+if [[ $h -ge 0 && $h -le 31 ]]
+then echo "NO($h) ok"
+else echo "NO fail ($s)"
+fi
+
+s=$(pigs nb $h 0xabcd)
+if [[ $s = "" ]]; then echo "NB($h) ok"; else echo "NB fail ($s)"; fi
+
+s=$(pigs np $h)
+if [[ $s = "" ]]; then echo "NP($h) ok"; else echo "NP fail ($s)"; fi
+
+s=$(pigs nc $h)
+if [[ $s = "" ]]; then echo "NC($h) ok"; else echo "NC fail ($s)"; fi
+
+s=$(pigs pfs $GPIO 800)
+if [[ $s = 800 ]]; then echo "PFG-a ok"; else echo "PFG-a fail ($s)"; fi
+
+s=$(pigs pfg $GPIO)
+if [[ $s = 800 ]]; then echo "PFG-b ok"; else echo "PFG-b fail ($s)"; fi
+
+s=$(pigs pfs $GPIO 0)
+if [[ $s = 10 ]]; then echo "PFS-a ok"; else echo "PFS-a fail ($s)"; fi
+
+s=$(pigs pfs $GPIO 800)
+if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
+
+s=$(pigs pigpv)
+if [[ $s = 13 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+
+s=$(pigs prs $GPIO 255)
+if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi
+s=$(pigs prg $GPIO)
+if [[ $s = 255 ]]; then echo "PRG-b ok"; else echo "PRG-b fail ($s)"; fi
+
+p=$(pigs proc ldap 0 ldpa 1 ldai 1234 ldpa 0 label 999 milli 1000 jmp 999)
+if [[ $p -ge 0 && $p -le 31 ]]
+then echo "PROC($p) ok"
+else echo "PROC($p) fail ($s)"
+fi
+
+s=$(pigs procr $p 9876)
+if [[ $s = 0 ]]; then echo "PROCR($p) ok"; else echo "PROCR($p) fail ($s)"; fi
+
+s=$(pigs procp $p)
+v=(${s// / })
+if [[ ${v[0]} = 1 && ${v[1]} = 1234 && ${v[2]} = 9876 ]]
+then echo "PROCP($p) ok"
+else echo "PROCP($p) fail ($s)"
+fi
+
+s=$(pigs procs $p)
+if [[ $s = 0 ]]; then echo "PROCS($p) ok"; else echo "PROCS($p) fail ($s)"; fi
+
+s=$(pigs procd $p)
+if [[ $s = 0 ]]; then echo "PROCD($p) ok"; else echo "PROCD($p) fail ($s)"; fi
+
+s=$(pigs prrg $GPIO)
+if [[ $s = 250 ]]; then echo "PRRG ok"; else echo "PRRG fail ($s)"; fi
+
+s=$(pigs prs $GPIO 1000)
+if [[ $s = 250 ]]; then echo "PRS-a ok"; else echo "PRS-a fail ($s)"; fi
+s=$(pigs prg $GPIO)
+if [[ $s = 1000 ]]; then echo "PRS-b ok"; else echo "PRS-b fail ($s)"; fi
+s=$(pigs prs $GPIO 255)
+if [[ $s = 250 ]]; then echo "PRS-c ok"; else echo "PRS-c fail ($s)"; fi
+s=$(pigs prg $GPIO)
+if [[ $s = 255 ]]; then echo "PRS-d ok"; else echo "PRS-d fail ($s)"; fi
+
+s=$(pigs pud $GPIO u)
+if [[ $s = "" ]]; then echo "PUD-a ok"; else echo "PUD-a fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 1 ]]; then echo "PUD-b ok"; else echo "PUD-b fail ($s)"; fi
+s=$(pigs pud $GPIO d)
+if [[ $s = "" ]]; then echo "PUD-c ok"; else echo "PUD-c fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 0 ]]; then echo "PUD-d ok"; else echo "PUD-d fail ($s)"; fi
+s=$(pigs pud $GPIO o)
+if [[ $s = "" ]]; then echo "PUD-e ok"; else echo "PUD-e fail ($s)"; fi
+
+s=$(pigs p $GPIO 128)
+if [[ $s = "" ]]; then echo "PWM-a ok"; else echo "PWM-a fail ($s)"; fi
+s=$(pigs pwm $GPIO 64)
+if [[ $s = "" ]]; then echo "PWM-b ok"; else echo "PWM-b fail ($s)"; fi
+s=$(pigs pwm $GPIO 0)
+if [[ $s = "" ]]; then echo "PWM-c ok"; else echo "PWM-c fail ($s)"; fi
+s=$(pigs m $GPIO r)
+if [[ $s = "" ]]; then echo "PWM-d ok"; else echo "PWM-d fail ($s)"; fi
+
+s=$(pigs pud $GPIO u)
+if [[ $s = "" ]]; then echo "READ-a ok"; else echo "READ-a fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 1 ]]; then echo "READ-b ok"; else echo "READ-b fail ($s)"; fi
+s=$(pigs pud $GPIO d)
+if [[ $s = "" ]]; then echo "READ-c ok"; else echo "READ-c fail ($s)"; fi
+s=$(pigs read $GPIO)
+if [[ $s = 0 ]]; then echo "READ-d ok"; else echo "READ-d fail ($s)"; fi
+s=$(pigs pud $GPIO o)
+if [[ $s = "" ]]; then echo "READ-e ok"; else echo "READ-e fail ($s)"; fi
+
+s=$(pigs s $GPIO 500)
+if [[ $s = "" ]]; then echo "SERVO-a ok"; else echo "SERVO-a fail ($s)"; fi
+s=$(pigs servo $GPIO 2500)
+if [[ $s = "" ]]; then echo "SERVO-b ok"; else echo "SERVO-b fail ($s)"; fi
+s=$(pigs servo $GPIO 0)
+if [[ $s = "" ]]; then echo "SERVO-c ok"; else echo "SERVO-c fail ($s)"; fi
+s=$(pigs w $GPIO 1)
+if [[ $s = "" ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
+
+s=$(pigs wvclr)
+if [[ $s = 0 ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
+s=$(pigs slro $GPIO 1200)
+if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
+s=$(pigs wvas $GPIO 1200 0 "my name is joan")
+if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
+s=$(pigs m $GPIO w)
+if [[ $s = "" ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
+s=$(pigs wvgo)
+if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
+sleep 0.1
+s=$(pigs slr $GPIO 100)
+if [[ $s = "my name is joan" ]]
+then echo "SLR-f ok"
+else echo "SLR-f fail with [$s]"
+fi
+s=$(pigs slrc $GPIO)
+if [[ $s = 0 ]]; then echo "SLR-g ok"; else echo "SLR-g fail ($s)"; fi
+
+t1=$(pigs t)
+t2=$(pigs tick)
+s=$(($t2-$t1))
+if [[ $s -gt 0 && $s -lt 20000 ]]
+then echo "TICK ok"
+else echo "TICK fail($s)"
+fi
+
+pigs w $GPIO 1 # put in known state
+s=$(pigs trig $GPIO 10 1)
+if [[ $s = "" ]]; then echo "TRIG-a ok"; else echo "TRIG-a fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 0 ]]; then echo "TRIG-b ok"; else echo "TRIG-b fail ($s)"; fi
+s=$(pigs trig $GPIO 10 0)
+if [[ $s = "" ]]; then echo "TRIG-c ok"; else echo "TRIG-c fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 1 ]]; then echo "TRIG-d ok"; else echo "TRIG-d fail ($s)"; fi
+
+s=$(pigs wdog $GPIO 1000)
+if [[ $s = "" ]]; then echo "WDOG-a ok"; else echo "WDOG-a fail ($s)"; fi
+s=$(pigs wdog $GPIO 0)
+if [[ $s = "" ]]; then echo "WDOG-b ok"; else echo "WDOG-b fail ($s)"; fi
+
+s=$(pigs w $GPIO 1)
+if [[ $s = "" ]]; then echo "WRITE-a ok"; else echo "WRITE-a fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 1 ]]; then echo "WRITE-b ok"; else echo "WRITE-b fail ($s)"; fi
+s=$(pigs write $GPIO 0)
+if [[ $s = "" ]]; then echo "WRITE-c ok"; else echo "WRITE-c fail ($s)"; fi
+s=$(pigs r $GPIO)
+if [[ $s = 0 ]]; then echo "WRITE-d ok"; else echo "WRITE-d fail ($s)"; fi
+
+
+s=$(pigs wvclr )
+if [[ $s = 0 ]]; then echo "WVCLR ok"; else echo "WVCLR fail ($s)"; fi
+s=$(pigs wvas $GPIO 300 0 "this is then winter of my discontent made glorious")
+if [[ $s = 309 ]]; then echo "WVAS ok"; else echo "WVAS fail ($s)"; fi
+s=$(pigs wvag 16 0 5000000 0 16 5000000)
+if [[ $s = 310 ]]; then echo "WVAG ok"; else echo "WVAG fail ($s)"; fi
+s=$(pigs wvgo)
+if [[ $s = 621 ]]; then echo "WVGO ok"; else echo "WVGO fail ($s)"; fi
+s=$(pigs wvbsy)
+if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
+sleep 1
+s=$(pigs wvbsy)
+if [[ $s = 1 ]]; then echo "WVBSY-b ok"; else echo "WVBSY-b fail ($s)"; fi
+s=$(pigs wvhlt)
+if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+s=$(pigs wvbsy)
+if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
+s=$(pigs wvgor)
+if [[ $s = 621 ]]; then echo "WVGOR ok"; else echo "WVGOR fail ($s)"; fi
+s=$(pigs wvbsy)
+if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
+s=$(pigs wvhlt)
+if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+s=$(pigs wvbsy)
+if [[ $s = 0 ]]; then echo "WVBSY-e ok"; else echo "WVBSY-e fail ($s)"; fi
+
+s=$(pigs wvsc 0)
+if [[ $s = 620 ]]; then echo "WVSC-a ok"; else echo "WVSC-a fail ($s)"; fi
+s=$(pigs wvsc 1)
+if [[ $s -ge 620 ]]; then echo "WVSC-b ok"; else echo "WVSC-b fail ($s)"; fi
+s=$(pigs wvsc 2)
+if [[ $s = 25016 ]]; then echo "WVSC-c ok"; else echo "WVSC-c fail ($s)"; fi
+
+s=$(pigs wvsm 0)
+if [[ $s = 10000000 ]]; then echo "WVSM-a ok"; else echo "WVSM-a fail ($s)"; fi
+s=$(pigs wvsm 1)
+if [[ $s -ge 10000000 ]]; then echo "WVSM-b ok"; else echo "WVSM-b fail ($s)"; fi
+s=$(pigs wvsm 2)
+if [[ $s = 1800000000 ]]
+then echo "WVSM-c ok"
+else echo "WVSM-c fail ($s)"
+fi
+
+s=$(pigs wvsp 0)
+if [[ $s = 310 ]]; then echo "WVSP-a ok"; else echo "WVSP-a fail ($s)"; fi
+s=$(pigs wvsp 1)
+if [[ $s -ge 310 ]]; then echo "WVSP-b ok"; else echo "WVSP-b fail ($s)"; fi
+s=$(pigs wvsp 2)
+if [[ $s = 12000 ]]; then echo "WVSP-c ok"; else echo "WVSP-c fail ($s)"; fi
+

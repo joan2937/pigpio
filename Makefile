@@ -13,17 +13,22 @@ OBJ2     = pigpiod_if.o command.o
 
 LIB      = $(LIB1) $(LIB2)
 
-ALL     = $(LIB) checklib pig2vcd pigpiod pigs
+ALL     = $(LIB) x_pigpio x_pigpiod_if pig2vcd pigpiod pigs
 
-LL      = -L. -lpigpio -lpthread -lrt
+LL1      = -L. -lpigpio -lpthread -lrt
+
+LL2      = -L. -lpigpiod_if -lpthread -lrt
 
 all:	$(ALL)
 
-checklib:	checklib.o $(LIB1)
-	$(CC) -o checklib checklib.c $(LL)
+x_pigpio:	x_pigpio.o $(LIB1)
+	$(CC) -o x_pigpio x_pigpio.c $(LL1)
+
+x_pigpiod_if:	x_pigpiod_if.o $(LIB2)
+	$(CC) -o x_pigpiod_if x_pigpiod_if.c $(LL2)
 
 pigpiod:	pigpiod.o $(LIB1)
-	$(CC) -o pigpiod pigpiod.c $(LL)
+	$(CC) -o pigpiod pigpiod.c $(LL1)
 
 pigs:		pigs.o command.o
 	$(CC) -o pigs pigs.c command.c
@@ -35,6 +40,7 @@ clean:
 	rm -f *.o *.i *.s *~ $(ALL)
 
 install:	$(LIB) 
+	sudo install -m 0755 -d              /opt/pigpio/cgi
 	sudo install -m 0755 -d              /usr/local/include
 	sudo install -m 0644 pigpio.h        /usr/local/include
 	sudo install -m 0644 pigpiod_if.h    /usr/local/include
@@ -68,7 +74,8 @@ $(LIB2):	$(OBJ2)
 
 # generated using gcc -MM *.c
 
-checklib.o: checklib.c pigpio.h
+x_pigpio.o: x_pigpio.c pigpio.h
+x_pigpiod_if.o: x_pigpiod_if.c
 command.o: command.c pigpio.h command.h
 pig2vcd.o: pig2vcd.c pigpio.h
 pigpio.o: pigpio.c pigpio.h command.h

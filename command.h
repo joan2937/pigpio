@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 11+
+This version is for pigpio version 13+
 */
 
 #ifndef COMMAND_H
@@ -37,23 +37,39 @@ This version is for pigpio version 11+
 
 #include "pigpio.h"
 
+#define MAX_PARAM 512
+
+#define PARSE_FLAGS_PARAMS 1
+#define PARSE_FLAGS_VARS   2
+
+#define CMD_NUMERIC 1
+#define CMD_PARAM   2
+#define CMD_VAR     3
+
 typedef struct
 {
-   int    cmd;  /* command number            */
-   char * name; /* command name              */
-   int    vt;   /* command verification type */
-   int    rv;   /* command return value type */
-   int    ext;  /* command has extensions    */
+   int     flags;
+   int     eaten;
+   uint8_t opt[8];
+} gpioCtlParse_t;
+
+typedef struct
+{
+   int   cmd;  /* command number            */
+   char *name; /* command name              */
+   int   vt;   /* command verification type */
+   int   rv;   /* command return value type */
 } cmdInfo_t;
 
 extern cmdInfo_t cmdInfo[];
 
-extern char * cmdUsage;
+extern char *cmdUsage;
 
-int cmdParse
-   (char *buf, cmdCmd_t *cmd, int argc, char *argv[], gpioExtent_t * ext);
+int cmdParse(char *buf, uint32_t *p, void **v, gpioCtlParse_t *ctlParse);
 
-char * cmdErrStr(int error);
+char *cmdErrStr(int error);
+
+char *cmdStr(void);
 
 #endif
 
