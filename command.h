@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 13+
+This version is for pigpio version 14+
 */
 
 #ifndef COMMAND_H
@@ -39,19 +39,18 @@ This version is for pigpio version 13+
 
 #define MAX_PARAM 512
 
-#define PARSE_FLAGS_PARAMS 1
-#define PARSE_FLAGS_VARS   2
+#define CMD_UNKNOWN_CMD   -1
+#define CMD_BAD_PARAMETER -2
 
 #define CMD_NUMERIC 1
-#define CMD_PARAM   2
-#define CMD_VAR     3
+#define CMD_VAR     2
+#define CMD_PAR     3
 
 typedef struct
 {
-   int     flags;
-   int     eaten;
-   uint8_t opt[8];
-} gpioCtlParse_t;
+   int    eaten;
+   int8_t opt[4];
+} cmdCtlParse_t;
 
 typedef struct
 {
@@ -61,11 +60,41 @@ typedef struct
    int   rv;   /* command return value type */
 } cmdInfo_t;
 
+typedef struct
+{
+   uint32_t tag;
+   int      step;
+} cmdTagStep_t;
+
+typedef struct
+{
+   uint32_t p[7];
+   int8_t opt[4];
+} cmdInstr_t;
+
+typedef struct
+{
+   /*
+     +-----------+---------+---------+----------------+
+     | PARAMS... | VARS... | CMDS... | STRING AREA... |
+     +-----------+---------+---------+----------------+
+   */
+   int *par;
+   int *var;
+   cmdInstr_t *instr;
+   int instrs;
+   char *str_area;
+   int str_area_len;
+   int str_area_pos;
+} cmdScript_t;
+
 extern cmdInfo_t cmdInfo[];
 
 extern char *cmdUsage;
 
-int cmdParse(char *buf, uint32_t *p, void **v, gpioCtlParse_t *ctlParse);
+int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl);
+
+int cmdParseScript(char *script, cmdScript_t *s, int diags);
 
 char *cmdErrStr(int error);
 

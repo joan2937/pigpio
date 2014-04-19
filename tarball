@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+rm -rf                PIGPIO
+mkdir                 PIGPIO
+#
+cp command.c          PIGPIO
+cp command.h          PIGPIO
+cp Makefile           PIGPIO
+cp MakeRemote         PIGPIO
+cp pig2vcd.c          PIGPIO
+cp pigpio.c           PIGPIO
+cp pigpio.h           PIGPIO
+cp pigpiod.c          PIGPIO
+cp pigpiod_if.c       PIGPIO
+cp pigpiod_if.h       PIGPIO
+cp pigpio.py          PIGPIO
+cp pigs.c             PIGPIO
+cp README             PIGPIO
+cp setup.py           PIGPIO
+cp UNLICENCE          PIGPIO
+cp x_pigpio.c         PIGPIO
+cp x_pigpio.py        PIGPIO
+cp x_pigpiod_if.c     PIGPIO
+cp x_pigs             PIGPIO
+cp x_pipe             PIGPIO
+#
+zip -r pigpio-$1.zip  PIGPIO
+tar cvf pigpio-$1.tar PIGPIO
+

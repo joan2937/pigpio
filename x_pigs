@@ -40,16 +40,16 @@ s=$(pigs bs2 0)
 if [[ $s = "" ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 s=$(pigs h)
-if [[ ${#s} = 2999 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
+if [[ ${#s} = 3315 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
 
 s=$(pigs hwver)
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
 
-s=$(pigs micro 1000)
-if [[ $s = "" ]]; then echo "MICRO ok"; else echo "MICRO fail ($s)"; fi
+s=$(pigs mics 1000)
+if [[ $s = "" ]]; then echo "MICS ok"; else echo "MICS fail ($s)"; fi
 
-s=$(pigs milli 10)
-if [[ $s = "" ]]; then echo "MILLI ok"; else echo "MILLI fail ($s)"; fi
+s=$(pigs mils 10)
+if [[ $s = "" ]]; then echo "MILS ok"; else echo "MILS fail ($s)"; fi
 
 s=$(pigs modes $GPIO 0)
 s=$(pigs modeg $GPIO)
@@ -86,14 +86,14 @@ s=$(pigs pfs $GPIO 800)
 if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 s=$(pigs pigpv)
-if [[ $s = 13 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 14 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 s=$(pigs prs $GPIO 255)
 if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi
 s=$(pigs prg $GPIO)
 if [[ $s = 255 ]]; then echo "PRG-b ok"; else echo "PRG-b fail ($s)"; fi
 
-p=$(pigs proc ldap 0 ldpa 1 ldai 1234 ldpa 0 label 999 milli 1000 jmp 999)
+p=$(pigs proc ld p1 p0 ld p0 1234 tag 999 mils 1000 jmp 999)
 if [[ $p -ge 0 && $p -le 31 ]]
 then echo "PROC($p) ok"
 else echo "PROC($p) fail ($s)"
@@ -186,10 +186,10 @@ fi
 s=$(pigs slrc $GPIO)
 if [[ $s = 0 ]]; then echo "SLR-g ok"; else echo "SLR-g fail ($s)"; fi
 
-t1=$(pigs t)
-t2=$(pigs tick)
-s=$(($t2-$t1))
-if [[ $s -gt 0 && $s -lt 20000 ]]
+t=$(pigs t tick)
+v=(${t// / })
+s=$((v[1]-v[0]))
+if [[ $s -gt 0 && $s -lt 2000 ]]
 then echo "TICK ok"
 else echo "TICK fail($s)"
 fi

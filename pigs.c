@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 13+
+This version is for pigpio version 14+
 */
 
 #include <stdio.h>
@@ -49,6 +49,8 @@ the commands available from pigpio.
 
 char command_buf[8192];
 char response_buf[8192];
+
+#define SOCKET_OPEN_FAILED -1
 
 void fatal(char *fmt, ...)
 {
@@ -88,7 +90,7 @@ static int openSocket(void)
 
    err = getaddrinfo(addrStr, portStr, &hints, &res);
 
-   if (err) return -1;
+   if (err) return SOCKET_OPEN_FAILED;
 
    for (rp=res; rp!=NULL; rp=rp->ai_next)
    {
@@ -101,7 +103,7 @@ static int openSocket(void)
 
    freeaddrinfo(res);
 
-   if (rp == NULL) return -1;
+   if (rp == NULL) return SOCKET_OPEN_FAILED;
 
    return sock;
 }
@@ -156,7 +158,7 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
 
             p = (uint32_t *)response_buf;
 
-            for (i=0; i<MAX_SCRIPT_PARAMS; i++)
+            for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
             {
                printf(" %d", p[i]);
             }
@@ -176,7 +178,7 @@ void get_extensions(int sock, int command, int res)
          {
             recv(sock,
                  response_buf,
-                 sizeof(uint32_t)*MAX_SCRIPT_PARAMS,
+                 sizeof(uint32_t)*PI_MAX_SCRIPT_PARAMS,
                  MSG_WAITALL);
          }
          break;
@@ -259,38 +261,47 @@ int main(int argc , char *argv[])
    cmdCmd_t cmd;
    uint32_t p[10];
    void *v[10];
-   gpioCtlParse_t ctl;
+   cmdCtlParse_t ctl;
+   cmdScript_t s;
 
-   sock = openSocket(); 
+   sock = openSocket();
 
-   if (sock != -1)
+   command_buf[0] = 0;
+   l = 0;
+   pp = 0;
+
+   for (i=1; i<argc; i++)
    {
-      command_buf[0] = 0;
-      l = 0;
-      pp = 0;
+      l += (strlen(argv[i]) + 1);
+      if (l < sizeof(command_buf))
+         {sprintf(command_buf+pp, "%s ", argv[i]); pp=l;}
+   }
 
-      for (i=1; i<argc; i++)
+   if (pp) {command_buf[--pp] = 0;}
+
+   ctl.eaten = 0;
+
+   len = strlen(command_buf);
+   idx = 0;
+
+   while ((idx >= 0) && (ctl.eaten < len))
+   {
+      if ((idx=cmdParse(command_buf, p, v, &ctl)) >= 0)
       {
-         l += (strlen(argv[i]) + 1);
-         if (l < sizeof(command_buf))
-            {sprintf(command_buf+pp, "%s ", argv[i]); pp=l;}
-      }
+         command = p[0];
 
-      if (pp) {command_buf[--pp] = 0;}
-
-      ctl.flags = 0;
-      ctl.eaten = 0;
-
-      len = strlen(command_buf);
-      idx = 0;
-
-      while ((idx >= 0) && (ctl.eaten < len))
-      {
-         if ((idx=cmdParse(command_buf, p, v, &ctl)) >= 0)
+         if (command < PI_CMD_SCRIPT)
          {
-            command = p[0];
-
-            if (command < PI_CMD_SCRIPT)
+            if (command == PI_CMD_HELP)
+            {
+               printf(cmdUsage);
+            }
+            else if (command == PI_CMD_PARSE)
+            {
+               cmdParseScript(v[1], &s, 1);
+               if (s.par) free (s.par);
+            }
+            else
             {
                cmd.cmd = command;
                cmd.p1 = p[1];
@@ -300,36 +311,46 @@ int main(int argc , char *argv[])
                {
                   case PI_CMD_WVAS:
                      cmd.p2 = p[4];
-                    break;
+                     break;
 
                   case PI_CMD_PROC:
                      cmd.p2 = 0;
                      break;
                }
 
-               if (send(sock, &cmd, sizeof(cmdCmd_t), 0) == sizeof(cmdCmd_t))
+               if (sock != SOCKET_OPEN_FAILED)
                {
-                  put_extensions(sock, command, p, v);
-
-                  if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
+                  if (send(sock, &cmd, sizeof(cmdCmd_t), 0) ==
                      sizeof(cmdCmd_t))
                   {
-                     get_extensions(sock, command, cmd.res);
+                     put_extensions(sock, command, p, v);
 
-                     print_result(sock, cmdInfo[idx].rv, cmd);
+                     if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
+                        sizeof(cmdCmd_t))
+                     {
+                        get_extensions(sock, command, cmd.res);
+
+                        print_result(sock, cmdInfo[idx].rv, cmd);
+                     }
+                     else fatal("recv failed, %m");
                   }
-                  else fatal("recv failed, %m");
+                  else fatal("send failed, %m");
                }
-               else fatal("send failed, %m");
+               else fatal("connect failed");
             }
-            else fatal("%s only allowed within a script", cmdInfo[idx].name);
          }
-         else fatal("%s? pigs h for help", cmdStr());
+         else fatal("%s only allowed within a script", cmdInfo[idx].name);
+      }
+      else
+      {
+         if (idx == CMD_UNKNOWN_CMD)
+            fatal("%s? unknown command, pigs h for help", cmdStr());
+         else
+            fatal("%s: bad parameter, pigs h for help", cmdStr());
       }
    }
-   else fatal("connect failed, %m");
 
-   close(sock);
+   if (sock >= 0) close(sock);
 
    return 0;
 }

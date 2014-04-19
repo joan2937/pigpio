@@ -22,11 +22,18 @@ o the Python module pigpio.py
 
 TEST (optional)
 
+*** WARNING ************************************************
+*                                                          *
+* All the tests make extensive use of gpio 4 (pin P1-7).   *
+* Ensure that either nothing or just a LED is connected to *
+* gpio 4 before running any of the tests.                  *
+************************************************************
+
 To test the library do
 
 sudo ./x_pigpio
 
-To text the pigpio daemon do
+To test the pigpio daemon do
 
 sudo pigpiod
 
@@ -41,7 +48,7 @@ x_pigpio.c, pig2vcd.c, and pigpiod.c show examples of interfacing
 with the pigpio library.
 
 pigs.c, pigpio.py, x_pigpiod_if.c, x_pigpio.py, x_pigs, and x_pipe
-show examples of interfacing with the pigpiod daemon.
+show examples of interfacing with the pigpio daemon.
 
 DAEMON
 

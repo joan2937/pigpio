@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 11+
+This version is for pigpio version 14+
 */
 
 #include <sys/types.h>
@@ -58,6 +58,8 @@ static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
 static uint64_t updateMask             = -1;
+
+static int updateMaskSet = 0;
 
 static FILE * errFifo;
 
@@ -183,7 +185,11 @@ static void initOpts(int argc, char *argv[])
          case 'x':
             mask = strtoll(optarg, &endptr, 0);
             printf("mask=%llx\n", mask);
-            if (!*endptr) updateMask = mask;
+            if (!*endptr)
+            {
+               updateMask = mask;
+               updateMaskSet = 1;
+            }
             else fatal("invalid -x option (%s)", optarg);
             break;
 
@@ -264,7 +270,7 @@ int main(int argc, char **argv)
 
    gpioCfgSocketPort(socketPort);
 
-   if (updateMask != -1) gpioCfgPermissions(updateMask);
+   if (updateMaskSet) gpioCfgPermissions(updateMask);
 
    /* start library */
 

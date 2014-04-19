@@ -26,13 +26,19 @@ The pigpio module's main features are:
 
 - provision of servo pulses on any number of gpios 0-31 simultaneously.
 
-- callbacks when any of gpios 0-31 change state.
+- callbacks when any of gpios 0-31 change state (callbacks receive the
+  time of the event accurate to a few microseconds).
 
 - reading/writing gpios and setting their modes (typically input
   or output).
 
 - reading/writing all of the gpios in a bank (0-31, 32-53) as a single
   operation.
+
+- creating and transmitting precisely timed waveforms (accurate
+  to a few microseconds).
+
+- creating and running scripts on the pigpio daemon.
 
 Notes
 
@@ -76,7 +82,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.4"
+VERSION = "1.5"
 
 # gpio levels
 
@@ -168,10 +174,15 @@ _PI_CMD_SLRO= 42
 _PI_CMD_SLR=  43
 _PI_CMD_SLRC= 44
 _PI_CMD_PROCP=45
-
+_PI_CMD_MICRO=46
+_PI_CMD_MILLI=47
+_PI_CMD_PARSE=48
+_PI_CMD_WVCRE=49
+_PI_CMD_WVDEL=50
+_PI_CMD_WVTX =51
+_PI_CMD_WVTXR=52
 
 _PI_CMD_NOIB= 99
-
 
 # pigpio error numbers
 
@@ -228,8 +239,8 @@ PI_BAD_SER_OFFSET   =-49
 PI_GPIO_IN_USE      =-50
 PI_BAD_SERIAL_COUNT =-51
 PI_BAD_PARAM_NUM    =-52
-PI_DUP_LABEL        =-53
-PI_TOO_MANY_LABELS  =-54
+PI_DUP_TAG          =-53
+PI_TOO_MANY_TAGS    =-54
 PI_BAD_SCRIPT_CMD   =-55
 PI_BAD_VAR_NUM      =-56
 PI_NO_SCRIPT_ROOM   =-57
@@ -238,6 +249,14 @@ PI_SOCK_READ_FAILED =-59
 PI_SOCK_WRIT_FAILED =-60
 PI_TOO_MANY_PARAM   =-61
 PI_NOT_HALTED       =-62
+PI_BAD_TAG          =-63
+PI_BAD_MICS_DELAY   =-64
+PI_BAD_MILS_DELAY   =-65
+PI_BAD_WAVE_ID      =-66
+PI_TOO_MANY_CBS     =-67
+PI_TOO_MANY_OOL     =-68
+PI_EMPTY_WAVEFORM   =-69
+PI_NO_WAVEFORM_ID   =-70
 
 # pigpio error text
 
@@ -285,15 +304,15 @@ _errors=[
    [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
    [PI_BAD_WVSM_COMMND   , "bad WVSM subcommand"],
    [PI_BAD_WVSP_COMMND   , "bad WVSP subcommand"],
-   [PI_BAD_PULSELEN      , "trigger pulse length > 100"],
+   [PI_BAD_PULSELEN      , "trigger pulse length > 50"],
    [PI_BAD_SCRIPT        , "invalid script"],
    [PI_BAD_SCRIPT_ID     , "unknown script id"],
    [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
    [PI_GPIO_IN_USE       , "gpio already in use"],
    [PI_BAD_SERIAL_COUNT  , "must read at least a byte at a time"],
    [PI_BAD_PARAM_NUM     , "script parameter must be 0-9"],
-   [PI_DUP_LABEL         , "script has duplicate label"],
-   [PI_TOO_MANY_LABELS   , "script has too many labels"],
+   [PI_DUP_TAG           , "script has duplicate tag"],
+   [PI_TOO_MANY_TAGS     , "script has too many tags"],
    [PI_BAD_SCRIPT_CMD    , "illegal script command"],
    [PI_BAD_VAR_NUM       , "script variable must be 0-149"],
    [PI_NO_SCRIPT_ROOM    , "no more room for scripts"],
@@ -302,6 +321,14 @@ _errors=[
    [PI_SOCK_WRIT_FAILED  , "socket write failed"],
    [PI_TOO_MANY_PARAM    , "too many script parameters (> 10)"],
    [PI_NOT_HALTED        , "script already running or failed"],
+   [PI_BAD_TAG           , "script has unresolved tag"],
+   [PI_BAD_MICS_DELAY    , "bad MICS delay (too large)"],
+   [PI_BAD_MILS_DELAY    , "bad MILS delay (too large)"],
+   [PI_BAD_WAVE_ID       , "non existent wave id"],
+   [PI_TOO_MANY_CBS      , "No more CBs for waveform"],
+   [PI_TOO_MANY_OOL      , "No more OOL for waveform"],
+   [PI_EMPTY_WAVEFORM    , "attempt to create an empty waveform"],
+   [PI_NO_WAVEFORM_ID    , "No more waveform ids"],
 
 ]
 
@@ -402,11 +429,9 @@ def _pigpio_command_ext(sock, cmd, p1, p2, extents):
    extents: additional data blocks
    """
    if sock is not None:
-      sock.send(struct.pack('IIII', cmd, p1, p2, 0))
-
-      for ext in extents:
-         sock.sendall(ext)
-
+      msg = struct.pack('IIII', cmd, p1, p2, 0)
+      for ext in extents: msg += ext
+      sock.sendall(msg)
       x, y, z, res = struct.unpack('IIII', sock.recv(16))
       return res
    else:
@@ -523,7 +548,7 @@ class _wait_for_edge:
       _notify.append(self.callb)
       self.start = time.time()
       while (self.trigger == False) and ((time.time()-self.start) < timeout):
-         time.sleep(0.1)
+         time.sleep(0.05)
       _notify.remove(self.callb)
 
    def func(self, gpio, level, tick):
@@ -916,7 +941,7 @@ def set_servo_pulsewidth(user_gpio, pulsewidth):
 
    Example 1: standard 50 Hz hobby servo updates
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time
@@ -943,7 +968,7 @@ def set_servo_pulsewidth(user_gpio, pulsewidth):
 
    Example 2: 400 Hz ESC type servo updates
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time
@@ -1102,7 +1127,7 @@ def set_watchdog(user_gpio, timeout):
 
    Example
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time
@@ -1189,7 +1214,7 @@ def clear_bank_1(levels):
 
    Example
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
 
@@ -1255,7 +1280,7 @@ def set_bank_1(levels):
 
    Example
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
 
@@ -1317,7 +1342,7 @@ def get_current_tick():
 
    Example
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time
@@ -1406,25 +1431,18 @@ class pulse:
 
 def wave_clear():
    """
-   Initialises a new waveform.
-
-   Returns 0 if OK.
-
-   A waveform comprises one of more pulses.
-
-   A pulse specifies
-
-   1) the gpios to be switched on at the start of the pulse.
-   2) the gpios to be switched off at the start of the pulse.
-   3) the delay in microseconds before the next pulse.
-
-   Any or all the fields can be zero.  It doesn't make any sense
-   to set all the fields to zero (the pulse will be ignored).
-
-   When a waveform is started each pulse is executed in order with
-   the specified delay between the pulse and the next.
+   Clears all waveforms and any data added by calls to the
+   wave_add_* functions.
    """
    return _u2i(_pigpio_command(_control, _PI_CMD_WVCLR, 0, 0))
+
+def wave_add_new():
+   """
+   Starts a new empty waveform.  You wouldn't normally need
+   to call this function as it is automatically called after a
+   waveform is created with the wave_create function.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVNEW, 0, 0))
 
 def wave_add_generic(pulses):
    """
@@ -1447,61 +1465,53 @@ def wave_add_generic(pulses):
 
    Example
 
-   #!/usr/bin/env python
-
    import time
+
    import pigpio
 
-   class stepper:
-
-      def __init__(self, g1, g2, g3, g4):
-         self.g1 = g1
-         self.g2 = g2
-         self.g3 = g3
-         self.g4 = g4
-         self.all = (1<<g1 | 1<<g2 | 1<<g3 | 1<<g4)
-
-         pigpio.set_mode(g1, pigpio.OUTPUT)
-         pigpio.set_mode(g2, pigpio.OUTPUT)
-         pigpio.set_mode(g3, pigpio.OUTPUT)
-         pigpio.set_mode(g4, pigpio.OUTPUT)
-
-      def step_on(self, pos):
-         if   pos == 0: return (1<<self.g4)
-         elif pos == 1: return (1<<self.g3 | 1<<self.g4)
-         elif pos == 2: return (1<<self.g3)
-         elif pos == 3: return (1<<self.g2 | 1<<self.g3)
-         elif pos == 4: return (1<<self.g2)
-         elif pos == 5: return (1<<self.g1 | 1<<self.g2)
-         elif pos == 6: return (1<<self.g1)
-         elif pos == 7: return (1<<self.g1 | 1<<self.g4)
-         else:          return 0
-
-      def step_off(self, pos):
-         return self.step_on(pos) ^ self.all
+   G1=4
+   G2=22
 
    pigpio.start()
 
-   s1 = stepper(14, 15, 18, 17)
-   s2 = stepper(24, 25,  8,  7)
+   pigpio.set_mode(G1, pigpio.OUTPUT)
+   pigpio.set_mode(G2, pigpio.OUTPUT)
 
-   f1=[] # pulses to drive stepper 1 forward
-   b2=[] # pulses to drive stepper 2 backward
 
-   for i in range(8):
-      f1.append(pigpio.pulse(s1.step_on(i), s1.step_off(i), 1200))
-      b2.append(pigpio.pulse(s2.step_on(7-i), s2.step_off(7-i), 1200))
+   flash_500=[] # flash every 500 ms
+   flash_100=[] # flash every 100 ms
 
-   pigpio.wave_clear() # initialise a new waveform
+   #                              ON     OFF  DELAY
 
-   pigpio.wave_add_generic(f1) # add stepper 1 forward
-   pigpio.wave_add_generic(b2) # add stepper 2 backward
+   flash_500.append(pigpio.pulse(1<<G1, 1<<G2, 500000))
+   flash_500.append(pigpio.pulse(1<<G2, 1<<G1, 500000))
 
-   pigpio.wave_tx_repeat() # repeately transmit pulses
+   flash_100.append(pigpio.pulse(1<<G1, 1<<G2, 100000))
+   flash_100.append(pigpio.pulse(1<<G2, 1<<G1, 100000))
 
-   time.sleep(10)
+   pigpio.wave_clear() # clear any existing waveforms
+
+   pigpio.wave_add_generic(flash_500) # 500 ms flashes
+   f500 = pigpio.wave_create() # create and save id
+
+   pigpio.wave_add_generic(flash_100) # 100 ms flashes
+   f100 = pigpio.wave_create() # create and save id
+
+   pigpio.wave_send_repeat(f500)
+
+   time.sleep(4)
+
+   pigpio.wave_send_repeat(f100)
+
+   time.sleep(4)
+
+   pigpio.wave_send_repeat(f500)
+
+   time.sleep(4)
 
    pigpio.wave_tx_stop() # stop waveform
+
+   pigpio.wave_clear() # clear all waveforms
 
    pigpio.stop()
    """
@@ -1511,12 +1521,15 @@ def wave_add_generic(pulses):
    # I p2 0
    ## extension ##
    # III on/off/delay * number of pulses
-   msg = ""
-   for p in pulses:
-      msg += struct.pack("III", p.gpio_on, p.gpio_off, p.delay)
-   extents = [msg]
-   return _u2i(_pigpio_command_ext(
-      _control, _PI_CMD_WVAG, len(pulses), 0, extents))
+   if len(pulses):
+      msg = ""
+      for p in pulses:
+         msg += struct.pack("III", p.gpio_on, p.gpio_off, p.delay)
+      extents = [msg]
+      return _u2i(_pigpio_command_ext(
+         _control, _PI_CMD_WVAG, len(pulses), 0, extents))
+   else:
+      return 0
 
 def wave_add_serial(user_gpio, baud, offset, data):
    """
@@ -1548,21 +1561,25 @@ def wave_add_serial(user_gpio, baud, offset, data):
 
    import pigpio
 
-   GPIO=24
+   TX_GPIO=22
 
    pigpio.start()
 
    pigpio.set_mode(TX_GPIO, pigpio.OUTPUT)
 
-   pigpio.wave_clear() # initialise waveform
+   pigpio.wave_clear() # clear all waveforms
 
    for i in range(10):
       pigpio.wave_add_serial(
-         GPIO, 9600, i*2000000, "{} seconds in.\r\n".format(i*2))
+         TX_GPIO, 300, i*2000000, "{} seconds in.\r\n".format(i*2))
 
-   pigpio.wave_tx_start()
+   id = pigpio.wave_create()
+
+   pigpio.wave_send_once(id)
 
    time.sleep(22)
+
+   pigpio.write(TX_GPIO, 0)
 
    pigpio.stop()
    """
@@ -1574,9 +1591,97 @@ def wave_add_serial(user_gpio, baud, offset, data):
    # I baud
    # I offset
    # s data
-   extents = [struct.pack("I", baud),struct.pack("I", offset), data]
-   return _u2i(_pigpio_command_ext(
-      _control, _PI_CMD_WVAS, user_gpio, len(data), extents))
+   if len(data):
+      extents = [struct.pack("I", baud),struct.pack("I", offset), data]
+      return _u2i(_pigpio_command_ext(
+         _control, _PI_CMD_WVAS, user_gpio, len(data), extents))
+   else:
+      return 0
+
+def wave_create():
+   """
+   Creates a waveform from the data provided by the prior calls to the
+   wave_add_* functions.  Upon success a positive wave id is returned.
+
+   The data provided by the wave_add_* functions is consumed by this
+   function.
+
+   As many waveforms may be created as there is space available.  The
+   wave id is passed to wave_send_* to specify the waveform to transmit.
+
+   Normal usage would be
+
+   Step 1. wave_clear to clear all waveforms and added data.
+
+   Step 2. wave_add_* calls to supply the waveform data.
+
+   Step 3. wave_create to create the waveform and get a unique id
+
+   Repeat steps 2 and 3 as needed.
+
+   Step 4. wave_send_* with the id of the waveform to transmit.
+
+   A waveform comprises one or more pulses.
+
+   A pulse specifies
+
+   1) the gpios to be switched on at the start of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
+   3) the delay in microseconds before the next pulse.
+
+   Any or all the fields can be zero.  It doesn't make any sense
+   to set all the fields to zero (the pulse will be ignored).
+
+   When a waveform is started each pulse is executed in order with
+   the specified delay between the pulse and the next.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVCRE, 0, 0))
+
+def wave_delete(wave_id):
+   """
+   Deletes all created waveforms with ids greater than or equal
+   to wave_id.
+
+   Wave ids are allocated in order, 0, 1, 2, etc.
+
+   Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVDEL, wave_id, 0))
+
+def wave_tx_start():
+   """
+   This function is deprecated and will be removed.
+
+     Use wave_create/wave_send_* instead.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVGO, 0, 0))
+
+def wave_tx_repeat():
+   """
+   This function is deprecated and will be removed.
+
+   Use wave_create/wave_send_* instead.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVGOR, 0, 0))
+
+def wave_send_once(wave_id):
+   """
+   Transmits the waveform with id wave_id.  The waveform is sent once.
+
+   Returns the number of cbs in the waveform if OK,
+   otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVTX, wave_id, 0))
+
+def wave_send_repeat(wave_id):
+   """
+   Transmits the waveform with id wave_id.  The waveform repeats until
+   wave_tx_stop is called or another call to wave_send_* is made.
+
+   Returns the number of cbs in the waveform if OK,
+   otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+   """
+   return _u2i(_pigpio_command(_control, _PI_CMD_WVTXR, wave_id, 0))
 
 def wave_tx_busy():
    """
@@ -1593,28 +1698,9 @@ def wave_tx_stop():
    Returns 0 if OK.
 
    This function is intended to stop a waveform started with
-   wave_tx_repeat().
+   wave_send_repeatedly.
    """
    return _u2i(_pigpio_command(_control, _PI_CMD_WVHLT, 0, 0))
-
-def wave_tx_start():
-   """
-   Transmits the current waveform.  The waveform is sent once.
-
-   Returns the number of cbs in the waveform if OK,
-   otherwise PI_BAD_WAVE_MODE.
-   """
-   return _u2i(_pigpio_command(_control, _PI_CMD_WVGO, 0, 0))
-
-def wave_tx_repeat():
-   """
-   Transmits the current waveform.  The waveform repeats until
-   wave_tx_stop is called.
-
-   Returns the number of cbs in the waveform if OK,
-   otherwise PI_BAD_WAVE_MODE.
-   """
-   return _u2i(_pigpio_command(_control, _PI_CMD_WVGOR, 0, 0))
 
 def wave_get_micros():
    """
@@ -1676,7 +1762,7 @@ def gpio_trigger(user_gpio, pulse_len=10, level=1):
 
    pigpio.start()
 
-   for i in range(10):
+   for i in range(5):
       pigpio.gpio_trigger(GPIO, (i*5)+10, 1)
       time.sleep(1)
 
@@ -1840,7 +1926,7 @@ class callback:
 
       Example 1: user supplied edge and callback
 
-      #!/usr/bin/python
+      #!/usr/bin/env python
 
       import pigpio
       import time
@@ -1869,7 +1955,7 @@ class callback:
 
       Example 2: user supplied edge, default (tally) callback
 
-      #!/usr/bin/python
+      #!/usr/bin/env python
 
       import pigpio
       import time
@@ -1904,7 +1990,7 @@ class callback:
 
       Example 3: default edge and (tally) callback
 
-      #!/usr/bin/python
+      #!/usr/bin/env python
 
       import pigpio
       import time
@@ -1983,7 +2069,7 @@ def wait_for_edge(user_gpio, edge=RISING_EDGE, timeout=60.0):
 
    Example 1: default edge and timeout
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time
@@ -2007,7 +2093,7 @@ def wait_for_edge(user_gpio, edge=RISING_EDGE, timeout=60.0):
 
    Example 2: user supplied edge and timeout
 
-   #!/usr/bin/python
+   #!/usr/bin/env python
 
    import pigpio
    import time

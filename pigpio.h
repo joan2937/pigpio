@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 13
+This version is for pigpio version 14
 */
 
 #ifndef PIGPIO_H
@@ -86,7 +86,7 @@ This version is for pigpio version 13
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 13
+#define PIGPIO_VERSION 14
 
 /*-------------------------------------------------------------------------*/
 
@@ -125,17 +125,20 @@ gpioNotifyBegin            Begin a gpio(s) changed notification.
 gpioNotifyPause            Pause a gpio(s) changed notification.
 gpioNotifyClose            Close a gpio(s) changed notification.
 
-gpioWaveClear              Initialises a new waveform.
+gpioWaveClear              Deletes all waveforms.
+
+gpioWaveAddNew             Starts a new waveform.
 gpioWaveAddGeneric         Adds a series of pulses to the waveform.
 gpioWaveAddSerial          Adds serial data to the waveform.
 
-gpioWaveTxStart            Transmits the waveform.
+gpioWaveCreate             Creates a waveform from added data.
+gpioWaveDelete             Deletes one or more waveforms.
+
+gpioWaveTxStart            Creates/transmits a waveform (DEPRECATED).
+
+gpioWaveTxSend             Transmits a waveform.
 gpioWaveTxBusy             Checks to see if the waveform has ended.
 gpioWaveTxStop             Aborts the current waveform.
-
-gpioSerialReadOpen         Opens a gpio for reading serial data.
-gpioSerialRead             Reads serial data from a gpio.
-gpioSerialReadClose        Closes a gpio for reading serial data.
 
 gpioWaveGetMicros          Length in microseconds of the current waveform.
 gpioWaveGetHighMicros      Length of longest waveform so far.
@@ -148,6 +151,10 @@ gpioWaveGetMaxPulses       Absolute maximum allowed pulses.
 gpioWaveGetCbs             Length in cbs of the current waveform.
 gpioWaveGetHighCbs         Length of longest waveform so far.
 gpioWaveGetMaxCbs          Absolute maximum allowed cbs.
+
+gpioSerialReadOpen         Opens a gpio for reading serial data.
+gpioSerialRead             Reads serial data from a gpio.
+gpioSerialReadClose        Closes a gpio for reading serial data.
 
 gpioTrigger                Send a trigger pulse to a gpio.
 
@@ -281,7 +288,17 @@ typedef struct
    int clk_pol; /* clock off state          */
    int clk_pha; /* clock phase              */
    int clk_us;  /* clock micros             */
-} gpioSPI_t;
+} rawSPI_t;
+
+typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
+   unsigned long info;
+   unsigned long src;
+   unsigned long dst;
+   unsigned long length;
+   unsigned long stride;
+   unsigned long next;
+   unsigned long pad[2];
+} rawCbs_t;
 
 typedef void (*gpioAlertFunc_t)    (int      gpio,
                                     int      level,
@@ -873,32 +890,24 @@ int gpioNotifyClose(unsigned handle);
 /*-------------------------------------------------------------------------*/
 int gpioWaveClear(void);
 /*-------------------------------------------------------------------------*/
-/* This function initialises a new waveform.
+/* This function clears all waveforms and any data added by calls to the
+   gpioWaveAdd* functions.
 
    Returns 0 if OK.
-
-   A waveform comprises one of more pulses.  Each pulse consists of a
-   gpioPulse_t structure.
-
-   typedef struct
-   {
-      uint32_t gpioOn;
-      uint32_t gpioOff;
-      uint32_t usDelay;
-   } gpioPulse_t;
-
-   The fields specify
-
-   1) the gpios to be switched on at the start of the pulse.
-   2) the gpios to be switched off at the start of the pulse.
-   3) the delay in microseconds before the next pulse.
-
-   Any or all the fields can be zero.  It doesn't make any sense to
-   set all the fields to zero (the pulse will be ignored).
-
-   When a waveform is started each pulse is executed in order with the
-   specified delay between the pulse and the next.
 */
+
+
+
+/*-------------------------------------------------------------------------*/
+int gpioWaveAddNew(void);
+/*-------------------------------------------------------------------------*/
+/* This function starts a new empty waveform.  You wouldn't normally need
+   to call this function as it is automatically called after a waveform is
+   created with the gpioWaveCreate function.
+
+   Returns 0 if OK.
+*/
+
 
 
 /*-------------------------------------------------------------------------*/
@@ -911,7 +920,7 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t * pulses);
 
    NOTES:
 
-   The   pulses are interleaved in time order within the existing waveform
+   The pulses are interleaved in time order within the existing waveform
    (if any).
 
    Merging allows the waveform to be built in parts, that is the settings
@@ -956,14 +965,95 @@ int gpioWaveAddSerial(unsigned user_gpio,
 
 #define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
 
+#define PI_MAX_WAVES 100
+
+
+
 /*-------------------------------------------------------------------------*/
-int gpioWaveTxStart(unsigned mode);
+int gpioWaveCreate(void);
 /*-------------------------------------------------------------------------*/
-/* This function transmits the current waveform.  The mode determines
-   whether the waveform is sent once or cycles endlessly.
+/* This function creates a waveform from the data provided by the prior
+   calls to the gpioWaveAdd* functions.  Upon success a positive wave id
+   is returned.
+
+   The data provided by the gpioWaveAdd* functions is consumed by this
+   function.
+
+   As many waveforms may be created as there is space available.  The
+   wave id is passed to gpioWaveTxSend to specify the waveform to transmit.
+
+   Normal usage would be
+
+   Step 1. gpioWaveClear to clear all waveforms and added data.
+
+   Step 2. gpioWaveAdd* calls to supply the waveform data.
+
+   Step 3. gpioWaveCreate to create the waveform and get a unique id
+
+   Repeat steps 2 and 3 as needed.
+
+   Step 4. gpioWaveTxSend with the id of the waveform to transmit.
+
+   A waveform comprises one of more pulses.  Each pulse consists of a
+   gpioPulse_t structure.
+
+   typedef struct
+   {
+      uint32_t gpioOn;
+      uint32_t gpioOff;
+      uint32_t usDelay;
+   } gpioPulse_t;
+
+   The fields specify
+
+   1) the gpios to be switched on at the start of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
+   3) the delay in microseconds before the next pulse.
+
+   Any or all the fields can be zero.  It doesn't make any sense to
+   set all the fields to zero (the pulse will be ignored).
+
+   When a waveform is started each pulse is executed in order with the
+   specified delay between the pulse and the next.
+
+   Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
+   PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
+*/
+
+
+/*-------------------------------------------------------------------------*/
+int gpioWaveDelete(unsigned wave_id);
+/*-------------------------------------------------------------------------*/
+/* This function deletes all created waveforms with ids greater than or
+   equal to wave_id.
+
+   Wave ids are allocated in order, 0, 1, 2, etc.
+
+   Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
+*/
+
+
+/*-------------------------------------------------------------------------*/
+int gpioWaveTxStart(unsigned mode); /* DEPRECATED */
+/*-------------------------------------------------------------------------*/
+/* This function creates and then transmits a waveform.  The mode
+   determines whether the waveform is sent once or cycles endlessly.
+
+   This function is deprecated and should no longer be used.  Use
+   gpioWaveCreate/gpioWaveTxSend instead.
 
    Returns the number of DMA control blocks in the waveform if OK,
    otherwise PI_BAD_WAVE_MODE.
+*/
+
+/*-------------------------------------------------------------------------*/
+int gpioWaveTxSend(unsigned wave_id, unsigned mode);
+/*-------------------------------------------------------------------------*/
+/* This function transmits the waveform with id wave_id.  The mode
+   determines whether the waveform is sent once or cycles endlessly.
+
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 */
 
 #define PI_WAVE_MODE_ONE_SHOT 0
@@ -991,46 +1081,7 @@ int gpioWaveTxStop(void);
 
    NOTES:
 
-   This function is intended to stop a waveform started with the repeat mode.
-*/
-
-
-
-/*-------------------------------------------------------------------------*/
-int gpioSerialReadOpen(unsigned user_gpio, unsigned baud);
-/*-------------------------------------------------------------------------*/
-/* This function opens a gpio for reading serial data.
-
-   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
-   or PI_GPIO_IN_USE.
-
-   The serial data is returned in a cyclic buffer and is read using
-   gpioSerialRead().
-
-   It is the caller's responsibility to read data from the cyclic buffer
-   in a timely fashion.
-*/
-
-
-
-/*-------------------------------------------------------------------------*/
-int gpioSerialRead(unsigned user_gpio, void *buf, size_t bufSize);
-/*-------------------------------------------------------------------------*/
-/* This function copies up to bufSize bytes of data read from the
-   serial cyclic buffer to the buffer starting at buf.
-
-   Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
-   or PI_NOT_SERIAL_GPIO.
-*/
-
-
-
-/*-------------------------------------------------------------------------*/
-int gpioSerialReadClose(unsigned user_gpio);
-/*-------------------------------------------------------------------------*/
-/* This function closes a gpio for reading serial data.
-
-   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+   This function is intended to stop a waveform started in repeat mode.
 */
 
 
@@ -1115,6 +1166,45 @@ int gpioWaveGetMaxCbs(void);
 
 
 /*-------------------------------------------------------------------------*/
+int gpioSerialReadOpen(unsigned user_gpio, unsigned baud);
+/*-------------------------------------------------------------------------*/
+/* This function opens a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
+   or PI_GPIO_IN_USE.
+
+   The serial data is returned in a cyclic buffer and is read using
+   gpioSerialRead().
+
+   It is the caller's responsibility to read data from the cyclic buffer
+   in a timely fashion.
+*/
+
+
+
+/*-------------------------------------------------------------------------*/
+int gpioSerialRead(unsigned user_gpio, void *buf, size_t bufSize);
+/*-------------------------------------------------------------------------*/
+/* This function copies up to bufSize bytes of data read from the
+   serial cyclic buffer to the buffer starting at buf.
+
+   Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
+   or PI_NOT_SERIAL_GPIO.
+*/
+
+
+
+/*-------------------------------------------------------------------------*/
+int gpioSerialReadClose(unsigned user_gpio);
+/*-------------------------------------------------------------------------*/
+/* This function closes a gpio for reading serial data.
+
+   Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+*/
+
+
+
+/*-------------------------------------------------------------------------*/
 int gpioTrigger(unsigned user_gpio, unsigned pulseLen, unsigned level);
 /*-------------------------------------------------------------------------*/
 /* This function sends a trigger pulse to a gpio.  The gpio is set to
@@ -1124,7 +1214,7 @@ int gpioTrigger(unsigned user_gpio, unsigned pulseLen, unsigned level);
    or PI_BAD_PULSELEN.
 */
 
-#define PI_MAX_PULSELEN 100
+#define PI_MAX_PULSELEN 50
 
 
 /*-------------------------------------------------------------------------*/
@@ -1351,13 +1441,15 @@ int gpioStoreScript(char *script);
    otherwise PI_BAD_SCRIPT.
 */
 
-#define MAX_SCRIPT_LABELS  50
-#define MAX_SCRIPT_VARS   150
-#define MAX_SCRIPT_PARAMS  10
+#define PI_MAX_SCRIPTS       32
+
+#define PI_MAX_SCRIPT_TAGS   50
+#define PI_MAX_SCRIPT_VARS  150
+#define PI_MAX_SCRIPT_PARAMS 10
 
 
 /* ----------------------------------------------------------------------- */
-int gpioRunScript(int script_id, unsigned numParam, uint32_t *param);
+int gpioRunScript(unsigned script_id, unsigned numParam, uint32_t *param);
 /* ----------------------------------------------------------------------- */
 /* This function runs a stored script.
 
@@ -1371,7 +1463,7 @@ int gpioRunScript(int script_id, unsigned numParam, uint32_t *param);
 
 
 /* ----------------------------------------------------------------------- */
-int gpioScriptStatus(int script_id, uint32_t *param);
+int gpioScriptStatus(unsigned script_id, uint32_t *param);
 /* ----------------------------------------------------------------------- */
 /* This function returns the run status of a stored script as well as
    the current values of parameters 0 to 9.
@@ -1399,7 +1491,7 @@ int gpioScriptStatus(int script_id, uint32_t *param);
 
 
 /* ----------------------------------------------------------------------- */
-int gpioStopScript(int script_id);
+int gpioStopScript(unsigned script_id);
 /* ----------------------------------------------------------------------- */
 /* This function stops a running script.
 
@@ -1409,7 +1501,7 @@ int gpioStopScript(int script_id);
 
 
 /* ----------------------------------------------------------------------- */
-int gpioDeleteScript(int script_id);
+int gpioDeleteScript(unsigned script_id);
 /* ----------------------------------------------------------------------- */
 /* This function deletes a stored script.
 
@@ -1615,7 +1707,8 @@ uint32_t gpioDelay(uint32_t micros);
    Returns the actual length of the delay in microseconds.  
 */
 
-
+#define PI_MAX_MICS_DELAY 1000000 /* 1 second */
+#define PI_MAX_MILS_DELAY 60000   /* 60 seconds */
 
 /*-------------------------------------------------------------------------*/
 uint32_t gpioTick(void);
@@ -1860,12 +1953,13 @@ int gpioCfgInternals(unsigned what,
                      int      value);
 /*-------------------------------------------------------------------------*/
 /* Used to tune internal settings.
+
    Not intended for general use.
 */
 
 /*-------------------------------------------------------------------------*/
-int gpioWaveAddSPI(
-   gpioSPI_t *spi,
+int rawWaveAddSPI(
+   rawSPI_t *spi,
    unsigned offset,
    unsigned ss,
    uint8_t *tx_bits,
@@ -1883,36 +1977,59 @@ int gpioWaveAddSPI(
 
    Returns the new total number of pulses in the current waveform if OK,
    otherwise PI_BAD_USER_GPIO, PI_BAD_SER_OFFSET, or PI_TOO_MANY_PULSES.
+
+   Not intended for general use.
 */
 
+/* ----------------------------------------------------------------------- */
+unsigned rawWaveCB(void);
+/* ----------------------------------------------------------------------- */
+/*
+   Returns the number of the cb being currently output.
+
+   Not intended for general use.
+*/
 
 /* ----------------------------------------------------------------------- */
-uint32_t waveGetRawOut(int pos);
+rawCbs_t * rawWaveCBAdr(int n);
+/* ----------------------------------------------------------------------- */
+/*
+   Return the Linux address of contol block n.
+
+   Not intended for general use.
+*/
+
+/* ----------------------------------------------------------------------- */
+uint32_t rawWaveGetOut(int pos);
 /* ----------------------------------------------------------------------- */
 /* Gets the wave output parameter stored at pos.
+
    Not intended for general use.
 */
 
 
 /* ----------------------------------------------------------------------- */
-void waveSetRawOut(int pos, uint32_t value);
+void rawWaveSetOut(int pos, uint32_t value);
 /* ----------------------------------------------------------------------- */
 /* Sets the wave output parameter stored at pos to value.
+
    Not intended for general use.
 */
 
 /* ----------------------------------------------------------------------- */
-uint32_t waveGetRawIn(int pos);
+uint32_t rawWaveGetIn(int pos);
 /* ----------------------------------------------------------------------- */
 /* Gets the wave input value parameter stored at pos.
+
    Not intended for general use.
 */
 
 
 /* ----------------------------------------------------------------------- */
-void waveSetRawIn(int pos, uint32_t value);
+void rawWaveSetIn(int pos, uint32_t value);
 /* ----------------------------------------------------------------------- */
 /* Sets the wave input value stored at pos to value.
+
    Not intended for general use.
 */
 
@@ -1944,17 +2061,19 @@ void time_sleep(double seconds);
 
 
 /*-------------------------------------------------------------------------*/
-void gpioDumpWave(void);
+void rawDumpWave(void);
 /*-------------------------------------------------------------------------*/
 /* Used to print a readable version of the current waveform to stderr.
+
    Not intended for general use.
 */
 
 
 /*-------------------------------------------------------------------------*/
-void gpioDumpScript(int s);
+void rawDumpScript(int s);
 /*-------------------------------------------------------------------------*/
 /* Used to print a readable version of a script to stderr.
+
    Not intended for general use.
 */
 
@@ -2011,8 +2130,14 @@ void gpioDumpScript(int s);
 #define PI_CMD_SLR   43
 #define PI_CMD_SLRC  44
 #define PI_CMD_PROCP 45
-#define PI_CMD_MICRO 46
-#define PI_CMD_MILLI 47
+#define PI_CMD_MICS  46
+#define PI_CMD_MILS  47
+#define PI_CMD_PARSE 48
+#define PI_CMD_WVCRE 49
+#define PI_CMD_WVDEL 50
+#define PI_CMD_WVTX  51
+#define PI_CMD_WVTXR 52
+#define PI_CMD_WVNEW 53
 
 
 /*
@@ -2031,49 +2156,43 @@ after this command is issued.
 
 #define PI_CMD_SCRIPT 800
 
-#define PI_CMD_ADDI  800
-#define PI_CMD_ADDV  801
-#define PI_CMD_ANDI  802
-#define PI_CMD_ANDV  803
-#define PI_CMD_CALL  804
-#define PI_CMD_CMPI  805
-#define PI_CMD_CMPV  806
-#define PI_CMD_DCRA  807
-#define PI_CMD_DCRV  808
-#define PI_CMD_HALT  809
-#define PI_CMD_INRA  810
-#define PI_CMD_INRV  811
-#define PI_CMD_JM    812
-#define PI_CMD_JMP   813
-#define PI_CMD_JNZ   814
-#define PI_CMD_JP    815
-#define PI_CMD_JZ    816
-#define PI_CMD_LABEL 817
-#define PI_CMD_LDAI  818
-#define PI_CMD_LDAP  819
-#define PI_CMD_LDAV  820
-#define PI_CMD_LDPA  821
-#define PI_CMD_LDVA  822
-#define PI_CMD_LDVI  823
-#define PI_CMD_LDVV  824
-#define PI_CMD_ORI   827
-#define PI_CMD_ORV   828
-#define PI_CMD_POPA  829
-#define PI_CMD_POPV  830
-#define PI_CMD_PUSHA 831
-#define PI_CMD_PUSHV 832
-#define PI_CMD_RET   833
-#define PI_CMD_RAL   834
-#define PI_CMD_RAR   835
-#define PI_CMD_SUBI  836
-#define PI_CMD_SUBV  837
-#define PI_CMD_SWAPA 838
-#define PI_CMD_SWAPV 839
-#define PI_CMD_SYS   840
-#define PI_CMD_WAITI 841
-#define PI_CMD_WAITV 842
-#define PI_CMD_XORI  843
-#define PI_CMD_XORV  844
+#define PI_CMD_ADD   800
+#define PI_CMD_AND   801
+#define PI_CMD_CALL  802
+#define PI_CMD_CMP   803
+#define PI_CMD_DCR   804
+#define PI_CMD_DCRA  805
+#define PI_CMD_DIV   806
+#define PI_CMD_HALT  807
+#define PI_CMD_INR   808
+#define PI_CMD_INRA  809
+#define PI_CMD_JM    810
+#define PI_CMD_JMP   811
+#define PI_CMD_JNZ   812
+#define PI_CMD_JP    813
+#define PI_CMD_JZ    814
+#define PI_CMD_TAG   815
+#define PI_CMD_LD    816
+#define PI_CMD_LDA   817
+#define PI_CMD_MLT   818
+#define PI_CMD_MOD   819
+#define PI_CMD_OR    820
+#define PI_CMD_POP   821
+#define PI_CMD_POPA  822
+#define PI_CMD_PUSH  823
+#define PI_CMD_PUSHA 824
+#define PI_CMD_RET   825
+#define PI_CMD_RL    826
+#define PI_CMD_RLA   827
+#define PI_CMD_RR    828
+#define PI_CMD_RRA   829
+#define PI_CMD_STA   830
+#define PI_CMD_SUB   831
+#define PI_CMD_SYS   832
+#define PI_CMD_WAIT  833
+#define PI_CMD_X     834
+#define PI_CMD_XA    835
+#define PI_CMD_XOR   836
 
 /*-------------------------------------------------------------------------*/
 
@@ -2126,15 +2245,15 @@ after this command is issued.
 #define PI_BAD_WVSC_COMMND  -43 /* bad WVSC subcommand                     */
 #define PI_BAD_WVSM_COMMND  -44 /* bad WVSM subcommand                     */
 #define PI_BAD_WVSP_COMMND  -45 /* bad WVSP subcommand                     */
-#define PI_BAD_PULSELEN     -46 /* trigger pulse length > 100              */
+#define PI_BAD_PULSELEN     -46 /* trigger pulse length > 50               */
 #define PI_BAD_SCRIPT       -47 /* invalid script                          */
 #define PI_BAD_SCRIPT_ID    -48 /* unknown script id                       */
 #define PI_BAD_SER_OFFSET   -49 /* add serial data offset > 30 minutes     */
 #define PI_GPIO_IN_USE      -50 /* gpio already in use                     */
 #define PI_BAD_SERIAL_COUNT -51 /* must read at least a byte at a time     */
 #define PI_BAD_PARAM_NUM    -52 /* script parameter must be 0-9            */
-#define PI_DUP_LABEL        -53 /* script has duplicate label              */
-#define PI_TOO_MANY_LABELS  -54 /* script has too many labels              */
+#define PI_DUP_TAG          -53 /* script has duplicate tag                */
+#define PI_TOO_MANY_TAGS    -54 /* script has too many tags                */
 #define PI_BAD_SCRIPT_CMD   -55 /* illegal script command                  */
 #define PI_BAD_VAR_NUM      -56 /* script variable must be 0-149           */
 #define PI_NO_SCRIPT_ROOM   -57 /* no more room for scripts                */
@@ -2143,6 +2262,14 @@ after this command is issued.
 #define PI_SOCK_WRIT_FAILED -60 /* socket write failed                     */
 #define PI_TOO_MANY_PARAM   -61 /* too many script parameters > 10         */
 #define PI_NOT_HALTED       -62 /* script already running or failed        */
+#define PI_BAD_TAG          -63 /* script has unresolved tag               */
+#define PI_BAD_MICS_DELAY   -64 /* bad MICS delay (too large)              */
+#define PI_BAD_MILS_DELAY   -65 /* bad MILS delay (too large)              */
+#define PI_BAD_WAVE_ID      -66 /* non existent wave id                    */
+#define PI_TOO_MANY_CBS     -67 /* No more CBs for waveform                */
+#define PI_TOO_MANY_OOL     -68 /* No more OOL for waveform                */
+#define PI_EMPTY_WAVEFORM   -69 /* attempt to create an empty waveform     */
+#define PI_NO_WAVEFORM_ID   -70 /* no more waveforms                       */
 
 /*-------------------------------------------------------------------------*/
 

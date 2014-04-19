@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+#*** WARNING ************************************************
+#*                                                          *
+#* All the tests make extensive use of gpio 4 (pin P1-7).   *
+#* Ensure that either nothing or just a LED is connected to *
+#* gpio 4 before running any of the tests.                  *
+#************************************************************
+
 import time
 import struct
 
@@ -364,6 +371,50 @@ To the lascivious pleasing of a lute.
    c = pigpio.wave_get_max_cbs()
    CHECK(5, 21, c, 25016, 0, "wave get max cbs")
 
+   e = pigpio.wave_clear()
+   CHECK(5, 22, e, 0, 0, "wave clear")
+
+   e = pigpio.wave_add_generic(wf)
+   CHECK(5, 23, e, 4, 0, "pulse, wave add generic")
+
+   w1 = pigpio.wave_create()
+   CHECK(5, 24, w1, 0, 0, "wave create")
+
+   e = pigpio.wave_send_repeat(w1)
+   CHECK(5, 25, e, 9, 0, "wave send repeat")
+
+   oc = t5_count
+   time.sleep(5)
+   c = t5_count - oc
+   CHECK(5, 26, c, 50, 1, "callback")
+
+   e = pigpio.wave_tx_stop()
+   CHECK(5, 27, e, 0, 0, "wave tx stop")
+
+   e = pigpio.wave_add_serial(GPIO, BAUD, 5000000, TEXT)
+   CHECK(5, 28, e, 3405, 0, "wave add serial")
+
+   w2 = pigpio.wave_create()
+   CHECK(5, 29, w2, 1, 0, "wave create")
+
+   e = pigpio.wave_send_once(w2)
+   CHECK(5, 30, e, 6811, 0, "wave send once")
+
+   oc = t5_count
+   time.sleep(3)
+   c = t5_count - oc
+   CHECK(5, 31, c, 0, 0, "callback")
+
+   oc = t5_count
+   while pigpio.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.1)
+   c = t5_count - oc
+   CHECK(5, 32, c, 1702, 0, "wave tx busy, callback")
+
+   e = pigpio.wave_delete(0)
+   CHECK(5, 33, e, 0, 0, "wave delete")
+
 t6_count=0
 t6_on=0
 t6_on_tick=None
@@ -388,15 +439,15 @@ def t6():
 
    t6cb = pigpio.callback(GPIO, pigpio.EITHER_EDGE, t6cbf)
 
-   for t in range(10):
+   for t in range(5):
       time.sleep(0.1)
       p = 10 + (t*10)
       tp += p;
-      pigpio.gpio_trigger(4, p, 1)
+      pigpio.gpio_trigger(GPIO, p, 1)
 
    time.sleep(0.5)
 
-   CHECK(6, 1, t6_count, 10, 0, "gpio trigger count")
+   CHECK(6, 1, t6_count, 5, 0, "gpio trigger count")
 
    CHECK(6, 2, t6_on, tp, 25, "gpio trigger pulse length")
 
@@ -480,16 +531,16 @@ def t9():
    # p0 number of loops
    # p1 GPIO
    script="""
-   ldap 0
-   ldva 0
-   label 0
+   lda p0
+   sta v0
+   tag 0
    w p1 1
-   milli 5
+   mils 5
    w p1 0
-   milli 5
-   dcrv 0
-   ldav 0
-   ldpa 9
+   mils 5
+   dcr v0
+   lda v0
+   sta p9
    jp 0"""
 
    t9cb = pigpio.callback(GPIO)

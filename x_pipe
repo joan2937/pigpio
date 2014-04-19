@@ -46,14 +46,14 @@ if [[ $s = 0 ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 echo "h" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 v         Clear gpios defined by mask v in bank 1." ]]
+if [[ $s = "BC1 v         Clear gpios specified by mask v in bank 1." ]]
 then echo "HELP-a ok"
 else echo "HELP-a fail ($s)"
 fi
 read -t 1 -N 9000 </dev/pigout # dump rest of help
 echo "help" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 v         Clear gpios defined by mask v in bank 1." ]]
+if [[ $s = "BC1 v         Clear gpios specified by mask v in bank 1." ]]
 then echo "HELP-b ok"
 else echo "HELP-b fail ($s)"
 fi
@@ -63,13 +63,13 @@ echo "hwver" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
 
-echo "micro 1000" >/dev/pigpio
+echo "mics 1000" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 0 ]]; then echo "MICRO ok"; else echo "MICRO fail ($s)"; fi
+if [[ $s = 0 ]]; then echo "MICS ok"; else echo "MICS fail ($s)"; fi
 
-echo "milli 10" >/dev/pigpio
+echo "mils 10" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 0 ]]; then echo "MILLI ok"; else echo "MILLI fail ($s)"; fi
+if [[ $s = 0 ]]; then echo "MILS ok"; else echo "MILS fail ($s)"; fi
 
 echo "modes $GPIO 0" >/dev/pigpio
 read -t 1 s </dev/pigout
@@ -119,7 +119,7 @@ if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 echo "pigpv" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 13 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 14 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 echo "prs $GPIO 255" >/dev/pigpio
 read -t 1 s </dev/pigout
@@ -128,7 +128,7 @@ echo "prg $GPIO" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 255 ]]; then echo "PRG-b ok"; else echo "PRG-b fail ($s)"; fi
 
-echo "proc ldap 0 ldpa 1 ldai 29 ldpa 0 label 9 milli 1000 jmp 9" >/dev/pigpio
+echo "proc ld p1 p0 ld p0 29 tag 9 mils 1000 jmp 9" >/dev/pigpio
 read -t 1 p </dev/pigout
 if [[ $p -ge 0 && $p -le 31 ]]
 then echo "PROC($p) ok"

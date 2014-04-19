@@ -606,6 +606,9 @@ uint32_t get_pigpio_version(void)
 int wave_clear(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVCLR, 0, 0);}
 
+int wave_add_new(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVNEW, 0, 0);}
+
 int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
 {
    gpioExtent_t ext[1];
@@ -616,6 +619,8 @@ int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
    ## extension ##
    gpioPulse_t[] pulses
    */
+
+   if (!numPulses) return 0;
 
    ext[0].size = numPulses * sizeof(gpioPulse_t);
    ext[0].ptr = pulses;
@@ -637,6 +642,8 @@ int wave_add_serial(
    char[] str
    */
 
+   if (!numChar) return 0;
+
    ext[0].size = sizeof(unsigned);
    ext[0].ptr = &baud;
 
@@ -649,17 +656,29 @@ int wave_add_serial(
    return pigpio_command_ext(gPigCommand, PI_CMD_WVAS, gpio, numChar, 3, ext);
 }
 
+int wave_create(void)
+   {return pigpio_command(gPigCommand, PI_CMD_WVCRE, 0, 0);}
+
+int wave_delete(unsigned wave_id)
+   {return pigpio_command(gPigCommand, PI_CMD_WVDEL, wave_id, 0);}
+
+int wave_tx_start(void) /* DEPRECATED */
+   {return pigpio_command(gPigCommand, PI_CMD_WVGO, 0, 0);}
+
+int wave_tx_repeat(void) /* DEPRECATED */
+   {return pigpio_command(gPigCommand, PI_CMD_WVGOR, 0, 0);}
+
+int wave_send_once(unsigned wave_id)
+   {return pigpio_command(gPigCommand, PI_CMD_WVTX, 0, 0);}
+
+int wave_send_repeat(unsigned wave_id)
+   {return pigpio_command(gPigCommand, PI_CMD_WVTXR, 0, 0);}
+
 int wave_tx_busy(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVBSY, 0, 0);}
 
 int wave_tx_stop(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVHLT, 0, 0);}
-
-int wave_tx_start(void)
-   {return pigpio_command(gPigCommand, PI_CMD_WVGO, 0, 0);}
-
-int wave_tx_repeat(void)
-   {return pigpio_command(gPigCommand, PI_CMD_WVGOR, 0, 0);}
 
 int wave_get_micros(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVSM, 0, 0);}
@@ -743,10 +762,10 @@ int run_script(unsigned script_id, unsigned numPar, uint32_t *param)
       (gPigCommand, PI_CMD_PROCR, script_id, numPar, 1, ext);
 }
 
-int script_status(int script_id, uint32_t *param)
+int script_status(unsigned script_id, uint32_t *param)
 {
    int status;
-   uint32_t p[MAX_SCRIPT_PARAMS];
+   uint32_t p[PI_MAX_SCRIPT_PARAMS];
 
    status = pigpio_command(gPigCommand, PI_CMD_PROCP, script_id, 0);
 

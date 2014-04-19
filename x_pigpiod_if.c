@@ -1,6 +1,13 @@
 /*
 gcc -o x_pigpiod_if x_pigpiod_if.c -lpigpiod_if -lrt -lpthread
 sudo ./x_pigpiod_if
+
+*** WARNING ************************************************
+*                                                          *
+* All the tests make extensive use of gpio 4 (pin P1-7).   *
+* Ensure that either nothing or just a LED is connected to *
+* gpio 4 before running any of the tests.                  *
+************************************************************
 */
 
 #include <stdio.h>
@@ -429,17 +436,17 @@ void t6()
 
    time_sleep(0.2);
 
-   for (t=0; t<10; t++)
+   for (t=0; t<5; t++)
    {
       time_sleep(0.1);
       p = 10 + (t*10);
       tp += p;
-      gpio_trigger(4, p, 1);
+      gpio_trigger(GPIO, p, 1);
    }
 
    time_sleep(0.5);
 
-   CHECK(6, 1, t6_count, 10, 0, "gpio trigger count");
+   CHECK(6, 1, t6_count, 5, 0, "gpio trigger count");
 
    CHECK(6, 2, t6_on, tp, 25, "gpio trigger pulse length");
 }
@@ -540,16 +547,16 @@ void t9()
    p1 GPIO
    */
    char *script="\
-   ldap 0\
-   ldva 0\
-   label 0\
+   lda p0\
+   sta v0\
+   tag 0\
    w p1 1\
-   milli 5\
+   mils 5\
    w p1 0\
-   milli 5\
-   dcrv 0\
-   ldav 0\
-   ldpa 9\
+   mils 5\
+   dcr v0\
+   lda v0\
+   sta p9\
    jp 0";
 
    callback(GPIO, RISING_EDGE, t9cbf);

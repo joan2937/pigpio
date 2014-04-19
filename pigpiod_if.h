@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 4
+#define PIGPIOD_IF_VERSION 5
 
 typedef enum
 {
@@ -514,62 +514,18 @@ uint32_t get_pigpio_version(void);
 
 
 int wave_clear(void);
-/* This function initialises a new waveform.
+/* This function clears all waveforms and any data added by calls to the
+   wave_add_* functions.
 
    Returns 0 if OK.
-
-   A waveform comprises one of more pulses.  Each pulse consists of a
-   gpioPulse_t structure.
-
-   typedef struct
-   {
-      uint32_t gpioOn;
-      uint32_t gpioOff;
-      uint32_t usDelay;
-   } gpioPulse_t;
-
-   The fields specify
-
-   1) the gpios to be switched on at the start of the pulse.
-   2) the gpios to be switched off at the start of the pulse.
-   3) the delay in microseconds before the next pulse.
-
-   Any or all the fields can be zero.  It doesn't make any sense to
-   set all the fields to zero (the pulse will be ignored).
-
-   When a waveform is started each pulse is executed in order with the
-   specified delay between the pulse and the next.
 */
 
-int wave_tx_busy(void);
-/* This function checks to see if a waveform is currently being
-   transmitted.
-
-   Returns 1 if a waveform is currently being transmitted, otherwise 0.
-*/
-
-int wave_tx_stop(void);
-/* This function stops the transmission of the current waveform.
+int wave_add_new(void);
+/* This function starts a new empty waveform.  You wouldn't normally need
+   to call this function as it is automatically called after a waveform is
+   created with the wave_create function.
 
    Returns 0 if OK.
-
-   This function is intended to stop a waveform started with the repeat mode.
-*/
-
-int wave_tx_start(void);
-/* This function transmits the current waveform.  The waveform is
-   sent once.
-
-   Returns the number of DMA control blocks in the waveform if OK,
-   otherwise PI_BAD_WAVE_MODE.
-*/
-
-int wave_tx_repeat(void);
-/* This function transmits the current waveform.  The waveform repeats
-   endlessly until wave_tx_stop is called.
-
-   Returns the number of DMA control blocks in the waveform if OK,
-   otherwise PI_BAD_WAVE_MODE.
 */
 
 int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses);
@@ -578,7 +534,7 @@ int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses);
    Returns the new total number of pulses in the current waveform if OK,
    otherwise PI_TOO_MANY_PULSES.
 
-   The   pulses are interleaved in time order within the existing waveform
+   The pulses are interleaved in time order within the existing waveform
    (if any).
 
    Merging allows the waveform to be built in parts, that is the settings
@@ -605,6 +561,108 @@ int wave_add_serial
 
    It is legal to add serial data streams with different baud rates to
    the same waveform.
+*/
+
+int wave_create(void);
+/* This function creates a waveform from the data provided by the prior
+   calls to the wave_add_* functions.  Upon success a positive wave id
+   is returned.
+
+   The data provided by the wave_add_* functions is consumed by this
+   function.
+
+   As many waveforms may be created as there is space available.  The
+   wave id is passed to wave_send_* to specify the waveform to transmit.
+
+   Normal usage would be
+
+   Step 1. wave_clear to clear all waveforms and added data.
+
+   Step 2. wave_add_* calls to supply the waveform data.
+
+   Step 3. wave_create to create the waveform and get a unique id
+
+   Repeat steps 2 and 3 as needed.
+
+   Step 4. wave_send_* with the id of the waveform to transmit.
+
+   A waveform comprises one or more pulses.  Each pulse consists of a
+   gpioPulse_t structure.
+
+   typedef struct
+   {
+      uint32_t gpioOn;
+      uint32_t gpioOff;
+      uint32_t usDelay;
+   } gpioPulse_t;
+
+   The fields specify
+
+   1) the gpios to be switched on at the start of the pulse.
+   2) the gpios to be switched off at the start of the pulse.
+   3) the delay in microseconds before the next pulse.
+
+   Any or all the fields can be zero.  It doesn't make any sense to
+   set all the fields to zero (the pulse will be ignored).
+
+   When a waveform is started each pulse is executed in order with the
+   specified delay between the pulse and the next.
+
+   Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
+   PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
+*/
+
+
+int wave_delete(unsigned wave_id);
+/* This function deletes all created waveforms with ids greater than or
+   equal to wave_id.
+
+   Wave ids are allocated in order, 0, 1, 2, etc.
+
+   Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
+*/
+
+int wave_tx_start(void);
+/* This function is deprecated and should no longer be used.  Use
+   wave_create/wave_send_* instead.
+*/
+
+int wave_tx_repeat(void);
+/* This function is deprecated and should no longer be used.  Use
+   wave_create/wave_send_* instead.
+*/
+
+int wave_send_once(unsigned wave_id);
+/* This function transmits the waveform with id wave_id.  The waveform
+   is sent once.
+
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+*/
+
+int wave_send_repeat(unsigned wave_id);
+/* This function transmits the waveform with id wave_id.  The waveform
+   cycles until cancelled (either by the sending of a new waveform or
+   by wave_tx_stop).
+
+   Returns the number of DMA control blocks in the waveform if OK,
+   otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+*/
+
+
+int wave_tx_busy(void);
+/* This function checks to see if a waveform is currently being
+   transmitted.
+
+   Returns 1 if a waveform is currently being transmitted, otherwise 0.
+*/
+
+int wave_tx_stop(void);
+/* This function stops the transmission of the current waveform.
+
+   Returns 0 if OK.
+
+   This function is intended to stop a waveform started with the repeat mode.
 */
 
 int wave_get_micros(void);
@@ -675,7 +733,7 @@ int run_script(unsigned script_id, unsigned numPar, uint32_t *param);
    the script as param 0 to param 9..
 */
 
-int script_status(int script_id, uint32_t *param);
+int script_status(unsigned script_id, uint32_t *param);
 /* This function returns the run status of a stored script as well
    as the current values of parameters 0 to 9.
 
