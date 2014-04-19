@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 14 */
+/* pigpio version 15 */
 
 #include <stdio.h>
 #include <string.h>
@@ -774,7 +774,7 @@ static struct timespec libStarted;
 
 static uint64_t gpioMask;
 
-static gpioWave_t wf[3][PI_WAVE_MAX_PULSES];
+static rawWave_t wf[3][PI_WAVE_MAX_PULSES];
 
 static int wfc[3]={0, 0, 0};
 
@@ -1107,6 +1107,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
       case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
 
       case PI_CMD_MICS:
+         DBG(0,"mics %d", p[1]);
          if (p[1] <= PI_MAX_MICS_DELAY) myGpioDelay(p[1]);
          else res = PI_BAD_MICS_DELAY;
          break;
@@ -1636,7 +1637,7 @@ static int wave2Cbs(unsigned mode)
 
    unsigned numWaves;
 
-   gpioWave_t * waves;
+   rawWave_t * waves;
 
    numWaves = wfc[wfcur];
    waves    = wf [wfcur];
@@ -1862,7 +1863,7 @@ static void waveRxBit(int gpio, int level, uint32_t tick)
 
 /* ----------------------------------------------------------------------- */
 
-static int waveMerge(unsigned numIn1, gpioWave_t *in1)
+int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 {
    unsigned inPos1=0, inPos2=0, outPos=0, level = NUM_WAVE_OOL;
 
@@ -1872,7 +1873,7 @@ static int waveMerge(unsigned numIn1, gpioWave_t *in1)
 
    uint32_t tNow, tNext1, tNext2, tDelay;
 
-   gpioWave_t *in2, *out;
+   rawWave_t *in2, *out;
 
    numIn2 = wfc[wfcur];
    in2    = wf[wfcur];
@@ -4416,7 +4417,7 @@ void rawDumpWave(void)
 
    unsigned numWaves, t;
 
-   gpioWave_t *waves;
+   rawWave_t *waves;
 
    numWaves = wfc[wfcur];
    waves    = wf [wfcur];
@@ -5058,7 +5059,7 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
       wf[2][p].flags   = 0;
    }
 
-   return waveMerge(numPulses, wf[2]);
+   return rawWaveAddGeneric(numPulses, wf[2]);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -5171,7 +5172,7 @@ int gpioWaveAddSerial(unsigned gpio,
    wf[2][p].usDelay = bitDelay[0];
    wf[2][p].flags   = 0;
 
-   return waveMerge(p, wf[2]);
+   return rawWaveAddGeneric(p, wf[2]);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -5311,7 +5312,7 @@ int rawWaveAddSPI(
 
    p++;
 
-   return waveMerge(p, wf[2]);
+   return rawWaveAddGeneric(p, wf[2]);
 }
 
 /* ----------------------------------------------------------------------- */

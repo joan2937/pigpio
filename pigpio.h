@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 14
+This version is for pigpio version 15
 */
 
 #ifndef PIGPIO_H
@@ -86,7 +86,7 @@ This version is for pigpio version 14
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 14
+#define PIGPIO_VERSION 15
 
 /*-------------------------------------------------------------------------*/
 
@@ -276,7 +276,7 @@ typedef struct
    uint32_t gpioOff;
    uint32_t usDelay;
    uint32_t flags;
-} gpioWave_t;
+} rawWave_t;
 
 typedef struct
 {
@@ -1980,6 +1980,33 @@ int rawWaveAddSPI(
 
    Not intended for general use.
 */
+
+/*-------------------------------------------------------------------------*/
+int rawWaveAddGeneric(unsigned numPulses, rawWave_t *pulses);
+/*-------------------------------------------------------------------------*/
+/* This function adds a number of pulses to the current waveform.
+
+   Returns the new total number of pulses in the current waveform if OK,
+   otherwise PI_TOO_MANY_PULSES.
+
+   NOTES:
+
+   The advantage of this function over gpioWaveAddGeneric is that it
+   allows the setting of the flags field.
+
+   The pulses are interleaved in time order within the existing waveform
+   (if any).
+
+   Merging allows the waveform to be built in parts, that is the settings
+   for gpio#1 can be added, and then gpio#2 etc.
+
+   If the added waveform is intended to start after or within the existing
+   waveform then the first pulse should consist of a delay.
+
+   Not intended for general use.
+*/
+
+
 
 /* ----------------------------------------------------------------------- */
 unsigned rawWaveCB(void);
