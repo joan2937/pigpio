@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 14+
+This version is for pigpio version 16+
 */
 
 #ifndef COMMAND_H
@@ -37,14 +37,32 @@ This version is for pigpio version 14+
 
 #include "pigpio.h"
 
-#define MAX_PARAM 512
+#define CMD_MAX_PARAM 512
+#define CMD_MAX_EXTENSION 8192
 
 #define CMD_UNKNOWN_CMD   -1
 #define CMD_BAD_PARAMETER -2
+#define CMD_EXT_TOO_SMALL -3
+
+#define CMD_P_ARR 10
+#define CMD_V_ARR 10
 
 #define CMD_NUMERIC 1
 #define CMD_VAR     2
 #define CMD_PAR     3
+
+typedef struct
+{
+   uint32_t cmd;
+   uint32_t p1;
+   uint32_t p2;
+   union
+   {
+      uint32_t p3;
+      uint32_t ext_len;
+      uint32_t res;
+   };
+} cmdCmd_t;
 
 typedef struct
 {
@@ -68,7 +86,7 @@ typedef struct
 
 typedef struct
 {
-   uint32_t p[7];
+   uint32_t p[5];
    int8_t opt[4];
 } cmdInstr_t;
 
@@ -92,7 +110,7 @@ extern cmdInfo_t cmdInfo[];
 
 extern char *cmdUsage;
 
-int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl);
+int cmdParse(char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl);
 
 int cmdParseScript(char *script, cmdScript_t *s, int diags);
 

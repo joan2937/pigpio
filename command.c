@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 14+
+This version is for pigpio version 16+
 */
 
 #include <stdio.h>
@@ -42,72 +42,133 @@ cmdInfo_t cmdInfo[]=
 {
    /* num         str   vfyt retv */
 
-   {PI_CMD_BC1,   "BC1",   111, 1},
-   {PI_CMD_BC2,   "BC2",   111, 1},
-   {PI_CMD_BR1,   "BR1",   101, 3},
-   {PI_CMD_BR2,   "BR2",   101, 3},
-   {PI_CMD_BS1,   "BS1",   111, 1},
-   {PI_CMD_BS2,   "BS2",   111, 1},
-   {PI_CMD_HELP,  "H",     101, 5},
-   {PI_CMD_HELP,  "HELP",  101, 5},
-   {PI_CMD_HWVER, "HWVER", 101, 4},
-   {PI_CMD_MICS,  "MICS",  112, 0},
-   {PI_CMD_MILS,  "MILS",  112, 0},
-   {PI_CMD_MODEG, "MG"   , 112, 2},
-   {PI_CMD_MODEG, "MODEG", 112, 2},
-   {PI_CMD_MODES, "M",     125, 0},
-   {PI_CMD_MODES, "MODES", 125, 0},
-   {PI_CMD_NB,    "NB",    122, 0},
-   {PI_CMD_NC,    "NC",    112, 0},
-   {PI_CMD_NO,    "NO",    101, 2},
-   {PI_CMD_NP,    "NP",    112, 0},
-   {PI_CMD_PARSE, "PARSE", 115, 2},
-   {PI_CMD_PFG,   "PFG",   112, 2},
-   {PI_CMD_PFS,   "PFS",   121, 2},
-   {PI_CMD_PIGPV, "PIGPV", 101, 4},
-   {PI_CMD_PRG,   "PRG",   112, 2},
-   {PI_CMD_PROC,  "PROC",  115, 2},
-   {PI_CMD_PROCD, "PROCD", 112, 2},
-   {PI_CMD_PROCP, "PROCP", 112, 7},
-   {PI_CMD_PROCR, "PROCR", 191, 2},
-   {PI_CMD_PROCS, "PROCS", 112, 2},
-   {PI_CMD_PRRG,  "PRRG",  112, 2},
-   {PI_CMD_PRS,   "PRS",   121, 2},
-   {PI_CMD_PUD,   "PUD",   126, 0},
-   {PI_CMD_PWM,   "P",     121, 0},
-   {PI_CMD_PWM,   "PWM",   121, 0},
-   {PI_CMD_READ,  "R",     112, 2},
-   {PI_CMD_READ,  "READ",  112, 2},
-   {PI_CMD_SERVO, "S",     121, 0},
-   {PI_CMD_SERVO, "SERVO", 121, 0},
-   {PI_CMD_SLR,   "SLR",   121, 6},
-   {PI_CMD_SLRC,  "SLRC",  112, 2},
-   {PI_CMD_SLRO,  "SLRO",  121, 2},
-   {PI_CMD_TICK,  "T",     101, 4},
-   {PI_CMD_TICK,  "TICK",  101, 4},
-   {PI_CMD_TRIG,  "TRIG",  131, 0},
-   {PI_CMD_WDOG,  "WDOG",  121, 0},
-   {PI_CMD_WRITE, "W",     121, 0},
-   {PI_CMD_WRITE, "WRITE", 121, 0},
-   {PI_CMD_WVAG,  "WVAG",  192, 2},
-   {PI_CMD_WVAS,  "WVAS",  141, 2},
-   {PI_CMD_WVBSY, "WVBSY", 101, 2},
-   {PI_CMD_WVCLR, "WVCLR", 101, 2},
-   {PI_CMD_WVCRE, "WVCRE", 101, 2},
-   {PI_CMD_WVDEL, "WVDEL", 112, 2},
-   {PI_CMD_WVGO,  "WVGO" , 101, 2},
-   {PI_CMD_WVGOR, "WVGOR", 101, 2},
-   {PI_CMD_WVHLT, "WVHLT", 101, 2},
-   {PI_CMD_WVNEW, "WVNEW", 101, 2},
-   {PI_CMD_WVSC,  "WVSC",  112, 2},
-   {PI_CMD_WVSM,  "WVSM",  112, 2},
-   {PI_CMD_WVSP,  "WVSP",  112, 2},
-   {PI_CMD_WVTX,  "WVTX",  112, 2},
-   {PI_CMD_WVTXR, "WVTXR", 112, 2},
+   {PI_CMD_BC1,   "BC1",   111, 1}, // gpioWrite_Bits_0_31_Clear
+   {PI_CMD_BC2,   "BC2",   111, 1}, // gpioWrite_Bits_32_53_Clear
+
+   {PI_CMD_BR1,   "BR1",   101, 3}, // gpioRead_Bits_0_31
+   {PI_CMD_BR2,   "BR2",   101, 3}, // gpioRead_Bits_32_53
+
+   {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
+   {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
+
+   {PI_CMD_HELP,  "H",     101, 5}, // cmdUsage
+   {PI_CMD_HELP,  "HELP",  101, 5}, // cmdUsage
+
+   {PI_CMD_HWVER, "HWVER", 101, 4}, // gpioHardwareRevision
+
+   {PI_CMD_I2CC,  "I2CC",  112, 0}, // i2cClose
+   {PI_CMD_I2CO,  "I2CO",  131, 2}, // i2cOpen
+
+   {PI_CMD_I2CPC, "I2CPC", 131, 2}, // i2cProcessCall
+   {PI_CMD_I2CPK, "I2CPK", 194, 6}, // i2cBlockProcessCall
+
+   {PI_CMD_I2CRB, "I2CRB", 121, 2}, // i2cReadByteData
+   {PI_CMD_I2CRD, "I2CRD", 121, 6}, // i2cReadDevice
+   {PI_CMD_I2CRI, "I2CRI", 131, 6}, // i2cReadI2CBlockData
+   {PI_CMD_I2CRK, "I2CRK", 121, 6}, // i2cReadBlockData
+   {PI_CMD_I2CRS, "I2CRS", 112, 2}, // i2cReadByte
+   {PI_CMD_I2CRW, "I2CRW", 121, 2}, // i2cReadWordData
+
+   {PI_CMD_I2CWB, "I2CWB", 131, 0}, // i2cWriteByteData
+   {PI_CMD_I2CWD, "I2CWD", 193, 0}, // i2cWriteDevice
+   {PI_CMD_I2CWI, "I2CWI", 194, 0}, // i2cWriteI2CBlockData
+   {PI_CMD_I2CWK, "I2CWK", 194, 0}, // i2cWriteBlockData
+   {PI_CMD_I2CWQ, "I2CWQ", 121, 0}, // i2cWriteQuick
+   {PI_CMD_I2CWS, "I2CWS", 121, 0}, // i2cWriteByte
+   {PI_CMD_I2CWW, "I2CWW", 131, 0}, // i2cWriteWordData
+
+   {PI_CMD_MICS,  "MICS",  112, 0}, // gpioDelay
+   {PI_CMD_MILS,  "MILS",  112, 0}, // gpioDelay
+
+   {PI_CMD_MODEG, "MG"   , 112, 2}, // gpioGetMode
+   {PI_CMD_MODEG, "MODEG", 112, 2}, // gpioGetMode
+
+   {PI_CMD_MODES, "M",     125, 0}, // gpioSetMode
+   {PI_CMD_MODES, "MODES", 125, 0}, // gpioSetMode
+
+   {PI_CMD_NB,    "NB",    122, 0}, // gpioNotifyBegin
+   {PI_CMD_NC,    "NC",    112, 0}, // gpioNotifyClose
+   {PI_CMD_NO,    "NO",    101, 2}, // gpioNotifyOpen
+   {PI_CMD_NP,    "NP",    112, 0}, // gpioNotifyPause
+
+   {PI_CMD_PARSE, "PARSE", 115, 2}, // cmdParseScript
+
+   {PI_CMD_PFG,   "PFG",   112, 2}, // gpioGetPWMfrequency
+   {PI_CMD_PFS,   "PFS",   121, 2}, // gpioSetPWMfrequency
+
+   {PI_CMD_PIGPV, "PIGPV", 101, 4}, // gpioVersion
+
+   {PI_CMD_PRG,   "PRG",   112, 2}, // gpioGetPWMrangeg
+
+   {PI_CMD_PROC,  "PROC",  115, 2}, // gpioStoreScript
+   {PI_CMD_PROCD, "PROCD", 112, 2}, // gpioDeleteScript
+   {PI_CMD_PROCP, "PROCP", 112, 7}, // gpioScriptStatus
+   {PI_CMD_PROCR, "PROCR", 191, 2}, // gpioRunScript
+   {PI_CMD_PROCS, "PROCS", 112, 2}, // gpioStopScript
+
+   {PI_CMD_PRRG,  "PRRG",  112, 2}, // gpioGetPWMrealRange
+   {PI_CMD_PRS,   "PRS",   121, 2}, // gpioSetPWMrange
+
+   {PI_CMD_PUD,   "PUD",   126, 0}, // gpioSetPullUpDown
+
+   {PI_CMD_PWM,   "P",     121, 0}, // gpioPWM
+   {PI_CMD_PWM,   "PWM",   121, 0}, // gpioPWM
+
+   {PI_CMD_READ,  "R",     112, 2}, // gpioRead
+   {PI_CMD_READ,  "READ",  112, 2}, // gpioRead
+
+   {PI_CMD_SERRB, "SERRB", 112, 2}, // serReadByte
+   {PI_CMD_SERWB, "SERWB", 121, 0}, // serWriteByte
+   {PI_CMD_SERC,  "SERC",  112, 0}, // serClose
+   {PI_CMD_SERDA, "SERDA", 112, 2}, // serDataAvailable
+   {PI_CMD_SERO,  "SERO",  132, 2}, // serOpen
+   {PI_CMD_SERR,  "SERR",  121, 6}, // serRead
+   {PI_CMD_SERW,  "SERW",  193, 0}, // serWrite
+
+   {PI_CMD_SERVO, "S",     121, 0}, // gpioServo
+   {PI_CMD_SERVO, "SERVO", 121, 0}, // gpioServo
+
+   {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
+   {PI_CMD_SLRC,  "SLRC",  112, 2}, // gpioSerialReadClose
+   {PI_CMD_SLRO,  "SLRO",  121, 2}, // gpioSerialReadOpen
+
+   {PI_CMD_SPIC,  "SPIC",  112, 0}, // spiClose
+   {PI_CMD_SPIO,  "SPIO",  131, 2}, // spiOpen
+   {PI_CMD_SPIR,  "SPIR",  121, 6}, // spiRead
+   {PI_CMD_SPIW,  "SPIW",  193, 2}, // spiWrite
+   {PI_CMD_SPIX,  "SPIX",  193, 6}, // spiXfer
+
+   {PI_CMD_TICK,  "T",     101, 4}, // gpioTick
+   {PI_CMD_TICK,  "TICK",  101, 4}, // gpioTick
+
+   {PI_CMD_TRIG,  "TRIG",  131, 0}, // gpioTrigger
+
+   {PI_CMD_WDOG,  "WDOG",  121, 0}, // gpioSetWatchdog
+
+   {PI_CMD_WRITE, "W",     121, 0}, // gpioWrite
+   {PI_CMD_WRITE, "WRITE", 121, 0}, // gpioWrite
+
+   {PI_CMD_WVAG,  "WVAG",  192, 2}, // gpioWaveAddGeneric
+   {PI_CMD_WVAS,  "WVAS",  196, 2}, // gpioWaveAddSerial
+   {PI_CMD_WVBSY, "WVBSY", 101, 2}, // gpioWaveTxBusy
+   {PI_CMD_WVCLR, "WVCLR", 101, 0}, // gpioWaveClear
+   {PI_CMD_WVCRE, "WVCRE", 101, 2}, // gpioWaveCreate
+   {PI_CMD_WVDEL, "WVDEL", 112, 2}, // gpioWaveDelete
+   {PI_CMD_WVGO,  "WVGO" , 101, 2}, // gpioWaveTxStart
+   {PI_CMD_WVGOR, "WVGOR", 101, 2}, // gpioWaveTxStart
+   {PI_CMD_WVHLT, "WVHLT", 101, 2}, // gpioWaveTxStop
+   {PI_CMD_WVNEW, "WVNEW", 101, 2}, // gpioWaveAddNew
+   {PI_CMD_WVSC,  "WVSC",  112, 2}, // gpioWaveGet*Cbs
+   {PI_CMD_WVSM,  "WVSM",  112, 2}, // gpioWaveGet*Micros
+   {PI_CMD_WVSP,  "WVSP",  112, 2}, // gpioWaveGet*Pulses
+   {PI_CMD_WVTX,  "WVTX",  112, 2}, // gpioWaveTxSend
+   {PI_CMD_WVTXR, "WVTXR", 112, 2}, // gpioWaveTxSend
 
    {PI_CMD_ADD  , "ADD"  , 111, 0},
    {PI_CMD_AND  , "AND"  , 111, 0},
    {PI_CMD_CALL , "CALL" , 114, 0},
+   {PI_CMD_CMDR  ,"CMDR" , 111, 0},
+   {PI_CMD_CMDW , "CMDW" , 111, 0},
    {PI_CMD_CMP  , "CMP"  , 111, 0},
    {PI_CMD_DCR  , "DCR"  , 113, 0},
    {PI_CMD_DCRA , "DCRA" , 101, 0},
@@ -122,8 +183,10 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_JZ   , "JZ"   , 114, 0},
    {PI_CMD_LD   , "LD"   , 123, 0},
    {PI_CMD_LDA  , "LDA"  , 111, 0},
+   {PI_CMD_LDAB , "LDAB" , 111, 0},
    {PI_CMD_MLT  , "MLT"  , 111, 0},
    {PI_CMD_MOD  , "MOD"  , 111, 0},
+   {PI_CMD_NOP  , "NOP"  , 101, 0},
    {PI_CMD_OR   , "OR"   , 111, 0},
    {PI_CMD_POP  , "POP"  , 113, 0},
    {PI_CMD_POPA , "POPA" , 101, 0},
@@ -135,6 +198,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_RR   , "RR"   , 123, 0},
    {PI_CMD_RRA  , "RRA"  , 111, 0},
    {PI_CMD_STA  , "STA"  , 113, 0},
+   {PI_CMD_STAB , "STAB" , 111, 0},
    {PI_CMD_SUB  , "SUB"  , 111, 0},
    {PI_CMD_SYS  , "SYS"  , 116, 0},
    {PI_CMD_TAG  , "TAG"  , 114, 0},
@@ -145,87 +209,150 @@ cmdInfo_t cmdInfo[]=
 
 };
 
+
 char * cmdUsage = "\
-BC1 v         Clear gpios specified by mask v in bank 1.\n\
-BC2 v         Clear gpios specified by mask v in bank 2.\n\
-BR1           Read gpios bank 1.\n\
-BR2           Read gpios bank 2.\n\
-BS1 v         Set gpios specified by mask v in bank 1.\n\
-BS2 v         Set gpios specified by mask v in bank 2.\n\
-H             Displays command help.\n\
-HELP          Displays command help.\n\
-HWVER         Return hardware version.\n\
-M g m         Set gpio g to mode m.\n\
-MG g          Get gpio g mode.\n\
-MICS v        Delay for v microseconds.\n\
-MILS v        Delay for v milliseconds.\n\
-MODEG g       Get gpio g mode.\n\
-MODES g m     Set gpio g to mode m.\n\
-NB h v        Start notifications on handle h for gpios specified by mask v.\n\
-NC h          Close notification handle h.\n\
-NO            Request notification handle.\n\
-NP h          Pause notifications on handle h.\n\
-P u v         Set PWM value for user gpio u to v.\n\
-PARSE t       Validate script text t without storing.\n\
-PFG u         Get PWM frequency for user gpio u.\n\
-PFS u v       Set PWM frequency for user gpio u to v.\n\
-PIGPV         Return pigpio version.\n\
-PRG u         Get PWM range for user gpio u.\n\
-PROC t        Store text t of script.\n\
-PROCD s       Delete script s.\n\
-PROCP s       Get current status and parameter values for script s.\n\
-PROCR s pars  Run script s with up to 10 optional parameters.\n\
-PROCS s       Stop script s.\n\
-PRRG u        Get PWM real range for user gpio u.\n\
-PRS u v       Set PWM range for user gpio u to v.\n\
-PUD g p       Set gpio pull up/down for gpio g to p.\n\
-PWM u v       Set PWM value for user gpio u to v.\n\
-R g           Read gpio g.\n\
-READ g        Read gpio g.\n\
-S u v         Set servo value for user gpio u to v microseconds.\n\
-SERVO u v     Set servo value for user gpio u to v microseconds.\n\
-SLR u v       Read up to d bytes of serial data from user gpio u.\n\
-SLRC u        Close user gpio u for serial data.\n\
-SLRO u b      Open user gpio u for serial data at b baud.\n\
-T             Return current tick.\n\
-TICK          Return current tick.\n\
-TRIG u pl L   Trigger level L for pl micros on user gpio u.\n\
-W g L         Write level L to gpio g.\n\
-WDOG u v      Set watchdog of v milliseconds on user gpio u.\n\
-WRITE g L     Write level L to gpio g.\n\
-WVAG pulses   Wave add generic pulses.\n\
-WVAS u b o t  Wave add serial data t to user gpio u at b baud.\n\
-WVBSY         Check if wave busy.\n\
-WVCLR         Wave clear.\n\
-WVCRE         Create wave from added pulses.\n\
-WVDEL w       Delete waves w and higher.\n\
-WVGO          Wave transmit (DEPRECATED).\n\
-WVGOR         Wave transmit repeatedly (DEPRECATED).\n\
-WVHLT         Wave stop.\n\
-WVNEW         Start a new empty wave.\n\
-WVSC ws       Wave get DMA control block stats.\n\
-WVSM ws       Wave get micros stats.\n\
-WVSP ws       Wave get pulses stats.\n\
-WVTX w        Transmit wave w as one-shot.\n\
-WVTXR w       Transmit wave w repeatedly.\n\
+BC1 bits         Clear specified gpios in bank 1.\n\
+BC2 bits         Clear specified gpios in bank 2.\n\
+BR1              Read bank 1 gpios.\n\
+BR2              Read bank 2 gpios.\n\
+BS1 bits         Set specified gpios in bank 2.\n\
+BS2 bits         Set specified gpios in bank 2.\n\
 \n\
-b = baud rate.\n\
-g = any gpio (0-53).\n\
-h = handle (>=0).\n\
-L = level (0-1).\n\
-m = mode (RW540123).\n\
-mask = a bit mask where (1<<g) is set for each gpio g of interest.\n\
-o = offset (>=0).\n\
-p = pud (ODU).\n\
-pars = 0 to 10 parameters for script.\n\
-pl = pulse length (1-50).\n\
-pulses = 1 or more triplets of gpios on, gpios off, delay.\n\
-s = script id (>=0).\n\
-t = text.\n\
-u = user gpio (0-31).\n\
-v = value.\n\
-w = wave id (>=0).\n\
-ws = 0=now, 1=high, 2=max.\n\
+H/HELP           Display command help.\n\
+\n\
+HWVER            Get hardware version.\n\
+\n\
+I2CC h           Close I2C handle.\n\
+I2CO ib id if    Open I2C bus and device with flags.\n\
+\n\
+I2CPC h r wv     smb Process Call: exchange register with word.\n\
+I2CPK h r bvs    smb Block Process Call: exchange data bytes with register.\n\
+\n\
+I2CRB h r        smb Read Byte Data: read byte from register.\n\
+I2CRD h num      i2c Read bytes.\n\
+I2CRI h r num    smb Read I2C Block Data: read bytes from register.\n\
+I2CRK h r        smb Read Block Data: read data from register.\n\
+I2CRS h          smb Read Byte: read byte.\n\
+I2CRW h r        smb Read Word Data: read word from register.\n\
+\n\
+I2CWB h r bv     smb Write Byte Data: write byte to register.\n\
+I2CWD h bvs      i2c Write data.\n\
+I2CWI h          smb Write I2C Block Data.\n\
+I2CWK h r bvs    smb Write Block Data: write data to register.\n\
+I2CWQ h bit      smb Write Quick: write bit.\n\
+I2CWS h bv       smb Write Byte: write byte.\n\
+I2CWW h r wv     smb Write Word Data: write word to register.\n\
+\n\
+M/MODES g m      Set gpio mode.\n\
+MG/MODEG g       Get gpio mode.\n\
+\n\
+MICS v           Delay for microseconds.\n\
+MILS v           Delay for milliseconds.\n\
+\n\
+NB h bits        Start notification.\n\
+NC h             Close notification.\n\
+NO               Request a notification.\n\
+NP h             Pause notification.\n\
+\n\
+P/PWM u v        Set gpio PWM value.\n\
+\n\
+PARSE t          Validate script.\n\
+\n\
+PFG u            Get gpio PWM frequency.\n\
+PFS u v          Set gpio PWM frequency.\n\
+\n\
+PIGPV            Get pigpio library version.\n\
+\n\
+PRG u            Get gpio PWM range.\n\
+\n\
+PROC t           Store script.\n\
+PROCD sid        Delete script.\n\
+PROCP sid        Get script status and parameters.\n\
+PROCR sid pars   Run script.\n\
+PROCS sid        Stop script.\n\
+\n\
+PRRG u           Get gpio PWM real range.\n\
+PRS u v          Set gpio PWM range.\n\
+\n\
+PUD g p          Set gpio pull up/down.\n\
+\n\
+R/READ g         Read gpio level.\n\
+\n\
+S/SERVO u v      Set gpio servo pulsewidth.\n\
+\n\
+SERC h           Close serial handle.\n\
+SERDA h          Check for serial data ready to read.\n\
+SERO srd srb srf Open serial device at baud with flags.\n\
+\n\
+SERR h num       Read bytes from serial handle.\n\
+SERRB            Read byte from serial handle.\n\
+SERW h bvs       Write bytes to serial handle.\n\
+SERWB h bv       Write byte to serial handle.\n\
+\n\
+SLR u num        Read bit bang serial data from gpio.\n\
+SLRC u           Close gpio for bit bang serial data.\n\
+SLRO u b         Open gpio for bit bang serial data.\n\
+\n\
+SPIC h           SPI close handle.\n\
+SPIO sc sb sf    SPI open channel at baud with flags.\n\
+SPIR h num       SPI read bytes from handle.\n\
+SPIW h bvs       SPI write bytes to handle.\n\
+SPIX h bvs       SPI transfer bytes to handle.\n\
+\n\
+T/TICK           Get current tick.\n\
+\n\
+TRIG u pl L      Trigger level for micros on gpio.\n\
+\n\
+W/WRITE g L      Write level to gpio.\n\
+\n\
+WDOG u v         Set millisecond watchdog on gpio.\n\
+\n\
+WVAG trips       Wave add generic pulses.\n\
+WVAS u b o bvs   Wave add serial data with offset for gpio at baud.\n\
+WVBSY            Check if wave busy.\n\
+WVCLR            Wave clear.\n\
+WVCRE            Create wave from added pulses.\n\
+WVDEL wid        Delete waves w and higher.\n\
+WVGO             Wave transmit (DEPRECATED).\n\
+WVGOR            Wave transmit repeatedly (DEPRECATED).\n\
+WVHLT            Wave stop.\n\
+WVNEW            Start a new empty wave.\n\
+WVSC ws          Wave get DMA control block stats.\n\
+WVSM ws          Wave get micros stats.\n\
+WVSP ws          Wave get pulses stats.\n\
+WVTX wid         Transmit wave as one-shot.\n\
+WVTXR wid        Transmit wave repeatedly.\n\
+\n\
+bits  = a mask where (1<<g) is set for each gpio g of interest.\n\
+bv    = byte value (0-255).\n\
+bvs   = one or more byte values (0-255).\n\
+g     = any gpio (0-53).\n\
+h     = handle (>=0).\n\
+ib    = I2C bus (0-1).\n\
+id    = I2C device (0-127).\n\
+if    = I2C flags (0).\n\
+L     = level (0-1).\n\
+m     = mode (RW540123).\n\
+num   = number of bytes to read.\n\
+o     = offset (>=0).\n\
+p     = pud (ODU).\n\
+pars  = 0 to 10 parameters for script.\n\
+pl    = pulse length (1-50).\n\
+r     = register.\n\
+sid   = script id (>=0).\n\
+sb    = SPI baud.\n\
+sc    = SPI channel (0-1).\n\
+sf    = SPI flags (0-3).\n\
+srd   = serial device (/dev/tty*).\n\
+srb   = serial baud rate.\n\
+srf   = serial flags (0).\n\
+t     = text.\n\
+trips = 1 or more triplets of gpios on, gpios off, delay.\n\
+u     = user gpio (0-31).\n\
+v     = value.\n\
+w     = wave id (>=0).\n\
+ws    = 0=now, 1=high, 2=max.\n\
+wv    = word value (0-65535).\n\
 \n\
 Numbers may be entered as hex (prefix 0x), octal (prefix 0),\n\
 otherwise they are assumed to be decimal.\n\
@@ -309,6 +436,24 @@ static errInfo_t errInfo[]=
    {PI_TOO_MANY_OOL     , "No more OOL for waveform"},
    {PI_EMPTY_WAVEFORM   , "attempt to create an empty waveform"},
    {PI_NO_WAVEFORM_ID   , "no more waveform ids"},
+   {PI_I2C_OPEN_FAILED  , "can't open I2C device"},
+   {PI_SER_OPEN_FAILED  , "can't open serial device"},
+   {PI_SPI_OPEN_FAILED  , "can't open SPI device"},
+   {PI_BAD_I2C_BUS      , "bad I2C bus"},
+   {PI_BAD_I2C_ADDR     , "bad I2C address"},
+   {PI_BAD_SPI_CHANNEL  , "bad SPI channel"},
+   {PI_BAD_FLAGS        , "bad i2c/spi/ser open flags"},
+   {PI_BAD_SPI_SPEED    , "bad SPI speed"},
+   {PI_BAD_SER_DEVICE   , "bad serial device name"},
+   {PI_BAD_SER_SPEED    , "bad serial baud rate"},
+   {PI_BAD_PARAM        , "bad i2c/spi/ser parameter"},
+   {PI_I2C_WRITE_FAILED , "I2C write failed"},
+   {PI_I2C_READ_FAILED  , "I2C read failed"},
+   {PI_BAD_SPI_COUNT    , "bad SPI count"},
+   {PI_SER_WRITE_FAILED , "ser write failed"},
+   {PI_SER_READ_FAILED  , "ser read failed"},
+   {PI_SER_READ_NO_DATA , "ser read no data available"},
+   {PI_UNKNOWN_COMMAND  , "unknown command"},
 
 };
 
@@ -372,12 +517,18 @@ char *cmdStr(void)
    return intCmdStr;
 }
 
-int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
+int cmdParse(
+   char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl)
 {
    int f, valid, idx, val, pp, pars, n, n2, i;
-   char *ptr;
+   char *p8;
+   int32_t *p32;
    char c;
-   int32_t param[MAX_PARAM];
+   uint32_t tp1;
+   int8_t to1;
+
+   /* Check that ext is big enough for the largest message. */
+   if (ext_len < (4 * CMD_MAX_PARAM)) return CMD_EXT_TOO_SMALL;
 
    bzero(&ctl->opt, sizeof(ctl->opt));
 
@@ -394,12 +545,14 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
    valid = 0;
 
    p[0] = cmdInfo[idx].cmd;
-   p[1]  = 0;
-   p[2]  = 0;
+   p[1] = 0;
+   p[2] = 0;
+   p[3] = 0;
 
    switch (cmdInfo[idx].vt)
    {
-      case 101: /* BR1  BR2  DCRA  H  HALT  HELP  HWVER  INRA  NO
+      case 101: /* BR1  BR2  H  HELP  HWVER
+                   DCRA  HALT  INRA  NO
                    PIGPV  POPA  PUSHA  RET  T  TICK  WVBSY  WVCLR
                    WVCRE  WVGO  WVGOR  WVHLT  WVNEW
 
@@ -409,26 +562,28 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
          break;
 
-      case 111: /* ADD  AND  BC1  BC2  BS1  BS2  CMP  DIV  LDA  MLT
-                   MOD  OR  RLA  RRA  SUB  WAIT  XOR
+      case 111: /* BC1  BC2  BS1  BS2  
+                   ADD  AND  CMP  DIV  LDA  LDAB  MLT
+                   MOD  OR  RLA  RRA  STAB  SUB  WAIT  XOR
 
                    One parameter, any value.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
-         if (ctl->opt[0] > 0) valid = 1;
+         if (ctl->opt[1] > 0) valid = 1;
 
          break;
 
-      case 112: /* MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
-                   PROCD  PROCP  PROCS  PRRG  R  READ  SLRC
+      case 112: /* I2CC
+                   I2CRB MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
+                   PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
                    WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR
 
                    One positive parameter.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0)) valid = 1;
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0)) valid = 1;
 
          break;
 
@@ -436,9 +591,9 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    One register parameter.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
-         if ((ctl->opt[0] > 0) && (p[1] < PI_MAX_SCRIPT_VARS)) valid = 1;
+         if ((ctl->opt[1] > 0) && (p[1] < PI_MAX_SCRIPT_VARS)) valid = 1;
 
          break;
 
@@ -446,8 +601,8 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    One numeric parameter, any value.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         if (ctl->opt[0] == CMD_NUMERIC) valid = 1;
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         if (ctl->opt[1] == CMD_NUMERIC) valid = 1;
 
          break;
 
@@ -455,10 +610,9 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    One parameter, string (rest of input).
                 */
-         p[1] = strlen(buf+ctl->eaten);
-         v[1] = buf+ctl->eaten;
-         ctl->eaten += p[1];
-
+         p[3] = strlen(buf+ctl->eaten);
+         memcpy(ext, buf+ctl->eaten, p[3]);
+         ctl->eaten += p[3];
          valid = 1;
 
          break;
@@ -485,24 +639,25 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
             if (valid)
             {
-               p[1] = n;
-               ctl->opt[0] = CMD_NUMERIC;
-               v[1]=buf+ctl->eaten;
+               p[3] = n;
+               ctl->opt[3] = CMD_NUMERIC;
+               memcpy(ext, buf+ctl->eaten, n);
                ctl->eaten += n2;
             }
          }
 
          break;
 
-      case 121: /* P  PFS  PRS  PWM  S  SERVO  SLR  SLRO  W  WDOG  WRITE
+      case 121: /* I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
+                   PWM  S  SERVO  SLR  SLRO  W  WDOG  WRITE
 
                    Two positive parameters.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0) &&
-             (ctl->opt[1] > 0) && ((int)p[2] >= 0)) valid = 1;
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] > 0) && ((int)p[2] >= 0)) valid = 1;
 
          break;
 
@@ -510,11 +665,11 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    Two parameters, first positive, second any value.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0) &&
-             (ctl->opt[1] > 0)) valid = 1;
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] > 0)) valid = 1;
 
          break;
 
@@ -522,12 +677,12 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    Two parameters, first register, second any value.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
 
-         if ((ctl->opt[0] > 0) &&
+         if ((ctl->opt[1] > 0) &&
              (p[1] < PI_MAX_SCRIPT_VARS) &&
-             (ctl->opt[1] > 0)) valid = 1;
+             (ctl->opt[2] > 0)) valid = 1;
 
          break;
 
@@ -535,11 +690,11 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    Two register parameters.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
 
-         if ((ctl->opt[0] > 0) && (p[1] < PI_MAX_SCRIPT_VARS) &&
-             (ctl->opt[1] > 0) && (p[2] < PI_MAX_SCRIPT_VARS)) valid = 1;
+         if ((ctl->opt[1] > 0) && (p[1] < PI_MAX_SCRIPT_VARS) &&
+             (ctl->opt[2] > 0) && (p[2] < PI_MAX_SCRIPT_VARS)) valid = 1;
 
          break;
 
@@ -547,19 +702,19 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    Two parameters, first positive, second in 'RW540123'.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
          f = sscanf(buf+ctl->eaten, " %c %n", &c, &n);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0) && (f >= 1))
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) && (f >= 1))
          {
             ctl->eaten += n;
             val = toupper(c);
-            ptr = strchr(fmtMdeStr, val);
+            p8 = strchr(fmtMdeStr, val);
 
-            if (ptr != NULL)
+            if (p8 != NULL)
             {
-               val = ptr - fmtMdeStr;
+               val = p8 - fmtMdeStr;
                p[2] = val;
                valid = 1;
             }
@@ -571,18 +726,18 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
                    Two parameters, first positive, second in 'ODU'.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
          f = sscanf(buf+ctl->eaten, " %c %n", &c, &n);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0)  && (f >= 1))
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0)  && (f >= 1))
          {
             ctl->eaten += n;
             val = toupper(c);
-            ptr = strchr(fmtPudStr, val);
-            if (ptr != NULL)
+            p8 = strchr(fmtPudStr, val);
+            if (p8 != NULL)
             {
-               val = ptr - fmtPudStr;
+               val = p8 - fmtPudStr;
                p[2] = val;
                valid = 1;
             }
@@ -590,38 +745,43 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
 
          break;
 
-      case 131: /* TRIG
+      case 131: /* I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SPIO  TRIG
 
                    Three positive parameters.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[3], &ctl->opt[2]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
 
-         if ((ctl->opt[0] > 0) && ((int)p[1] >= 0) &&
-             (ctl->opt[1] > 0) && ((int)p[2] >= 0) &&
-             (ctl->opt[2] == CMD_NUMERIC) && ((int)p[3] >= 0))
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] > 0) && ((int)p[2] >= 0) &&
+             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0))
+         {
+            p[3] = 4;
+            memcpy(ext, &tp1, 4);
             valid = 1;
+         }
 
          break;
 
-      case 141: /* WVAS
+      case 132: /* SERO
 
-                  Four parameters, first two positive, third any value,
-                  last string (rest of input).
+                   Three parameters, first a string, rest >=0
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
-         ctl->eaten += getNum(buf+ctl->eaten, &p[3], &ctl->opt[2]);
-
-         if ((ctl->opt[0] == CMD_NUMERIC) && ((int)p[1] >= 0) &&
-             (ctl->opt[1] == CMD_NUMERIC) && ((int)p[2] >= 0) &&
-             (ctl->opt[2] == CMD_NUMERIC))
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+         if ((f >= 0) && n)
          {
-            p[4] = strlen(buf+ctl->eaten);
-            v[1] = buf+ctl->eaten;
-            ctl->eaten += p[4];
-            valid = 1;
+            p[3] = n;
+            ctl->opt[2] = CMD_NUMERIC;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n2;
+
+            ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+            ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+
+            if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+                (ctl->opt[2] > 0) && ((int)p[2] >= 0))
+               valid = 1;
          }
 
          break;
@@ -631,22 +791,25 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
                    One to 11 parameters, first positive,
                    optional remainder, any value.
                 */
-         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
-         if ((ctl->opt[0] == CMD_NUMERIC) && ((int)p[1] >= 0))
+         if ((ctl->opt[1] == CMD_NUMERIC) && ((int)p[1] >= 0))
          {
             pars = 0;
+            p32 = (int32_t *)ext;
 
             while (pars < PI_MAX_SCRIPT_PARAMS)
             {
-               ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[1]);
-               if (ctl->opt[1] == CMD_NUMERIC) param[pars++] = p[2];
+               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+               if (to1 == CMD_NUMERIC)
+               {
+                  pars++;
+                  *p32++ = tp1;
+               }
                else break;
             }
 
-            p[2] = pars;
-
-            v[1] = param;
+            p[3] = pars * 4;
 
             valid = 1;
          }
@@ -658,23 +821,133 @@ int cmdParse(char *buf, uint32_t *p, void **v, cmdCtlParse_t *ctl)
                    One or more triplets (gpios on, gpios off, delay),
                    any value.
                 */
-         pars = 0;
 
-         while (pars < MAX_PARAM)
+         pars = 0;
+         p32 = (int32_t *)ext;
+
+         while (pars < CMD_MAX_PARAM)
          {
-            ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[0]);
-            if (ctl->opt[0] == CMD_NUMERIC) param[pars++] = p[1];
+            ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+            if (to1 == CMD_NUMERIC)
+            {
+               pars++;
+               *p32++ = tp1;
+            }
             else break;
          }
 
-         p[1] = pars / 3;
-
-         v[1] = param;
+         p[3] = pars * 4;
 
          if (pars && ((pars % 3) == 0)) valid = 1;
 
          break;
 
+      case 193: /* I2CWD  SERW
+
+                   Two or more parameters, first >=0, rest 0-255.
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+
+         if ((ctl->opt[1] == CMD_NUMERIC) && ((int)p[1] >= 0))
+         {
+            pars = 0;
+            p8 = ext;
+
+            while (pars < CMD_MAX_PARAM)
+            {
+               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+               if ((to1 == CMD_NUMERIC) &&
+                   ((int)tp1>=0) && ((int)tp1<=255))
+               {
+                  pars++;
+                  *p8++ = tp1;
+               }
+               else break;
+            }
+
+            p[3] = pars;
+
+            if (pars) valid = 1;
+         }
+
+         break;
+
+      case 194: /* I2CPK  I2CWI  I2CWK
+
+                   Three to 34 parameters, all 0-255.
+                */
+
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+
+         if ((ctl->opt[1] == CMD_NUMERIC) &&
+             (ctl->opt[2] == CMD_NUMERIC) &&
+             ((int)p[1]>=0) && ((int)p[2]>=0) && ((int)p[2]<=255))
+         {
+            pars = 0;
+            p8 = ext;
+
+            while (pars < 32)
+            {
+               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+               if ((to1 == CMD_NUMERIC) &&
+                  ((int)tp1>=0) &&
+                  ((int)tp1<=255))
+               {
+                  pars++;
+                  *p8++ = tp1;
+               }
+               else break;
+            }
+
+            p[3] = pars;
+
+            if (pars > 0) valid = 1;
+         }
+
+         break;
+
+      case 196: /* WVAS
+
+                   gpio baud offset char...
+
+                   p1 gpio
+                   p2 baud
+                   p3 len + 4
+                   ---------
+                   uint32_t offset
+                   uint8_t[len]
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+
+         if ((ctl->opt[1] == CMD_NUMERIC) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] == CMD_NUMERIC) && ((int)p[2] > 0) &&
+             (to1 == CMD_NUMERIC))
+         {
+            pars = 0;
+
+            memcpy(ext, &tp1, 4);
+            p8 = ext + 4;
+            while (pars < CMD_MAX_PARAM)
+            {
+               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+               if ((to1 == CMD_NUMERIC) &&
+                   ((int)tp1>=0) && ((int)tp1<=255))
+               {
+                  *p8++ = tp1;
+                  pars++;
+               }
+               else break;
+            }
+
+            p[3] = pars + 4;
+
+            if (pars > 0) valid = 1;
+         }
+
+         break;
 
    }
 
@@ -697,9 +970,9 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
    int idx, len, b, i, j, tags, resolved;
    int status;
    uint32_t p[10];
-   void *v[10];
    cmdInstr_t instr;
    cmdCtlParse_t ctl;
+   char v[CMD_MAX_EXTENSION];
 
    ctl.eaten = 0;
 
@@ -714,7 +987,7 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
    b = (sizeof(int) * (PI_MAX_SCRIPT_PARAMS + PI_MAX_SCRIPT_VARS)) +
        (sizeof(cmdInstr_t) * (len + 2) / 2) + len;
 
-   s->par = calloc(b, 1);
+   s->par = calloc(1, b);
 
    if (s->par == NULL) return -1;
 
@@ -735,81 +1008,52 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
 
    while (ctl.eaten<len)
    {
-      idx = cmdParse(script, p, v, &ctl);
-
-      memcpy(&instr.p, p, sizeof(instr.p));
+      idx = cmdParse(script, p, CMD_MAX_EXTENSION, v, &ctl);
 
       if (idx >= 0)
       {
-         switch (instr.p[0])
+         if (p[3])
          {
-            case PI_CMD_HELP:
-            case PI_CMD_PARSE:
-            case PI_CMD_PROC:
-            case PI_CMD_PROCD:
-            case PI_CMD_PROCP:
-            case PI_CMD_PROCR:
-            case PI_CMD_PROCS:
-            case PI_CMD_SLR:
-            case PI_CMD_SLRC:
-            case PI_CMD_SLRO:
-            case PI_CMD_WVAG:
-            case PI_CMD_WVAS:
+            memcpy(s->str_area + s->str_area_pos, v, p[3]);
+            s->str_area[s->str_area_pos + p[3]] = 0;
+            p[4] = (intptr_t) s->str_area + s->str_area_pos;
+            s->str_area_pos += (p[3] + 1);
+         }
 
+         memcpy(&instr.p, p, sizeof(instr.p));
+
+         if (instr.p[0] == PI_CMD_TAG)
+         {
+            if (tags < PI_MAX_SCRIPT_TAGS)
+            {
+               /* check tag not already used */
+               for (j=0; j<tags; j++)
+               {
+                  if (tag_step[j].tag == instr.p[1])
+                  {
+                     if (diags)
+                     {
+                        fprintf(stderr, "Duplicate tag: %d\n", instr.p[1]);
+                     }
+
+                     if (!status) status = PI_DUP_TAG;
+                     idx = -1;
+                  }
+               }
+
+               tag_step[tags].tag = instr.p[1];
+               tag_step[tags].step = s->instrs;
+               tags++;
+            }
+            else
+            {
                if (diags)
                {
-                  fprintf(stderr, "Illegal command: %s\n", cmdStr());
+                  fprintf(stderr, "Too many tags: %d\n", instr.p[1]);
                }
-
-               if (!status) status = PI_BAD_SCRIPT_CMD;
+               if (!status) status = PI_TOO_MANY_TAGS;
                idx = -1;
-
-               break;
-
-            case PI_CMD_TAG:
-
-               if (tags < PI_MAX_SCRIPT_TAGS)
-               {
-                  /* check tag not already used */
-                  for (j=0; j<tags; j++)
-                  {
-                     if (tag_step[j].tag == instr.p[1])
-                     {
-                        if (diags)
-                        {
-                           fprintf(stderr, "Duplicate tag: %d\n", instr.p[1]);
-                        }
-
-                        if (!status) status = PI_DUP_TAG;
-                        idx = -1;
-                     }
-                  }
-
-                  tag_step[tags].tag = instr.p[1];
-                  tag_step[tags].step = s->instrs;
-                  tags++;
-               }
-               else
-               {
-                  if (diags)
-                  {
-                      fprintf(stderr, "Too many tags: %d\n", instr.p[1]);
-                  }
-                  if (!status) status = PI_TOO_MANY_TAGS;
-                  idx = -1;
-               }
-
-               break;
-
-            case PI_CMD_SYS:
-
-               strncpy(s->str_area+s->str_area_pos, v[1], p[1]);
-               s->str_area[s->str_area_pos+p[1]] = 0;
-               instr.p[1] = (intptr_t) s->str_area+s->str_area_pos;
-               s->str_area_pos += (p[1] + 1);
-
-               break;
-
+            }
          }
       }
       else

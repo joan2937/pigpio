@@ -107,7 +107,7 @@ static int pigpio_command(int fd, int command, int p1, int p2)
 }
 
 static int pigpio_command_ext
-   (int fd, int command, int p1, int p2, int extents, gpioExtent_t *ext)
+   (int fd, int command, int p1, int p2, int p3, int extents, gpioExtent_t *ext)
 {
    int i;
    cmdCmd_t cmd;
@@ -115,7 +115,7 @@ static int pigpio_command_ext
    cmd.cmd = command;
    cmd.p1  = p1;
    cmd.p2  = p2;
-   cmd.res = 0;
+   cmd.p3  = p3;
 
    if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd)) return pigif_bad_send;
 
@@ -614,8 +614,9 @@ int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
    gpioExtent_t ext[1];
    
    /*
-   p1=numPulses
+   p1=0
    p2=0
+   p3=pulses*sizeof(gpioPulse_t)
    ## extension ##
    gpioPulse_t[] pulses
    */
@@ -625,7 +626,8 @@ int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
    ext[0].size = numPulses * sizeof(gpioPulse_t);
    ext[0].ptr = pulses;
 
-   return pigpio_command_ext(gPigCommand, PI_CMD_WVAG, numPulses, 0, 1, ext);
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_WVAG, 0, 0, ext[0].size, 1, ext);
 }
 
 int wave_add_serial(
@@ -635,25 +637,23 @@ int wave_add_serial(
 
    /*
    p1=gpio
-   p2=numChar
+   p2=baud
+   p3=len+4
    ## extension ##
-   unsigned baud
    unsigned offset
-   char[] str
+   char[len] str
    */
 
    if (!numChar) return 0;
 
    ext[0].size = sizeof(unsigned);
-   ext[0].ptr = &baud;
+   ext[0].ptr = &offset;
 
-   ext[1].size = sizeof(unsigned);
-   ext[1].ptr = &offset;
+   ext[1].size = numChar;
+   ext[1].ptr = str;
 
-   ext[2].size = numChar;
-   ext[2].ptr = str;
-
-   return pigpio_command_ext(gPigCommand, PI_CMD_WVAS, gpio, numChar, 3, ext);
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_WVAS, gpio, baud, numChar+4, 2, ext);
 }
 
 int wave_create(void)
@@ -714,6 +714,7 @@ int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level)
    /*
    p1=gpio
    p2=pulseLen
+   p3=4
    ## extension ##
    unsigned level
    */
@@ -721,7 +722,8 @@ int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level)
    ext[0].size = sizeof(level);
    ext[0].ptr = &level;
 
-   return pigpio_command_ext(gPigCommand, PI_CMD_TRIG, gpio, pulseLen, 1, ext);
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_TRIG, gpio, pulseLen, 4, 1, ext);
 }
 
 int store_script(char *script)
@@ -730,18 +732,21 @@ int store_script(char *script)
    gpioExtent_t ext[1];
 
    /*
-   p1=script length
+   p1=0
    p2=0
+   p3=len
    ## extension ##
-   char[] script
+   char[len] script
    */
 
    len = strlen(script);
 
+   if (!len) return 0;
+
    ext[0].size = len;
    ext[0].ptr = script;
 
-   return pigpio_command_ext(gPigCommand, PI_CMD_PROC, len, 0, 1, ext);
+   return pigpio_command_ext(gPigCommand, PI_CMD_PROC, 0, 0, len, 1, ext);
 }
 
 int run_script(unsigned script_id, unsigned numPar, uint32_t *param)
@@ -750,16 +755,17 @@ int run_script(unsigned script_id, unsigned numPar, uint32_t *param)
 
    /*
    p1=script id
-   p2=number of parameters
+   p2=0
+   p3=numPar * 4
    ## extension ##
-   uint32_t[] parameters
+   uint32_t[numPar] pars
    */
 
-   ext[0].size = sizeof(uint32_t)*numPar;
+   ext[0].size = 4 * numPar;
    ext[0].ptr = param;
 
    return pigpio_command_ext
-      (gPigCommand, PI_CMD_PROCR, script_id, numPar, 1, ext);
+      (gPigCommand, PI_CMD_PROCR, script_id, 0, numPar*4, 1, ext);
 }
 
 int script_status(unsigned script_id, uint32_t *param)
@@ -786,10 +792,10 @@ int stop_script(unsigned script_id)
 int delete_script(unsigned script_id)
    {return pigpio_command(gPigCommand, PI_CMD_PROCD, script_id, 0);}
 
-int serial_read_open(unsigned gpio, unsigned baud)
+int bb_serial_read_open(unsigned gpio, unsigned baud)
    {return pigpio_command(gPigCommand, PI_CMD_SLRO, gpio, baud);}
 
-int serial_read(unsigned gpio, void *buf, size_t bufSize)
+int bb_serial_read(unsigned gpio, void *buf, size_t bufSize)
 {
    int bytes;
 
@@ -803,8 +809,397 @@ int serial_read(unsigned gpio, void *buf, size_t bufSize)
    return bytes;
 }
 
-int serial_read_close(unsigned gpio)
+int bb_serial_read_close(unsigned gpio)
    {return pigpio_command(gPigCommand, PI_CMD_SLRC, gpio, 0);}
+
+int i2c_open(unsigned bus, unsigned addr, unsigned flags)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=bus
+   p2=addr
+   p3=4
+   ## extension ##
+   uint32_t flags
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &flags;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CO, bus, addr, 4, 1, ext);
+}
+
+int i2c_close(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CC, handle, 0);}
+
+int i2c_read_device(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   bytes = pigpio_command(gPigCommand, PI_CMD_I2CRD, handle, count);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int i2c_write_device(unsigned handle, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=0
+   p3=count
+   ## extension ##
+   char buf[count] flags
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CWD, handle, 0, count, 1, ext);
+}
+
+int i2c_write_quick(unsigned handle, unsigned bit)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CWQ, handle, bit);}
+
+int i2c_write_byte(unsigned handle, unsigned val)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CWS, handle, val);}
+
+int i2c_read_byte(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CRS, handle, 0);}
+
+int i2c_write_byte_data(unsigned handle, unsigned reg, unsigned val)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=4
+   ## extension ##
+   uint32_t val
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &val;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CWB, handle, reg, 4, 1, ext);
+}
+
+int i2c_write_word_data(unsigned handle, unsigned reg, unsigned val)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=4
+   ## extension ##
+   uint32_t val
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &val;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CWW, handle, reg, 4, 1, ext);
+}
+
+int i2c_read_byte_data(unsigned handle, unsigned reg)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CRB, handle, reg);}
+
+int i2c_read_word_data(unsigned handle, unsigned reg)
+   {return pigpio_command(gPigCommand, PI_CMD_I2CRW, handle, reg);}
+
+int i2c_process_call(unsigned handle, unsigned reg, unsigned val)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=4
+   ## extension ##
+   uint32_t val
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &val;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CPK, handle, reg, 4, 1, ext);
+}
+
+int i2c_write_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CWK, handle, reg, count, 1, ext);
+}
+
+int i2c_read_block_data(unsigned handle, unsigned reg, char *buf)
+{
+   int bytes;
+
+   bytes = pigpio_command(gPigCommand, PI_CMD_I2CRK, handle, reg);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int i2c_block_process_call(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   int bytes;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   bytes = pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CPK, handle, reg, count, 1, ext);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int i2c_read_i2c_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   int bytes;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=4
+   ## extension ##
+   uint32_t count
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &count;
+
+   bytes = pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CRI, handle, reg, 4, 1, ext);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+
+int i2c_write_i2c_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=reg
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_I2CWI, handle, reg, count, 1, ext);
+}
+
+int spi_open(unsigned channel, unsigned speed, unsigned flags)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=channel
+   p2=speed
+   p3=4
+   ## extension ##
+   uint32_t flags
+   */
+
+   ext[0].size = 4;
+   ext[0].ptr = &flags;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_SPIO, channel, speed, 4, 1, ext);
+}
+
+int spi_close(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_SPIC, handle, 0);}
+
+int spi_read(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   bytes = pigpio_command
+      (gPigCommand, PI_CMD_SPIR, handle, count);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int spi_write(unsigned handle, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=0
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_SPIW, handle, 0, count, 1, ext);
+}
+
+int spi_xfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
+{
+   int bytes;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=0
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = txBuf;
+
+   bytes = pigpio_command_ext
+      (gPigCommand, PI_CMD_SPIX, handle, 0, count, 1, ext);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, rxBuf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int serial_open(char *dev, unsigned baud, unsigned flags)
+{
+   int len;
+   gpioExtent_t ext[1];
+
+   len = strlen(dev);
+
+   /*
+   p1=baud
+   p2=flags
+   p3=len
+   ## extension ##
+   char dev[len]
+   */
+
+   ext[0].size = len;
+   ext[0].ptr = dev;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_SERO, baud, flags, len, 1, ext);
+}
+
+int serial_close(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_SERC, handle, 0);}
+
+int serial_write_byte(unsigned handle, unsigned val)
+   {return pigpio_command(gPigCommand, PI_CMD_SERWB, handle, val);}
+
+int serial_read_byte(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_SERRB, handle, 0);}
+
+int serial_write(unsigned handle, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=0
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_SERW, handle, 0, count, 1, ext);
+}
+
+int serial_read(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   bytes = pigpio_command
+      (gPigCommand, PI_CMD_SERR, handle, count);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, buf, bytes, MSG_WAITALL);
+   }
+   return bytes;
+}
+
+int serial_data_available(unsigned handle)
+   {return pigpio_command(gPigCommand, PI_CMD_SERDA, handle, 0);}
 
 int callback(unsigned gpio, unsigned edge, CBFunc_t f)
    {return intCallback(gpio, edge, f, 0, 0);}

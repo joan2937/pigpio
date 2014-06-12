@@ -46,14 +46,14 @@ if [[ $s = 0 ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 echo "h" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 v         Clear gpios specified by mask v in bank 1." ]]
+if [[ $s = "BC1 bits         Clear specified gpios in bank 1." ]]
 then echo "HELP-a ok"
 else echo "HELP-a fail ($s)"
 fi
 read -t 1 -N 9000 </dev/pigout # dump rest of help
 echo "help" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 v         Clear gpios specified by mask v in bank 1." ]]
+if [[ $s = "BC1 bits         Clear specified gpios in bank 1." ]]
 then echo "HELP-b ok"
 else echo "HELP-b fail ($s)"
 fi
@@ -119,7 +119,7 @@ if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 echo "pigpv" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 14 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 16 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 echo "prs $GPIO 255" >/dev/pigpio
 read -t 1 s </dev/pigout
@@ -235,7 +235,7 @@ if [[ $s = 0 ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
 echo "slro $GPIO 1200" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
-echo "wvas $GPIO 1200 0 my name is joan¬" >/dev/pigpio
+echo "wvas $GPIO 1200 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e 0xc2 0xac" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 105 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 echo "m $GPIO w" >/dev/pigpio
@@ -303,7 +303,7 @@ if [[ $s = 0 ]]; then echo "WRITE-d ok"; else echo "WRITE-d fail ($s)"; fi
 echo "wvclr" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "WVCLR ok"; else echo "WVCLR fail ($s)"; fi
-echo "wvas $GPIO 300 0 this is the winter of my discontent" >/dev/pigpio
+echo "wvas $GPIO 300 0 0x74 0x68 0x69 0x73 0x20 0x69 0x73 0x20 0x74 0x68 0x65 0x20 0x77 0x69 0x6e 0x74 0x65 0x72 0x20 0x6f 0x66 0x20 0x6d 0x79 0x20 0x64 0x69 0x73 0x63 0x6f 0x6e 0x74 0x65 0x6e 0x74" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 215 ]]; then echo "WVAS ok"; else echo "WVAS fail ($s)"; fi
 echo "wvag 16 0 5000000 0 16 5000000" >/dev/pigpio

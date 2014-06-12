@@ -762,31 +762,219 @@ int delete_script(unsigned script_id);
    The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 */
 
-int serial_read_open(unsigned user_gpio, unsigned baud);
-/* This function opens a gpio for reading serial data.
+int bb_serial_read_open(unsigned user_gpio, unsigned baud);
+/* This function opens a gpio for bit-banged reading of serial data.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
    or PI_GPIO_IN_USE.
 
    The serial data is returned in a cyclic buffer and is read using
-   serial_read().
+   bb_serial_read().
 
    It is the caller's responsibility to read data from the cyclic buffer
    in a timely fashion.
 */
 
-int serial_read(unsigned user_gpio, void *buf, size_t bufSize);
+int bb_serial_read(unsigned user_gpio, void *buf, size_t bufSize);
 /* This function copies up to bufSize bytes of data read from the
-   serial cyclic buffer to the buffer starting at buf.
+   bit-bang serial cyclic buffer to the buffer starting at buf.
 
    Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
    or PI_NOT_SERIAL_GPIO.
 */
 
-int serial_read_close(unsigned user_gpio);
-/* This function closes a gpio for reading serial data.
+int bb_serial_read_close(unsigned user_gpio);
+/* This function closes a gpio for bit-banged reading of serial data.
 
    Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+*/
+
+int i2c_open(unsigned bus, unsigned addr, unsigned flags);
+/* This returns a handle for the device at address addr on I2C bus bus.
+
+   No flags are currently defined.  This parameter should be set to zero.
+*/
+
+int i2c_close(unsigned handle);
+/* This closes the I2C device associated with the handle.
+*/
+
+int i2c_read_device(unsigned handle, char *buf, unsigned count);
+/* This reads count bytes from the raw device into buf.
+*/
+
+int i2c_write_device(unsigned handle, char *buf, unsigned count);
+/* This writes count bytes from buf to the raw device.
+*/
+
+int i2c_write_quick(unsigned handle, unsigned bit);
+/* This sends a single bit to the device (in the Rd/Wr bit).
+
+   Quick command. smbus 2.0 5.5.1
+*/
+
+int i2c_write_byte(unsigned handle, unsigned val);
+/* This operation is the reverse of i2cReadByte: it sends a single byte
+   to a device.
+
+   Send byte. smbus 2.0 5.5.2
+*/
+
+int i2c_read_byte(unsigned handle);
+/* This reads a single byte from a device, without specifying a device
+   register. Some devices are so simple that this interface is enough;
+   for others, it is a shorthand if you want to read the same register
+   as in the previous SMBus command.
+
+   Receive byte. smbus 2.0 5.5.3
+*/
+
+int i2c_write_byte_data(unsigned handle, unsigned reg, unsigned val);
+/* This writes a single byte to a device, to a designated register.
+   This is the opposite of the i2cReadByte function.
+
+   Write byte. smbus 2.0 5.5.4
+*/
+
+int i2c_write_word_data(unsigned handle, unsigned reg, unsigned val);
+/* This is the opposite of the i2cReadWordData operation. 16 bits
+   of data is written to a device, to the designated register.
+
+   Write word. smbus 2.0 5.5.4
+*/
+
+int i2c_read_byte_data(unsigned handle, unsigned reg);
+/* This reads a single byte from a device, from a designated register.
+
+   Read byte. smbus 2.0 5.5.5
+*/
+
+int i2c_read_word_data(unsigned handle, unsigned reg);
+/* This operation is very like i2cReadByte; again, data is read
+   from a device, from a designated register.  But this time, the data
+   is a complete word (16 bits).
+
+   Read word. smbus 2.0 5.5.5
+*/
+
+int i2c_process_call(unsigned handle, unsigned reg, unsigned val);
+/* This command selects a device register, sends 16 bits of data to it,
+   and reads 16 bits of data in return.
+
+   Process call. smbus 2.0 5.5.6
+*/
+
+int i2c_write_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count);
+/* The opposite of the i2cReadBlockData command, this writes up to
+   32 bytes to a device, to a designated register. The amount of data
+   is specified in the count byte.
+
+   Block write. smbus 2.0 5.5.7
+*/
+
+int i2c_read_block_data(unsigned handle, unsigned reg, char *buf);
+/* This command reads a block of up to 32 bytes from a device, from a
+   designated register. The amount of returned data is set by the device.
+
+   Block read. smbus 2.0 5.5.7
+*/
+
+int i2c_block_process_call(
+   unsigned handle, unsigned reg, char *buf, unsigned count);
+/* This command selects a device register, sends count bytes of data
+   to it, and reads a device specified number of bytes of data in return.
+
+   The smbus 2.0 documentation states that a minimum of 1 byte may be
+   sent and a minimum of 1 byte may be received.  The total number of
+   bytes sent/received must be 32 or less.
+
+   Block write-block read. smbus 2.0 5.5.8
+*/
+
+int i2c_read_i2c_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count);
+/* This command reads a block of bytes from a device, from a 
+   designated register.  The count may be 1-32.
+*/
+
+
+int i2c_write_i2c_block_data(
+   unsigned handle, unsigned reg, char *buf, unsigned count);
+/* The opposite of the i2cReadI2CBlockData command, this writes bytes to 
+   a device, to a designated register.. Note that command lengths of 0, 2,
+   or more bytes are supported as they are indistinguishable from data.
+   Count may be 1-32.
+*/
+
+int spi_open(unsigned channel, unsigned speed, unsigned flags);
+/* This function returns a handle for the SPI device on channel.
+   Data will be transferred at speed bits per second.
+
+   The bottom two bits of flags define the SPI mode as follows.
+        bit bit
+         1   0
+   Mode POL PHA
+    0    0   0
+    1    0   1
+    2    1   0
+    3    1   1
+
+   The other bits in flags should be set to zero.
+*/
+
+int spi_close(unsigned handle);
+/* This functions closes the SPI device identified by the handle.
+*/
+
+int spi_read(unsigned handle, char *buf, unsigned count);
+/* This function reads count bytes of data from the SPI
+   device associated with the handle.
+*/
+
+int spi_write(unsigned handle, char *buf, unsigned count);
+/* This function writes count bytes of data from buf to the SPI
+   device associated with the handle.
+*/
+
+int spi_xfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count);
+/* This function writes count bytes of data from txBuf to the SPI
+   device associated with the handle.
+
+   The data read from the device is written to rxBuf.
+*/
+
+int serial_open(char *dev, unsigned baud, unsigned flags);
+/* This function open the serial device named dev at baud bits per second.
+
+   No flags are currently defined.  This parameter should be set to zero.
+*/
+
+int serial_close(unsigned handle);
+/* This function closes the serial device associated with handle.
+*/
+
+int serial_write_byte(unsigned handle, unsigned val);
+/* This function writes val to the serial port associated with handle.
+*/
+
+int serial_read_byte(unsigned handle);
+/* This function reads a byte from the serial port associated with handle.
+*/
+
+int serial_write(unsigned handle, char *buf, unsigned count);
+/* This function writes count bytes from buf to the the serial port
+   associated with handle.
+*/
+
+int serial_read(unsigned handle, char *buf, unsigned count);
+/* This function reads count bytes from the the serial port
+   associated with handle and writes them to buf.
+*/
+
+int serial_data_available(unsigned handle);
+/* Returns the number of bytes available to be read from the
+   device associated with handle.
 */
 
 int callback(unsigned gpio, unsigned edge, CBFunc_t f);

@@ -16,6 +16,7 @@ sudo ./x_pigpiod_if
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "pigpiod_if.h"
 
@@ -349,7 +350,7 @@ To the lascivious pleasing of a lute.\n\
    e = wave_tx_stop();
    CHECK(5, 5, e, 0, 0, "wave tx stop");
 
-   e = serial_read_open(GPIO, BAUD);
+   e = bb_serial_read_open(GPIO, BAUD);
    CHECK(5, 6, e, 0, 0, "serial read open");
 
    wave_clear();
@@ -370,11 +371,11 @@ To the lascivious pleasing of a lute.\n\
    c = t5_count - oc;
    CHECK(5, 10, c, 1702, 0, "wave tx busy, callback");
 
-   c = serial_read(GPIO, text, sizeof(text)-1);
+   c = bb_serial_read(GPIO, text, sizeof(text)-1);
    if (c > 0) text[c] = 0; /* null terminate string */
    CHECK(5, 11, strcmp(TEXT, text), 0, 0, "wave tx busy, serial read");
 
-   e = serial_read_close(GPIO);
+   e = bb_serial_read_close(GPIO);
    CHECK(5, 12, e, 0, 0, "serial read close");
 
    c = wave_get_micros();
@@ -603,10 +604,217 @@ void t9()
    CHECK(9, 4, e, 0, 0, "delete script");
 }
 
+void ta()
+{
+   int h, b, e;
+   char *TEXT;
+   char text[2048];
+
+   printf("Serial link tests.\n");
+
+   /* this test needs RXD and TXD to be connected */
+
+   h = serial_open("/dev/ttyAMA0", 57600, 0);
+
+   CHECK(10, 1, h, 0, 0, "serial open");
+
+   time_sleep(0.1); /* allow time for transmission */
+
+   b = serial_read(h, text, sizeof(text)); /* flush buffer */
+
+   b = serial_data_available(h);
+   CHECK(10, 2, b, 0, 0, "serial data available");
+
+   TEXT = "\
+To be, or not to be, that is the question-\
+Whether 'tis Nobler in the mind to suffer\
+The Slings and Arrows of outrageous Fortune,\
+Or to take Arms against a Sea of troubles,\
+";
+   e = serial_write(h, TEXT, strlen(TEXT));
+   CHECK(10, 3, e, 0, 0, "serial write");
+
+   e = serial_write_byte(h, 0xAA);
+   e = serial_write_byte(h, 0x55);
+   e = serial_write_byte(h, 0x00);
+   e = serial_write_byte(h, 0xFF);
+
+   CHECK(10, 4, e, 0, 0, "serial write byte");
+
+   time_sleep(0.1); /* allow time for transmission */
+
+   b = serial_data_available(h);
+   CHECK(10, 5, b, strlen(TEXT)+4, 0, "serial data available");
+
+   b = serial_read(h, text, strlen(TEXT));
+   CHECK(10, 6, b, strlen(TEXT), 0, "serial read");
+   if (b >= 0) text[b] = 0;
+   CHECK(10, 7, strcmp(TEXT, text), 0, 0, "serial read");
+
+   b = serial_read_byte(h);
+   CHECK(10, 8, b, 0xAA, 0, "serial read byte");
+
+   b = serial_read_byte(h);
+   CHECK(10, 9, b, 0x55, 0, "serial read byte");
+
+   b = serial_read_byte(h);
+   CHECK(10, 10, b, 0x00, 0, "serial read byte");
+
+   b = serial_read_byte(h);
+   CHECK(10, 11, b, 0xFF, 0, "serial read byte");
+
+   b = serial_data_available(h);
+   CHECK(10, 12, b, 0, 0, "serial data availabe");
+
+   e = serial_close(h);
+   CHECK(10, 13, e, 0, 0, "serial close");
+}
+
+void tb()
+{
+   int h, e, b, len;
+   char *exp;
+   char buf[128];
+
+   printf("SMBus / I2C tests.");
+
+   /* this test requires an ADXL345 on I2C bus 1 addr 0x53 */
+
+   h = i2c_open(1, 0x53, 0);
+   CHECK(11, 1, h, 0, 0, "i2c open");
+
+   e = i2c_write_device(h, "\x00", 1); /* move to known register */
+   CHECK(11, 2, e, 0, 0, "i2c write device");
+
+   b = i2c_read_device(h, buf, 1);
+   CHECK(11, 3, b, 1, 0, "i2c read device");
+   CHECK(11, 4, buf[0], 0xE5, 0, "i2c read device");
+
+   b = i2c_read_byte(h);
+   CHECK(11, 5, b, 0xE5, 0, "i2c read byte");
+
+   b = i2c_read_byte_data(h, 0);
+   CHECK(11, 6, b, 0xE5, 0, "i2c read byte data");
+
+   b = i2c_read_byte_data(h, 48);
+   CHECK(11, 7, b, 2, 0, "i2c read byte data");
+
+   exp = "\x1D[aBcDeFgHjKM]";
+   len = strlen(exp);
+
+   e = i2c_write_device(h, exp, len);
+   CHECK(11, 8, e, 0, 0, "i2c write device");
+
+   e = i2c_write_device(h, "\x1D", 1);
+   b = i2c_read_device(h, buf, len-1);
+   CHECK(11, 9, b, len-1, 0, "i2c read device");
+   CHECK(11, 10, strncmp(buf, exp+1, len-1), 0, 0, "i2c read device");
+
+   if (strncmp(buf, exp+1, len-1))
+      printf("got [%.*s] expected [%.*s]\n", len-1, buf, len-1, exp+1);
+
+   e = i2c_write_byte_data(h, 0x1d, 0xAA);
+   CHECK(11, 11, e, 0, 0, "i2c write byte data");
+
+   b = i2c_read_byte_data(h, 0x1d);
+   CHECK(11, 12, b, 0xAA, 0, "i2c read byte data");
+
+   e = i2c_write_byte_data(h, 0x1d, 0x55);
+   CHECK(11, 13, e, 0, 0, "i2c write byte data");
+
+   b = i2c_read_byte_data(h, 0x1d);
+   CHECK(11, 14, b, 0x55, 0, "i2c read byte data");
+
+   exp = "[1234567890#]";
+   len = strlen(exp);
+
+   e = i2c_write_block_data(h, 0x1C, exp, len);
+   CHECK(11, 15, e, 0, 0, "i2c write block data");
+
+   e = i2c_write_device(h, "\x1D", 1);
+   b = i2c_read_device(h, buf, len);
+   CHECK(11, 16, b, len, 0, "i2c read device");
+   CHECK(11, 17, strncmp(buf, exp, len), 0, 0, "i2c read device");
+
+   if (strncmp(buf, exp, len))
+      printf("got [%.*s] expected [%.*s]\n", len, buf, len, exp);
+
+   b = i2c_read_i2c_block_data(h, 0x1D, buf, len);
+   CHECK(11, 18, b, len, 0, "i2c read i2c block data");
+   CHECK(11, 19, strncmp(buf, exp, len), 0, 0, "i2c read i2c block data");
+
+   if (strncmp(buf, exp, len))
+      printf("got [%.*s] expected [%.*s]\n", len, buf, len, exp);
+
+   exp = "(-+=;:,<>!%)";
+   len = strlen(exp);
+
+   e = i2c_write_i2c_block_data(h, 0x1D, exp, len);
+   CHECK(11, 20, e, 0, 0, "i2c write i2c block data");
+
+   b = i2c_read_i2c_block_data(h, 0x1D, buf, len);
+   CHECK(11, 21, b, len, 0, "i2c read i2c block data");
+   CHECK(11, 22, strncmp(buf, exp, len), 0, 0, "i2c read i2c block data");
+
+   if (strncmp(buf, exp, len))
+      printf("got [%.*s] expected [%.*s]\n", len, buf, len, exp);
+
+   e = i2c_close(h);
+   CHECK(11, 23, e, 0, 0, "i2c close");
+}
+
+void tc()
+{
+   int h, x, b, e;
+   char buf[128];
+
+   printf("SPI tests.");
+
+   /* this test requires a MCP3202 on SPI channel 1 */
+
+   h = spi_open(1, 50000, 0);
+   CHECK(12, 1, h, 0, 0, "spi open");
+
+
+   for (x=0; x<5; x++)
+   {
+      sprintf(buf, "\x01\x80");
+      b = spi_xfer(h, buf, buf, 3);
+      CHECK(12, 2, b, 3, 0, "spi xfer");
+      if (b == 3)
+      {
+         time_sleep(1.0);
+         printf("%d ", ((buf[1]&0x0F)*256)|buf[2]);
+      }
+   }
+
+   e = spi_close(h);
+   CHECK(12, 99, e, 0, 0, "spi close");
+}
+
+
 int main(int argc, char *argv[])
 {
-   int t, status;
-   void (*test[])(void) = {t0, t1, t2, t3, t4, t5, t6, t7, t8, t9};
+   int i, t, c, status;
+
+   char test[64];
+
+   if (argc > 1)
+   {
+      t = 0;
+
+      for (i=0; i<strlen(argv[1]); i++)
+      {
+         c = tolower(argv[1][i]);
+
+         if (!strchr(test, c))
+         {
+            test[t++] = c;
+            test[t] = 0;
+         }
+      }
+   }
+   else strcat(test, "0123456789");
 
    status = pigpio_start(0, 0);
 
@@ -618,7 +826,19 @@ int main(int argc, char *argv[])
 
    printf("Connected to pigpio daemon.\n");
 
-   for (t=0; t<10; t++) test[t]();
+   if (strchr(test, '0')) t0();
+   if (strchr(test, '1')) t1();
+   if (strchr(test, '2')) t2();
+   if (strchr(test, '3')) t3();
+   if (strchr(test, '4')) t4();
+   if (strchr(test, '5')) t5();
+   if (strchr(test, '6')) t6();
+   if (strchr(test, '7')) t7();
+   if (strchr(test, '8')) t8();
+   if (strchr(test, '9')) t9();
+   if (strchr(test, 'a')) ta();
+   if (strchr(test, 'b')) tb();
+   if (strchr(test, 'c')) tc();
 
    pigpio_stop();
 

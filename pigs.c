@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 14+
+This version is for pigpio version 16+
 */
 
 #include <stdio.h>
@@ -142,11 +142,11 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          printf(cmdUsage);
          break;
 
-      case 6: /* SLR */
+      case 6: /* SLR I2CRD */
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
          else if (r > 0)
          {
-            printf("%s", response_buf);
+            write(1, response_buf, r);
          }
          break;
 
@@ -173,7 +173,7 @@ void get_extensions(int sock, int command, int res)
 {
    switch (command)
    {
-      case PI_CMD_PROCP: /* PROCP */
+      case PI_CMD_PROCP:
          if (res >= 0)
          {
             recv(sock,
@@ -183,7 +183,15 @@ void get_extensions(int sock, int command, int res)
          }
          break;
 
-      case PI_CMD_SLR: /* SLR */
+      case PI_CMD_I2CPK:
+      case PI_CMD_I2CRD:
+      case PI_CMD_I2CRI:
+      case PI_CMD_I2CRK:
+      case PI_CMD_SERR:
+      case PI_CMD_SLR:
+      case PI_CMD_SPIX:
+      case PI_CMD_SPIR:
+
          if (res > 0)
          {
             recv(sock, response_buf, res, MSG_WAITALL);
@@ -193,76 +201,15 @@ void get_extensions(int sock, int command, int res)
    }
 }
 
-void put_extensions(int sock, int command, uint32_t *p, void *v[])
-{
-   switch (command)
-   {
-      case PI_CMD_PROC:
-         /*
-         p1=script length w[1]
-         p2=0
-         ## extension ##
-         char[] script    v[1]
-         */
-         send(sock, v[1], p[1], 0);
-         break;
-
-      case PI_CMD_PROCR:
-         /*
-         p1=script id     w[1]
-         p2=numParam      w[2]
-         ## extension ##
-         int[] param      v[1]
-         */
-         if (p[2]) send(sock, v[1], p[2]*sizeof(uint32_t), 0);
-         break;
-
-      case PI_CMD_TRIG:
-         /*
-         p1=user_gpio      w[1]
-         p2=pulseLen       w[2]
-         ## extension ##
-         unsigned level    w[3]
-         */
-         send(sock, &p[3], 4, 0);
-         break;
-
-      case PI_CMD_WVAG:
-         /*
-         p1=pulses        w[1]
-         p2=0
-         ## extension ##
-         int[] param      v[1]
-         */
-         if (p[1]) send(sock, v[1], p[1]*sizeof(gpioPulse_t), 0);
-         break;
-
-      case PI_CMD_WVAS:
-         /*
-         p1=user_gpio       w[1]
-         p2=numChar         w[4]
-         ## extension ##
-         unsigned baud      w[2]
-         unsigned offset    w[3]
-         char[] str         v[1]
-         */
-         send(sock, &p[2], 4, 0);
-         send(sock, &p[3], 4, 0);
-         send(sock, v[1], p[4], 0);
-         break;
-   }
-
-}
-
 int main(int argc , char *argv[])
 {
    int sock, command;
    int idx, i, pp, l, len;
    cmdCmd_t cmd;
-   uint32_t p[10];
-   void *v[10];
+   uint32_t p[CMD_P_ARR];
    cmdCtlParse_t ctl;
    cmdScript_t s;
+   char v[CMD_MAX_EXTENSION];
 
    sock = openSocket();
 
@@ -286,7 +233,7 @@ int main(int argc , char *argv[])
 
    while ((idx >= 0) && (ctl.eaten < len))
    {
-      if ((idx=cmdParse(command_buf, p, v, &ctl)) >= 0)
+      if ((idx=cmdParse(command_buf, p, CMD_MAX_EXTENSION, v, &ctl)) >= 0)
       {
          command = p[0];
 
@@ -298,7 +245,7 @@ int main(int argc , char *argv[])
             }
             else if (command == PI_CMD_PARSE)
             {
-               cmdParseScript(v[1], &s, 1);
+               cmdParseScript(v, &s, 1);
                if (s.par) free (s.par);
             }
             else
@@ -306,24 +253,14 @@ int main(int argc , char *argv[])
                cmd.cmd = command;
                cmd.p1 = p[1];
                cmd.p2 = p[2];
-
-               switch (command)
-               {
-                  case PI_CMD_WVAS:
-                     cmd.p2 = p[4];
-                     break;
-
-                  case PI_CMD_PROC:
-                     cmd.p2 = 0;
-                     break;
-               }
+               cmd.p3 = p[3];
 
                if (sock != SOCKET_OPEN_FAILED)
                {
                   if (send(sock, &cmd, sizeof(cmdCmd_t), 0) ==
                      sizeof(cmdCmd_t))
                   {
-                     put_extensions(sock, command, p, v);
+                     if (p[3]) send(sock, v, p[3], 0); /* send extensions */
 
                      if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
                         sizeof(cmdCmd_t))
@@ -332,11 +269,11 @@ int main(int argc , char *argv[])
 
                         print_result(sock, cmdInfo[idx].rv, cmd);
                      }
-                     else fatal("recv failed, %m");
+                     else fatal("socket receive failed");
                   }
-                  else fatal("send failed, %m");
+                  else fatal("socket send failed");
                }
-               else fatal("connect failed");
+               else fatal("socket connect failed");
             }
          }
          else fatal("%s only allowed within a script", cmdInfo[idx].name);

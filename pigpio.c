@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 15 */
+/* pigpio version 16 */
 
 #include <stdio.h>
 #include <string.h>
@@ -36,11 +36,13 @@ For more information, please refer to <http://unlicense.org/>
 #include <syslog.h>
 #include <poll.h>
 #include <unistd.h>
+#include <termios.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
 #include <time.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <limits.h>
 #include <pthread.h> 
 #include <sys/time.h>
@@ -51,8 +53,10 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+#include <linux/spi/spidev.h>
 
 #include "pigpio.h"
+
 #include "command.h"
 
 /* --------------------------------------------------------------- */
@@ -538,6 +542,15 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define TICKSLOTS 50
 
+#define PI_I2C_CLOSED 0
+#define PI_I2C_OPENED 1
+
+#define PI_SPI_CLOSED 0
+#define PI_SPI_OPENED 1
+
+#define PI_SER_CLOSED 0
+#define PI_SER_OPENED 1
+
 #define PI_NOTIFY_CLOSED  0
 #define PI_NOTIFY_CLOSING 1
 #define PI_NOTIFY_OPENED  2
@@ -555,9 +568,27 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define MAX_EMITS (PIPE_BUF / sizeof(gpioReport_t))
 
 #define SRX_BUF_SIZE 8192
-#define CMD_BUF_SIZE 4096
 
 #define MAX_DELAY 50
+
+#define PI_I2C_SLAVE 0x0703
+#define PI_I2C_SMBUS 0x0720
+
+#define PI_I2C_SMBUS_READ  1
+#define PI_I2C_SMBUS_WRITE 0
+
+#define PI_I2C_SMBUS_QUICK            0
+#define PI_I2C_SMBUS_BYTE             1
+#define PI_I2C_SMBUS_BYTE_DATA        2
+#define PI_I2C_SMBUS_WORD_DATA        3
+#define PI_I2C_SMBUS_PROC_CALL        4
+#define PI_I2C_SMBUS_BLOCK_DATA       5
+#define PI_I2C_SMBUS_I2C_BLOCK_BROKEN 6
+#define PI_I2C_SMBUS_BLOCK_PROC_CALL  7
+#define PI_I2C_SMBUS_I2C_BLOCK_DATA   8
+
+#define PI_I2C_SMBUS_BLOCK_MAX     32
+#define PI_I2C_SMBUS_I2C_BLOCK_MAX 32
 
 /* --------------------------------------------------------------- */
 
@@ -679,6 +710,28 @@ typedef struct
 
 typedef struct
 {
+   uint16_t state;
+   int16_t  fd;
+   uint32_t flags;
+} i2cInfo_t;
+
+typedef struct
+{
+   uint16_t state;
+   int16_t  fd;
+   uint32_t flags;
+} serInfo_t;
+
+typedef struct
+{
+   uint16_t state;
+   int16_t     fd;
+   unsigned speed;
+   uint32_t flags;
+} spiInfo_t;
+
+typedef struct
+{
    uint32_t startTick;
    uint32_t alertTicks;
    uint32_t diffTick[TICKSLOTS];
@@ -738,11 +791,32 @@ typedef struct
 
 typedef struct
 {
-   int botCB;  /* first CB used by wave */
-   int topCB;  /* last CB used by wave */
-   int botOOL;
-   int topOOL;
+   uint16_t botCB;  /* first CB used by wave */
+   uint16_t topCB;  /* last CB used by wave */
+   uint16_t botOOL;
+   uint16_t topOOL;
 } waveInfo_t;
+
+union my_smbus_data
+{
+   uint8_t  byte;
+   uint16_t word;
+   uint8_t  block[PI_I2C_SMBUS_BLOCK_MAX + 2];
+};
+
+struct my_smbus_ioctl_data
+{
+   uint8_t read_write;
+   uint8_t command;
+   uint32_t size;
+   union my_smbus_data *data;
+};
+
+struct my_rdwr_ioctl_data
+{
+   struct i2c_msg *msgs;   /* pointers to msgs */
+   uint32_t nmsgs;         /* number of msgs */
+};
 
 /* --------------------------------------------------------------- */
 
@@ -817,6 +891,10 @@ static gpioGetSamples_t gpioGetSamples;
 static gpioInfo_t       gpioInfo   [PI_MAX_USER_GPIO+1];
 
 static gpioNotify_t     gpioNotify [PI_NOTIFY_SLOTS];
+
+static i2cInfo_t        i2cInfo    [PI_I2C_SLOTS];
+static serInfo_t        serInfo    [PI_SER_SLOTS];
+static spiInfo_t        spiInfo    [PI_SPI_SLOTS];
 
 static gpioScript_t     gpioScript [PI_MAX_SCRIPTS];
 
@@ -906,6 +984,36 @@ static int  gpioNotifyOpenInBand(int fd);
 
 /* ======================================================================= */
 
+static int my_smbus_access(
+   int fd, char rw, uint8_t cmd, int size, union my_smbus_data *data)
+{
+   struct my_smbus_ioctl_data args;
+
+   args.read_write = rw;
+   args.command    = cmd;
+   args.size       = size;
+   args.data       = data;
+
+   return ioctl(fd, PI_I2C_SMBUS, &args);
+}
+
+static char *myBuf2Str(unsigned count, char *buf)
+{
+   static char str[64];
+   int i, c;
+
+   if (count)
+   {
+      if (count > 10) c = 10; else c = count;
+
+      for (i=0; i<c; i++) sprintf(str+(3*i), "%02X ", buf[i]);
+      str[(3*c)-1] = 0;
+   }
+   else str[0] = 0;
+
+   return str;
+}
+
 static void myGpioSleep(int seconds, int micros)
 {
    struct timespec ts, rem;
@@ -928,7 +1036,7 @@ static uint32_t myGpioDelay(uint32_t micros)
 
    start = systReg[SYST_CLO];
 
-   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros) ;
+   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
 
    else myGpioSleep(micros/MILLION, micros%MILLION);
 
@@ -1031,9 +1139,9 @@ static int myPermit(unsigned gpio)
 
 /* ----------------------------------------------------------------------- */
 
-static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
+static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 {
-   int res, i, tmp;
+   int res, i, j, tmp;
    uint32_t mask;
    gpioPulse_t *pulse;
    int masked;
@@ -1050,7 +1158,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          if ((mask | p[1]) != mask)
          {
             DBG(DBG_USER, 
-               "gpioWrite_Bits_0_31_Clear: bad levels %08X (permissions %08X)",
+               "gpioWrite_Bits_0_31_Clear: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1064,7 +1172,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          if ((mask | p[1]) != mask)
          {
             DBG(DBG_USER, 
-               "gpioWrite_Bits_32_53_Clear: bad levels %08X (permissions %08X)",
+               "gpioWrite_Bits_32_53_Clear: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1082,7 +1190,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          if ((mask | p[1]) != mask)
          {
             DBG(DBG_USER, 
-               "gpioWrite_Bits_0_31_Set: bad levels %08X (permissions %08X)",
+               "gpioWrite_Bits_0_31_Set: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1096,7 +1204,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          if ((mask | p[1]) != mask)
          {
             DBG(DBG_USER, 
-               "gpioWrite_Bits_32_53_Set: bad levels %08X (permissions %08X)",
+               "gpioWrite_Bits_32_53_Set: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
          }
@@ -1106,8 +1214,73 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
 
       case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
 
+
+
+      case PI_CMD_I2CC: res = i2cClose(p[1]); break;
+
+      case PI_CMD_I2CO:
+         memcpy(&p[4], buf, 4);
+         res = i2cOpen(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_I2CPC:
+         memcpy(&p[4], buf, 4);
+         res = i2cProcessCall(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_I2CPK:
+         res = i2cBlockProcessCall(p[1], p[2], buf, p[3]);
+         break;
+
+      case PI_CMD_I2CRB: res = i2cReadByteData(p[1], p[2]); break;
+
+      case PI_CMD_I2CRD:
+         if (p[2] > bufSize) p[2] = bufSize;
+         res = i2cReadDevice(p[1], buf, p[2]);
+         break;
+
+      case PI_CMD_I2CRI:
+         memcpy(&p[4], buf, 4);
+         res = i2cReadI2CBlockData(p[1], p[2], buf, p[4]);
+         break;
+
+      case PI_CMD_I2CRK:
+         res = i2cReadBlockData(p[1], p[2], buf);
+         break;
+
+      case PI_CMD_I2CRS: res = i2cReadByte(p[1]); break;
+
+      case PI_CMD_I2CRW: res = i2cReadWordData(p[1], p[2]); break;
+
+      case PI_CMD_I2CWB:
+         memcpy(&p[4], buf, 4);
+         res = i2cWriteByteData(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_I2CWD:
+         res = i2cWriteDevice(p[1], buf, p[3]);
+         break;
+
+      case PI_CMD_I2CWI:
+         res = i2cWriteI2CBlockData(p[1], p[2], buf, p[3]);
+         break;
+
+      case PI_CMD_I2CWK:
+         res = i2cWriteBlockData(p[1], p[2], buf, p[3]);
+         break;
+
+      case PI_CMD_I2CWQ: res = i2cWriteQuick(p[1], p[2]); break;
+
+      case PI_CMD_I2CWS: res = i2cWriteByte(p[1], p[2]); break;
+
+      case PI_CMD_I2CWW:
+         memcpy(&p[4], buf, 4);
+         res = i2cWriteWordData(p[1], p[2], p[4]);
+         break;
+
+
+
       case PI_CMD_MICS:
-         DBG(0,"mics %d", p[1]);
          if (p[1] <= PI_MAX_MICS_DELAY) myGpioDelay(p[1]);
          else res = PI_BAD_MICS_DELAY;
          break;
@@ -1153,15 +1326,17 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
       case PI_CMD_PRG: res = gpioGetPWMrange(p[1]); break;
 
       case PI_CMD_PROC:
-         res = gpioStoreScript((char *)p[2]);
+         res = gpioStoreScript(buf);
          break;
 
       case PI_CMD_PROCD: res = gpioDeleteScript(p[1]); break;
 
-      case PI_CMD_PROCP: res = gpioScriptStatus(p[1], oExt[0].ptr); break;
+      case PI_CMD_PROCP:
+         res = gpioScriptStatus(p[1], (uint32_t *)buf);
+         break;
 
       case PI_CMD_PROCR:
-         res = gpioRunScript(p[1], p[2], (uint32_t *)p[3]);
+         res = gpioRunScript(p[1], p[3]/4, (uint32_t *)buf);
          break;
 
       case PI_CMD_PROCS: res = gpioStopScript(p[1]); break;
@@ -1208,19 +1383,70 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          }
          break;
 
-      case PI_CMD_SLRO: res = gpioSerialReadOpen(p[1], p[2]); break;
+
+
+      case PI_CMD_SERRB: res = serReadByte(p[1]); break;
+
+      case PI_CMD_SERWB: res = serWriteByte(p[1], p[2]); break;
+
+      case PI_CMD_SERC: res = serClose(p[1]); break;
+
+      case PI_CMD_SERDA: res = serDataAvailable(p[1]); break;
+
+      case PI_CMD_SERO: res = serOpen(buf, p[1], p[2]); break;
+
+      case PI_CMD_SERR:
+         if (p[2] > bufSize) p[2] = bufSize;
+         res = serRead(p[1], buf, p[2]);
+         break;
+
+      case PI_CMD_SERW: res = serWrite(p[1], buf, p[3]); break;
+
+
 
       case PI_CMD_SLR:
-         if (p[2] < oExt[0].size) oExt[0].size = p[2];
-         res = gpioSerialRead(p[1], oExt[0].ptr, oExt[0].size);
+         if (p[2] > bufSize) p[2] = bufSize;
+         res = gpioSerialRead(p[1], buf, p[2]);
          break;
 
       case PI_CMD_SLRC: res = gpioSerialReadClose(p[1]); break;
 
+      case PI_CMD_SLRO: res = gpioSerialReadOpen(p[1], p[2]); break;
+
+
+
+      case PI_CMD_SPIC: res = spiClose(p[1]); break;
+
+      case PI_CMD_SPIO:
+         memcpy(&p[4], buf, 4);
+         res = spiOpen(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_SPIR:
+         if (p[2] > bufSize) p[2] = bufSize;
+         res = spiRead(p[1], buf, p[2]);
+         break;
+
+      case PI_CMD_SPIW:
+         if (p[3] > bufSize) p[3] = bufSize;
+         res = spiWrite(p[1], buf, p[3]);
+         break;
+
+      case PI_CMD_SPIX:
+         if (p[3] > bufSize) p[3] = bufSize;
+         res = spiXfer(p[1], buf, buf, p[3]);
+         break;
+
+
+
       case PI_CMD_TICK: res = gpioTick(); break;
 
       case PI_CMD_TRIG:
-         if (myPermit(p[1])) res = gpioTrigger(p[1], p[2], p[3]);
+         if (myPermit(p[1]))
+         {
+            memcpy(&p[4], buf, 4);
+            res = gpioTrigger(p[1], p[2], p[4]);
+         }
          else
          {
             DBG(DBG_USER, "gpioTrigger: gpio %d, no permission to update", p[1]);
@@ -1239,15 +1465,18 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
          }
          break;
 
+
+
       case PI_CMD_WVAG:
 
          /* need to mask off any non permitted gpios */
 
          mask = gpioMask;
-         pulse = (gpioPulse_t *)p[2];
+         pulse = (gpioPulse_t *)buf;
+         j = p[3]/sizeof(gpioPulse_t);
          masked = 0;
 
-         for (i=0; i<p[1]; i++)
+         for (i=0; i<j; i++)
          {
             tmp = pulse[i].gpioOn & mask;
             if (tmp != pulse[i].gpioOn)
@@ -1266,7 +1495,7 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
                pulse[i].gpioOn, pulse[i].gpioOff, pulse[i].usDelay);
          }
 
-         res = gpioWaveAddGeneric(p[1], pulse);
+         res = gpioWaveAddGeneric(j, pulse);
 
          /* report permission error unless another error occurred */
          if (masked && (res >= 0)) res = PI_SOME_PERMITTED;
@@ -1275,7 +1504,10 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
 
       case PI_CMD_WVAS:
          if (myPermit(p[1]))
-            res = gpioWaveAddSerial(p[1], p[2], p[3], p[4], (char *)p[5]);
+         {
+            memcpy(&p[4], buf, 4);
+            res = gpioWaveAddSerial(p[1], p[2], p[4], p[3]-4, buf+4);
+         }
          else
          {
             DBG(
@@ -1337,8 +1569,12 @@ static int myDoCommand(uint32_t *p, gpioExtent_t *oExt)
       case PI_CMD_WVTXR:
          res = gpioWaveTxSend(p[1], PI_WAVE_MODE_REPEAT); break;
 
+      default:
+         res = PI_UNKNOWN_COMMAND;
+         break;
    }
-   return (res);
+
+   return res;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1993,6 +2229,1001 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
    else return PI_TOO_MANY_PULSES;
 }
 
+/* ======================================================================= */
+
+int i2cWriteQuick(unsigned handle, unsigned bit)
+{
+   int err;
+
+   DBG(DBG_USER, "handle=%d bit=%d", handle, bit);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (bit > 1)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bit (%d)", bit);
+
+   err = my_smbus_access(i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
+
+   if (err < 0) return PI_I2C_WRITE_FAILED;
+
+   return err;
+}
+
+int i2cReadByte(unsigned handle)
+{
+   union my_smbus_data data;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data))
+      return PI_I2C_READ_FAILED;
+   else
+      return 0xFF & data.byte;
+}
+
+
+int i2cWriteByte(unsigned handle, unsigned bVal)
+{
+   int err;
+
+   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
+
+   err = my_smbus_access(
+            i2cInfo[handle].fd,
+            PI_I2C_SMBUS_WRITE,
+            bVal,
+            PI_I2C_SMBUS_BYTE,
+            NULL);
+
+   if (err < 0) return PI_I2C_WRITE_FAILED;
+
+   return err;
+}
+
+
+int i2cReadByteData(unsigned handle, unsigned reg)
+{
+   union my_smbus_data data;
+
+   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data))
+      return PI_I2C_READ_FAILED;
+   else
+      return 0xFF & data.byte;
+}
+
+
+int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
+{
+   union my_smbus_data data;
+
+   int err;
+
+   DBG(DBG_USER, "handle=%d reg=%d bVal=%d", handle, reg, bVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
+
+   data.byte = bVal;
+
+   err = my_smbus_access(
+            i2cInfo[handle].fd,
+            PI_I2C_SMBUS_WRITE,
+            reg,
+            PI_I2C_SMBUS_BYTE_DATA,
+            &data);
+
+   if (err < 0) return PI_I2C_WRITE_FAILED;
+
+   return err;
+}
+
+
+int i2cReadWordData(unsigned handle, unsigned reg)
+{
+   union my_smbus_data data;
+
+   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data))
+      return PI_I2C_READ_FAILED;
+   else
+      return 0xFFFF & data.word;
+}
+
+
+int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
+{
+   union my_smbus_data data;
+
+   int err;
+
+   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (wVal > 0xFFFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
+
+   data.word = wVal;
+
+   err = my_smbus_access(
+            i2cInfo[handle].fd,
+            PI_I2C_SMBUS_WRITE,
+            reg,
+            PI_I2C_SMBUS_WORD_DATA,
+            &data);
+
+   if (err < 0) return PI_I2C_WRITE_FAILED;
+
+   return err;
+}
+
+
+int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
+{
+   union my_smbus_data data;
+
+   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (wVal > 0xFFFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
+
+   data.word = wVal;
+
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_PROC_CALL, &data))
+      return PI_I2C_READ_FAILED;
+   else
+      return 0xFFFF & data.word;
+}
+
+
+int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
+{
+   union my_smbus_data data;
+
+   int i;
+
+   DBG(DBG_USER, "handle=%d reg=%d buf=%08X", handle, reg, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data))
+      return PI_I2C_READ_FAILED;
+   else
+   {
+      for (i=1; i<=data.block[0]; i++) buf[i-1] = data.block[i];
+      return data.block[0];
+   }
+}
+
+
+int i2cWriteBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, err;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   data.block[0] = count;
+
+   err = my_smbus_access(
+            i2cInfo[handle].fd,
+            PI_I2C_SMBUS_WRITE,
+            reg,
+            PI_I2C_SMBUS_BLOCK_DATA,
+            &data);
+
+    if (err < 0) return PI_I2C_WRITE_FAILED;
+
+    return err;
+}
+
+
+int i2cBlockProcessCall(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   data.block[0] = count;
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data))
+      return PI_I2C_READ_FAILED;
+   else
+   {
+      for (i=1; i<=data.block[0]; i++) buf[i-1] = data.block[i];
+      return data.block[0];
+   }
+}
+
+
+int i2cReadI2CBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i;
+   uint32_t size;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d buf=%08X",
+      handle, reg, count, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   if (count == 32)
+      size = PI_I2C_SMBUS_I2C_BLOCK_BROKEN;
+   else
+      size = PI_I2C_SMBUS_I2C_BLOCK_DATA;
+
+   data.block[0] = count;
+   if (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data))
+      return PI_I2C_READ_FAILED;
+   else 
+   {
+      for (i = 1; i <= data.block[0]; i++) buf[i-1] = data.block[i];
+      return data.block[0];
+   }
+}
+
+
+int i2cWriteI2CBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, err;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+
+   data.block[0] = count;
+
+   err = my_smbus_access(
+            i2cInfo[handle].fd,
+            PI_I2C_SMBUS_WRITE,
+            reg,
+            PI_I2C_SMBUS_I2C_BLOCK_BROKEN,
+            &data);
+
+   if (err < 0) return PI_I2C_WRITE_FAILED;
+
+   return err;
+}
+
+int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   bytes = write(i2cInfo[handle].fd, buf, count);
+
+   if (bytes != count)
+      return PI_I2C_WRITE_FAILED;
+   else
+      return 0;
+}
+
+int i2cReadDevice(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   DBG(DBG_USER, "handle=%d count=%d buf=%08X",
+      handle, count, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   bytes = read(i2cInfo[handle].fd, buf, count);
+
+   if (bytes != count)
+      return PI_I2C_READ_FAILED;
+   else
+      return bytes;
+}
+
+int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
+{
+   char dev[32];
+   int i, slot, fd;
+
+   DBG(DBG_USER, "i2cBus=%d i2cAddr=%d flags=0x%X",
+      i2cBus, i2cAddr, i2cFlags);
+
+   CHECK_INITED;
+
+   if (i2cBus >= PI_NUM_I2C_BUS)
+      SOFT_ERROR(PI_BAD_I2C_BUS, "bad I2C bus (%d)", i2cBus);
+
+   if ((i2cAddr < 0x08) || (i2cAddr > 0x77))
+      SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (0x%X)", i2cAddr);
+
+   if (i2cFlags)
+      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", i2cFlags);
+
+   slot = -1;
+
+   for (i=0; i<PI_I2C_SLOTS; i++)
+   {
+      if (i2cInfo[i].state == PI_I2C_CLOSED)
+      {
+         i2cInfo[i].state = PI_I2C_OPENED;
+         slot = i;
+         break;
+      }
+   }
+
+   if (slot < 0)
+      SOFT_ERROR(PI_NO_HANDLE, "no I2C handles");
+
+   sprintf(dev, "/dev/i2c-%d", i2cBus);
+
+   if ((fd = open(dev, O_RDWR)) < 0)
+   {
+      /* try a modprobe */
+
+      system("/sbin/modprobe i2c_dev");
+      system("/sbin/modprobe i2c_bcm2708");
+
+      usleep(100000);
+
+      if ((fd = open(dev, O_RDWR)) < 0)
+      {
+         i2cInfo[slot].state = PI_I2C_CLOSED;
+         return PI_I2C_OPEN_FAILED;
+      }
+   }
+
+   if (ioctl(fd, PI_I2C_SLAVE, i2cAddr) < 0)
+   {
+      close(fd);
+      i2cInfo[slot].state = PI_I2C_CLOSED;
+      return PI_I2C_OPEN_FAILED;
+   }
+
+   i2cInfo[slot].fd = fd;
+   i2cInfo[slot].flags = i2cFlags;
+
+   return slot;
+}
+
+int i2cClose(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].fd >= 0) close(i2cInfo[handle].fd);
+
+   i2cInfo[handle].fd = -1;
+   i2cInfo[handle].state = PI_I2C_CLOSED;
+
+   return 0;
+}
+
+/* ======================================================================= */
+
+
+int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
+{
+   int i, slot, fd;
+   char  spiMode;
+   char  spiBits  = 8;
+   char dev[32];
+
+   DBG(DBG_USER, "spiChan=%d spiBaud=%d spiFlags=0x%X",
+      spiChan, spiBaud, spiFlags);
+
+   CHECK_INITED;
+
+   spiMode  = spiFlags & 3;
+   spiBits  = 8;
+
+   if (spiChan >= PI_NUM_SPI_CHANNEL)
+      SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
+
+   if (!spiBaud)
+      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad spiBaud (%d)", spiBaud);
+
+   if (spiFlags > 3)
+      SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
+
+   slot = -1;
+
+   for (i=0; i<PI_SPI_SLOTS; i++)
+   {
+      if (spiInfo[i].state == PI_SPI_CLOSED)
+      {
+         spiInfo[i].state = PI_SPI_OPENED;
+         slot = i;
+         break;
+      }
+   }
+
+   if (slot < 0)
+      SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
+
+   sprintf(dev, "/dev/spidev0.%d", spiChan);
+
+   if ((fd = open(dev, O_RDWR)) < 0)
+   {
+      /* try a modprobe */
+
+      system("/sbin/modprobe spi_bcm2708");
+
+      usleep(100000);
+
+      if ((fd = open(dev, O_RDWR)) < 0)
+      {
+         i2cInfo[slot].state = PI_SPI_CLOSED;
+         return PI_SPI_OPEN_FAILED;
+      }
+   }
+
+   if (ioctl(fd, SPI_IOC_WR_MODE, &spiMode) < 0)
+   {
+      close(fd);
+      spiInfo[slot].state = PI_SPI_CLOSED;
+      return PI_SPI_OPEN_FAILED;
+   }
+
+   if (ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &spiBits) < 0)
+   {
+      close(fd);
+      spiInfo[slot].state = PI_SPI_CLOSED;
+      return PI_SPI_OPEN_FAILED;
+   }
+
+   if (ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &spiBaud) < 0)
+   {
+      close(fd);
+      spiInfo[slot].state = PI_SPI_CLOSED;
+      return PI_SPI_OPEN_FAILED;
+   }
+
+   spiInfo[slot].fd    = fd;
+   spiInfo[slot].speed = spiBaud;
+   spiInfo[slot].flags = spiFlags;
+
+   return slot;
+}
+
+int spiClose(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].fd >= 0) close(spiInfo[handle].fd);
+
+   spiInfo[handle].fd = -1;
+   spiInfo[handle].state = PI_I2C_CLOSED;
+
+   return 0;
+}
+
+int spiRead(unsigned handle, char *buf, unsigned count)
+{
+   int err;
+
+   struct spi_ioc_transfer spi;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spi.tx_buf        = (unsigned) NULL;
+   spi.rx_buf        = (unsigned) buf;
+   spi.len           = count;
+   spi.speed_hz      = spiInfo[handle].speed;
+   spi.delay_usecs   = 0;
+   spi.bits_per_word = 8;
+   spi.cs_change     = 0;
+
+   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
+
+   if (err < 0) return PI_SPI_XFER_FAILED;
+   else return err;
+}
+
+int spiWrite(unsigned handle, char *buf, unsigned count)
+{
+   int err;
+   struct spi_ioc_transfer spi;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spi.tx_buf        = (unsigned) buf;
+   spi.rx_buf        = (unsigned) NULL;
+   spi.len           = count;
+   spi.speed_hz      = spiInfo[handle].speed;
+   spi.delay_usecs   = 0;
+   spi.bits_per_word = 8;
+   spi.cs_change     = 0;
+
+   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
+
+   if (err < 0) return PI_SPI_XFER_FAILED;
+   else return err;
+}
+
+int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
+{
+   int err;
+   struct spi_ioc_transfer spi;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, txBuf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spi.tx_buf        = (unsigned long)txBuf;
+   spi.rx_buf        = (unsigned long)rxBuf;
+   spi.len           = count;
+   spi.speed_hz      = spiInfo[handle].speed;
+   spi.delay_usecs   = 0;
+   spi.bits_per_word = 8;
+   spi.cs_change     = 0;
+
+   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
+
+   if (err < 0) return PI_SPI_XFER_FAILED;
+   else return err;
+}
+
+/* ======================================================================= */
+
+
+int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
+{
+   struct termios new;
+   int speed;
+   int fd;
+   int i, slot;
+
+   DBG(DBG_USER, "tty=%s serBaud=%d serFlags=0x%X", tty, serBaud, serFlags);
+
+   CHECK_INITED;
+
+   if (strncmp("/dev/tty", tty, 8))
+      SOFT_ERROR(PI_BAD_SER_DEVICE, "bad device (%s)", tty);
+
+   switch (serBaud)
+   {
+      case     50: speed =     B50; break;
+      case     75: speed =     B75; break;
+      case    110: speed =    B110; break;
+      case    134: speed =    B134; break;
+      case    150: speed =    B150; break;
+      case    200: speed =    B200; break;
+      case    300: speed =    B300; break;
+      case    600: speed =    B600; break;
+      case   1200: speed =   B1200; break;
+      case   1800: speed =   B1800; break;
+      case   2400: speed =   B2400; break;
+      case   4800: speed =   B4800; break;
+      case   9600: speed =   B9600; break;
+      case  19200: speed =  B19200; break;
+      case  38400: speed =  B38400; break;
+      case  57600: speed =  B57600; break;
+      case 115200: speed = B115200; break;
+      case 230400: speed = B230400; break;
+
+      default:
+         SOFT_ERROR(PI_BAD_SER_SPEED, "bad speed (%d)", serBaud);
+   }
+
+   if (serFlags)
+      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", serFlags);
+
+   slot = -1;
+
+   for (i=0; i<PI_SER_SLOTS; i++)
+   {
+      if (serInfo[i].state == PI_SER_CLOSED)
+      {
+         serInfo[i].state = PI_SER_OPENED;
+         slot = i;
+         break;
+      }
+   }
+
+   if (slot < 0)
+      SOFT_ERROR(PI_NO_HANDLE, "no serial handles");
+
+   if ((fd = open(tty, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK)) == -1)
+   {
+      serInfo[slot].state = PI_SER_CLOSED;
+      return PI_SER_OPEN_FAILED;
+   }
+
+   tcgetattr(fd, &new);
+
+   cfmakeraw(&new);
+
+   cfsetispeed(&new, speed);
+   cfsetospeed(&new, speed);
+
+   new.c_cc [VMIN]  = 0;
+   new.c_cc [VTIME] = 0;
+
+   tcflush(fd, TCIFLUSH);
+   tcsetattr(fd, TCSANOW, &new);
+
+   //fcntl(fd, F_SETFL, O_RDWR);
+
+   serInfo[slot].fd = fd;
+   serInfo[slot].flags = serFlags;
+
+   return slot;
+}
+
+int serClose(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].fd >= 0) close(serInfo[handle].fd);
+
+   serInfo[handle].fd = -1;
+   serInfo[handle].state = PI_SER_CLOSED;
+
+   return 0;
+}
+
+int serWriteByte(unsigned handle, unsigned bVal)
+{
+   char c;
+
+   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad parameter (%d)", bVal);
+
+   c = bVal;
+
+   if (write(serInfo[handle].fd, &c, 1) != 1)
+      return PI_SER_WRITE_FAILED;
+   else
+      return 0;
+}
+
+int serReadByte(unsigned handle)
+{
+   char x;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (read(serInfo[handle].fd, &x, 1) != 1)
+   {
+      if (errno == EAGAIN)
+         return PI_SER_READ_NO_DATA;
+      else
+         return PI_SER_READ_FAILED;
+   }
+
+   return ((int)x) & 0xFF;
+}
+
+int serWrite(unsigned handle, char *buf, unsigned count)
+{
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   if (write(serInfo[handle].fd, buf, count) != count)
+      return PI_SER_WRITE_FAILED;
+   else
+      return 0;
+}
+
+int serRead(unsigned handle, char *buf, unsigned count)
+{
+   int r;
+
+   DBG(DBG_USER, "handle=%d count=%d buf=0x%X", handle, count, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   r = read(serInfo[handle].fd, buf, count);
+
+   if (r == -1)
+   {
+      if (errno == EAGAIN)
+         return PI_SER_READ_NO_DATA;
+      else
+         return PI_SER_READ_FAILED;
+   }
+   else
+   {
+      buf[r] = 0;
+      return r;
+   }
+}
+
+int serDataAvailable(unsigned handle)
+{
+   int result;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (ioctl(serInfo[handle].fd, FIONREAD, &result) == -1) return 0;
+
+   return result;
+}
 
 /* ======================================================================= */
 
@@ -2300,7 +3531,7 @@ static void dmaInitCbs(void)
 
    p->next = dmaCbAdr(0) | DMA_BUS_ADR;
 
-   DBG(DBG_STARTUP, "DMA page type size = %d", sizeof(dmaIPage_t));
+   DBG(DBG_STARTUP, "DMA page type count = %d", sizeof(dmaIPage_t));
 
    DBG(DBG_STARTUP, "%d control blocks (exp=%d)", b+1, NUM_CBS);
 }
@@ -2880,13 +4111,12 @@ static int scrSys(char *cmd, int param)
 static void *pthScript(void *x)
 {
    gpioScript_t *s;
-   gpioExtent_t oExt[3];
-   char buf[CMD_BUF_SIZE];
    cmdInstr_t instr;
    int p1, p2, p1o, p2o, *t1, *t2;
-
    int PC, A, F, SP;
    int S[PI_SCRIPT_STACK_SIZE];
+   char buf[CMD_MAX_EXTENSION];
+
 
    S[0] = 0; /* to prevent compiler warning */
 
@@ -2915,18 +4145,20 @@ static void *pthScript(void *x)
          p1o = instr.p[1];
          p2o = instr.p[2];
 
-         if      (instr.opt[0] == CMD_VAR) instr.p[1] = s->script.var[p1o];
-         else if (instr.opt[0] == CMD_PAR) instr.p[1] = s->script.par[p1o];
+         if      (instr.opt[1] == CMD_VAR) instr.p[1] = s->script.var[p1o];
+         else if (instr.opt[1] == CMD_PAR) instr.p[1] = s->script.par[p1o];
 
-         if      (instr.opt[1] == CMD_VAR) instr.p[2] = s->script.var[p2o];
-         else if (instr.opt[1] == CMD_PAR) instr.p[2] = s->script.par[p2o];
+         if      (instr.opt[2] == CMD_VAR) instr.p[2] = s->script.var[p2o];
+         else if (instr.opt[2] == CMD_PAR) instr.p[2] = s->script.par[p2o];
 
          if (instr.p[0] < 100)
          {
-            oExt[0].ptr = buf;
-            oExt[0].size = CMD_BUF_SIZE-1;
+            if (instr.p[3])
+            {
+               memcpy(buf, (char *)instr.p[4], instr.p[3]);
+            }
 
-            A = myDoCommand(instr.p, oExt);
+            A = myDoCommand(instr.p, sizeof(buf)-1, buf);
 
             F = A;
 
@@ -2948,7 +4180,7 @@ static void *pthScript(void *x)
                case PI_CMD_CMP:   F=A-p1;                         PC++; break;
 
                case PI_CMD_DCR:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      {--s->script.par[p1o]; F=s->script.par[p1o];}
                   else
                      {--s->script.var[p1o]; F=s->script.var[p1o];}
@@ -2962,7 +4194,7 @@ static void *pthScript(void *x)
                case PI_CMD_HALT: s->run_state = PI_SCRIPT_HALTED;       break;
 
                case PI_CMD_INR:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      {++s->script.par[p1o]; F=s->script.par[p1o];}
                   else
                      {++s->script.var[p1o]; F=s->script.var[p1o];}
@@ -2982,12 +4214,17 @@ static void *pthScript(void *x)
                case PI_CMD_JZ:    if (!F)   PC=p1; else PC++;           break;
 
                case PI_CMD_LD:
-                  if (instr.opt[0] == CMD_PAR) s->script.par[p1o]=p2;
+                  if (instr.opt[1] == CMD_PAR) s->script.par[p1o]=p2;
                   else                         s->script.var[p1o]=p2;
                   PC++;
                   break;
 
                case PI_CMD_LDA:   A=p1;                           PC++; break;
+
+               case PI_CMD_LDAB:
+                  if ((p1 >= 0) && (p1 < sizeof(buf))) A = buf[p1];
+                  PC++;
+                  break;
 
                case PI_CMD_MLT:   A*=p1; F=A;                     PC++; break;
 
@@ -2996,7 +4233,7 @@ static void *pthScript(void *x)
                case PI_CMD_OR:    A|=p1; F=A;                     PC++; break;
 
                case PI_CMD_POP:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      s->script.par[p1o]=scrPop(s, &SP, S);
                   else
                      s->script.var[p1o]=scrPop(s, &SP, S);
@@ -3006,7 +4243,7 @@ static void *pthScript(void *x)
                case PI_CMD_POPA:  A=scrPop(s, &SP, S);            PC++; break;
 
                case PI_CMD_PUSH:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      scrPush(s, &SP, S, s->script.par[p1o]);
                   else
                      scrPush(s, &SP, S, s->script.var[p1o]);
@@ -3018,7 +4255,7 @@ static void *pthScript(void *x)
                case PI_CMD_RET:   PC=scrPop(s, &SP, S);                 break;
 
                case PI_CMD_RL:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      {s->script.par[p1o]<<=p2; F=s->script.par[p1o];}
                   else
                      {s->script.var[p1o]<<=p2; F=s->script.var[p1o];}
@@ -3028,7 +4265,7 @@ static void *pthScript(void *x)
                case PI_CMD_RLA:   A<<=p1; F=A;                    PC++; break;
 
                case PI_CMD_RR:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      {s->script.par[p1o]>>=p2; F=s->script.par[p1o];}
                   else
                      {s->script.var[p1o]>>=p2; F=s->script.var[p1o];}
@@ -3038,18 +4275,31 @@ static void *pthScript(void *x)
                case PI_CMD_RRA:   A>>=p1; F=A;                    PC++; break;
 
                case PI_CMD_STA:
-                  if (instr.opt[0] == CMD_PAR) s->script.par[p1o]=A;
+                  if (instr.opt[1] == CMD_PAR) s->script.par[p1o]=A;
                   else                         s->script.var[p1o]=A;
+                  PC++;
+                  break;
+
+               case PI_CMD_STAB:
+                  if ((p1 >= 0) && (p1 < sizeof(buf))) buf[p1] = A;
                   PC++;
                   break;
 
                case PI_CMD_SUB:   A-=p1; F=A;                     PC++; break;
 
+               case PI_CMD_SYS:
+                  A=scrSys((char*)instr.p[4], A);
+                  F=A;
+                  PC++;
+                  break;
+
+               case PI_CMD_WAIT:  A=scrWait(s, p1); F=A;          PC++; break;
+
                case PI_CMD_X:
-                  if (instr.opt[0] == CMD_PAR) t1 = &s->script.par[p1o];
+                  if (instr.opt[1] == CMD_PAR) t1 = &s->script.par[p1o];
                   else                         t1 = &s->script.var[p1o];
 
-                  if (instr.opt[1] == CMD_PAR) t2 = &s->script.par[p2o];
+                  if (instr.opt[2] == CMD_PAR) t2 = &s->script.par[p2o];
                   else                         t2 = &s->script.var[p2o];
 
                   scrSwap(t1, t2);
@@ -3057,16 +4307,12 @@ static void *pthScript(void *x)
                   break;
 
                case PI_CMD_XA:
-                  if (instr.opt[0] == CMD_PAR)
+                  if (instr.opt[1] == CMD_PAR)
                      scrSwap(&s->script.par[p1o], &A);
                   else
                      scrSwap(&s->script.var[p1o], &A);
                   PC++;
                   break;
-
-               case PI_CMD_SYS:   A=scrSys((char*)p1, A); F=A;    PC++; break;
-
-               case PI_CMD_WAIT:  A=scrWait(s, p1); F=A;          PC++; break;
 
                case PI_CMD_XOR:   A^=p1; F=A;                     PC++; break;
 
@@ -3141,14 +4387,12 @@ static void * pthTimerTick(void *x)
 
 static void * pthFifoThread(void *x)
 {
-   char buf[CMD_BUF_SIZE];
+   char buf[CMD_MAX_EXTENSION];
    int idx, flags, len, res, i;
-   uint32_t p[10];
-   void *v[10];
-   gpioExtent_t oExt[3];
+   uint32_t p[CMD_P_ARR];
    cmdCtlParse_t ctl;
-   char *pp;
    uint32_t *param;
+   char v[CMD_MAX_EXTENSION];
 
    myCreatePipe(PI_INPFIFO, 0662);
 
@@ -3183,20 +4427,13 @@ static void * pthFifoThread(void *x)
 
       while (((ctl.eaten)<len) && (idx >= 0))
       {
-         if ((idx=cmdParse(buf, p, v, &ctl)) >= 0)
+         if ((idx=cmdParse(buf, p, CMD_MAX_EXTENSION, v, &ctl)) >= 0)
          {
-            oExt[0].ptr = buf;
-            oExt[0].size = CMD_BUF_SIZE-1;
+            /* make sure extensions are null terminated */
 
-            switch (p[0])
-            {
-               case PI_CMD_PROC:  p[2] = (uint32_t)v[1]; break;
-               case PI_CMD_PROCR: p[3] = (uint32_t)v[1]; break;
-               case PI_CMD_WVAG:  p[2] = (uint32_t)v[1]; break;
-               case PI_CMD_WVAS:  p[5] = (uint32_t)v[1]; break;
-            }
+            v[p[3]] = 0;
 
-            res = myDoCommand(p, oExt);
+            res = myDoCommand(p, sizeof(v)-1, v);
 
             switch (cmdInfo[idx].rv)
             {
@@ -3228,9 +4465,7 @@ static void * pthFifoThread(void *x)
                   if (res < 0) fprintf(outFifo, "%d\n", res);
                   else if (res > 0)
                   {
-                     pp = oExt[0].ptr;
-                     pp[res] = 0;
-                     fprintf(outFifo, "%s", (char *)oExt[0].ptr);
+                     fwrite(v, 1, res, outFifo);
                   }
                   break;
 
@@ -3239,7 +4474,7 @@ static void * pthFifoThread(void *x)
                   else
                   {
                      fprintf(outFifo, "%d", res);
-                     param = oExt[0].ptr;
+                     param = (uint32_t *)v;
                      for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
                      {
                         fprintf(outFifo, " %d", param[i]);
@@ -3263,202 +4498,80 @@ static void * pthFifoThread(void *x)
 static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
-   int res;
    uint32_t p[10];
-   unsigned bytes;
-   char *memPtr;
-   gpioExtent_t oExt[3];
-   char buf[CMD_BUF_SIZE];
-
-   oExt[0].size = CMD_BUF_SIZE-1;
-   oExt[0].ptr = buf;
+   char buf[CMD_MAX_EXTENSION];
 
    free(fdC);
 
    while (1)
    {
-      res = 0;
-
       if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
 
-      switch (p[0])
+      if (p[3])
       {
-         case PI_CMD_NOIB:
-            res = gpioNotifyOpenInBand(sock);
-            break;
-
-         case PI_CMD_PROC:
-            /*
-            p1=script length
-            p2=0
-            ## extension ##
-            char[] script
-            */
-            if (p[1]) /* script appended */
+         if (p[3] < sizeof(buf))
+         {
+            /* read extension into buf */
+            if (recv(sock, buf, p[3], MSG_WAITALL) != p[3])
             {
-               memPtr = malloc(p[1]+1); /* add null terminator */
+               /* Serious error.  No point continuing. */
+               DBG(0, "recv failed for %d bytes", p[3]);
 
-               if (memPtr)
-               {
-                  if (recv(sock, memPtr, p[1], MSG_WAITALL) == p[1])
-                  {
-                     p[2] = (uint32_t)memPtr;
-                     memPtr[p[1]] = 0;
-                     res = myDoCommand(p, oExt);
-                     free(memPtr);
-                  }
-                  else
-                  {
-                     free(memPtr);
-                     close(sock);
-                     return 0;
-                  }
-               }
-            }
-            else res = PI_BAD_SCRIPT_CMD;
-            break;
-
-         case PI_CMD_PROCR:
-            /*
-            p1=script id
-            p2=numParam
-            ## extension ##
-            int[] param
-            */
-            if (p[2]) /* parameters appended */
-            {
-               memPtr = malloc(p[2]*sizeof(uint32_t));
-
-               if (memPtr)
-               {
-                  if (recv(sock, memPtr, p[2]*sizeof(uint32_t), MSG_WAITALL) ==
-                     p[2]*sizeof(uint32_t))
-                  {
-                     p[3] = (uint32_t)memPtr;
-                     res = myDoCommand(p, oExt);
-                     free(memPtr);
-                  }
-                  else
-                  {
-                     free(memPtr);
-                     close(sock);
-                     return 0;
-                  }
-               }
-            }
-            else res = myDoCommand(p, oExt);
-            break;
-
-         case PI_CMD_TRIG:
-            /*
-            p1=user_gpio
-            p2=pulseLen
-            ## extension ##
-            unsigned level
-            */
-            if (recv(sock, &p[3], sizeof(unsigned), MSG_WAITALL) ==
-               sizeof(unsigned))
-            {
-               res = myDoCommand(p, oExt);
-            }
-            else
-            {
                close(sock);
+
                return 0;
             }
-            break;
+         }
+         else
+         {
+            /* Serious error.  No point continuing. */
+            DBG(0, "ext too large %d(%d)", p[3], sizeof(buf));
 
-         case PI_CMD_WVAG:
-            /*
-            p1=numPulses
-            p2=0
-            ## extension ##
-            gpioPulse_t[] pulses
-            */
+            close(sock);
 
-            bytes = p[1] * sizeof(gpioPulse_t);
-
-            memPtr = malloc(bytes);
-
-            if (memPtr)
-            {
-               if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
-               {
-                  p[2] = (uint32_t)memPtr;
-                  res = myDoCommand(p, oExt);
-                  free(memPtr);
-               }
-               else
-               {
-                  free(memPtr);
-                  close(sock);
-                  return 0;
-               }
-            }
-            else res = PI_NO_MEMORY;
-            break;
-
-         case PI_CMD_WVAS:
-            /*
-            p1=user_gpio
-            p2=numChar
-            ## extension ##
-            unsigned baud
-            unsigned offset
-            char[] str
-            */
-
-            bytes = sizeof(unsigned) + sizeof(unsigned) + p[2];
-
-            memPtr = malloc(bytes+1); /* add 1 for a nul terminator */
-
-            if (memPtr)
-            {
-               if (recv(sock, memPtr, bytes, MSG_WAITALL) == bytes)
-               {
-                  p[4] = p[2];
-                  memcpy(&p[2], memPtr, 4);
-                  memcpy(&p[3], memPtr+4, 4);
-                  p[5] =
-                     (uint32_t)(memPtr + sizeof(unsigned) + sizeof(unsigned));
-                  memPtr[bytes] = 0; /* may be duplicate terminator */
-                  res = myDoCommand(p, oExt);
-                  free(memPtr);
-               }
-               else
-               {
-                  free(memPtr);
-                  close(sock);
-                  return 0;
-               }
-            }
-            else res = PI_NO_MEMORY;
-            break;
-
-         default:
-            res = myDoCommand(p, oExt);
-            break;
+            return 0;
+         }
       }
 
-      p[3] = res;
+      /* add null terminator in case it's a string */
+
+      buf[p[3]] = 0;
+
+      if (p[0] != PI_CMD_NOIB)
+      {
+         p[3] = myDoCommand(p, sizeof(buf)-1, buf);
+      }
+      else
+      {
+         p[3] = gpioNotifyOpenInBand(sock);
+      }
 
       write(sock, p, 16);
 
       switch (p[0])
       {
-         case PI_CMD_SLR: /* extension */
+         /* extensions */
 
-            if (res > 0)
+         case PI_CMD_I2CPK:
+         case PI_CMD_I2CRD:
+         case PI_CMD_I2CRI:
+         case PI_CMD_I2CRK:
+         case PI_CMD_SERR:
+         case PI_CMD_SLR:
+         case PI_CMD_SPIX:
+         case PI_CMD_SPIR:
+
+            if (p[3] > 0)
             {
-               write(sock, oExt[0].ptr, res);
+               write(sock, buf, p[3]);
             }
             break;
 
-         case PI_CMD_PROCP: /* extension */
+         case PI_CMD_PROCP:
 
-            if (res >= 0)
+            if (p[3] >= 0)
             {
-               write(sock, oExt[0].ptr, sizeof(uint32_t)*PI_MAX_SCRIPT_PARAMS);
+               write(sock, buf, sizeof(uint32_t)*PI_MAX_SCRIPT_PARAMS);
             }
             break;
 
@@ -3943,7 +5056,7 @@ static void initPCM(unsigned bits)
 
    /* enable PCM */
 
-   pcmReg[PCM_CS] |= PCM_CS_EN ;
+   pcmReg[PCM_CS] |= PCM_CS_EN;
 
    /* enable tx */
 
@@ -4291,7 +5404,7 @@ static void initReleaseResources(void)
 
 /* ======================================================================= */
 
-int getBitInBytes(int bitPos, uint8_t *buf, int numBits)
+int getBitInBytes(int bitPos, char *buf, int numBits)
 {
    int bitp, bufp;
 
@@ -4307,14 +5420,14 @@ int getBitInBytes(int bitPos, uint8_t *buf, int numBits)
 
 /* ----------------------------------------------------------------------- */
 
-void putBitInBytes(int bitPos, uint8_t *buf, int val)
+void putBitInBytes(int bitPos, char *buf, int bit)
 {
    int bitp, bufp;
 
    bufp =      bitPos / 8;
    bitp = 7 - (bitPos % 8);
 
-   if (val) buf[bufp] |=   (1<<bitp);
+   if (bit) buf[bufp] |=   (1<<bitp);
    else     buf[bufp] &= (~(1<<bitp));
 }
 
@@ -4435,30 +5548,42 @@ void rawDumpWave(void)
 
 /* ----------------------------------------------------------------------- */
 
-void rawDumpScript(int s)
+void rawDumpScript(unsigned script_id)
 {
    int i;
 
-   for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
+   if (script_id >= PI_MAX_SCRIPTS) return;
+
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
    {
-      fprintf(stderr, "p%d=%d ", i, gpioScript[s].script.par[i]);
-   }
 
-   fprintf(stderr, "\n");
+      for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
+      {
+         fprintf(stderr, "p%d=%d ", i, gpioScript[script_id].script.par[i]);
+      }
 
-   for (i=0; i<PI_MAX_SCRIPT_VARS; i++)
-   {
-      fprintf(stderr, "v%d=%d ", i, gpioScript[s].script.var[i]);
-   }
+      fprintf(stderr, "\n");
 
-   fprintf(stderr, "\n");
+      for (i=0; i<PI_MAX_SCRIPT_VARS; i++)
+      {
+         fprintf(stderr, "v%d=%d ", i, gpioScript[script_id].script.var[i]);
+      }
 
-   for (i=0; i<gpioScript[s].script.instrs; i++)
-   {
-      fprintf(stderr, "c%d=[%d, %d(%d), %d(%d)]\n",
-         i, gpioScript[s].script.instr[i].p[0],
-         gpioScript[s].script.instr[i].p[1], gpioScript[s].script.instr[i].opt[0],
-         gpioScript[s].script.instr[i].p[2], gpioScript[s].script.instr[i].opt[1]);
+      fprintf(stderr, "\n");
+
+      for (i=0; i<gpioScript[script_id].script.instrs; i++)
+      {
+         fprintf(stderr,
+            "c%d=[%d, %d(%d), %d(%d), %d, %d]\n",
+            i,
+            gpioScript[script_id].script.instr[i].p[0],
+            gpioScript[script_id].script.instr[i].p[1],
+            gpioScript[script_id].script.instr[i].opt[1],
+            gpioScript[script_id].script.instr[i].p[2],
+            gpioScript[script_id].script.instr[i].opt[2],
+            gpioScript[script_id].script.instr[i].p[3],
+            gpioScript[script_id].script.instr[i].p[4]);
+      }
    }
 }
 
@@ -5051,6 +6176,8 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
    if (numPulses > PI_WAVE_MAX_PULSES)
       SOFT_ERROR(PI_TOO_MANY_PULSES, "bad number of pulses (%d)", numPulses);
 
+   if (!pulses) SOFT_ERROR(PI_BAD_POINTER, "bad (NULL) pulses pointer");
+
    for (p=0; p<numPulses; p++)
    {
       wf[2][p].gpioOff = pulses[p].gpioOff;
@@ -5065,7 +6192,7 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
 /* ----------------------------------------------------------------------- */
 
 int gpioWaveAddSerial(unsigned gpio,
-                      unsigned baud,
+                      unsigned bbBaud,
                       unsigned offset,
                       unsigned numChar,
                       char     *str)
@@ -5074,20 +6201,17 @@ int gpioWaveAddSerial(unsigned gpio,
 
    unsigned bitDelay[10];
 
-   DBG(DBG_USER, "gpio=%d baud=%d offset=%d numChar=%d str=[%s]",
-      gpio, baud, offset, numChar, str);
-
-   DBG(DBG_USER, "l=%d s=%X e=%X",
-      strlen(str), str[0], str[strlen(str)-1]);
+   DBG(DBG_USER, "gpio=%d bbBaud=%d offset=%d numChar=%d str=[%s]",
+      gpio, bbBaud, offset, numChar, myBuf2Str(numChar, (char *)str));
 
    CHECK_INITED;
 
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if ((baud < PI_WAVE_MIN_BAUD) || (baud > PI_WAVE_MAX_BAUD))
+   if ((bbBaud < PI_WAVE_MIN_BAUD) || (bbBaud > PI_WAVE_MAX_BAUD))
       SOFT_ERROR(PI_BAD_WAVE_BAUD,
-         "gpio %d, bad baud rate (%d)", gpio, baud);
+         "gpio %d, bad baud rate (%d)", gpio, bbBaud);
 
    if (numChar > PI_WAVE_MAX_CHARS)
       SOFT_ERROR(PI_TOO_MANY_CHARS, "too many chars (%d)", numChar);
@@ -5097,7 +6221,7 @@ int gpioWaveAddSerial(unsigned gpio,
 
    if (!numChar) return 0;
 
-   waveBitDelay(baud, bitDelay);
+   waveBitDelay(bbBaud, bitDelay);
 
    p = 0;
 
@@ -5180,26 +6304,26 @@ int gpioWaveAddSerial(unsigned gpio,
 int rawWaveAddSPI(
    rawSPI_t *spi,
    unsigned offset,
-   unsigned ss,
-   uint8_t *tx_bits,
-   unsigned num_tx_bits,
-   unsigned rx_bit_first,
-   unsigned rx_bit_last,
-   unsigned bits)
+   unsigned spiSS,
+   char *buf,
+   unsigned spiTxBits,
+   unsigned spiBitFirst,
+   unsigned spiBitLast,
+   unsigned spiBits)
 {
    int p, dbv, bit, halfbit;
    int rising_edge[2], read_cycle[2];
    uint32_t on_bits, off_bits;
    int tx_bit_pos;
 
-   DBG(DBG_USER, "spi=%08X off=%d ss=%d tx=%08X, num=%d fb=%d lb=%d bits=%d",
-      (uint32_t)spi, offset, ss, (uint32_t)tx_bits, num_tx_bits,
-      rx_bit_first, rx_bit_last, bits);
+   DBG(DBG_USER, "spi=%08X off=%d spiSS=%d tx=%08X, num=%d fb=%d lb=%d spiBits=%d",
+      (uint32_t)spi, offset, spiSS, (uint32_t)buf, spiTxBits,
+      spiBitFirst, spiBitLast, spiBits);
 
    CHECK_INITED;
 
-   if (ss > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", ss);
+   if (spiSS > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", spiSS);
 
    /*
    CPOL CPHA
@@ -5233,7 +6357,7 @@ int rawWaveAddSPI(
 
    tx_bit_pos = 0;
 
-   if (getBitInBytes(tx_bit_pos, tx_bits, num_tx_bits))
+   if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
    {
       dbv = 1;
       on_bits  |= (1<<(spi->mosi));
@@ -5244,8 +6368,8 @@ int rawWaveAddSPI(
       off_bits  |= (1<<(spi->mosi));
    }
 
-   if (spi->ss_pol) off_bits |= (1<<ss);
-   else             on_bits  |= (1<<ss);
+   if (spi->ss_pol) off_bits |= (1<<spiSS);
+   else             on_bits  |= (1<<spiSS);
 
    wf[2][p].gpioOn  = on_bits;
    wf[2][p].gpioOff = off_bits;
@@ -5256,7 +6380,7 @@ int rawWaveAddSPI(
 
    p++;
 
-   for (bit=1; bit<=bits; bit++)
+   for (bit=1; bit<=spiBits; bit++)
    {
       for (halfbit=0; halfbit<2; halfbit++)
       {
@@ -5268,14 +6392,12 @@ int rawWaveAddSPI(
 
          if (read_cycle[halfbit])
          {
-            if ((bit>=rx_bit_first) && (bit<=rx_bit_last))
+            if ((bit>=spiBitFirst) && (bit<=spiBitLast))
                wf[2][p].flags = WAVE_FLAG_READ;
-
-;
          }
          else
          {
-            if (getBitInBytes(tx_bit_pos, tx_bits, num_tx_bits))
+            if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
             {
                if (!dbv) on_bits |= (1<<(spi->mosi));
                dbv = 1;
@@ -5302,8 +6424,8 @@ int rawWaveAddSPI(
    on_bits = 0;
    off_bits = 0;
 
-   if (spi->ss_pol) on_bits  |= (1<<ss);
-   else             off_bits |= (1<<ss);
+   if (spi->ss_pol) on_bits  |= (1<<spiSS);
+   else             off_bits |= (1<<spiSS);
 
    wf[2][p].gpioOn  = on_bits;
    wf[2][p].gpioOff = off_bits;
@@ -5586,25 +6708,25 @@ int gpioWaveGetMaxCbs(void)
 
 /*-------------------------------------------------------------------------*/
 
-int gpioSerialReadOpen(unsigned gpio, unsigned baud)
+int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud)
 {
    int bitTime, timeout;
 
-   DBG(DBG_USER, "gpio=%d baud=%d", gpio, baud);
+   DBG(DBG_USER, "gpio=%d bbBaud=%d", gpio, bbBaud);
 
    CHECK_INITED;
 
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if ((baud < PI_WAVE_MIN_BAUD) || (baud > PI_WAVE_MAX_BAUD))
+   if ((bbBaud < PI_WAVE_MIN_BAUD) || (bbBaud > PI_WAVE_MAX_BAUD))
       SOFT_ERROR(PI_BAD_WAVE_BAUD,
-         "gpio %d, bad baud rate (%d)", gpio, baud);
+         "gpio %d, bad baud rate (%d)", gpio, bbBaud);
 
    if (wfRx[gpio].mode != PI_WFRX_NONE)
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", gpio);
 
-   bitTime = MILLION / baud;
+   bitTime = MILLION / bbBaud;
 
    timeout  = (10 * bitTime)/1000;
    if (timeout < 1) timeout = 1;
@@ -5613,7 +6735,7 @@ int gpioSerialReadOpen(unsigned gpio, unsigned baud)
    wfRx[gpio].buf      = malloc(SRX_BUF_SIZE);
    wfRx[gpio].bufSize  = SRX_BUF_SIZE;
    wfRx[gpio].mode     = PI_WFRX_SERIAL;
-   wfRx[gpio].baud     = baud;
+   wfRx[gpio].baud     = bbBaud;
    wfRx[gpio].timeout  = timeout;
    wfRx[gpio].fullBit  = bitTime;
    wfRx[gpio].halfBit  = bitTime/2;
@@ -5752,7 +6874,7 @@ int gpioSetAlertFunc(unsigned gpio, gpioAlertFunc_t f)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioSetAlertFuncEx(unsigned gpio, gpioAlertFuncEx_t f, void * userdata)
+int gpioSetAlertFuncEx(unsigned gpio, gpioAlertFuncEx_t f, void *userdata)
 {
    DBG(DBG_USER, "gpio=%d function=%08X userdata=%08X",
       gpio, (uint32_t)f, (uint32_t)userdata);
@@ -5979,7 +7101,7 @@ int gpioTrigger(unsigned gpio, unsigned pulseLen, unsigned level)
    if (level > PI_ON)
       SOFT_ERROR(PI_BAD_LEVEL, "gpio %d, bad level (%d)", gpio, level);
 
-   if (pulseLen > PI_MAX_PULSELEN)
+   if ((pulseLen > PI_MAX_PULSELEN) || (!pulseLen))
       SOFT_ERROR(PI_BAD_PULSELEN,
          "gpio %d, bad pulseLen (%d)", gpio, pulseLen);
 
@@ -6063,13 +7185,13 @@ int gpioSetGetSamplesFuncEx(gpioGetSamplesFuncEx_t f,
 /* ----------------------------------------------------------------------- */
 
 static int intGpioSetTimerFunc(unsigned id,
-                               unsigned ms,
-                               void * f,
+                               unsigned millis,
+                               void *f,
                                int user,
-                               void * userdata)
+                               void *userdata)
 {
-   DBG(DBG_INTERNAL, "id=%d ms=%d function=%08X user=%d userdata=%08X",
-      id, ms, (uint32_t)f, user, (uint32_t)userdata);
+   DBG(DBG_INTERNAL, "id=%d millis=%d function=%08X user=%d userdata=%08X",
+      id, millis, (uint32_t)f, user, (uint32_t)userdata);
 
    gpioTimer[id].id   = id;
 
@@ -6078,7 +7200,7 @@ static int intGpioSetTimerFunc(unsigned id,
       gpioTimer[id].func     = f;
       gpioTimer[id].ex       = user;
       gpioTimer[id].userdata = userdata;
-      gpioTimer[id].millis   = ms;
+      gpioTimer[id].millis   = millis;
 
       if (!gpioTimer[id].running)
       {
@@ -6113,19 +7235,19 @@ static int intGpioSetTimerFunc(unsigned id,
 
 /* ----------------------------------------------------------------------- */
 
-int gpioSetTimerFunc(unsigned id, unsigned ms, gpioTimerFunc_t f)
+int gpioSetTimerFunc(unsigned id, unsigned millis, gpioTimerFunc_t f)
 {
-   DBG(DBG_USER, "id=%d ms=%d function=%08X", id, ms, (uint32_t)f);
+   DBG(DBG_USER, "id=%d millis=%d function=%08X", id, millis, (uint32_t)f);
 
    CHECK_INITED;
 
    if (id > PI_MAX_TIMER)
       SOFT_ERROR(PI_BAD_TIMER, "bad timer id (%d)", id);
 
-   if ((ms < PI_MIN_MS) || (ms > PI_MAX_MS))
-      SOFT_ERROR(PI_BAD_MS, "timer %d, bad ms (%d)", id, ms);
+   if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
+      SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
 
-   intGpioSetTimerFunc(id, ms, f, 0, NULL);
+   intGpioSetTimerFunc(id, millis, f, 0, NULL);
 
    return 0;
 }
@@ -6133,33 +7255,33 @@ int gpioSetTimerFunc(unsigned id, unsigned ms, gpioTimerFunc_t f)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioSetTimerFuncEx(unsigned id, unsigned ms, gpioTimerFuncEx_t f,
+int gpioSetTimerFuncEx(unsigned id, unsigned millis, gpioTimerFuncEx_t f,
                        void * userdata)
 {
-   DBG(DBG_USER, "id=%d ms=%d function=%08X, userdata=%08X",
-      id, ms, (uint32_t)f, (uint32_t)userdata);
+   DBG(DBG_USER, "id=%d millis=%d function=%08X, userdata=%08X",
+      id, millis, (uint32_t)f, (uint32_t)userdata);
 
    CHECK_INITED;
 
    if (id > PI_MAX_TIMER)
       SOFT_ERROR(PI_BAD_TIMER, "bad timer id (%d)", id);
 
-   if ((ms < PI_MIN_MS) || (ms > PI_MAX_MS))
-      SOFT_ERROR(PI_BAD_MS, "timer %d, bad ms (%d)", id, ms);
+   if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
+      SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
 
-   intGpioSetTimerFunc(id, ms, f, 1, userdata);
+   intGpioSetTimerFunc(id, millis, f, 1, userdata);
 
    return 0;
 }
 
 /* ----------------------------------------------------------------------- */
 
-pthread_t *gpioStartThread(gpioThreadFunc_t func, void *arg)
+pthread_t *gpioStartThread(gpioThreadFunc_t f, void *arg)
 {
    pthread_t *pth;
    pthread_attr_t pthAttr;
 
-   DBG(DBG_USER, "func=%08X, arg=%08X", (uint32_t)func, (uint32_t)arg);
+   DBG(DBG_USER, "f=%08X, arg=%08X", (uint32_t)f, (uint32_t)arg);
 
    CHECK_INITED_RET_NULL_PTR;
 
@@ -6179,7 +7301,7 @@ pthread_t *gpioStartThread(gpioThreadFunc_t func, void *arg)
          SOFT_ERROR(NULL, "pthread_attr_setstacksize failed");
       }
 
-      if (pthread_create(pth, &pthAttr, func, arg))
+      if (pthread_create(pth, &pthAttr, f, arg))
       {
          free(pth);
          SOFT_ERROR(NULL, "pthread_create failed");
@@ -6433,7 +7555,7 @@ int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f)
 /* ----------------------------------------------------------------------- */
 
 int gpioSetSignalFuncEx(unsigned signum, gpioSignalFuncEx_t f,
-                        void * userdata)
+                        void *userdata)
 {
    DBG(DBG_USER, "signum=%d function=%08X userdata=%08X",
       signum, (uint32_t)f, (uint32_t)userdata);
@@ -6478,13 +7600,13 @@ uint32_t gpioRead_Bits_32_53(void)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWrite_Bits_0_31_Clear(uint32_t levels)
+int gpioWrite_Bits_0_31_Clear(uint32_t bits)
 {
-   DBG(DBG_USER, "levels=%08X", levels);
+   DBG(DBG_USER, "bits=%08X", bits);
 
    CHECK_INITED;
 
-   *(gpioReg + GPCLR0) = levels;
+   *(gpioReg + GPCLR0) = bits;
 
    return 0;
 }
@@ -6492,13 +7614,13 @@ int gpioWrite_Bits_0_31_Clear(uint32_t levels)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWrite_Bits_32_53_Clear(uint32_t levels)
+int gpioWrite_Bits_32_53_Clear(uint32_t bits)
 {
-   DBG(DBG_USER, "levels=%08X", levels);
+   DBG(DBG_USER, "bits=%08X", bits);
 
    CHECK_INITED;
 
-   *(gpioReg + GPCLR1) = levels;
+   *(gpioReg + GPCLR1) = bits;
 
    return 0;
 }
@@ -6506,13 +7628,13 @@ int gpioWrite_Bits_32_53_Clear(uint32_t levels)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWrite_Bits_0_31_Set(uint32_t levels)
+int gpioWrite_Bits_0_31_Set(uint32_t bits)
 {
-   DBG(DBG_USER, "levels=%08X", levels);
+   DBG(DBG_USER, "bits=%08X", bits);
 
    CHECK_INITED;
 
-   *(gpioReg + GPSET0) = levels;
+   *(gpioReg + GPSET0) = bits;
 
    return 0;
 }
@@ -6520,13 +7642,13 @@ int gpioWrite_Bits_0_31_Set(uint32_t levels)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWrite_Bits_32_53_Set(uint32_t levels)
+int gpioWrite_Bits_32_53_Set(uint32_t bits)
 {
-   DBG(DBG_USER, "levels=%08X", levels);
+   DBG(DBG_USER, "bits=%08X", bits);
 
    CHECK_INITED;
 
-   *(gpioReg + GPSET1) = levels;
+   *(gpioReg + GPSET1) = bits;
 
    return 0;
 }
@@ -6534,7 +7656,7 @@ int gpioWrite_Bits_32_53_Set(uint32_t levels)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioTime(unsigned timetype, int * seconds, int * micros)
+int gpioTime(unsigned timetype, int *seconds, int *micros)
 {
    struct timespec ts;
 
@@ -6619,7 +7741,7 @@ uint32_t gpioDelay(uint32_t micros)
 
    start = systReg[SYST_CLO];
 
-   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros) ;
+   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
 
    else gpioSleep(PI_TIME_RELATIVE, (micros/MILLION), (micros%MILLION));
 
@@ -6730,16 +7852,16 @@ int gpioCfgClock(unsigned micros, unsigned peripheral, unsigned source)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioCfgDMAchannel(unsigned channel)
+int gpioCfgDMAchannel(unsigned DMAchannel)
 {
-   DBG(DBG_USER, "channel=%d", channel);
+   DBG(DBG_USER, "channel=%d", DMAchannel);
 
    CHECK_NOT_INITED;
 
-   if ((channel < PI_MIN_DMA_CHANNEL) || (channel > PI_MAX_DMA_CHANNEL))
-      SOFT_ERROR(PI_BAD_CHANNEL, "bad channel (%d)", channel);
+   if ((DMAchannel < PI_MIN_DMA_CHANNEL) || (DMAchannel > PI_MAX_DMA_CHANNEL))
+      SOFT_ERROR(PI_BAD_CHANNEL, "bad channel (%d)", DMAchannel);
 
-   gpioCfg.DMAprimaryChannel = channel;
+   gpioCfg.DMAprimaryChannel = DMAchannel;
 
    return 0;
 }
@@ -6821,11 +7943,11 @@ int gpioCfgSocketPort(unsigned port)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioCfgInternals(unsigned what, int value)
+int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
 {
    int retVal = PI_BAD_CFG_INTERNAL;
 
-   DBG(DBG_USER, "what=%u, value=%d", what, value);
+   DBG(DBG_USER, "cfgWhat=%u, cfgVal=%d", cfgWhat, cfgVal);
 
    CHECK_NOT_INITED;
 
@@ -6844,13 +7966,13 @@ int gpioCfgInternals(unsigned what, int value)
    997413601
    */
 
-   switch(what)
+   switch(cfgWhat)
    {
       case 562484977:
 
-         gpioCfg.showStats = value;
+         gpioCfg.showStats = cfgVal;
 
-         DBG(DBG_ALWAYS, "showStats is %u", value);
+         DBG(DBG_ALWAYS, "showStats is %u", cfgVal);
 
          retVal = 0;
 
@@ -6858,13 +7980,13 @@ int gpioCfgInternals(unsigned what, int value)
 
       case 984762879:
 
-         if (value < DBG_ALWAYS) value = DBG_ALWAYS;
+         if (cfgVal < DBG_ALWAYS) cfgVal = DBG_ALWAYS;
 
-         if (value > DBG_MAX_LEVEL) value = DBG_MAX_LEVEL;
+         if (cfgVal > DBG_MAX_LEVEL) cfgVal = DBG_MAX_LEVEL;
 
-         gpioCfg.dbgLevel = value;
+         gpioCfg.dbgLevel = cfgVal;
 
-         DBG(DBG_ALWAYS, "Debug level is %u", value);
+         DBG(DBG_ALWAYS, "Debug level is %u", cfgVal);
 
          retVal = 0;
 
