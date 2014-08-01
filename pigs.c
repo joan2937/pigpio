@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 16+
+This version is for pigpio version 17+
 */
 
 #include <stdio.h>
@@ -64,8 +64,6 @@ void fatal(char *fmt, ...)
    fprintf(stderr, "%s\n", buf);
 
    fflush(stderr);
-
-   exit(EXIT_FAILURE);
 }
 
 static int openSocket(void)
@@ -118,16 +116,17 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
    switch (rv)
    {
       case 0:
-         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-         break;
-
       case 1:
-         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
+         if (r < 0)
+         {
+            printf("%d\n", r);
+            fatal("ERROR: %s", cmdErrStr(r));
+         }
          break;
 
       case 2:
+         printf("%d\n", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-         else printf("%d\n", r);
          break;
 
       case 3:
@@ -142,29 +141,32 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          printf(cmdUsage);
          break;
 
-      case 6: /* SLR I2CRD */
+      case 6: /* I2CPK I2CRD I2CRI I2CRK SERR SLR SPIX SPIR */
+         printf("%d", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-         else if (r > 0)
+         if (r > 0)
          {
-            write(1, response_buf, r);
+            for (i=0; i<r; i++)
+            {
+               printf(" %hhu", response_buf[i]);
+            }
          }
+         printf("\n");
          break;
 
       case 7: /* PROCP */
+         printf("%d", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-         else
+         if (r >= 0)
          {
-            printf("%d", r);
-
             p = (uint32_t *)response_buf;
 
             for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
             {
                printf(" %d", p[i]);
             }
-
-            printf("\n");
          }
+         printf("\n");
          break;
    }
 }

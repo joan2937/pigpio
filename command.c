@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 16+
+This version is for pigpio version 17+
 */
 
 #include <stdio.h>
@@ -91,20 +91,20 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_NO,    "NO",    101, 2}, // gpioNotifyOpen
    {PI_CMD_NP,    "NP",    112, 0}, // gpioNotifyPause
 
-   {PI_CMD_PARSE, "PARSE", 115, 2}, // cmdParseScript
+   {PI_CMD_PARSE, "PARSE", 115, 0}, // cmdParseScript
 
    {PI_CMD_PFG,   "PFG",   112, 2}, // gpioGetPWMfrequency
    {PI_CMD_PFS,   "PFS",   121, 2}, // gpioSetPWMfrequency
 
    {PI_CMD_PIGPV, "PIGPV", 101, 4}, // gpioVersion
 
-   {PI_CMD_PRG,   "PRG",   112, 2}, // gpioGetPWMrangeg
+   {PI_CMD_PRG,   "PRG",   112, 2}, // gpioGetPWMrange
 
    {PI_CMD_PROC,  "PROC",  115, 2}, // gpioStoreScript
-   {PI_CMD_PROCD, "PROCD", 112, 2}, // gpioDeleteScript
+   {PI_CMD_PROCD, "PROCD", 112, 0}, // gpioDeleteScript
    {PI_CMD_PROCP, "PROCP", 112, 7}, // gpioScriptStatus
-   {PI_CMD_PROCR, "PROCR", 191, 2}, // gpioRunScript
-   {PI_CMD_PROCS, "PROCS", 112, 2}, // gpioStopScript
+   {PI_CMD_PROCR, "PROCR", 191, 0}, // gpioRunScript
+   {PI_CMD_PROCS, "PROCS", 112, 0}, // gpioStopScript
 
    {PI_CMD_PRRG,  "PRRG",  112, 2}, // gpioGetPWMrealRange
    {PI_CMD_PRS,   "PRS",   121, 2}, // gpioSetPWMrange
@@ -129,13 +129,13 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_SERVO, "SERVO", 121, 0}, // gpioServo
 
    {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
-   {PI_CMD_SLRC,  "SLRC",  112, 2}, // gpioSerialReadClose
-   {PI_CMD_SLRO,  "SLRO",  121, 2}, // gpioSerialReadOpen
+   {PI_CMD_SLRC,  "SLRC",  112, 0}, // gpioSerialReadClose
+   {PI_CMD_SLRO,  "SLRO",  121, 0}, // gpioSerialReadOpen
 
    {PI_CMD_SPIC,  "SPIC",  112, 0}, // spiClose
    {PI_CMD_SPIO,  "SPIO",  131, 2}, // spiOpen
    {PI_CMD_SPIR,  "SPIR",  121, 6}, // spiRead
-   {PI_CMD_SPIW,  "SPIW",  193, 2}, // spiWrite
+   {PI_CMD_SPIW,  "SPIW",  193, 0}, // spiWrite
    {PI_CMD_SPIX,  "SPIX",  193, 6}, // spiXfer
 
    {PI_CMD_TICK,  "T",     101, 4}, // gpioTick
@@ -153,11 +153,11 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_WVBSY, "WVBSY", 101, 2}, // gpioWaveTxBusy
    {PI_CMD_WVCLR, "WVCLR", 101, 0}, // gpioWaveClear
    {PI_CMD_WVCRE, "WVCRE", 101, 2}, // gpioWaveCreate
-   {PI_CMD_WVDEL, "WVDEL", 112, 2}, // gpioWaveDelete
+   {PI_CMD_WVDEL, "WVDEL", 112, 0}, // gpioWaveDelete
    {PI_CMD_WVGO,  "WVGO" , 101, 2}, // gpioWaveTxStart
    {PI_CMD_WVGOR, "WVGOR", 101, 2}, // gpioWaveTxStart
-   {PI_CMD_WVHLT, "WVHLT", 101, 2}, // gpioWaveTxStop
-   {PI_CMD_WVNEW, "WVNEW", 101, 2}, // gpioWaveAddNew
+   {PI_CMD_WVHLT, "WVHLT", 101, 0}, // gpioWaveTxStop
+   {PI_CMD_WVNEW, "WVNEW", 101, 0}, // gpioWaveAddNew
    {PI_CMD_WVSC,  "WVSC",  112, 2}, // gpioWaveGet*Cbs
    {PI_CMD_WVSM,  "WVSM",  112, 2}, // gpioWaveGet*Micros
    {PI_CMD_WVSP,  "WVSP",  112, 2}, // gpioWaveGet*Pulses
@@ -237,7 +237,7 @@ I2CRW h r        smb Read Word Data: read word from register.\n\
 \n\
 I2CWB h r bv     smb Write Byte Data: write byte to register.\n\
 I2CWD h bvs      i2c Write data.\n\
-I2CWI h          smb Write I2C Block Data.\n\
+I2CWI h r bvs    smb Write I2C Block Data.\n\
 I2CWK h r bvs    smb Write Block Data: write data to register.\n\
 I2CWQ h bit      smb Write Quick: write bit.\n\
 I2CWS h bv       smb Write Byte: write byte.\n\
@@ -373,7 +373,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_LEVEL        , "level not 0-1"},
    {PI_BAD_PUD          , "pud not 0-2"},
    {PI_BAD_PULSEWIDTH   , "pulsewidth not 0 or 500-2500"},
-   {PI_BAD_DUTYCYCLE    , "dutycycle outside set range"},
+   {PI_BAD_DUTYCYCLE    , "dutycycle not 0-range (default 255)"},
    {PI_BAD_TIMER        , "timer not 0-9"},
    {PI_BAD_MS           , "ms not 10-60000"},
    {PI_BAD_TIMETYPE     , "timetype not 0-1"},
@@ -390,7 +390,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_SIGNUM       , "signum not 0-63"},
    {PI_BAD_PATHNAME     , "can't open pathname"},
    {PI_NO_HANDLE        , "no handle available"},
-   {PI_BAD_HANDLE       , "unknown notify handle"},
+   {PI_BAD_HANDLE       , "unknown handle"},
    {PI_BAD_IF_FLAGS     , "ifFlags > 3"},
    {PI_BAD_CHANNEL      , "DMA channel not 0-14"},
    {PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"},

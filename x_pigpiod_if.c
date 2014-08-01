@@ -382,6 +382,7 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 13, c, 6158704, 0, "wave get micros");
 
    c = wave_get_high_micros();
+   if (c >= 6158704) c = 6158704;
    CHECK(5, 14, c, 6158704, 0, "wave get high micros");
 
    c = wave_get_max_micros();
@@ -548,21 +549,27 @@ void t9()
    p1 GPIO
    */
    char *script="\
-   lda p0\
-   sta v0\
+   ld p9 p0\
    tag 0\
    w p1 1\
    mils 5\
    w p1 0\
    mils 5\
-   dcr v0\
-   lda v0\
-   sta p9\
+   dcr p9\
    jp 0";
 
    callback(GPIO, RISING_EDGE, t9cbf);
 
    s = store_script(script);
+
+   /* Wait for script to finish initing. */
+   while (1)
+   {
+      time_sleep(0.1);
+      e = script_status(s, p);
+      if (e != PI_SCRIPT_INITING) break;
+   }
+
    oc = t9_count;
    p[0] = 99;
    p[1] = GPIO;
@@ -577,9 +584,9 @@ void t9()
    run_script(s, 2, p);
    while (1)
    {
+      time_sleep(0.1);
       e = script_status(s, p);
       if (e != PI_SCRIPT_RUNNING) break;
-      time_sleep(0.5);
    }
    c = t9_count - oc;
    time_sleep(0.1);
@@ -591,10 +598,10 @@ void t9()
    run_script(s, 2, p);
    while (1)
    {
+      time_sleep(0.1);
       e = script_status(s, p);
       if (e != PI_SCRIPT_RUNNING) break;
       if (p[9] < 1900) stop_script(s);
-      time_sleep(0.1);
    }
    c = t9_count - oc;
    time_sleep(0.1);

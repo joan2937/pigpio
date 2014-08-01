@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 #*** WARNING ************************************************
 #*                                                          *
@@ -37,6 +37,8 @@ def t0():
    print("pigpio version {}.".format(pi.get_pigpio_version()))
 
    print("Hardware revision {}.".format(pi.get_hardware_revision()))
+
+   print("Python version {}.".format(sys.version.replace("\n", " ")))
 
 def t1():
 
@@ -96,7 +98,7 @@ def t2():
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 3, f, 40, 5, "set PWM dutycycle, callback")
+   CHECK(2, 3, f, 40, 10, "set PWM dutycycle, callback")
 
    pi.set_PWM_frequency(GPIO,100)
    f = pi.get_PWM_frequency(GPIO)
@@ -106,7 +108,7 @@ def t2():
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 5, f, 400, 1, "callback")
+   CHECK(2, 5, f, 400, 5, "callback")
 
    pi.set_PWM_frequency(GPIO,1000)
    f = pi.get_PWM_frequency(GPIO)
@@ -116,7 +118,7 @@ def t2():
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 7, f, 4000, 1, "callback")
+   CHECK(2, 7, f, 4000, 5, "callback")
 
    r = pi.get_PWM_range(GPIO)
    CHECK(2, 8, r, 255, 0, "get PWM range")
@@ -489,7 +491,7 @@ def t7():
    oc = t7_count
    time.sleep(2)
    c = t7_count - oc
-   CHECK(7, 1, c, 200, 1, "set watchdog on count")
+   CHECK(7, 1, c, 200, 5, "set watchdog on count")
 
    pi.set_watchdog(GPIO, 0) # 0 switches watchdog off
    time.sleep(0.5)
@@ -549,21 +551,26 @@ def t9():
    # p0 number of loops
    # p1 GPIO
    script="""
-   lda p0
-   sta v0
+   ld p9 p0
    tag 0
    w p1 1
    mils 5
    w p1 0
    mils 5
-   dcr v0
-   lda v0
-   sta p9
+   dcr p9
    jp 0"""
 
    t9cb = pi.callback(GPIO)
 
    s = pi.store_script(script)
+
+   # Ensure the script has finished initing.
+   while True:
+      time.sleep(0.1)
+      e, p = pi.script_status(s)
+      if e != pigpio.PI_SCRIPT_INITING:
+         break
+
    oc = t9cb.tally()
    pi.run_script(s, [99, GPIO])
    time.sleep(2)

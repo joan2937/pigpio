@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 4 */
+/* PIGPIOD_IF_VERSION 6 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +42,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <sys/select.h>
 
 #include <arpa/inet.h>
@@ -133,7 +134,7 @@ static int pigpio_command_ext
 
 static int pigpioOpenSocket(char *addr, char *port)
 {
-   int sock, err;
+   int sock, err, opt;
    struct addrinfo hints, *res, *rp;
    const char *addrStr, *portStr;
 
@@ -174,6 +175,10 @@ static int pigpioOpenSocket(char *addr, char *port)
       sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
       if (sock == -1) continue;
+
+      /* Disable the Nagle algorithm. */
+      opt = 1;
+      setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
 
       if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) break;
    }
@@ -289,17 +294,17 @@ static void findNotifyBits(void)
    }
 }
 
-static void _wfe(unsigned gpio, unsigned level, uint32_t tick, void *user)
+static void _wfe(unsigned user_gpio, unsigned level, uint32_t tick, void *user)
 {
    *(int *)user = 1;
 }
 
-static int intCallback(unsigned gpio, unsigned edge, void *f, void *user, int ex)
+static int intCallback(unsigned user_gpio, unsigned edge, void *f, void *user, int ex)
 {
    static int id = 0;
    callback_t *p;
 
-   if ((gpio >=0) && (gpio < 32) && (edge >=0) && (edge <= 2) && f)
+   if ((user_gpio >=0) && (user_gpio < 32) && (edge >=0) && (edge <= 2) && f)
    {
       /* prevent duplicates */
 
@@ -307,7 +312,7 @@ static int intCallback(unsigned gpio, unsigned edge, void *f, void *user, int ex
 
       while (p)
       {
-         if ((p->gpio == gpio) && (p->edge == edge) && (p->f == f))
+         if ((p->gpio == user_gpio) && (p->edge == edge) && (p->f == f))
          {
             return pigif_duplicate_callback;
          }
@@ -321,7 +326,7 @@ static int intCallback(unsigned gpio, unsigned edge, void *f, void *user, int ex
          if (!gCallBackFirst) gCallBackFirst = p;
 
          p->id = id++;
-         p->gpio = gpio;
+         p->gpio = user_gpio;
          p->edge = edge;
          p->f = f;
          p->user = user;
@@ -375,12 +380,12 @@ void time_sleep(double seconds)
    }
 }
 
-const char *pigpio_error(int error)
+char *pigpio_error(int errnum)
 {
-   if (error > -1000) return cmdErrStr(error);
+   if (errnum > -1000) return cmdErrStr(errnum);
    else
    {
-      switch(error)
+      switch(errnum)
       {
          case pigif_bad_send:
             return "failed to send to pigpiod";
@@ -415,7 +420,7 @@ unsigned pigpiod_if_version(void)
    return PIGPIOD_IF_VERSION;
 }
 
-pthread_t *start_thread(gpioThreadFunc_t func, void *arg)
+pthread_t *start_thread(gpioThreadFunc_t thread_func, void *arg)
 {
    pthread_t *pth;
    pthread_attr_t pthAttr;
@@ -438,7 +443,7 @@ pthread_t *start_thread(gpioThreadFunc_t func, void *arg)
          return NULL;
       }
 
-      if (pthread_create(pth, &pthAttr, func, arg))
+      if (pthread_create(pth, &pthAttr, thread_func, arg))
       {
          perror("pthread_create socket failed");
          free(pth);
@@ -543,8 +548,8 @@ int gpio_write(unsigned gpio, unsigned level)
 int set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle)
    {return pigpio_command(gPigCommand, PI_CMD_PWM, user_gpio, dutycycle);}
 
-int set_PWM_range(unsigned user_gpio, unsigned range_)
-   {return pigpio_command(gPigCommand, PI_CMD_PRS, user_gpio, range_);}
+int set_PWM_range(unsigned user_gpio, unsigned range)
+   {return pigpio_command(gPigCommand, PI_CMD_PRS, user_gpio, range);}
 
 int get_PWM_range(unsigned user_gpio)
    {return pigpio_command(gPigCommand, PI_CMD_PRG, user_gpio, 0);}
@@ -631,12 +636,13 @@ int wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)
 }
 
 int wave_add_serial(
-   unsigned gpio, unsigned baud, unsigned offset, unsigned numChar, char *str)
+   unsigned user_gpio, unsigned baud, unsigned offset,
+   unsigned numChar, char *str)
 {
    gpioExtent_t ext[3];
 
    /*
-   p1=gpio
+   p1=user_gpio
    p2=baud
    p3=len+4
    ## extension ##
@@ -653,7 +659,7 @@ int wave_add_serial(
    ext[1].ptr = str;
 
    return pigpio_command_ext(
-      gPigCommand, PI_CMD_WVAS, gpio, baud, numChar+4, 2, ext);
+      gPigCommand, PI_CMD_WVAS, user_gpio, baud, numChar+4, 2, ext);
 }
 
 int wave_create(void)
@@ -707,12 +713,12 @@ int wave_get_high_cbs(void)
 int wave_get_max_cbs(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVSC, 2, 0);}
 
-int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level)
+int gpio_trigger(unsigned user_gpio, unsigned pulseLen, unsigned level)
 {
    gpioExtent_t ext[1];
    
    /*
-   p1=gpio
+   p1=user_gpio
    p2=pulseLen
    p3=4
    ## extension ##
@@ -723,7 +729,7 @@ int gpio_trigger(unsigned gpio, unsigned pulseLen, unsigned level)
    ext[0].ptr = &level;
 
    return pigpio_command_ext(
-      gPigCommand, PI_CMD_TRIG, gpio, pulseLen, 4, 1, ext);
+      gPigCommand, PI_CMD_TRIG, user_gpio, pulseLen, 4, 1, ext);
 }
 
 int store_script(char *script)
@@ -792,14 +798,14 @@ int stop_script(unsigned script_id)
 int delete_script(unsigned script_id)
    {return pigpio_command(gPigCommand, PI_CMD_PROCD, script_id, 0);}
 
-int bb_serial_read_open(unsigned gpio, unsigned baud)
-   {return pigpio_command(gPigCommand, PI_CMD_SLRO, gpio, baud);}
+int bb_serial_read_open(unsigned user_gpio, unsigned baud)
+   {return pigpio_command(gPigCommand, PI_CMD_SLRO, user_gpio, baud);}
 
-int bb_serial_read(unsigned gpio, void *buf, size_t bufSize)
+int bb_serial_read(unsigned user_gpio, void *buf, size_t bufSize)
 {
    int bytes;
 
-   bytes = pigpio_command(gPigCommand, PI_CMD_SLR, gpio, bufSize);
+   bytes = pigpio_command(gPigCommand, PI_CMD_SLR, user_gpio, bufSize);
 
    if (bytes > 0)
    {
@@ -809,26 +815,26 @@ int bb_serial_read(unsigned gpio, void *buf, size_t bufSize)
    return bytes;
 }
 
-int bb_serial_read_close(unsigned gpio)
-   {return pigpio_command(gPigCommand, PI_CMD_SLRC, gpio, 0);}
+int bb_serial_read_close(unsigned user_gpio)
+   {return pigpio_command(gPigCommand, PI_CMD_SLRC, user_gpio, 0);}
 
-int i2c_open(unsigned bus, unsigned addr, unsigned flags)
+int i2c_open(unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags)
 {
    gpioExtent_t ext[1];
 
    /*
-   p1=bus
-   p2=addr
+   p1=i2c_bus
+   p2=i2c_addr
    p3=4
    ## extension ##
-   uint32_t flags
+   uint32_t i2c_flags
    */
 
    ext[0].size = 4;
-   ext[0].ptr = &flags;
+   ext[0].ptr = &i2c_flags;
 
    return pigpio_command_ext
-      (gPigCommand, PI_CMD_I2CO, bus, addr, 4, 1, ext);
+      (gPigCommand, PI_CMD_I2CO, i2c_bus, i2c_addr, 4, 1, ext);
 }
 
 int i2c_close(unsigned handle)
@@ -857,7 +863,7 @@ int i2c_write_device(unsigned handle, char *buf, unsigned count)
    p2=0
    p3=count
    ## extension ##
-   char buf[count] flags
+   char buf[count]
    */
 
    ext[0].size = count;
@@ -1201,11 +1207,11 @@ int serial_read(unsigned handle, char *buf, unsigned count)
 int serial_data_available(unsigned handle)
    {return pigpio_command(gPigCommand, PI_CMD_SERDA, handle, 0);}
 
-int callback(unsigned gpio, unsigned edge, CBFunc_t f)
-   {return intCallback(gpio, edge, f, 0, 0);}
+int callback(unsigned user_gpio, unsigned edge, CBFunc_t f)
+   {return intCallback(user_gpio, edge, f, 0, 0);}
 
-int callback_ex(unsigned gpio, unsigned edge, CBFuncEx_t f, void *user)
-   {return intCallback(gpio, edge, f, user, 1);}
+int callback_ex(unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *user)
+   {return intCallback(user_gpio, edge, f, user, 1);}
 
 int callback_cancel(unsigned id)
 {
@@ -1234,7 +1240,7 @@ int callback_cancel(unsigned id)
    return pigif_callback_not_found;
 }
 
-int wait_for_edge(unsigned gpio, unsigned edge, double timeout)
+int wait_for_edge(unsigned user_gpio, unsigned edge, double timeout)
 {
    int triggered = 0;
    int id;
@@ -1244,7 +1250,7 @@ int wait_for_edge(unsigned gpio, unsigned edge, double timeout)
 
    due = time_time() + timeout;
 
-   id = callback_ex(gpio, edge, _wfe, &triggered);
+   id = callback_ex(user_gpio, edge, _wfe, &triggered);
 
    while (!triggered && (time_time() < due)) time_sleep(0.1);
 

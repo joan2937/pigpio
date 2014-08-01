@@ -86,7 +86,7 @@ s=$(pigs pfs $GPIO 800)
 if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 s=$(pigs pigpv)
-if [[ $s = 16 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 17 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 s=$(pigs prs $GPIO 255)
 if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi
@@ -99,21 +99,23 @@ then echo "PROC($p) ok"
 else echo "PROC($p) fail ($s)"
 fi
 
+sleep 0.1 # Make sure script has time to intialise.
+
 s=$(pigs procr $p 9876)
-if [[ $s = 0 ]]; then echo "PROCR($p) ok"; else echo "PROCR($p) fail ($s)"; fi
+if [[ $s = "" ]]; then echo "PROCR($p) ok"; else echo "PROCR($p) fail ($s)"; fi
 
 s=$(pigs procp $p)
 v=(${s// / })
-if [[ ${v[0]} = 1 && ${v[1]} = 1234 && ${v[2]} = 9876 ]]
+if [[ ${v[0]} = 2 && ${v[1]} = 1234 && ${v[2]} = 9876 ]]
 then echo "PROCP($p) ok"
 else echo "PROCP($p) fail ($s)"
 fi
 
 s=$(pigs procs $p)
-if [[ $s = 0 ]]; then echo "PROCS($p) ok"; else echo "PROCS($p) fail ($s)"; fi
+if [[ $s = "" ]]; then echo "PROCS($p) ok"; else echo "PROCS($p) fail ($s)"; fi
 
 s=$(pigs procd $p)
-if [[ $s = 0 ]]; then echo "PROCD($p) ok"; else echo "PROCD($p) fail ($s)"; fi
+if [[ $s = "" ]]; then echo "PROCD($p) ok"; else echo "PROCD($p) fail ($s)"; fi
 
 s=$(pigs prrg $GPIO)
 if [[ $s = 250 ]]; then echo "PRRG ok"; else echo "PRRG fail ($s)"; fi
@@ -170,7 +172,7 @@ if [[ $s = "" ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 s=$(pigs wvclr)
 if [[ $s = "" ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
 s=$(pigs slro $GPIO 1200)
-if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
+if [[ $s = "" ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
 s=$(pigs wvas $GPIO 1200 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e)
 if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 s=$(pigs m $GPIO w)
@@ -179,12 +181,13 @@ s=$(pigs wvgo)
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
 sleep 0.1
 s=$(pigs slr $GPIO 100)
-if [[ $s = "my name is joan" ]]
+e="15 109 121 32 110 97 109 101 32 105 115 32 106 111 97 110"
+if [[ $s = $e ]]
 then echo "SLR-f ok"
 else echo "SLR-f fail with [$s]"
 fi
 s=$(pigs slrc $GPIO)
-if [[ $s = 0 ]]; then echo "SLR-g ok"; else echo "SLR-g fail ($s)"; fi
+if [[ $s = "" ]]; then echo "SLR-g ok"; else echo "SLR-g fail ($s)"; fi
 
 t=$(pigs t tick)
 v=(${t// / })
@@ -233,7 +236,7 @@ sleep 1
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-b ok"; else echo "WVBSY-b fail ($s)"; fi
 s=$(pigs wvhlt)
-if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+if [[ $s = "" ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
 s=$(pigs wvgor)
@@ -241,7 +244,7 @@ if [[ $s = 621 ]]; then echo "WVGOR ok"; else echo "WVGOR fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
 s=$(pigs wvhlt)
-if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
+if [[ $s = "" ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 0 ]]; then echo "WVBSY-e ok"; else echo "WVBSY-e fail ($s)"; fi
 

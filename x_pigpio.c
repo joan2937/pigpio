@@ -561,16 +561,13 @@ void t9()
    p1 GPIO
    */
    char *script="\
-   lda p0\
-   sta v0\
+   ld p9 p0\
    tag 0\
    w p1 1\
    mils 5\
    w p1 0\
    mils 5\
-   dcr v0\
-   lda v0\
-   sta p9\
+   dcr p9\
    jp 0";
 
    printf("Script store/run/status/stop/delete tests.\n");
@@ -580,7 +577,15 @@ void t9()
    gpioSetAlertFunc(GPIO, t9cbf);
 
    s = gpioStoreScript(script);
-   time_sleep(0.1);
+
+   while (1)
+   {
+      /* loop until script initialised */
+      time_sleep(0.1);
+      e = gpioScriptStatus(s, p);
+      if (e != PI_SCRIPT_INITING) break;
+   }
+
    oc = t9_count;
    p[0] = 99;
    p[1] = GPIO;

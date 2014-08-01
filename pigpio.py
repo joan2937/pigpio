@@ -2,57 +2,51 @@
 pigpio is a Python module for the Raspberry which allows control
 of the general purpose input outputs (gpios).
 
-http://abyz.co.uk/rpi/pigpio/python.html
+[http://abyz.co.uk/rpi/pigpio/python.html]
 
-Features
+*Features*
 
-The pigpio module's main features are:
+o pigpio Python module can be running on Windows, Macs, or Linux
 
-- controlling the gpios of one or more Pi's
+o controls one or more Pi's
 
-- PWM on any of gpios 0-31 simultaneously
+o independent PWM on any of gpios 0-31 simultaneously
 
-- servo pulses on any of gpios 0-31 simultaneously
+o independent servo pulses on any of gpios 0-31 simultaneously
 
-- callbacks when any of gpios 0-31 change state
+o callbacks when any of gpios 0-31 change state
 
-- creating and transmitting precisely timed waveforms
+o creating and transmitting precisely timed waveforms
 
-- reading/writing gpios and setting their modes
+o reading/writing gpios and setting their modes
 
-- wrappers for I2C, SPI, and serial links
+o wrappers for I2C, SPI, and serial links
 
-- creating and running scripts on the pigpio daemon
+o creating and running scripts on the pigpio daemon
 
-Notes
+*gpios*
+
+ALL gpios are identified by their Broadcom number.
+
+*Notes*
 
 Transmitted waveforms are accurate to a microsecond.
 
 Callback level changes are time-stamped and will be
 accurate to within a few microseconds.
 
-ALL gpios are identified by their Broadcom number.
-
-This module uses the services of the C pigpio library.  pigpio
-must be running on the Pi whose gpios are to be manipulated.
-
-The normal way to start pigpio is as a daemon (during system
-start).
-
-sudo pigpiod
-
-Settings
+*Settings*
 
 A number of settings are determined when the pigpio daemon is started.
 
-- the sample rate (1, 2, 4, 5, 8, or 10us, default 5us).
+o the sample rate (1, 2, 4, 5, 8, or 10us, default 5us).
 
-- the set of gpios which may be updated (generally written to).  The
-  default set is those listed above for the Rev.1 or Rev.2 boards.
+o the set of gpios which may be updated (generally written to).  The
+  default set is those available on the Pi board revision.
 
-- the available PWM frequencies (see set_PWM_frequency).
+o the available PWM frequencies (see [*set_PWM_frequency*]).
 
-Exceptions
+*Exceptions*
 
 By default a fatal exception is raised if you pass an invalid
 argument to a pigpio function.
@@ -60,7 +54,26 @@ argument to a pigpio function.
 If you wish to handle the returned status yourself you should set
 pigpio.exceptions to False.
 
-USAGE
+You may prefer to check the returned status in only a few parts
+of your code.  In that case do the following.
+
+...
+pigpio.exceptions = False
+
+# Code where you want to test the error status.
+
+pigpio.exceptions = True
+...
+
+*Usage*
+
+This module uses the services of the C pigpio library.  pigpio
+must be running on the Pi(s) whose gpios are to be manipulated.
+
+The normal way to start pigpio is as a daemon (during system
+start).
+
+sudo pigpiod
 
 Your Python program must import pigpio and create one or more
 instances of the pigpio.pi class.  This class gives access to
@@ -68,19 +81,18 @@ a specified Pi's gpios.
 
 ...
 pi1 = pigpio.pi()       # pi1 accesses the local Pi's gpios
-pi2 = pigpio.pi('hard') # pi2 accesses hard's gpios
-pi3 = pigpio.pi('soft') # pi3 accesses soft's gpios
+pi2 = pigpio.pi('tom')  # pi2 accesses tom's gpios
+pi3 = pigpio.pi('dick') # pi3 accesses dick's gpios
 
 pi1.write(4, 0) # set local Pi's gpio 4 low
-pi2.write(4, 1) # set hard's gpio 4 to high
-pi3.read(4)     # get level of soft's gpio 4
+pi2.write(4, 1) # set tom's gpio 4 to high
+pi3.read(4)     # get level of dick's gpio 4
 ...
 
 The later example code snippets assume that pi is an instance of
 the pigpio.pi class.
 
 OVERVIEW
-
 
 Essential
 
@@ -234,7 +246,7 @@ import os
 import atexit
 import codecs
 
-VERSION = "1.6"
+VERSION = "1.7"
 
 exceptions = True
 
@@ -275,10 +287,11 @@ PUD_UP   = 2
 
 # script run status
 
-PI_SCRIPT_HALTED =0
-PI_SCRIPT_RUNNING=1
-PI_SCRIPT_WAITING=2
-PI_SCRIPT_FAILED =3
+PI_SCRIPT_INITING=0
+PI_SCRIPT_HALTED =1
+PI_SCRIPT_RUNNING=2
+PI_SCRIPT_WAITING=3
+PI_SCRIPT_FAILED =4
 
 # pigpio command numbers
 
@@ -483,7 +496,7 @@ _errors=[
    [PI_BAD_LEVEL         , "level not 0-1"],
    [PI_BAD_PUD           , "pud not 0-2"],
    [PI_BAD_PULSEWIDTH    , "pulsewidth not 0 or 500-2500"],
-   [PI_BAD_DUTYCYCLE     , "dutycycle not 0-255"],
+   [PI_BAD_DUTYCYCLE     , "dutycycle not 0-range (default 255)"],
    [_PI_BAD_TIMER        , "timer not 0-9"],
    [_PI_BAD_MS           , "ms not 10-60000"],
    [_PI_BAD_TIMETYPE     , "timetype not 0-1"],
@@ -500,7 +513,7 @@ _errors=[
    [_PI_BAD_SIGNUM       , "signum not 0-63"],
    [_PI_BAD_PATHNAME     , "can't open pathname"],
    [PI_NO_HANDLE         , "no handle available"],
-   [PI_BAD_HANDLE        , "unknown notify handle"],
+   [PI_BAD_HANDLE        , "unknown handle"],
    [_PI_BAD_IF_FLAGS     , "ifFlags > 3"],
    [_PI_BAD_CHANNEL      , "DMA channel not 0-14"],
    [_PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"],
@@ -936,7 +949,7 @@ class pi():
       user_gpio:= 0-31.
       dutycycle:= 0-range (range defaults to 255).
 
-      The set_PWM_range function can change the default range of 255.
+      The [*set_PWM_range*] function can change the default range of 255.
 
       ...
       pi.set_PWM_dutycycle(4,   0) # PWM off
@@ -1069,13 +1082,14 @@ class pi():
       A notification is a method for being notified of gpio state
       changes via a pipe.
 
-      Pipes are only accessible from the local machine so this 
+      Pipes are only accessible from the local machine so this
       function serves no purpose if you are using Python from a
       remote machine.  The in-built (socket) notifications
-      provided by callback should be used instead.
+      provided by [*callback*] should be used instead.
 
       Notifications for handle x will be available at the pipe
       named /dev/pigpiox (where x is the handle number).
+
       E.g. if the function returns 15 then the notifications must be
       read from /dev/pigpio15.
 
@@ -1101,7 +1115,7 @@ class pi():
       """
       Starts notifications on a handle.
 
-      handle:= >=0 (as returned by a prior call to notify_open)
+      handle:= >=0 (as returned by a prior call to [*notify_open*])
         bits:= a 32 bit mask indicating the gpios to be notified.
 
       The notification sends state changes for each gpio whose
@@ -1122,10 +1136,10 @@ class pi():
       """
       Pauses notifications on a handle.
 
-      handle:= >=0 (as returned by a prior call to notify_open)
+      handle:= >=0 (as returned by a prior call to [*notify_open*])
 
       Notifications for the handle are suspended until
-      notify_begin is called again.
+      [*notify_begin*] is called again.
 
       ...
       h = pi.notify_open()
@@ -1144,7 +1158,7 @@ class pi():
       """
       Stops notifications on a handle and releases the handle for reuse.
 
-      handle:= >=0 (as returned by a prior call to notify_open)
+      handle:= >=0 (as returned by a prior call to [*notify_open*])
 
       ...
       h = pi.notify_open()
@@ -1303,13 +1317,17 @@ class pi():
       The revision number can be used to determine the assignment
       of gpios to pins.
 
-      There are at least two types of board.
+      There are at least three types of board.
 
       Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13
       (revision numbers 2 and 3).
 
       Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13,
       and gpios 28-31 on P5 (revision numbers of 4, 5, 6, and 15).
+
+      Type 3 has a 40 pin connector rather than the 26 pin connector
+      of the earlier boards.  Gpios 0 to 27 are brought out to the
+      connector (revision number 16).
 
       If the hardware revision can not be found or is not a valid
       hexadecimal number the function returns 0.
@@ -1334,7 +1352,7 @@ class pi():
    def wave_clear(self):
       """
       Clears all waveforms and any data added by calls to the
-      wave_add_* functions.
+      [*wave_add_**] functions.
 
       ...
       pi.wave_clear()
@@ -1348,7 +1366,7 @@ class pi():
 
       You would not normally need to call this function as it is
       automatically called after a waveform is created with the
-      wave_create function.
+      [*wave_create*] function.
 
       ...
       pi.wave_add_new()
@@ -1483,28 +1501,28 @@ class pi():
    def wave_create(self):
       """
       Creates a waveform from the data provided by the prior calls
-      to the wave_add_* functions.
+      to the [*wave_add_**] functions.
 
       Returns a wave id (>=0) if OK.
 
-      The data provided by the wave_add_* functions is consumed by
+      The data provided by the [*wave_add_**] functions is consumed by
       this function.
 
       As many waveforms may be created as there is space available.
-      The wave id is passed to wave_send_* to specify the waveform
+      The wave id is passed to [*wave_send_**] to specify the waveform
       to transmit.
 
       Normal usage would be
 
-      Step 1. wave_clear to clear all waveforms and added data.
+      Step 1. [*wave_clear*] to clear all waveforms and added data.
 
-      Step 2. wave_add_* calls to supply the waveform data.
+      Step 2. [*wave_add_**] calls to supply the waveform data.
 
-      Step 3. wave_create to create the waveform and get a unique id
+      Step 3. [*wave_create*] to create the waveform and get a unique id
 
       Repeat steps 2 and 3 as needed.
 
-      Step 4. wave_send_* with the id of the waveform to transmit.
+      Step 4. [*wave_send_**] with the id of the waveform to transmit.
 
       A waveform comprises one or more pulses.
 
@@ -1531,7 +1549,7 @@ class pi():
       Deletes all created waveforms with ids greater than or equal
       to wave_id.
 
-      wave_id:= >=0 (as returned by a prior call to wave_create).
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
 
       Wave ids are allocated in order, 0, 1, 2, etc.
 
@@ -1547,7 +1565,7 @@ class pi():
       """
       This function is deprecated and will be removed.
 
-      Use wave_create/wave_send_* instead.
+      Use [*wave_create*]/[*wave_send_**] instead.
       """
       return _u2i(_pigpio_command(self._control, _PI_CMD_WVGO, 0, 0))
 
@@ -1555,7 +1573,7 @@ class pi():
       """
       This function is deprecated and will be removed.
 
-      Use wave_create/wave_send_* instead.
+      Use [*wave_create*]/[*wave_send_**] instead.
       """
       return _u2i(_pigpio_command(self._control, _PI_CMD_WVGOR, 0, 0))
 
@@ -1564,7 +1582,7 @@ class pi():
       Transmits the waveform with id wave_id.  The waveform is sent
       once.
 
-      wave_id:= >=0 (as returned by a prior call to wave_create).
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
 
       Returns the number of DMA control blocks used in the waveform.
 
@@ -1577,10 +1595,10 @@ class pi():
    def wave_send_repeat(self, wave_id):
       """
       Transmits the waveform with id wave_id.  The waveform repeats
-      until wave_tx_stop is called or another call to wave_send_*
+      until wave_tx_stop is called or another call to [*wave_send_**]
       is made.
 
-      wave_id:= >=0 (as returned by a prior call to wave_create).
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
 
       Returns the number of DMA control blocks used in the waveform.
 
@@ -1693,6 +1711,11 @@ class pi():
       i2c_address:= 0x08-0x77.
         i2c_flags:= 0, no flags are currently defined.
 
+      Normally you would only use the [*i2c_**] functions if
+      you are or will be connecting to the Pi over a network.  If
+      you will always run on the local Pi use the standard smbus
+      modules instead.
+
       ...
       h = pi.i2c_open(1, 0x53) # open device at address 0x53 on bus 1
       ...
@@ -1710,7 +1733,7 @@ class pi():
       """
       Closes the I2C device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
 
       ...
       pi.i2c_close(h)
@@ -1723,7 +1746,7 @@ class pi():
       Returns count bytes read from the raw device associated
       with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
        count:= >0, the number of bytes to read.
 
       The returned value is a tuple of the number of bytes read and a
@@ -1744,7 +1767,7 @@ class pi():
       """
       Writes the data bytes to the raw device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
         data:= the bytes to write.
 
       ...
@@ -1770,10 +1793,11 @@ class pi():
 
    def i2c_write_quick(self, handle, bit):
       """
-      Sends a single bit to the device associated with handle
-      (smbus 2.0 5.5.1 - Quick command).
+      Sends a single bit to the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.1 - Quick command.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          bit:= 0 or 1, the value to write.
 
       ...
@@ -1785,10 +1809,11 @@ class pi():
 
    def i2c_write_byte(self, handle, byte_val):
       """
-      Sends a single byte to the device associated with handle
-      (smbus 2.0 5.5.2 - Send byte).
+      Sends a single byte to the device associated with handle.
 
-        handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.2 - Send byte.
+
+        handle:= >=0 (as returned by a prior call to [*i2c_open*]).
       byte_val:= 0-255, the value to write.
 
       ...
@@ -1801,10 +1826,11 @@ class pi():
 
    def i2c_read_byte(self, handle):
       """
-      Reads a single byte from the device associated with handle
-      (smbus 2.0 5.5.3 - Receive byte).
+      Reads a single byte from the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.3 - Receive byte.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
 
       ...
       b = pi.i2c_read_byte(2) # read a byte from device 2
@@ -1815,9 +1841,11 @@ class pi():
    def i2c_write_byte_data(self, handle, reg, byte_val):
       """
       Writes a single byte to the specified register of the device
-      associated with handle (smbus 2.0 5.5.4 - Write byte).
+      associated with handle.
 
-        handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.4 - Write byte.
+
+        handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       byte_val:= 0-255, the value to write.
 
@@ -1841,9 +1869,11 @@ class pi():
    def i2c_write_word_data(self, handle, reg, word_val):
       """
       Writes a single 16 bit word to the specified register of the
-      device associated with handle (smbus 2.0 5.5.4 - Write word).
+      device associated with handle.
 
-        handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.4 - Write word.
+
+        handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       word_val:= 0-65535, the value to write.
 
@@ -1867,9 +1897,11 @@ class pi():
    def i2c_read_byte_data(self, handle, reg):
       """
       Reads a single byte from the specified register of the device
-      associated with handle (smbus 2.0 5.5.5 - Read byte).
+      associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.5 - Read byte.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
 
       ...
@@ -1885,9 +1917,11 @@ class pi():
    def i2c_read_word_data(self, handle, reg):
       """
       Reads a single 16 bit word from the specified register of the
-      device associated with handle (smbus 2.0 5.5.5 - Read word).
+      device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.5 - Read word.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
 
       ...
@@ -1903,10 +1937,11 @@ class pi():
    def i2c_process_call(self, handle, reg, word_val):
       """
       Writes 16 bits of data to the specified register of the device
-      associated with handle and reads 16 bits of data in return
-      (smbus 2.0 5.5.6 - Process call).
+      associated with handle and reads 16 bits of data in return.
 
-        handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.6 - Process call.
+
+        handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       word_val:= 0-65535, the value to write.
 
@@ -1927,9 +1962,11 @@ class pi():
    def i2c_write_block_data(self, handle, reg, data):
       """
       Writes up to 32 bytes to the specified register of the device
-      associated with handle (smbus 2.0 5.5.7 - Block write).
+      associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.7 - Block write.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
 
@@ -1957,9 +1994,11 @@ class pi():
    def i2c_read_block_data(self, handle, reg):
       """
       Reads a block of up to 32 bytes from the specified register of
-      the device associated with handle (smbus 2.0 5.5.7 - Block read).
+      the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.7 - Block read.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
 
       The amount of returned data is set by the device.
@@ -1986,10 +2025,11 @@ class pi():
       """
       Writes data bytes to the specified register of the device
       associated with handle and reads a device specified number
-      of bytes of data in return (smbus 2.0 5.5.8 -
-      Block write-block read).
+      of bytes of data in return.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      smbus 2.0 5.5.8 - Block write-block read.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
 
@@ -2028,7 +2068,7 @@ class pi():
       Writes data bytes to the specified register of the device
       associated with handle .  1-32 bytes may be written.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
 
@@ -2058,7 +2098,7 @@ class pi():
       Reads count bytes from the specified register of the device
       associated with handle .  The count may be 1-32.
 
-      handle:= >=0 (as returned by a prior call to i2c_open).
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
        count:= >0, the number of bytes to read.
 
@@ -2095,6 +2135,11 @@ class pi():
          spi_baud:= >0, the transmission rate in bits per second.
         spi_flags:= see below.
 
+      Normally you would only use the [*spi_**] functions if
+      you are or will be connecting to the Pi over a network.  If
+      you will always run on the local Pi use the standard SPI
+      modules instead.
+
       The bottom two bits of spi_flags define the SPI mode as
       follows.
 
@@ -2129,7 +2174,7 @@ class pi():
       """
       Closes the SPI device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to spi_open).
+      handle:= >=0 (as returned by a prior call to [*spi_open*]).
 
       ...
       pi.spi_close(h)
@@ -2141,7 +2186,7 @@ class pi():
       """
       Reads count bytes from the SPI device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to spi_open).
+      handle:= >=0 (as returned by a prior call to [*spi_open*]).
        count:= >0, the number of bytes to read.
 
       The returned value is a tuple of the number of bytes read and a
@@ -2167,7 +2212,7 @@ class pi():
       """
       Writes the data bytes to the SPI device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to spi_open).
+      handle:= >=0 (as returned by a prior call to [*spi_open*]).
         data:= the bytes to write.
 
       ...
@@ -2193,7 +2238,7 @@ class pi():
       Writes the data bytes to the SPI device associated with handle,
       returning the data bytes read from the device.
 
-      handle:= >=0 (as returned by a prior call to spi_open).
+      handle:= >=0 (as returned by a prior call to [*spi_open*]).
         data:= the bytes to write.
 
       The returned value is a tuple of the number of bytes read and a
@@ -2231,6 +2276,11 @@ class pi():
        ser_baud:= baud rate
       ser_flags:= 0, no flags are currently defined.
 
+      Normally you would only use the [*serial_**] functions if
+      you are or will be connecting to the Pi over a network.  If
+      you will always run on the local Pi use the standard serial
+      modules instead.
+
       ...
       h1 = pi.serial_open("/dev/ttyAMA0", 300)
 
@@ -2249,7 +2299,7 @@ class pi():
       """
       Closes the serial device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to serial_open).
+      handle:= >=0 (as returned by a prior call to [*serial_open*]).
 
       ...
       pi.serial_close(h1)
@@ -2261,7 +2311,7 @@ class pi():
       """
       Returns a single byte from the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to serial_open).
+      handle:= >=0 (as returned by a prior call to [*serial_open*]).
 
       ...
       b = pi.serial_read_byte(h1)
@@ -2273,7 +2323,7 @@ class pi():
       """
       Writes a single byte to the device associated with handle.
 
-        handle:= >=0 (as returned by a prior call to serial_open).
+        handle:= >=0 (as returned by a prior call to [*serial_open*]).
       byte_val:= 0-255, the value to write.
 
       ...
@@ -2289,7 +2339,7 @@ class pi():
       """
       Reads up to count bytes from the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to serial_open).
+      handle:= >=0 (as returned by a prior call to [*serial_open*]).
        count:= >0, the number of bytes to read.
 
       The returned value is a tuple of the number of bytes read and a
@@ -2313,7 +2363,7 @@ class pi():
       """
       Writes the data bytes to the device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to serial_open).
+      handle:= >=0 (as returned by a prior call to [*serial_open*]).
         data:= the bytes to write.
 
       ...
@@ -2340,7 +2390,7 @@ class pi():
       Returns the number of bytes available to be read from the
       device associated with handle.
 
-      handle:= >=0 (as returned by a prior call to serial_open).
+      handle:= >=0 (as returned by a prior call to [*serial_open*]).
 
       ...
       rdy = pi.serial_data_available(h1)
@@ -2441,6 +2491,7 @@ class pi():
       The run status may be
 
       . .
+      PI_SCRIPT_INITING
       PI_SCRIPT_HALTED
       PI_SCRIPT_RUNNING
       PI_SCRIPT_WAITING
@@ -2510,7 +2561,7 @@ class pi():
       """
       Returns data from the bit bang serial cyclic buffer.
 
-      user_gpio:= 0-31 (opened in a prior call to bb_serial_read_open)
+      user_gpio:= 0-31 (opened in a prior call to [*bb_serial_read_open*])
 
       The returned value is a tuple of the number of bytes read and a
       bytearray containing the bytes.  If there was an error the
@@ -2531,7 +2582,7 @@ class pi():
       """
       Closes a gpio for bit bang reading of serial data.
 
-      user_gpio:= 0-31 (opened in a prior call to bb_serial_read_open)
+      user_gpio:= 0-31 (opened in a prior call to [*bb_serial_read_open*])
 
       ...
       status = pi.bb_serial_read_close(17)
@@ -2607,11 +2658,11 @@ class pi():
       Grants access to a Pi's gpios.
 
       host:= the host name of the Pi on which the pigpio daemon is
-             running.  The default is localhost unless overwritten by
+             running.  The default is localhost unless overridden by
              the PIGPIO_ADDR environment variable.
        
       port:= the port number on which the pigpio daemon is listening.
-             The default is 8888 unless overwritten by the PIGPIO_PORT
+             The default is 8888 unless overridden by the PIGPIO_PORT
              environment variable.  The pigpio daemon must have been
              started with the same port number.
 
@@ -2637,9 +2688,13 @@ class pi():
 
       self._control = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+      # Disable the Nagle algorithm.
+      self._control.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
       try:
          self._control.connect((self._host, self._port))
          self._notify = _callback_thread(self._control, self._host, self._port)
+
       except socket.error:
          self.connected = False
          if self._control is not None:
@@ -2648,8 +2703,11 @@ class pi():
             h = "localhost"
          else:
             h = self._host
-         errStr = "Can't connect to pigpio on " + str(h) + "(" + str(self._port) + ")"
-         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
+         errStr = "Can't connect to pigpio on {}({})".format(
+            str(h), str(self._port))
+
+         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
          print(errStr)
          print("")
          print("Did you start the pigpio daemon? E.g. sudo pigpiod")
@@ -2660,7 +2718,7 @@ class pi():
          print("")
          print("Did you specify the correct Pi host/port in the")
          print("pigpio.pi() function? E.g. pigpio.pi('soft', 8888))")
-         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
       else:
          atexit.register(self.stop)
 
@@ -2680,7 +2738,7 @@ class pi():
          self._control.close()
          self._control = None
 
-def variables():
+def xref():
    """
    bb_baud: 100 - 250000
    The baud rate used for the transmission of bit bang serial data.
@@ -2710,13 +2768,17 @@ def variables():
    The length of a pulse in microseconds.
 
    dutycycle: 0-range_
-   A number between 0 and range_.  The dutycycle sets the
-   proportion of on time versus off time duting each PWM
-   cycle.
+   A number between 0 and range_.
 
-   0 is off. 
-   range_ / 2 is 50% on. 
-   range_ is fully on.
+   The dutycycle sets the proportion of time on versus time off during each
+   PWM cycle.
+
+   Dutycycle     @ On time
+   0             @ Off
+   range_ * 0.25 @ 25% On
+   range_ * 0.50 @ 50% On
+   range_ * 0.75 @ 75% On
+   range_        @ Fully On
 
    edge: 0-2
    EITHER_EDGE = 2 
@@ -2812,15 +2874,14 @@ def variables():
    of a pulse.
 
    handle: 0-
-   A number referencing an object opened by one of
-
-   [*i2c_open*] 
-   [*notify_open*] 
-   [*serial_open*] 
-   [*spi_open*]
+   A number referencing an object opened by one of [*i2c_open*],
+   [*notify_open*], [*serial_open*], [*spi_open*].
 
    host:
    The name or IP address of the Pi running the pigpio daemon.
+
+   i2c_*:
+   One of the i2c_ functions.
 
    i2c_address:
    The address of a device on the I2C bus (0x08 - 0x77)
@@ -2870,16 +2931,19 @@ def variables():
    A whole number.
 
    pulses:
+   A list of class pulse objects defining the characteristics of a
+   waveform.
 
    pulsewidth:
    The servo pulsewidth in microseconds.  0 switches pulses off.
 
    range_: 25-40000
    Defines the limits for the [*dutycycle*] parameter.
-   range_ defaults tpo 255.
+
+   range_ defaults to 255.
 
    reg: 0-255
-   An I2C devive register.  The usable registers depend on the
+   An I2C device register.  The usable registers depend on the
    actual device.
 
    script:
@@ -2889,13 +2953,20 @@ def variables():
    A number referencing a script created by [*store_script*].
 
    ser_baud:
-   The transmission rate in bits per second.  The default
-   allowable values are 50, 75, 110, 134, 150, 200, 300,
+   The transmission rate in bits per second.
+
+   The allowable values are 50, 75, 110, 134, 150, 200, 300,
    600, 1200, 1800, 2400, 4800, 9600, 19200, 38400,
    57600, 115200, or 230400.
 
    ser_flags: 32 bit
    No serial flags are currently defined.
+
+   serial_*:
+   One of the serial_ functions.
+
+   spi_*:
+   One of the spi_ functions.
 
    spi_baud: 1-
    The transmission rate in bits per second.
@@ -2916,15 +2987,24 @@ def variables():
    A Pi serial tty device, e.g. /dev/ttyAMA0, /dev/ttyUSB0
 
    user_gpio: 0-31
-   A Broadcom numbered gpio.  All the user gpios are in the range 0-31.
+   A Broadcom numbered gpio.
+
+   All the user gpios are in the range 0-31.
+
    Not all the gpios within this range are usable, some are reserved
    for system use.
 
    wait_timeout: 0.0 -
    The number of seconds to wait in wait_for_edge before timing out.
 
+   wave_add_*:
+   One of [*wave_add_new*] , [*wave_add_generic*], [*wave_add_serial*].
+
    wave_id: 0-
    A number referencing a wave created by [*wave_create*].
+
+   wave_send_*:
+   One of [*wave_send_once*], [*wave_send_repeat*].
 
    wdog_timeout: 0-60000
    Defines a gpio watchdog timeout in milliseconds.  If no level

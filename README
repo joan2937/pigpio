@@ -18,13 +18,14 @@ o the header file (pigpiod_if.h) in /usr/local/include
 o the daemon (pigpiod) in /usr/local/bin
 o the socket interface (pigs) in /usr/local/bin
 o the utility pig2vcd in /usr/local/bin
+o man pages in /usr/local/man/man1 and man3
 o the Python module pigpio.py
 
 TEST (optional)
 
 *** WARNING ************************************************
 *                                                          *
-* All the tests make extensive use of gpio 4 (pin P1-7).   *
+* All the tests make extensive use of gpio 4 (pin P1/J8-7).*
 * Ensure that either nothing or just a LED is connected to *
 * gpio 4 before running any of the tests.                  *
 ************************************************************
@@ -123,6 +124,7 @@ o the library (libpigpiod_if.a) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
 o the socket interface (pigs) in /usr/local/bin
+o man pages in /usr/local/man/man1 and man3
 o the Python module pigpio.py
 
 On Windows machines (and possibly Macs)
@@ -133,4 +135,19 @@ python setup.py install
 
 pigs and pigpiod_if.c will need minor mods to reflect the
 Window's/Mac's socket interface.
+
+DOCUMENTATION
+
+The most up to date should be http://abyz.co.uk/rpi/pigpio/
+
+On the Pi try
+
+man pigs
+man pigpiod
+man pig2vcd
+
+man pigpio
+man pigpiod_if
+
+pydoc pigpio
 

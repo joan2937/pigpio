@@ -92,7 +92,7 @@ void usage()
       "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
       "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
       "   -u value, clock source, 0=OSC 1=PLLD,         default PLLD\n" \
-      "   -x mask,  gpios which may be updated,         default 0xFFFFFFFF\n" \
+      "   -x mask,  gpios which may be updated,         default board user gpios\n" \
       "EXAMPLE\n" \
       "sudo pigpiod -s 2 -b 200 -f\n" \
       "  Set a sample rate of 2 microseconds with a 200 millisecond\n" \
@@ -184,7 +184,6 @@ static void initOpts(int argc, char *argv[])
 
          case 'x':
             mask = strtoll(optarg, &endptr, 0);
-            printf("mask=%llx\n", mask);
             if (!*endptr)
             {
                updateMask = mask;

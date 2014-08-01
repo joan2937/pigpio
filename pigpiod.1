@@ -1,0 +1,179 @@
+
+." Process this file with
+." groff -man -Tascii pigpiod.1
+."
+.TH pigpiod 1 2012-2014 Linux "pigpio archive"
+.SH NAME
+pigpiod - A utility to start the pigpio library as a daemon.
+
+.SH SYNOPSIS
+
+sudo pigpiod [OPTION]...
+.SH DESCRIPTION
+
+pigpiod is a utility which launches the pigpio library as a daemon.
+.br
+
+.br
+Once launched the pigpio library runs in the background accepting commands from the pipe and socket interfaces.
+.br
+
+.br
+The pigpiod utility requires sudo privileges to launch the library but thereafter the pipe and socket commands may be issued by normal users.
+.br
+
+.br
+pigpiod accepts the following configuration options
+.br
+
+.br
+.SH OPTIONS
+
+.IP "\fB-b value\fP"
+gpio sample buffer in milliseconds
+100-10000
+default 120
+
+.IP "\fB-d value\fP"
+primary DMA channel
+0-14
+default 14
+
+.IP "\fB-e value\fP"
+secondary DMA channel
+0-6
+default 5
+
+.IP "\fB-f\fP"
+disable fifo interface
+
+default enabled
+
+.IP "\fB-k\fP"
+disable socket interface
+
+default enabled
+
+.IP "\fB-p value\fP"
+socket port
+1024-32000
+default 8888
+
+.IP "\fB-s value\fP"
+sample rate
+1, 2, 4, 5, 8, 10
+default 5
+
+.IP "\fB-t value\fP"
+clock peripheral
+0=PWM 1=PCM
+default PCM
+
+.IP "\fB-u value\fP"
+clock source
+0=OSC 1=PLLD
+default PLLD
+
+.IP "\fB-x mask\fP"
+gpios which may be updated
+A 54 bit mask with (1<<n) set if the user may update gpio #n.
+default is the set of user gpios for the board revision
+
+.br
+
+.br
+.SS Example
+.br
+
+.br
+
+.EX
+sudo pigpiod -s 2 -b 200 -f
+.br
+
+.EE
+
+.br
+
+.br
+Launch the pigpio library with a sample rate of 2 microseconds and a 200 millisecond buffer.  Disable the fifo interface.
+
+.br
+
+.br
+.SS Permissions
+.br
+
+.br
+pigpio provides a rudimentary permissions system for commands issued via the socket and pipe interfaces.
+
+.br
+
+.br
+All gpios may be read.
+
+.br
+
+.br
+Only the default gpios for the board revision or those specified by the -x option may be updated.
+
+.br
+
+.br
+
+.EX
+Revision 1 boards 0x03E6CF93
+.br
+Revision 2 boards 0xFBC6CF9C
+.br
+Revision 3 boards 0x0FFFFFFC
+.br
+
+.EE
+
+.br
+
+.br
+In this context an update includes the following:
+
+.br
+
+.br
+gpio mode set
+.br
+gpio pull/up down
+.br
+gpio write
+.br
+gpio set PWM (including range and frequency)
+.br
+gpio set servo
+
+.br
+
+.br
+In addition the bank clear and set commands, and the wave commands will only
+affect updateable gpios.
+
+.br
+
+.br
+There are two special cases.
+
+.br
+
+.br
+The activity LED may be written (gpio 16 for Rev.1/2
+boards, gpio 47 for Rev.3 boards).
+
+.br
+
+.br
+The high USB power mode gpio may be written (gpio 38 for Rev.3 boards).
+
+.SH SEE ALSO
+
+pig2vcd(1), pigs(1), pigpio(3), pigpiod_if(3)
+.SH AUTHOR
+
+joan@abyz.co.uk

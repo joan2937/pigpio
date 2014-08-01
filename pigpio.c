@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 16 */
+/* pigpio version 17 */
 
 #include <stdio.h>
 #include <string.h>
@@ -51,6 +51,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
 #include <linux/spi/spidev.h>
@@ -812,12 +813,6 @@ struct my_smbus_ioctl_data
    union my_smbus_data *data;
 };
 
-struct my_rdwr_ioctl_data
-{
-   struct i2c_msg *msgs;   /* pointers to msgs */
-   uint32_t nmsgs;         /* number of msgs */
-};
-
 /* --------------------------------------------------------------- */
 
 /* initialise once then preserve */
@@ -984,6 +979,28 @@ static int  gpioNotifyOpenInBand(int fd);
 
 /* ======================================================================= */
 
+static char * myTimeStamp()
+{
+   static struct timeval last;
+   static char buf[32];
+   struct timeval now;
+
+   struct tm tmp;
+
+   gettimeofday(&now, NULL);
+
+   if (now.tv_sec != last.tv_sec)
+   {
+      localtime_r(&now.tv_sec, &tmp);
+      strftime(buf, sizeof(buf), "%F %T", &tmp);
+      last.tv_sec = now.tv_sec;
+   }
+
+   return buf;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static int my_smbus_access(
    int fd, char rw, uint8_t cmd, int size, union my_smbus_data *data)
 {
@@ -996,6 +1013,8 @@ static int my_smbus_access(
 
    return ioctl(fd, PI_I2C_SMBUS, &args);
 }
+
+/* ----------------------------------------------------------------------- */
 
 static char *myBuf2Str(unsigned count, char *buf)
 {
@@ -1013,6 +1032,8 @@ static char *myBuf2Str(unsigned count, char *buf)
 
    return str;
 }
+
+/* ----------------------------------------------------------------------- */
 
 static void myGpioSleep(int seconds, int micros)
 {
@@ -1041,28 +1062,6 @@ static uint32_t myGpioDelay(uint32_t micros)
    else myGpioSleep(micros/MILLION, micros%MILLION);
 
    return (systReg[SYST_CLO] - start);
-}
-
-/* ----------------------------------------------------------------------- */
-
-static char * myTimeStamp()
-{
-   static struct timeval last;
-   static char buf[32];
-   struct timeval now;
-
-   struct tm tmp;
-
-   gettimeofday(&now, NULL);
-
-   if (now.tv_sec != last.tv_sec)
-   {
-      localtime_r(&now.tv_sec, &tmp);
-      strftime(buf, sizeof(buf), "%F %T", &tmp);
-      last.tv_sec = now.tv_sec;
-   }
-
-   return buf;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1743,12 +1742,12 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 
 /* ======================================================================= */
 
-rawCbs_t * rawWaveCBAdr(int n)
+rawCbs_t * rawWaveCBAdr(int cbNum)
 {
    int page, slot;
 
-   page = n/CBS_PER_OPAGE;
-   slot = n%CBS_PER_OPAGE;
+   page = cbNum/CBS_PER_OPAGE;
+   slot = cbNum%CBS_PER_OPAGE;
 
    return &dmaOVirt[page]->cb[slot];
 }
@@ -1861,7 +1860,7 @@ static int errCBsOOL(int cb, int botOOL, int topOOL)
 
 /* ----------------------------------------------------------------------- */
 
-static int wave2Cbs(unsigned mode)
+static int wave2Cbs(unsigned wave_mode)
 {
    int botCB=waveOutBotCB, botOOL=waveOutBotOOL, topOOL=waveOutTopOOL;
 
@@ -2000,7 +1999,7 @@ static int wave2Cbs(unsigned mode)
 
    if (p != NULL)
    {
-      if (mode == PI_WAVE_MODE_ONE_SHOT)
+      if (wave_mode == PI_WAVE_MODE_ONE_SHOT)
            p->next = 0;
       else p->next = waveCbPOadr(repeatCB) | DMA_BUS_ADR;
    }
@@ -2485,8 +2484,12 @@ int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
       return PI_I2C_READ_FAILED;
    else
    {
-      for (i=1; i<=data.block[0]; i++) buf[i-1] = data.block[i];
-      return data.block[0];
+      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
    }
 }
 
@@ -2558,12 +2561,17 @@ int i2cBlockProcessCall(
    for (i=1; i<=count; i++) data.block[i] = buf[i-1];
    data.block[0] = count;
    if (my_smbus_access(
-      i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data))
+      i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg,
+      PI_I2C_SMBUS_BLOCK_PROC_CALL, &data))
       return PI_I2C_READ_FAILED;
    else
    {
-      for (i=1; i<=data.block[0]; i++) buf[i-1] = data.block[i];
-      return data.block[0];
+      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
    }
 }
 
@@ -2604,8 +2612,12 @@ int i2cReadI2CBlockData(
       return PI_I2C_READ_FAILED;
    else 
    {
-      for (i = 1; i <= data.block[0]; i++) buf[i-1] = data.block[i];
-      return data.block[0];
+      if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
    }
 }
 
@@ -4122,11 +4134,10 @@ static void *pthScript(void *x)
 
    s = x;
 
-   s->run_state = PI_SCRIPT_HALTED;
-
-   while (s->request != PI_SCRIPT_DELETE)
+   while ((volatile int)s->request != PI_SCRIPT_DELETE)
    {
       pthread_mutex_lock(&s->pthMutex);
+      s->run_state = PI_SCRIPT_HALTED;
       pthread_cond_wait(&s->pthCond, &s->pthMutex);
       pthread_mutex_unlock(&s->pthMutex);
 
@@ -4137,8 +4148,8 @@ static void *pthScript(void *x)
       PC = 0;
       SP = 0;
 
-      while ((s->request   == PI_SCRIPT_RUN    ) &&
-             (s->run_state == PI_SCRIPT_RUNNING))
+      while (((volatile int)s->request   == PI_SCRIPT_RUN    ) &&
+                           (s->run_state == PI_SCRIPT_RUNNING))
       {
          instr = s->script.instr[PC];
 
@@ -4150,7 +4161,11 @@ static void *pthScript(void *x)
 
          if      (instr.opt[2] == CMD_VAR) instr.p[2] = s->script.var[p2o];
          else if (instr.opt[2] == CMD_PAR) instr.p[2] = s->script.par[p2o];
-
+/*
+         fprintf(stderr, "PC=%d cmd=%d p1o=%d p1=%d p2o=%d p2=%d\n",
+            PC, instr.p[0], p1o, instr.p[1], p2o, instr.p[2]);
+         fflush(stderr);
+*/
          if (instr.p[0] < 100)
          {
             if (instr.p[3])
@@ -4323,7 +4338,8 @@ static void *pthScript(void *x)
 
       }
 
-      if (s->request == PI_SCRIPT_HALT) s->run_state = PI_SCRIPT_HALTED;
+      if ((volatile int)s->request == PI_SCRIPT_HALT)
+         s->run_state = PI_SCRIPT_HALTED;
 
    }
 
@@ -4462,11 +4478,15 @@ static void * pthFifoThread(void *x)
                   break;
 
                case 6:
-                  if (res < 0) fprintf(outFifo, "%d\n", res);
-                  else if (res > 0)
+                  fprintf(outFifo, "%d", res);
+                  if (res > 0)
                   {
-                     fwrite(v, 1, res, outFifo);
+                     for (i=0; i<res; i++)
+                     {
+                        fprintf(outFifo, " %d", v[i]);
+                     }
                   }
+                  fprintf(outFifo, "\n");
                   break;
 
                case 7:
@@ -4499,9 +4519,14 @@ static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
    uint32_t p[10];
+   int opt;
    char buf[CMD_MAX_EXTENSION];
 
    free(fdC);
+
+   /* Disable the Nagle algorithm. */
+   opt = 1;
+   setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
 
    while (1)
    {
@@ -4544,6 +4569,10 @@ static void *pthSocketThreadHandler(void *fdC)
       else
       {
          p[3] = gpioNotifyOpenInBand(sock);
+
+         /* Enable the Nagle algorithm. */
+         opt = 0;
+         setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
       }
 
       write(sock, p, 16);
@@ -5617,7 +5646,8 @@ int gpioInitialise(void)
 
       if      (i == 0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
       else if (i <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
-      else             gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+      else if (i < 16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+      else             gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
 
       gpioMaskSet = 1;
    }
@@ -6191,11 +6221,12 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWaveAddSerial(unsigned gpio,
-                      unsigned bbBaud,
-                      unsigned offset,
-                      unsigned numChar,
-                      char     *str)
+int gpioWaveAddSerial
+   (unsigned gpio,
+    unsigned bbBaud,
+    unsigned offset,
+    unsigned numChar,
+    char     *str)
 {
    int i, b, p, lev, c, v;
 
@@ -6489,7 +6520,7 @@ int gpioWaveDelete(unsigned wave_id)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWaveTxStart(unsigned mode)
+int gpioWaveTxStart(unsigned wave_mode)
 {
    /* This function is deprecated and will be removed. */
 
@@ -6497,12 +6528,12 @@ int gpioWaveTxStart(unsigned mode)
 
    int cb, i;
 
-   DBG(DBG_USER, "mode=%d", mode);
+   DBG(DBG_USER, "wave_mode=%d", wave_mode);
 
    CHECK_INITED;
 
-   if (mode > PI_WAVE_MODE_REPEAT)
-      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", mode);
+   if (wave_mode > PI_WAVE_MODE_REPEAT)
+      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
 
    if (wfc[wfcur] == 0) return 0;
    
@@ -6523,7 +6554,7 @@ int gpioWaveTxStart(unsigned mode)
 
    waveOutCount = 0;
 
-   cb = wave2Cbs(mode);
+   cb = wave2Cbs(wave_mode);
 
    if (gpioCfg.dbgLevel >= DBG_SLOW_TICK)
    {
@@ -6539,21 +6570,21 @@ int gpioWaveTxStart(unsigned mode)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWaveTxSend(unsigned wave_id, unsigned mode)
+int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
 {
    rawCbs_t *p=NULL;
 
    static int secondaryClockInited = 0;
 
-   DBG(DBG_USER, "wave_id=%d mode=%d", wave_id, mode);
+   DBG(DBG_USER, "wave_id=%d wave_mode=%d", wave_id, wave_mode);
 
    CHECK_INITED;
 
    if (wave_id >= waveOutCount)
       SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
 
-   if (mode > PI_WAVE_MODE_REPEAT)
-      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", mode);
+   if (wave_mode > PI_WAVE_MODE_REPEAT)
+      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
 
    if (!secondaryClockInited)
    {
@@ -6563,7 +6594,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned mode)
 
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
 
-   if (mode == PI_WAVE_MODE_ONE_SHOT) p->next = 0;
+   if (wave_mode == PI_WAVE_MODE_ONE_SHOT) p->next = 0;
    else p->next = waveCbPOadr(waveInfo[wave_id].botCB+1) | DMA_BUS_ADR;
 
    dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
@@ -7358,7 +7389,7 @@ int gpioStoreScript(char *script)
    if (status == 0)
    {
       s->request   = PI_SCRIPT_HALT;
-      s->run_state = PI_SCRIPT_HALTED;
+      s->run_state = PI_SCRIPT_INITING;
 
       pthread_cond_init(&s->pthCond, NULL);
       pthread_mutex_init(&s->pthMutex, NULL);
@@ -7519,7 +7550,8 @@ int gpioDeleteScript(unsigned script_id)
 
       gpioStopThread(gpioScript[script_id].pthIdp);
 
-      if (gpioScript[script_id].script.par) free(gpioScript[script_id].script.par);
+      if (gpioScript[script_id].script.par)
+         free(gpioScript[script_id].script.par);
 
       gpioScript[script_id].script.par = NULL;
 
@@ -7948,8 +7980,6 @@ int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
    int retVal = PI_BAD_CFG_INTERNAL;
 
    DBG(DBG_USER, "cfgWhat=%u, cfgVal=%d", cfgWhat, cfgVal);
-
-   CHECK_NOT_INITED;
 
    /* 
    133084774
