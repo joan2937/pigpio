@@ -246,7 +246,7 @@ import os
 import atexit
 import codecs
 
-VERSION = "1.7"
+VERSION = "1.8"
 
 exceptions = True
 
@@ -532,7 +532,7 @@ _errors=[
    [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
    [PI_BAD_WVSM_COMMND   , "bad WVSM subcommand"],
    [PI_BAD_WVSP_COMMND   , "bad WVSP subcommand"],
-   [PI_BAD_PULSELEN      , "trigger pulse length > 50"],
+   [PI_BAD_PULSELEN      , "trigger pulse length > 100"],
    [PI_BAD_SCRIPT        , "invalid script"],
    [PI_BAD_SCRIPT_ID     , "unknown script id"],
    [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
@@ -2129,7 +2129,10 @@ class pi():
 
    def spi_open(self, spi_channel, spi_baud, spi_flags=0):
       """
-      Returns a handle for the SPI device on channel.
+      Returns a handle for the SPI device on channel.  Data will be
+      transferred at baud bits per second.  The flags may be used to
+      modify the default behaviour of 4-wire operation, mode 0,
+      active low chip select.
 
       spi_channel:= 0 or 1, the SPI channel.
          spi_baud:= >0, the transmission rate in bits per second.
@@ -2140,20 +2143,32 @@ class pi():
       you will always run on the local Pi use the standard SPI
       modules instead.
 
-      The bottom two bits of spi_flags define the SPI mode as
-      follows.
+      spiFlags consists of the least significant 8 bits.
 
       . .
-      bit bit
-       1   0
-      POL PHA Mode
-       0   0   0
-       0   1   1
-       1   0   2
-       1   1   3
+      7 6 5 4 3 2 1 0
+      n n n n W P m m
       . .
 
-      The other bits in spi_flags should be set to zero.
+      mm defines the SPI mode.
+
+      . .
+      Mode POL PHA
+      0    0   0
+      1    0   1
+      2    1   0
+      3    1   1
+      . .
+
+      P is 0 for active low chip select (normal) and 1 for active high.
+
+      W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+      nnnn defines the number of bytes (0-15) to write before switching
+      the MOSI line to MISO to read data.  This field is ignored
+      if W is not set.
+
+      The other bits in flags should be set to zero.
 
       ...
       # open SPI device on channel 1 in mode 3 at 20000 bits per second
@@ -2507,9 +2522,9 @@ class pi():
       ...
       """
       status = _u2i(_pigpio_command(self._control, _PI_CMD_PROCP, script_id, 0))
-      if status >= 0:
-         param = struct.unpack('IIIIIIIIII', self._control.recv(40))
-         return status, param
+      if status > 0:
+         params = struct.unpack('I10i', self._control.recv(44))
+         return params[0], params[1:]
       return status, ()
 
    def stop_script(self, script_id):
@@ -2975,7 +2990,33 @@ def xref():
    A SPI channel.
 
    spi_flags: 32 bit
-   The flags are used to encode the SPI mode in bits 0 and 1.
+
+   spi_flags consists of the least significant 8 bits.
+
+   . .
+   7 6 5 4 3 2 1 0
+   n n n n W P m m
+   . .
+
+   mm defines the SPI mode.
+
+   . .
+   Mode POL PHA
+    0    0   0
+    1    0   1
+    2    1   0
+    3    1   1
+   . .
+
+   P is 0 for active low chip select (normal) and 1 for active high.
+
+   W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+   nnnn defines the number of bytes (0-15) to write before switching
+   the MOSI line to MISO to read data.  This field is ignored
+   if W is not set.
+
+   The other bits in flags should be set to zero.
 
    t1:
    A tick (earlier).

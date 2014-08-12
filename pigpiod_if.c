@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 6 */
+/* PIGPIOD_IF_VERSION 7 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -777,16 +777,17 @@ int run_script(unsigned script_id, unsigned numPar, uint32_t *param)
 int script_status(unsigned script_id, uint32_t *param)
 {
    int status;
-   uint32_t p[PI_MAX_SCRIPT_PARAMS];
+   uint32_t p[PI_MAX_SCRIPT_PARAMS+1]; /* space for script status */
 
    status = pigpio_command(gPigCommand, PI_CMD_PROCP, script_id, 0);
 
-   if (status >= 0)
+   if (status > 0)
    {
       /* get the data */
-      recv(gPigCommand, p, sizeof(p), MSG_WAITALL);
+      recv(gPigCommand, p, status, MSG_WAITALL);
 
-      if (param) memcpy(param, p, sizeof(p));
+      status = p[0];
+      if (param) memcpy(param, p+1, sizeof(p)-4);
    }
 
    return status;

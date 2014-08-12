@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 17+
+This version is for pigpio version 18+
 */
 
 #include <stdio.h>
@@ -155,15 +155,18 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          break;
 
       case 7: /* PROCP */
-         printf("%d", r);
-         if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
-         if (r >= 0)
+         if (r != (4 + (4*PI_MAX_SCRIPT_PARAMS)))
+         {
+            printf("%d", r);
+            fatal("ERROR: %s", cmdErrStr(r));
+         }
+         else
          {
             p = (uint32_t *)response_buf;
-
+            printf("%d", p[0]);
             for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
             {
-               printf(" %d", p[i]);
+               printf(" %d", p[i+1]);
             }
          }
          printf("\n");
@@ -175,20 +178,11 @@ void get_extensions(int sock, int command, int res)
 {
    switch (command)
    {
-      case PI_CMD_PROCP:
-         if (res >= 0)
-         {
-            recv(sock,
-                 response_buf,
-                 sizeof(uint32_t)*PI_MAX_SCRIPT_PARAMS,
-                 MSG_WAITALL);
-         }
-         break;
-
       case PI_CMD_I2CPK:
       case PI_CMD_I2CRD:
       case PI_CMD_I2CRI:
       case PI_CMD_I2CRK:
+      case PI_CMD_PROCP:
       case PI_CMD_SERR:
       case PI_CMD_SLR:
       case PI_CMD_SPIX:

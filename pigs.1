@@ -2172,20 +2172,55 @@ This command returns a handle to a SPI device on channel \fBc\fP.
 .br
 
 .br
-Data will be transferred at \fBb\fP bits per second.  The least
-significant two bits of the flags \fBspf\fP determine the SPI mode.  All
-other bits in \fBspf\fP should be set to zero.
+Data will be transferred at \fBb\fP bits per second.  The flags \fBspf\fP
+may be used to modify the default behaviour of 4-wire operation,
+mode 0, active low chip select.
+
+.br
+The flags consists of the least significant 8 bits.
 
 .br
 
 .EX
-Flags   Mode
-0       0
-1       1
-2       2
-3       3
+7 6 5 4 3 2 1 0
+.br
+n n n n W P m m
+.br
 
 .EE
+
+.br
+mm defines the SPI mode.
+
+.br
+
+.EX
+Mode POL PHA
+.br
+ 0    0   0
+.br
+ 1    0   1
+.br
+ 2    1   0
+.br
+ 3    1   1
+.br
+
+.EE
+
+.br
+P is 0 for active low chip select (normal) and 1 for active high.
+
+.br
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+.br
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
+
+.br
+The other bits in flags should be set to zero.
 
 .br
 Upon success a handle (>=0) is returned.  On error a negative status code
@@ -3152,8 +3187,50 @@ The command expects a script id as returned by a call to \fBPROC\fP.
 .br
 
 .IP "\fBspf\fP - SPI flags (32 bits)" 0
-The command expects a flag value.  The least significant two bits
-define the SPI mode.
+The flags consists of the least significant 8 bits.
+
+.br
+
+.EX
+7 6 5 4 3 2 1 0
+.br
+n n n n W P m m
+.br
+
+.EE
+
+.br
+mm defines the SPI mode.
+
+.br
+
+.EX
+Mode POL PHA
+.br
+ 0    0   0
+.br
+ 1    0   1
+.br
+ 2    1   0
+.br
+ 3    1   1
+.br
+
+.EE
+
+.br
+P is 0 for active low chip select (normal) and 1 for active high.
+
+.br
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+.br
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
+
+.br
+The other bits in flags should be set to zero.
 
 .br
 

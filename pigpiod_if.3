@@ -2165,7 +2165,9 @@ PI_I2C_WRITE_FAILED.
 .IP "\fBint spi_open(unsigned spi_channel, unsigned spi_baud, unsigned spi_flags)\fP"
 .IP "" 4
 This function returns a handle for the SPI device on channel.
-Data will be transferred at baud bits per second.
+Data will be transferred at baud bits per second.  The flags may
+be used to modify the default behaviour of 4-wire operation, mode 0,
+active low chip select.
 
 .br
 
@@ -2176,7 +2178,7 @@ spi_channel: 0-1.
 .br
    spi_baud: >1.
 .br
-  spi_flags: 0-3.
+  spi_flags: see below.
 .br
 
 .EE
@@ -2190,17 +2192,30 @@ PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
 .br
 
 .br
-The least significant two bits of flags define the SPI mode as follows.
+spiFlags consists of the least significant 8 bits.
 
 .br
 
 .br
 
 .EX
-     bit bit
+7 6 5 4 3 2 1 0
 .br
-      1   0
+n n n n W P m m
 .br
+
+.EE
+
+.br
+
+.br
+mm defines the SPI mode.
+
+.br
+
+.br
+
+.EX
 Mode POL PHA
 .br
  0    0   0
@@ -2213,6 +2228,23 @@ Mode POL PHA
 .br
 
 .EE
+
+.br
+
+.br
+P is 0 for active low chip select (normal) and 1 for active high.
+
+.br
+
+.br
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+.br
+
+.br
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
 
 .br
 
@@ -3193,8 +3225,64 @@ A SPI channel, 0 or 1.
 .br
 
 .IP "\fBspi_flags\fP" 0
-Flags which modify a SPI open command. The two least significant bits
-define the SPI mode.  The other bits are undefined.
+spi_flags consists of the least significant 8 bits.
+
+.br
+
+.br
+
+.EX
+7 6 5 4 3 2 1 0
+.br
+n n n n W P m m
+.br
+
+.EE
+
+.br
+
+.br
+mm defines the SPI mode.
+
+.br
+
+.br
+
+.EX
+Mode POL PHA
+.br
+ 0    0   0
+.br
+ 1    0   1
+.br
+ 2    1   0
+.br
+ 3    1   1
+.br
+
+.EE
+
+.br
+
+.br
+P is 0 for active low chip select (normal) and 1 for active high.
+
+.br
+
+.br
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+.br
+
+.br
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
+
+.br
+
+.br
+The other bits in flags should be set to zero.
 
 .br
 

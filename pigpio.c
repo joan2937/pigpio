@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 17 */
+/* pigpio version 18 */
 
 #include <stdio.h>
 #include <string.h>
@@ -54,7 +54,6 @@ For more information, please refer to <http://unlicense.org/>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
-#include <linux/spi/spidev.h>
 
 #include "pigpio.h"
 
@@ -293,17 +292,18 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define GPIO_BASE  0x20200000
 #define PCM_BASE   0x20203000
 #define PWM_BASE   0x2020C000
-#define SPI0_BASE  0x20204000
+#define SPI_BASE   0x20204000
 #define SYST_BASE  0x20003000
 #define UART0_BASE 0x20201000
 #define UART1_BASE 0x20215000
 
-#define DMA_LEN   0x1000 /* allow access to all channels */
 #define CLK_LEN   0xA8
+#define DMA_LEN   0x1000 /* allow access to all channels */
 #define GPIO_LEN  0xB4
-#define SYST_LEN  0x1C
 #define PCM_LEN   0x24
 #define PWM_LEN   0x28
+#define SPI_LEN   0x18
+#define SYST_LEN  0x1C
 
 #define DMA_ENABLE (0xFF0/4)
 
@@ -482,6 +482,59 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define SYST_CLO     1
 #define SYST_CHI     2
 
+/* SPI */
+
+#define SPI_CS   0
+#define SPI_FIFO 1
+#define SPI_CLK  2
+#define SPI_DLEN 3
+#define SPI_LTOH 4
+#define SPI_DC   5
+
+#define SPI_CS_LEN_LONG  (1<<25)
+#define SPI_CS_DMA_LEN   (1<<24)
+#define SPI_CS_CSPOL2    (1<<23)
+#define SPI_CS_CSPOL1    (1<<22)
+#define SPI_CS_CSPOL0    (1<<21)
+#define SPI_CS_RXF       (1<<20)
+#define SPI_CS_RXR       (1<<19)
+#define SPI_CS_TXD       (1<<18)
+#define SPI_CS_RXD       (1<<17)
+#define SPI_CS_DONE      (1<<16)
+#define SPI_CS_LEN       (1<<13)
+#define SPI_CS_REN       (1<<12)
+#define SPI_CS_ADCS      (1<<11)
+#define SPI_CS_INTR      (1<<10)
+#define SPI_CS_INTD      (1<<9)
+#define SPI_CS_DMAEN     (1<<8)
+#define SPI_CS_TA        (1<<7)
+#define SPI_CS_CSPOL(x)  ((x)<<6)
+#define SPI_CS_CLEAR(x)  ((x)<<4)
+#define SPI_CS_MODE(x)   ((x)<<2)
+#define SPI_CS_CS(x)     ((x)<<0)
+
+#define SPI_DC_RPANIC(x) ((x)<<24)
+#define SPI_DC_RDREQ(x)  ((x)<<16)
+#define SPI_DC_TPANIC(x) ((x)<<8)
+#define SPI_DC_TDREQ(x)  ((x)<<0)
+
+#define SPI_MODE0 0
+#define SPI_MODE1 1
+#define SPI_MODE2 2
+#define SPI_MODE3 3
+
+#define SPI_CS0     0
+#define SPI_CS1     1
+#define SPI_CS2     2
+
+/* SPI gpios. */
+
+#define PI_SPI_CE0   8
+#define PI_SPI_CE1   7
+#define PI_SPI_SCLK 11
+#define PI_SPI_MISO  9
+#define PI_SPI_MOSI 10
+
 /* --------------------------------------------------------------- */
 
 #define NORMAL_DMA (DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
@@ -569,8 +622,6 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define MAX_EMITS (PIPE_BUF / sizeof(gpioReport_t))
 
 #define SRX_BUF_SIZE 8192
-
-#define MAX_DELAY 50
 
 #define PI_I2C_SLAVE 0x0703
 #define PI_I2C_SMBUS 0x0720
@@ -726,7 +777,6 @@ typedef struct
 typedef struct
 {
    uint16_t state;
-   int16_t     fd;
    unsigned speed;
    uint32_t flags;
 } spiInfo_t;
@@ -937,6 +987,7 @@ static volatile uint32_t  * dmaReg  = MAP_FAILED;
 static volatile uint32_t  * gpioReg = MAP_FAILED;
 static volatile uint32_t  * pcmReg  = MAP_FAILED;
 static volatile uint32_t  * pwmReg  = MAP_FAILED;
+static volatile uint32_t  * spiReg  = MAP_FAILED;
 static volatile uint32_t  * systReg = MAP_FAILED;
 
 static volatile uint32_t  * dmaIn   = MAP_FAILED;
@@ -1057,7 +1108,7 @@ static uint32_t myGpioDelay(uint32_t micros)
 
    start = systReg[SYST_CLO];
 
-   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
+   if (micros <= PI_MAX_BUSY_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
 
    else myGpioSleep(micros/MILLION, micros%MILLION);
 
@@ -2801,21 +2852,175 @@ int i2cClose(unsigned handle)
 
 /* ======================================================================= */
 
+static unsigned old_mode_ce0;
+static unsigned old_mode_ce1;
+static unsigned old_mode_sclk;
+static unsigned old_mode_miso;
+static unsigned old_mode_mosi;
+
+static uint32_t old_spi_cs;
+static uint32_t old_spi_clk;
+
+static uint32_t spi_dummy; /* only used to prevent warning */
+
+static void spiInit(void)
+{
+   old_mode_ce0  = gpioGetMode(PI_SPI_CE0);
+   old_mode_ce1  = gpioGetMode(PI_SPI_CE1);
+   old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
+   old_mode_miso = gpioGetMode(PI_SPI_MISO);
+   old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
+
+   gpioSetMode(PI_SPI_CE0, PI_ALT0);
+   gpioSetMode(PI_SPI_CE1, PI_ALT0);
+   gpioSetMode(PI_SPI_SCLK, PI_ALT0);
+   gpioSetMode(PI_SPI_MISO, PI_ALT0);
+   gpioSetMode(PI_SPI_MOSI, PI_ALT0);
+
+   old_spi_cs  = spiReg[SPI_CS];
+   old_spi_clk = spiReg[SPI_CLK];
+}
+
+static void spiTerm(void)
+{  
+   gpioSetMode(PI_SPI_CE0, old_mode_ce0);
+   gpioSetMode(PI_SPI_CE1, old_mode_ce1);
+   gpioSetMode(PI_SPI_SCLK, old_mode_sclk);
+   gpioSetMode(PI_SPI_MISO, old_mode_miso);
+   gpioSetMode(PI_SPI_MOSI, old_mode_mosi);
+
+   spiReg[SPI_CS]  = old_spi_cs;
+   spiReg[SPI_CLK] = old_spi_clk;
+}
+
+#define PI_SPI_FLAGS_CHAN(x)  ((x)<<30)
+
+/*
+3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+C C - - - - - - - - - - - - - - - - - - - - - - N N N N 3 P M M
+
+CC   channel
+NNNN switch to 3-wire after NNNN bytes
+3    3-wire part
+P    CS polarity
+MM   mode
+*/
+static void spiGo(
+   unsigned speed,
+   uint32_t flags,
+   char     *txBuf,
+   char     *rxBuf,
+   unsigned count)
+{
+   unsigned txCnt=0;
+   unsigned rxCnt=0;
+   unsigned cnt, cnt4w, cnt3w;
+   uint32_t spiDefaults;
+   unsigned mode, channel, cspol, flag3w, ren3w;
+
+   mode =     flags       & 3;
+   cspol  =  (flags >> 2) & 1;
+   flag3w =  (flags >> 3) & 1;
+   ren3w =   (flags >> 4) & 15;
+   channel = (flags >> 30) & 3;
+
+   spiDefaults = SPI_CS_MODE(mode)   |
+                 SPI_CS_CS(channel)  |
+                 SPI_CS_CSPOL(cspol) |
+                 SPI_CS_CLEAR(3);
+
+   if (flag3w)
+   {
+      if (ren3w < count)
+      {
+         cnt4w = ren3w;
+         cnt3w = count - ren3w;
+      }
+      else
+      {
+         cnt4w = count;
+         cnt3w = 0;
+      }
+   }
+   else
+   {
+      cnt4w = count;
+      cnt3w = 0;
+   }
+
+   spiReg[SPI_CLK] = 250000000/speed;
+
+   spiReg[SPI_CS] = spiDefaults | SPI_CS_TA; /* start */
+
+   cnt = cnt4w;
+
+   while((txCnt < cnt) || (rxCnt < cnt))
+   {
+      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
+      {
+         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
+         else       spiReg[SPI_FIFO] = 0;
+         txCnt++;
+      }
+
+      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
+      {
+         if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
+         else       spi_dummy    = spiReg[SPI_FIFO];
+         rxCnt++;
+      }
+   }
+
+   while (!(spiReg[SPI_CS] & SPI_CS_DONE)) ;
+
+   /* now switch to 3-wire bus */
+
+   cnt += cnt3w;
+
+   while((txCnt < cnt) || (rxCnt < cnt))
+   {
+      spiReg[SPI_CS] |= SPI_CS_REN;
+
+      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
+      {
+         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
+         else       spiReg[SPI_FIFO] = 0;
+         txCnt++;
+      }
+
+      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
+      {
+         if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
+         else       spi_dummy    = spiReg[SPI_FIFO];
+         rxCnt++;
+      }
+   }
+
+   while (!(spiReg[SPI_CS] & SPI_CS_DONE)) ;
+
+   spiReg[SPI_CS] = spiDefaults; /* stop */
+}
+
+static int spiAnyOpen(void)
+{
+   int i;
+
+   for (i=0; i<PI_SPI_SLOTS; i++)
+   {
+      if (spiInfo[i].state == PI_SPI_OPENED) return 1;
+   }
+   return 0;
+}
 
 int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
 {
-   int i, slot, fd;
-   char  spiMode;
-   char  spiBits  = 8;
-   char dev[32];
+   int i, slot;
 
    DBG(DBG_USER, "spiChan=%d spiBaud=%d spiFlags=0x%X",
       spiChan, spiBaud, spiFlags);
 
    CHECK_INITED;
-
-   spiMode  = spiFlags & 3;
-   spiBits  = 8;
 
    if (spiChan >= PI_NUM_SPI_CHANNEL)
       SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
@@ -2823,8 +3028,10 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
    if (!spiBaud)
       SOFT_ERROR(PI_BAD_SPI_SPEED, "bad spiBaud (%d)", spiBaud);
 
-   if (spiFlags > 3)
+   if (spiFlags > 256)
       SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
+
+   if (!spiAnyOpen()) spiInit(); /* initialise on first open */
 
    slot = -1;
 
@@ -2841,47 +3048,8 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
    if (slot < 0)
       SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
 
-   sprintf(dev, "/dev/spidev0.%d", spiChan);
-
-   if ((fd = open(dev, O_RDWR)) < 0)
-   {
-      /* try a modprobe */
-
-      system("/sbin/modprobe spi_bcm2708");
-
-      usleep(100000);
-
-      if ((fd = open(dev, O_RDWR)) < 0)
-      {
-         i2cInfo[slot].state = PI_SPI_CLOSED;
-         return PI_SPI_OPEN_FAILED;
-      }
-   }
-
-   if (ioctl(fd, SPI_IOC_WR_MODE, &spiMode) < 0)
-   {
-      close(fd);
-      spiInfo[slot].state = PI_SPI_CLOSED;
-      return PI_SPI_OPEN_FAILED;
-   }
-
-   if (ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &spiBits) < 0)
-   {
-      close(fd);
-      spiInfo[slot].state = PI_SPI_CLOSED;
-      return PI_SPI_OPEN_FAILED;
-   }
-
-   if (ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &spiBaud) < 0)
-   {
-      close(fd);
-      spiInfo[slot].state = PI_SPI_CLOSED;
-      return PI_SPI_OPEN_FAILED;
-   }
-
-   spiInfo[slot].fd    = fd;
    spiInfo[slot].speed = spiBaud;
-   spiInfo[slot].flags = spiFlags;
+   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHAN(spiChan);
 
    return slot;
 }
@@ -2898,20 +3066,15 @@ int spiClose(unsigned handle)
    if (spiInfo[handle].state != PI_SPI_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (spiInfo[handle].fd >= 0) close(spiInfo[handle].fd);
-
-   spiInfo[handle].fd = -1;
    spiInfo[handle].state = PI_I2C_CLOSED;
+
+   if (!spiAnyOpen()) spiTerm(); /* terminate on last close */
 
    return 0;
 }
 
 int spiRead(unsigned handle, char *buf, unsigned count)
 {
-   int err;
-
-   struct spi_ioc_transfer spi;
-
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
 
@@ -2926,25 +3089,13 @@ int spiRead(unsigned handle, char *buf, unsigned count)
    if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
       SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
 
-   spi.tx_buf        = (unsigned) NULL;
-   spi.rx_buf        = (unsigned) buf;
-   spi.len           = count;
-   spi.speed_hz      = spiInfo[handle].speed;
-   spi.delay_usecs   = 0;
-   spi.bits_per_word = 8;
-   spi.cs_change     = 0;
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
 
-   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
-
-   if (err < 0) return PI_SPI_XFER_FAILED;
-   else return err;
+   return count;
 }
 
 int spiWrite(unsigned handle, char *buf, unsigned count)
 {
-   int err;
-   struct spi_ioc_transfer spi;
-
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
 
@@ -2959,25 +3110,13 @@ int spiWrite(unsigned handle, char *buf, unsigned count)
    if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
       SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
 
-   spi.tx_buf        = (unsigned) buf;
-   spi.rx_buf        = (unsigned) NULL;
-   spi.len           = count;
-   spi.speed_hz      = spiInfo[handle].speed;
-   spi.delay_usecs   = 0;
-   spi.bits_per_word = 8;
-   spi.cs_change     = 0;
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
 
-   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
-
-   if (err < 0) return PI_SPI_XFER_FAILED;
-   else return err;
+   return count;
 }
 
 int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
 {
-   int err;
-   struct spi_ioc_transfer spi;
-
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, txBuf));
 
@@ -2992,18 +3131,9 @@ int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
    if ((count < 1) || (count > PI_MAX_SPI_DEVICE_COUNT))
       SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
 
-   spi.tx_buf        = (unsigned long)txBuf;
-   spi.rx_buf        = (unsigned long)rxBuf;
-   spi.len           = count;
-   spi.speed_hz      = spiInfo[handle].speed;
-   spi.delay_usecs   = 0;
-   spi.bits_per_word = 8;
-   spi.cs_change     = 0;
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, txBuf, rxBuf, count);
 
-   err = ioctl(spiInfo[handle].fd, SPI_IOC_MESSAGE(1), &spi);
-
-   if (err < 0) return PI_SPI_XFER_FAILED;
-   else return err;
+   return count;
 }
 
 /* ======================================================================= */
@@ -4562,17 +4692,28 @@ static void *pthSocketThreadHandler(void *fdC)
 
       buf[p[3]] = 0;
 
-      if (p[0] != PI_CMD_NOIB)
+      switch (p[0])
       {
-         p[3] = myDoCommand(p, sizeof(buf)-1, buf);
-      }
-      else
-      {
-         p[3] = gpioNotifyOpenInBand(sock);
+         case PI_CMD_NOIB:
+            p[3] = gpioNotifyOpenInBand(sock);
 
-         /* Enable the Nagle algorithm. */
-         opt = 0;
-         setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
+            /* Enable the Nagle algorithm. */
+            opt = 0;
+            setsockopt(
+               sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
+            break;
+
+         case PI_CMD_PROCP:
+            p[3] = myDoCommand(p, sizeof(buf)-1, buf+sizeof(int));
+            if (p[3] >= 0)
+            {
+               memcpy(buf, &p[3], 4);
+               p[3] = 4 + (4*PI_MAX_SCRIPT_PARAMS);
+            }
+            break;
+
+         default:
+            p[3] = myDoCommand(p, sizeof(buf)-1, buf);
       }
 
       write(sock, p, 16);
@@ -4585,6 +4726,7 @@ static void *pthSocketThreadHandler(void *fdC)
          case PI_CMD_I2CRD:
          case PI_CMD_I2CRI:
          case PI_CMD_I2CRK:
+         case PI_CMD_PROCP:
          case PI_CMD_SERR:
          case PI_CMD_SLR:
          case PI_CMD_SPIX:
@@ -4593,14 +4735,6 @@ static void *pthSocketThreadHandler(void *fdC)
             if (p[3] > 0)
             {
                write(sock, buf, p[3]);
-            }
-            break;
-
-         case PI_CMD_PROCP:
-
-            if (p[3] >= 0)
-            {
-               write(sock, buf, sizeof(uint32_t)*PI_MAX_SCRIPT_PARAMS);
             }
             break;
 
@@ -4829,6 +4963,11 @@ static int initPeripherals(void)
 
    if (systReg == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap syst failed (%m)");
+
+   spiReg  = initMapMem(fdMem, SPI_BASE,  SPI_LEN);
+
+   if (spiReg == MAP_FAILED)
+      SOFT_ERROR(PI_INIT_FAILED, "mmap spi failed (%m)");
 
    pwmReg  = initMapMem(fdMem, PWM_BASE,  PWM_LEN);
 
@@ -5298,6 +5437,7 @@ static void initClearGlobals(void)
    pcmReg  = MAP_FAILED;
    pwmReg  = MAP_FAILED;
    systReg = MAP_FAILED;
+   spiReg  = MAP_FAILED;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -5351,6 +5491,7 @@ static void initReleaseResources(void)
    if (pcmReg  != MAP_FAILED) munmap((void *)pcmReg,  PCM_LEN);
    if (pwmReg  != MAP_FAILED) munmap((void *)pwmReg,  PWM_LEN);
    if (systReg != MAP_FAILED) munmap((void *)systReg, SYST_LEN);
+   if (spiReg  != MAP_FAILED) munmap((void *)spiReg,  SPI_LEN);
 
    clkReg  = MAP_FAILED;
    dmaReg  = MAP_FAILED;
@@ -5358,6 +5499,7 @@ static void initReleaseResources(void)
    pcmReg  = MAP_FAILED;
    pwmReg  = MAP_FAILED;
    systReg = MAP_FAILED;
+   spiReg  = MAP_FAILED;
 
    if (dmaVirt != MAP_FAILED)
    {
@@ -7132,7 +7274,7 @@ int gpioTrigger(unsigned gpio, unsigned pulseLen, unsigned level)
    if (level > PI_ON)
       SOFT_ERROR(PI_BAD_LEVEL, "gpio %d, bad level (%d)", gpio, level);
 
-   if ((pulseLen > PI_MAX_PULSELEN) || (!pulseLen))
+   if ((pulseLen > PI_MAX_BUSY_DELAY) || (!pulseLen))
       SOFT_ERROR(PI_BAD_PULSELEN,
          "gpio %d, bad pulseLen (%d)", gpio, pulseLen);
 
@@ -7476,7 +7618,7 @@ int gpioScriptStatus(unsigned script_id, uint32_t *param)
 
    if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
    {
-      if (param != 0)
+      if (param != NULL)
       {
          memcpy(param, gpioScript[script_id].script.par,
             sizeof(uint32_t) * PI_MAX_SCRIPT_PARAMS);
@@ -7773,7 +7915,7 @@ uint32_t gpioDelay(uint32_t micros)
 
    start = systReg[SYST_CLO];
 
-   if (micros <= MAX_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
+   if (micros <= PI_MAX_BUSY_DELAY) while ((systReg[SYST_CLO] - start) <= micros);
 
    else gpioSleep(PI_TIME_RELATIVE, (micros/MILLION), (micros%MILLION));
 

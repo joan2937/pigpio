@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 17+
+This version is for pigpio version 18+
 */
 
 #include <stdio.h>
@@ -411,7 +411,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_WVSC_COMMND  , "bad WVSC subcommand"},
    {PI_BAD_WVSM_COMMND  , "bad WVSM subcommand"},
    {PI_BAD_WVSP_COMMND  , "bad WVSP subcommand"},
-   {PI_BAD_PULSELEN     , "trigger pulse > 50 microseconds"},
+   {PI_BAD_PULSELEN     , "trigger pulse > 100 microseconds"},
    {PI_BAD_SCRIPT       , "invalid script"},
    {PI_BAD_SCRIPT_ID    , "unknown script id"},
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},

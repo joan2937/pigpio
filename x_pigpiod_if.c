@@ -601,11 +601,11 @@ void t9()
       time_sleep(0.1);
       e = script_status(s, p);
       if (e != PI_SCRIPT_RUNNING) break;
-      if (p[9] < 1900) stop_script(s);
+      if (p[9] < 1600) stop_script(s);
    }
    c = t9_count - oc;
    time_sleep(0.1);
-   CHECK(9, 3, c, 110, 10, "run/stop script/script status");
+   CHECK(9, 3, c, 410, 10, "run/stop script/script status");
 
    e = delete_script(s);
    CHECK(9, 4, e, 0, 0, "delete script");

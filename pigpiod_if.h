@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 6
+#define PIGPIOD_IF_VERSION 7
 
 /*TEXT
 
@@ -1562,28 +1562,43 @@ D*/
 int spi_open(unsigned spi_channel, unsigned spi_baud, unsigned spi_flags);
 /*D
 This function returns a handle for the SPI device on channel.
-Data will be transferred at baud bits per second.
+Data will be transferred at baud bits per second.  The flags may
+be used to modify the default behaviour of 4-wire operation, mode 0,
+active low chip select.
 
 . .
 spi_channel: 0-1.
    spi_baud: >1.
-  spi_flags: 0-3.
+  spi_flags: see below.
 . .
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
 PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
 
-The least significant two bits of flags define the SPI mode as follows.
+spiFlags consists of the least significant 8 bits.
 
 . .
-     bit bit
-      1   0
+7 6 5 4 3 2 1 0
+n n n n W P m m
+. .
+
+mm defines the SPI mode.
+
+. .
 Mode POL PHA
  0    0   0
  1    0   1
  2    1   0
  3    1   1
 . .
+
+P is 0 for active low chip select (normal) and 1 for active high.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
 
 The other bits in flags should be set to zero.
 D*/
@@ -2087,8 +2102,32 @@ spi_channel::
 A SPI channel, 0 or 1.
 
 spi_flags::
-Flags which modify a SPI open command. The two least significant bits
-define the SPI mode.  The other bits are undefined.
+spi_flags consists of the least significant 8 bits.
+
+. .
+7 6 5 4 3 2 1 0
+n n n n W P m m
+. .
+
+mm defines the SPI mode.
+
+. .
+Mode POL PHA
+ 0    0   0
+ 1    0   1
+ 2    1   0
+ 3    1   1
+. .
+
+P is 0 for active low chip select (normal) and 1 for active high.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
+
+The other bits in flags should be set to zero.
 
 *str::
  An array of characters.

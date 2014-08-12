@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 17
+#define PIGPIO_VERSION 18
 
 /*TEXT
 
@@ -481,10 +481,11 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_WAVE_MODE_ONE_SHOT 0
 #define PI_WAVE_MODE_REPEAT   1
 
-#define PI_I2C_SLOTS 32
-#define PI_SPI_SLOTS 4
-#define PI_SER_SLOTS 4
+/* I2C, SPI, SER */
 
+#define PI_I2C_SLOTS 32
+#define PI_SPI_SLOTS 8
+#define PI_SER_SLOTS 8
 
 #define PI_NUM_I2C_BUS 2
 #define PI_NUM_SPI_CHANNEL 2
@@ -492,7 +493,14 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_MAX_I2C_DEVICE_COUNT 8192
 #define PI_MAX_SPI_DEVICE_COUNT 8192
 
-#define PI_MAX_PULSELEN 50
+#define PI_SPI_FLAGS_3WREN(x) ((x)<<4)
+#define PI_SPI_FLAGS_3WIRE(x) ((x)<<3)
+#define PI_SPI_FLAGS_CSPOL(x) ((x)<<2)
+#define PI_SPI_FLAGS_MODE(x)  ((x)<<0)
+
+/* Longest busy delay */
+
+#define PI_MAX_BUSY_DELAY 100
 
 /* timeout: 0-60000 */
 
@@ -1873,19 +1881,28 @@ D*/
 /*F*/
 int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags);
 /*D
-This function returns a handle for the SPI device on the channel
-Data will be transferred at baud bits per second.
+This function returns a handle for the SPI device on the channel.
+Data will be transferred at baud bits per second.  The flags may
+be used to modify the default behaviour of 4-wire operation, mode 0,
+active low chip select.
 
 . .
  spiChan: 0-1
  spiBaud: >1
-spiFlags: 0-3
+spiFlags: 0-0xFF
 . .
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
 PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
 
-The least significant two bits of flags define the SPI mode.
+spiFlags consists of the least significant 8 bits.
+
+. .
+7 6 5 4 3 2 1 0
+n n n n W P m m
+. .
+
+mm defines the SPI mode.
 
 . .
 Mode POL PHA
@@ -1894,6 +1911,14 @@ Mode POL PHA
  2    1   0
  3    1   1
 . .
+
+P is 0 for active low chip select (normal) and 1 for active high.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
 
 The other bits in flags should be set to zero.
 D*/
@@ -3521,8 +3546,32 @@ A SPI channel, 0 or 1.
 
 spiFlags::
 
-Flags which modify a SPI open command. The two least significant bits
-define the SPI mode.  The other bits are undefined.
+spiFlags consists of the least significant 8 bits.
+
+. .
+7 6 5 4 3 2 1 0
+n n n n W P m m
+. .
+
+mm defines the SPI mode.
+
+. .
+Mode POL PHA
+ 0    0   0
+ 1    0   1
+ 2    1   0
+ 3    1   1
+. .
+
+P is 0 for active low chip select (normal) and 1 for active high.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.
+
+The other bits in flags should be set to zero.
 
 spiSS::
 
@@ -3809,7 +3858,7 @@ after this command is issued.
 #define PI_BAD_WVSC_COMMND  -43 // bad WVSC subcommand
 #define PI_BAD_WVSM_COMMND  -44 // bad WVSM subcommand
 #define PI_BAD_WVSP_COMMND  -45 // bad WVSP subcommand
-#define PI_BAD_PULSELEN     -46 // trigger pulse length > 50
+#define PI_BAD_PULSELEN     -46 // trigger pulse length > 100
 #define PI_BAD_SCRIPT       -47 // invalid script
 #define PI_BAD_SCRIPT_ID    -48 // unknown script id
 #define PI_BAD_SER_OFFSET   -49 // add serial data offset > 30 minutes

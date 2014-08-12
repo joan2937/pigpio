@@ -610,7 +610,7 @@ def ta():
    # this test needs RXD and TXD to be connected
 
    h = pi.serial_open("/dev/ttyAMA0", 57600)
-   CHECK(10, 1, h, 0, 0, "serial open")
+   CHECK(10, 1, h>=0, 1, 0, "serial open")
 
    (b, s) = pi.serial_read(h, 1000) # flush buffer
 
@@ -666,7 +666,7 @@ def tb():
    # this test requires an ADXL345 on I2C bus 1 addr 0x53
 
    h = pi.i2c_open(1, 0x53)
-   CHECK(11, 1, h, 0, 0, "i2c open")
+   CHECK(11, 1, h>=0, 1, 0, "i2c open")
 
    e = pi.i2c_write_device(h, "\x00") # move to known register
    CHECK(11, 2, e, 0, 0, "i2c write device")
@@ -747,7 +747,7 @@ def tc():
    # this test requires a MCP3202 on SPI channel 1
 
    h = pi.spi_open(1, 50000)
-   CHECK(12, 1, h, 0, 0, "spi open")
+   CHECK(12, 1, h>=0, 1, 0, "spi open")
 
    (b, d) = pi.spi_xfer(h, [1,128,0])
    CHECK(12, 2, b, 3, 0, "spi xfer")
