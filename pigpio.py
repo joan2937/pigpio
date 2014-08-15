@@ -246,7 +246,7 @@ import os
 import atexit
 import codecs
 
-VERSION = "1.8"
+VERSION = "1.9"
 
 exceptions = True
 
@@ -578,6 +578,14 @@ _errors=[
    [PI_SPI_XFER_FAILED   , "SPI xfer/read/write failed"],
 ]
 
+class _socklock:
+   """
+   A class to store socket and lock.
+   """
+   def __init__(self):
+      self.s = None
+      self.l = threading.Lock()
+
 class error(Exception):
    """pigpio module exception"""
    def __init__(self, value):
@@ -658,24 +666,26 @@ def _u2i(number):
       else:
          return v
 
-def _pigpio_command(sock, cmd, p1, p2):
+def _pigpio_command(sl, cmd, p1, p2):
    """
    Runs a pigpio socket command.
 
-   sock:= command socket.
-    cmd:= the command to be executed.
-     p1:= command parameter 1 (if applicable).
+    sl:= command socket and lock.
+   cmd:= the command to be executed.
+    p1:= command parameter 1 (if applicable).
      p2:=  command parameter 2 (if applicable).
    """
-   sock.send(struct.pack('IIII', cmd, p1, p2, 0))
-   dummy, res = struct.unpack('12sI', sock.recv(16))
+   sl.l.acquire()
+   sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
+   dummy, res = struct.unpack('12sI', sl.s.recv(16))
+   sl.l.release()
    return res
 
-def _pigpio_command_ext(sock, cmd, p1, p2, p3, extents):
+def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents):
    """
    Runs an extended pigpio socket command.
 
-      sock:= command socket.
+        sl:= command socket and lock.
        cmd:= the command to be executed.
         p1:= command parameter 1 (if applicable).
         p2:= command parameter 2 (if applicable).
@@ -688,8 +698,10 @@ def _pigpio_command_ext(sock, cmd, p1, p2, p3, extents):
          ext.extend(_b(x))
       else:
          ext.extend(x)
-   sock.sendall(ext)
-   dummy, res = struct.unpack('12sI', sock.recv(16))
+   sl.l.acquire()
+   sl.s.sendall(ext)
+   dummy, res = struct.unpack('12sI', sl.s.recv(16))
+   sl.l.release()
    return res
 
 class _callback_ADT:
@@ -714,13 +726,14 @@ class _callback_thread(threading.Thread):
       """Initialises notifications."""
       threading.Thread.__init__(self)
       self.control = control
+      self.sl = _socklock()
       self.go = False
       self.daemon = True
       self.monitor = 0
       self.callbacks = []
-      self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      self.sock.connect((host, port))
-      self.handle = _pigpio_command(self.sock, _PI_CMD_NOIB, 0, 0)
+      self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.sl.s.connect((host, port))
+      self.handle = _pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0)
       self.go = True
       self.start()
 
@@ -728,7 +741,7 @@ class _callback_thread(threading.Thread):
       """Stops notifications."""
       if self.go:
          self.go = False
-         self.sock.send(struct.pack('IIII', _PI_CMD_NC, self.handle, 0, 0))
+         self.sl.s.send(struct.pack('IIII', _PI_CMD_NC, self.handle, 0, 0))
 
    def append(self, callb):
       """Adds a callback to the notification thread."""
@@ -757,10 +770,10 @@ class _callback_thread(threading.Thread):
 
       while self.go:
 
-         buf = self.sock.recv(MSG_SIZ)
+         buf = self.sl.s.recv(MSG_SIZ)
 
          while self.go and len(buf) < MSG_SIZ:
-            buf += self.sock.recv(MSG_SIZ-len(buf))
+            buf += self.sl.s.recv(MSG_SIZ-len(buf))
 
          if self.go:
             seq, flags, tick, level = (struct.unpack('HHII', buf))
@@ -781,7 +794,7 @@ class _callback_thread(threading.Thread):
                   if cb.gpio == gpio:
                      cb.func(cb.gpio, TIMEOUT, tick)
 
-      self.sock.close()
+      self.sl.s.close()
 
 class _callback:
    """A class to provide gpio level change callbacks."""
@@ -837,9 +850,9 @@ class pi():
 
    def _rxbuf(self, count):
       """Returns count bytes from the command socket."""
-      ext = bytearray(self._control.recv(count))
+      ext = bytearray(self.sl.s.recv(count))
       while len(ext) < count:
-         ext.extend(self._control.recv(count - len(ext)))
+         ext.extend(self.sl.s.recv(count - len(ext)))
       return ext
 
    def set_mode(self, gpio, mode):
@@ -855,7 +868,7 @@ class pi():
       pi.set_mode(24, pigpio.ALT2)   # gpio 24 as ALT2
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_MODES, gpio, mode))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_MODES, gpio, mode))
 
    def get_mode(self, gpio):
       """
@@ -881,7 +894,7 @@ class pi():
       4
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_MODEG, gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_MODEG, gpio, 0))
 
    def set_pull_up_down(self, gpio, pud):
       """
@@ -896,7 +909,7 @@ class pi():
       pi.set_pull_up_down(24, pigpio.PUD_DOWN)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PUD, gpio, pud))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PUD, gpio, pud))
 
    def read(self, gpio):
       """
@@ -916,7 +929,7 @@ class pi():
       1
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_READ, gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_READ, gpio, 0))
 
    def write(self, gpio, level):
       """
@@ -940,7 +953,7 @@ class pi():
       1
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WRITE, gpio, level))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WRITE, gpio, level))
 
    def set_PWM_dutycycle(self, user_gpio, dutycycle):
       """
@@ -960,7 +973,7 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(
-         self._control, _PI_CMD_PWM, user_gpio, int(dutycycle)))
+         self.sl, _PI_CMD_PWM, user_gpio, int(dutycycle)))
 
    def set_PWM_range(self, user_gpio, range_):
       """
@@ -975,7 +988,7 @@ class pi():
       pi.set_PWM_range(9, 3000) # now 750 1/4, 1500 1/2, 2250 3/4 on
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PRS, user_gpio, range_))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PRS, user_gpio, range_))
 
    def get_PWM_range(self, user_gpio):
       """
@@ -989,7 +1002,7 @@ class pi():
       500
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PRG, user_gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PRG, user_gpio, 0))
 
    def get_PWM_real_range(self, user_gpio):
       """
@@ -1004,7 +1017,7 @@ class pi():
       250
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PRRG, user_gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PRRG, user_gpio, 0))
 
    def set_PWM_frequency(self, user_gpio, frequency):
       """
@@ -1025,7 +1038,8 @@ class pi():
       8000
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PFS, user_gpio, frequency))
+      return _u2i(
+         _pigpio_command(self.sl, _PI_CMD_PFS, user_gpio, frequency))
 
    def get_PWM_frequency(self, user_gpio):
       """
@@ -1045,7 +1059,7 @@ class pi():
       800
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PFG, user_gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PFG, user_gpio, 0))
 
    def set_servo_pulsewidth(self, user_gpio, pulsewidth):
       """
@@ -1073,7 +1087,7 @@ class pi():
       ...
    """
       return _u2i(_pigpio_command(
-         self._control, _PI_CMD_SERVO, user_gpio, int(pulsewidth)))
+         self.sl, _PI_CMD_SERVO, user_gpio, int(pulsewidth)))
 
    def notify_open(self):
       """
@@ -1109,7 +1123,7 @@ class pi():
          pi.notify_begin(h, 1234)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_NO, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_NO, 0, 0))
 
    def notify_begin(self, handle, bits):
       """
@@ -1130,7 +1144,7 @@ class pi():
          pi.notify_begin(h, 1234)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_NB, handle, bits))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_NB, handle, bits))
 
    def notify_pause(self, handle):
       """
@@ -1152,7 +1166,7 @@ class pi():
          ...
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_NB, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_NB, handle, 0))
 
    def notify_close(self, handle):
       """
@@ -1169,7 +1183,7 @@ class pi():
          ...
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_NC, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_NC, handle, 0))
 
    def set_watchdog(self, user_gpio, wdog_timeout):
       """
@@ -1197,7 +1211,7 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(
-         self._control, _PI_CMD_WDOG, user_gpio, int(wdog_timeout)))
+         self.sl, _PI_CMD_WDOG, user_gpio, int(wdog_timeout)))
 
    def read_bank_1(self):
       """
@@ -1211,7 +1225,7 @@ class pi():
       0b10010100000011100100001001111
       ...
       """
-      return _pigpio_command(self._control, _PI_CMD_BR1, 0, 0)
+      return _pigpio_command(self.sl, _PI_CMD_BR1, 0, 0)
 
    def read_bank_2(self):
       """
@@ -1225,7 +1239,7 @@ class pi():
       0b1111110000000000000000
       ...
       """
-      return _pigpio_command(self._control, _PI_CMD_BR2, 0, 0)
+      return _pigpio_command(self.sl, _PI_CMD_BR2, 0, 0)
 
    def clear_bank_1(self, bits):
       """
@@ -1241,7 +1255,7 @@ class pi():
       pi.clear_bank_1(int("111110010000",2))
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_BC1, bits, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BC1, bits, 0))
 
    def clear_bank_2(self, bits):
       """
@@ -1257,7 +1271,7 @@ class pi():
       pi.clear_bank_2(0x1010)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_BC2, bits, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BC2, bits, 0))
 
    def set_bank_1(self, bits):
       """
@@ -1273,7 +1287,7 @@ class pi():
       pi.set_bank_1(int("111110010000",2))
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_BS1, bits, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BS1, bits, 0))
 
    def set_bank_2(self, bits):
       """
@@ -1289,7 +1303,7 @@ class pi():
       pi.set_bank_2(0x303)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_BS2, bits, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BS2, bits, 0))
 
    def get_current_tick(self):
       """
@@ -1305,7 +1319,7 @@ class pi():
       t2 = pi.get_current_tick()
       ...
       """
-      return _pigpio_command(self._control, _PI_CMD_TICK, 0, 0)
+      return _pigpio_command(self.sl, _PI_CMD_TICK, 0, 0)
 
    def get_hardware_revision(self):
       """
@@ -1337,7 +1351,7 @@ class pi():
       2
       ...
       """
-      return _pigpio_command(self._control, _PI_CMD_HWVER, 0, 0)
+      return _pigpio_command(self.sl, _PI_CMD_HWVER, 0, 0)
 
    def get_pigpio_version(self):
       """
@@ -1347,7 +1361,7 @@ class pi():
       v = pi.get_pigpio_version()
       ...
       """
-      return _pigpio_command(self._control, _PI_CMD_PIGPV, 0, 0)
+      return _pigpio_command(self.sl, _PI_CMD_PIGPV, 0, 0)
 
    def wave_clear(self):
       """
@@ -1358,7 +1372,7 @@ class pi():
       pi.wave_clear()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVCLR, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCLR, 0, 0))
 
    def wave_add_new(self):
       """
@@ -1372,7 +1386,7 @@ class pi():
       pi.wave_add_new()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVNEW, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVNEW, 0, 0))
 
    def wave_add_generic(self, pulses):
       """
@@ -1448,7 +1462,7 @@ class pi():
             ext.extend(struct.pack("III", p.gpio_on, p.gpio_off, p.delay))
          extents = [ext]
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_WVAG, 0, 0, len(pulses)*12, extents))
+            self.sl, _PI_CMD_WVAG, 0, 0, len(pulses)*12, extents))
       else:
          return 0
 
@@ -1494,7 +1508,7 @@ class pi():
       if len(data):
          extents = [struct.pack("I", offset), data]
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_WVAS, user_gpio, bb_baud, len(data)+4, extents))
+            self.sl, _PI_CMD_WVAS, user_gpio, bb_baud, len(data)+4, extents))
       else:
          return 0
 
@@ -1542,7 +1556,7 @@ class pi():
       wid = pi.wave_create()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVCRE, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCRE, 0, 0))
 
    def wave_delete(self, wave_id):
       """
@@ -1559,7 +1573,7 @@ class pi():
       pi.wave_delete(0) # delete all waves
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVDEL, wave_id, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVDEL, wave_id, 0))
 
    def wave_tx_start(self): # DEPRECATED
       """
@@ -1567,7 +1581,7 @@ class pi():
 
       Use [*wave_create*]/[*wave_send_**] instead.
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVGO, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVGO, 0, 0))
 
    def wave_tx_repeat(self): # DEPRECATED
       """
@@ -1575,7 +1589,7 @@ class pi():
 
       Use [*wave_create*]/[*wave_send_**] instead.
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVGOR, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVGOR, 0, 0))
 
    def wave_send_once(self, wave_id):
       """
@@ -1590,7 +1604,7 @@ class pi():
       cbs = pi.wave_send_once(wid)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVTX, wave_id, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTX, wave_id, 0))
 
    def wave_send_repeat(self, wave_id):
       """
@@ -1606,7 +1620,7 @@ class pi():
       cbs = pi.wave_send_repeat(wid)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVTXR, wave_id, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTXR, wave_id, 0))
 
    def wave_tx_busy(self):
       """
@@ -1622,7 +1636,7 @@ class pi():
       pi.wave_send_once(1) # send next waveform
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVBSY, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVBSY, 0, 0))
 
    def wave_tx_stop(self):
       """
@@ -1639,7 +1653,7 @@ class pi():
       pi.wave_tx_stop()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVHLT, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVHLT, 0, 0))
 
    def wave_get_micros(self):
       """
@@ -1649,7 +1663,7 @@ class pi():
       micros = pi.wave_get_micros()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSM, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSM, 0, 0))
 
    def wave_get_max_micros(self):
       """
@@ -1659,7 +1673,7 @@ class pi():
       micros = pi.wave_get_max_micros()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSM, 2, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSM, 2, 0))
 
    def wave_get_pulses(self):
       """
@@ -1669,7 +1683,7 @@ class pi():
       pulses = pi.wave_get_pulses()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSP, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSP, 0, 0))
 
    def wave_get_max_pulses(self):
       """
@@ -1679,7 +1693,7 @@ class pi():
       pulses = pi.wave_get_max_pulses()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSP, 2, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSP, 2, 0))
 
    def wave_get_cbs(self):
       """
@@ -1690,7 +1704,7 @@ class pi():
       cbs = pi.wave_get_cbs()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSC, 0, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSC, 0, 0))
 
    def wave_get_max_cbs(self):
       """
@@ -1701,7 +1715,7 @@ class pi():
       cbs = pi.wave_get_max_cbs()
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_WVSC, 2, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVSC, 2, 0))
 
    def i2c_open(self, i2c_bus, i2c_address, i2c_flags=0):
       """
@@ -1727,7 +1741,7 @@ class pi():
       # I i2c_flags
       extents = [struct.pack("I", i2c_flags)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CO, i2c_bus, i2c_address, 4, extents))
+         self.sl, _PI_CMD_I2CO, i2c_bus, i2c_address, 4, extents))
 
    def i2c_close(self, handle):
       """
@@ -1739,7 +1753,7 @@ class pi():
       pi.i2c_close(h)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_I2CC, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CC, handle, 0))
 
    def i2c_read_device(self, handle, count):
       """
@@ -1758,7 +1772,7 @@ class pi():
       (count, data) = pi.i2c_read_device(h, 12)
       ...
       """
-      bytes = _u2i(_pigpio_command(self._control, _PI_CMD_I2CRD, handle, count))
+      bytes = _u2i(_pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -1787,7 +1801,7 @@ class pi():
       # s len data bytes
       if len(data):
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_I2CWD, handle, 0, len(data), [data]))
+            self.sl, _PI_CMD_I2CWD, handle, 0, len(data), [data]))
       else:
          return 0
 
@@ -1805,7 +1819,7 @@ class pi():
       pi.i2c_write_quick(3, 0) # send 0 to device 3
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_I2CWQ, handle, bit))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CWQ, handle, bit))
 
    def i2c_write_byte(self, handle, byte_val):
       """
@@ -1822,7 +1836,7 @@ class pi():
       ...
       """
       return _u2i(
-         _pigpio_command(self._control, _PI_CMD_I2CWS, handle, byte_val))
+         _pigpio_command(self.sl, _PI_CMD_I2CWS, handle, byte_val))
 
    def i2c_read_byte(self, handle):
       """
@@ -1836,7 +1850,7 @@ class pi():
       b = pi.i2c_read_byte(2) # read a byte from device 2
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_I2CRS, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CRS, handle, 0))
 
    def i2c_write_byte_data(self, handle, reg, byte_val):
       """
@@ -1864,7 +1878,7 @@ class pi():
       # I byte_val
       extents = [struct.pack("I", byte_val)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CWB, handle, reg, 4, extents))
+         self.sl, _PI_CMD_I2CWB, handle, reg, 4, extents))
 
    def i2c_write_word_data(self, handle, reg, word_val):
       """
@@ -1892,7 +1906,7 @@ class pi():
       # I word_val
       extents = [struct.pack("I", word_val)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CWW, handle, reg, 4, extents))
+         self.sl, _PI_CMD_I2CWW, handle, reg, 4, extents))
 
    def i2c_read_byte_data(self, handle, reg):
       """
@@ -1912,7 +1926,7 @@ class pi():
       b = pi.i2c_read_byte_data(0, 1)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_I2CRB, handle, reg))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CRB, handle, reg))
 
    def i2c_read_word_data(self, handle, reg):
       """
@@ -1932,7 +1946,7 @@ class pi():
       w = pi.i2c_read_word_data(2, 7)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_I2CRW, handle, reg))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CRW, handle, reg))
 
    def i2c_process_call(self, handle, reg, word_val):
       """
@@ -1957,7 +1971,7 @@ class pi():
       # I word_val
       extents = [struct.pack("I", word_val)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CPC, handle, reg, 4, extents))
+         self.sl, _PI_CMD_I2CPC, handle, reg, 4, extents))
 
    def i2c_write_block_data(self, handle, reg, data):
       """
@@ -1987,7 +2001,7 @@ class pi():
       # s len data bytes
       if len(data):
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_I2CWK, handle, reg, len(data), [data]))
+            self.sl, _PI_CMD_I2CWK, handle, reg, len(data), [data]))
       else:
          return 0
 
@@ -2016,7 +2030,7 @@ class pi():
          # process read failure
       ...
       """
-      bytes = _u2i(_pigpio_command(self._control, _PI_CMD_I2CRK, handle, reg))
+      bytes = _u2i(_pigpio_command(self.sl, _PI_CMD_I2CRK, handle, reg))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2058,7 +2072,7 @@ class pi():
       ## extension ##
       # s len data bytes
       bytes = _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CPK, handle, reg, len(data), [data]))
+         self.sl, _PI_CMD_I2CPK, handle, reg, len(data), [data]))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2089,7 +2103,7 @@ class pi():
       # s len data bytes
       if len(data):
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_I2CWI, handle, reg, len(data), [data]))
+            self.sl, _PI_CMD_I2CWI, handle, reg, len(data), [data]))
       else:
          return 0
 
@@ -2122,7 +2136,7 @@ class pi():
       # I count
       extents = [struct.pack("I", count)]
       bytes = _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_I2CRI, handle, reg, 4, extents))
+         self.sl, _PI_CMD_I2CRI, handle, reg, 4, extents))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2183,7 +2197,7 @@ class pi():
       # I spi_flags
       extents = [struct.pack("I", spi_flags)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_SPIO, spi_channel, spi_baud, 4, extents))
+         self.sl, _PI_CMD_SPIO, spi_channel, spi_baud, 4, extents))
 
    def spi_close(self, handle):
       """
@@ -2195,7 +2209,7 @@ class pi():
       pi.spi_close(h)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_SPIC, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SPIC, handle, 0))
 
    def spi_read(self, handle, count):
       """
@@ -2218,7 +2232,7 @@ class pi():
       ...
       """
       bytes = _u2i(_pigpio_command(
-         self._control, _PI_CMD_SPIR, handle, count))
+         self.sl, _PI_CMD_SPIR, handle, count))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2246,7 +2260,7 @@ class pi():
       ## extension ##
       # s len data bytes
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_SPIW, handle, 0, len(data), [data]))
+         self.sl, _PI_CMD_SPIW, handle, 0, len(data), [data]))
 
    def spi_xfer(self, handle, data):
       """
@@ -2277,7 +2291,7 @@ class pi():
       ## extension ##
       # s len data bytes
       bytes = _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_SPIX, handle, 0, len(data), [data]))
+         self.sl, _PI_CMD_SPIX, handle, 0, len(data), [data]))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2308,7 +2322,7 @@ class pi():
       ## extension ##
       # s len data bytes
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_SERO, ser_baud, ser_flags, len(tty), [tty]))
+         self.sl, _PI_CMD_SERO, ser_baud, ser_flags, len(tty), [tty]))
 
    def serial_close(self, handle):
       """
@@ -2320,7 +2334,7 @@ class pi():
       pi.serial_close(h1)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_SERC, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SERC, handle, 0))
 
    def serial_read_byte(self, handle):
       """
@@ -2332,7 +2346,7 @@ class pi():
       b = pi.serial_read_byte(h1)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_SERRB, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SERRB, handle, 0))
 
    def serial_write_byte(self, handle, byte_val):
       """
@@ -2348,7 +2362,7 @@ class pi():
       ...
       """
       return _u2i(
-         _pigpio_command(self._control, _PI_CMD_SERWB, handle, byte_val))
+         _pigpio_command(self.sl, _PI_CMD_SERWB, handle, byte_val))
 
    def serial_read(self, handle, count):
       """
@@ -2368,7 +2382,7 @@ class pi():
          # process read data
       ...
       """
-      bytes = _u2i(_pigpio_command(self._control, _PI_CMD_SERR, handle, count))
+      bytes = _u2i(_pigpio_command(self.sl, _PI_CMD_SERR, handle, count))
 
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
@@ -2398,7 +2412,7 @@ class pi():
       # s len data bytes
 
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_SERW, handle, 0, len(data), [data]))
+         self.sl, _PI_CMD_SERW, handle, 0, len(data), [data]))
 
    def serial_data_available(self, handle):
       """
@@ -2414,7 +2428,7 @@ class pi():
          (b, d) = pi.serial_read(h1, rdy)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_SERDA, handle, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SERDA, handle, 0))
 
    def gpio_trigger(self, user_gpio, pulse_len=10, level=1):
       """
@@ -2438,7 +2452,7 @@ class pi():
       # I level
       extents = [struct.pack("I", level)]
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_TRIG, user_gpio, pulse_len, 4, extents))
+         self.sl, _PI_CMD_TRIG, user_gpio, pulse_len, 4, extents))
 
    def store_script(self, script):
       """
@@ -2460,7 +2474,7 @@ class pi():
       # s len data bytes
       if len(script):
          return _u2i(_pigpio_command_ext(
-            self._control, _PI_CMD_PROC, 0, 0, len(script), [script]))
+            self.sl, _PI_CMD_PROC, 0, 0, len(script), [script]))
       else:
          return 0
 
@@ -2494,7 +2508,7 @@ class pi():
          nump = 0
          extents = []
       return _u2i(_pigpio_command_ext(
-         self._control, _PI_CMD_PROCR, script_id, 0, nump*4, extents))
+         self.sl, _PI_CMD_PROCR, script_id, 0, nump*4, extents))
 
    def script_status(self, script_id):
       """
@@ -2521,9 +2535,9 @@ class pi():
       (s, pars) = pi.script_status(sid)
       ...
       """
-      status = _u2i(_pigpio_command(self._control, _PI_CMD_PROCP, script_id, 0))
+      status = _u2i(_pigpio_command(self.sl, _PI_CMD_PROCP, script_id, 0))
       if status > 0:
-         params = struct.unpack('I10i', self._control.recv(44))
+         params = struct.unpack('I10i', self.sl.s.recv(44))
          return params[0], params[1:]
       return status, ()
 
@@ -2537,7 +2551,7 @@ class pi():
       status = pi.stop_script(sid)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PROCS, script_id, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PROCS, script_id, 0))
 
    def delete_script(self, script_id):
       """
@@ -2549,7 +2563,7 @@ class pi():
       status = pi.delete_script(sid)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_PROCD, script_id, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PROCD, script_id, 0))
 
    def bb_serial_read_open(self, user_gpio, bb_baud):
       """
@@ -2570,7 +2584,7 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(
-         self._control, _PI_CMD_SLRO, user_gpio, bb_baud))
+         self.sl, _PI_CMD_SLRO, user_gpio, bb_baud))
 
    def bb_serial_read(self, user_gpio):
       """
@@ -2587,7 +2601,7 @@ class pi():
       (count, data) = pi.bb_serial_read(4)
       ...
       """
-      bytes = _u2i(_pigpio_command(self._control, _PI_CMD_SLR, user_gpio, 10000))
+      bytes = _u2i(_pigpio_command(self.sl, _PI_CMD_SLR, user_gpio, 10000))
       if bytes > 0:
          return bytes, self._rxbuf(bytes)
       return bytes, ""
@@ -2603,7 +2617,7 @@ class pi():
       status = pi.bb_serial_read_close(17)
       ...
       """
-      return _u2i(_pigpio_command(self._control, _PI_CMD_SLRC, user_gpio, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRC, user_gpio, 0))
 
    def callback(self, user_gpio, edge=RISING_EDGE, func=None):
       """
@@ -2692,7 +2706,7 @@ class pi():
       """
       self.connected = True
 
-      self._control = None
+      self.sl = _socklock()
       self._notify  = None
 
       self._host = ''
@@ -2701,19 +2715,19 @@ class pi():
       self._host = host
       self._port = int(port)
 
-      self._control = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
       # Disable the Nagle algorithm.
-      self._control.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+      self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
       try:
-         self._control.connect((self._host, self._port))
-         self._notify = _callback_thread(self._control, self._host, self._port)
+         self.sl.s.connect((self._host, self._port))
+         self._notify = _callback_thread(self.sl, self._host, self._port)
 
       except socket.error:
          self.connected = False
-         if self._control is not None:
-            self._control = None
+         if self.sl.s is not None:
+            self.sl.s = None
          if self._host == '':
             h = "localhost"
          else:
@@ -2749,9 +2763,9 @@ class pi():
          self._notify.stop()
          self._notify = None
 
-      if self._control is not None:
-         self._control.close()
-         self._control = None
+      if self.sl.s is not None:
+         self.sl.s.close()
+         self.sl.s = None
 
 def xref():
    """

@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 18 */
+/* pigpio version 19 */
 
 #include <stdio.h>
 #include <string.h>

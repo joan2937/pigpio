@@ -119,7 +119,7 @@ if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 echo "pigpv" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 18 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 19 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 echo "prs $GPIO 255" >/dev/pigpio
 read -t 1 s </dev/pigout

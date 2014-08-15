@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 7
+#define PIGPIOD_IF_VERSION 8
 
 /*TEXT
 
@@ -71,33 +71,31 @@ ALL gpios are identified by their Broadcom number.
 
 The PWM and servo pulses are timed using the DMA and PWM/PCM peripherals.
 
-TEXT*/
-
-/*USAGE
-
-Usage
+*Usage*
 
 Include <pigpiod_if.h> in your source files.
 
-Assuming your source is in example.c use the following command to build
+Assuming your source is in prog.c use the following command to build
 
 . .
-gcc -o example example.c -lpigpiod_if
+gcc -o prog prog.c -lpigpiod_if
+. .
 
 to run make sure the pigpio daemon is running
 
+. .
 sudo pigpiod
 
-./example # sudo is not required to run programs linked to pigpiod_if
+ ./prog # sudo is not required to run programs linked to pigpiod_if
 . .
 
-For examples see checklib.c, demolib.c, pigpio.c, pigpiod.c, pig2vcd.c,
-and pigs.c
+For examples see x_pigpiod_if.c within the pigpio archive file.
 
-All the functions which return an int return < 0 on error.
+*Notes*
 
+All the functions which return an int return < 0 on error
 
-USAGE*/
+TEXT*/
 
 /*OVERVIEW
 
