@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 19
+#define PIGPIO_VERSION 20
 
 /*TEXT
 
@@ -2102,7 +2102,7 @@ level for pulseLen microseconds and then reset to not level.
 
 . .
 user_gpio: 0-31
- pulseLen: 1-50
+ pulseLen: 1-100
     level: 0,1
 . .
 
@@ -3411,7 +3411,7 @@ PI_PUD_UP 2
 
 pulseLen::
 
-1-50, the length of a trigger pulse in microseconds.
+1-100, the length of a trigger pulse in microseconds.
 
 *pulses::
 

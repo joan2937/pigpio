@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 19 */
+/* pigpio version 20 */
 
 #include <stdio.h>
 #include <string.h>
@@ -4705,7 +4705,7 @@ static void *pthSocketThreadHandler(void *fdC)
 
          case PI_CMD_PROCP:
             p[3] = myDoCommand(p, sizeof(buf)-1, buf+sizeof(int));
-            if (p[3] >= 0)
+            if (((int)p[3]) >= 0)
             {
                memcpy(buf, &p[3], 4);
                p[3] = 4 + (4*PI_MAX_SCRIPT_PARAMS);
@@ -4732,7 +4732,7 @@ static void *pthSocketThreadHandler(void *fdC)
          case PI_CMD_SPIX:
          case PI_CMD_SPIR:
 
-            if (p[3] > 0)
+            if (((int)p[3]) > 0)
             {
                write(sock, buf, p[3]);
             }
