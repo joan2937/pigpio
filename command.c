@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 18+
+This version is for pigpio version 21+
 */
 
 #include <stdio.h>
@@ -454,6 +454,9 @@ static errInfo_t errInfo[]=
    {PI_SER_READ_FAILED  , "ser read failed"},
    {PI_SER_READ_NO_DATA , "ser read no data available"},
    {PI_UNKNOWN_COMMAND  , "unknown command"},
+   {PI_SPI_XFER_FAILED  , "spi xfer/read/write failed"},
+   {PI_BAD_POINTER      , "bad (NULL) pointer"},
+   {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
 
 };
 

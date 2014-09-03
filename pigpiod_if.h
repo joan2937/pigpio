@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 8
+#define PIGPIOD_IF_VERSION 9
 
 /*TEXT
 
@@ -1564,6 +1564,10 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
+An auxiliary SPI device is available on the B+ and may be
+selected by setting the A bit in the flags.  The auxiliary
+device has 3 chip selects and a selectable word size in bits.
+
 . .
 spi_channel: 0-1.
    spi_baud: >1.
@@ -1571,13 +1575,13 @@ spi_channel: 0-1.
 . .
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
-PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
+PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
 
-spiFlags consists of the least significant 8 bits.
+spi_flags consists of the least significant 22 bits.
 
 . .
-7 6 5 4 3 2 1 0
-n n n n W P m m
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
 . .
 
 mm defines the SPI mode.
@@ -1590,13 +1594,30 @@ Mode POL PHA
  3    1   1
 . .
 
-P is 0 for active low chip select (normal) and 1 for active high.
+px is 0 if CEx is active low (default) and 1 for active high.
 
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
+auxiliary device is only present on the B+.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
+SPI device only.
 
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
+if W is not set.  Standard SPI device only.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.  Auxiliary SPI
+device only.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.  Auxiliary SPI
+device only.
+
+bbbbbb defines the word size in bits (0-32).  The default (0)
+sets 8 bits per word.  Auxiliary SPI device only.
 
 The other bits in flags should be set to zero.
 D*/
@@ -2047,7 +2068,7 @@ pulseLen::
 1-100, the length of a trigger pulse in microseconds.
 
 *pulses::
-An array of pulsed to be added to a waveform.
+An array of pulses to be added to a waveform.
 
 pulsewidth::0, 500-2500
 . .
@@ -2095,37 +2116,11 @@ A standard type used to indicate the size of an object in bytes.
 spi_baud::
 The speed in bits per second to use for the SPI device.
 
-
 spi_channel::
 A SPI channel, 0 or 1.
 
 spi_flags::
-spi_flags consists of the least significant 8 bits.
-
-. .
-7 6 5 4 3 2 1 0
-n n n n W P m m
-. .
-
-mm defines the SPI mode.
-
-. .
-Mode POL PHA
- 0    0   0
- 1    0   1
- 2    1   0
- 3    1   1
-. .
-
-P is 0 for active low chip select (normal) and 1 for active high.
-
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
-
-nnnn defines the number of bytes (0-15) to write before switching
-the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
-
-The other bits in flags should be set to zero.
+See [*spi_open*].
 
 *str::
  An array of characters.

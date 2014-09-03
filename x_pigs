@@ -86,7 +86,7 @@ s=$(pigs pfs $GPIO 800)
 if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
 
 s=$(pigs pigpv)
-if [[ $s = 20 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
+if [[ $s = 21 ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 s=$(pigs prs $GPIO 255)
 if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi

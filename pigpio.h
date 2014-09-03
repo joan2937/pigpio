@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 20
+#define PIGPIO_VERSION 21
 
 /*TEXT
 
@@ -483,20 +483,30 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* I2C, SPI, SER */
 
+#define MIN_SPI_SPEED 32000
+#define MAX_SPI_SPEED 125000000
+
 #define PI_I2C_SLOTS 32
-#define PI_SPI_SLOTS 8
+#define PI_SPI_SLOTS 16
 #define PI_SER_SLOTS 8
 
 #define PI_NUM_I2C_BUS 2
-#define PI_NUM_SPI_CHANNEL 2
+
+#define PI_NUM_AUX_SPI_CHANNEL 3
+#define PI_NUM_STD_SPI_CHANNEL 2
 
 #define PI_MAX_I2C_DEVICE_COUNT 8192
 #define PI_MAX_SPI_DEVICE_COUNT 8192
 
-#define PI_SPI_FLAGS_3WREN(x) ((x)<<4)
-#define PI_SPI_FLAGS_3WIRE(x) ((x)<<3)
-#define PI_SPI_FLAGS_CSPOL(x) ((x)<<2)
-#define PI_SPI_FLAGS_MODE(x)  ((x)<<0)
+#define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
+#define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
+#define PI_SPI_FLAGS_TX_LSB(x)  ((x&1)<<14)
+#define PI_SPI_FLAGS_3WREN(x)  ((x&15)<<10)
+#define PI_SPI_FLAGS_3WIRE(x)   ((x&1)<<9)
+#define PI_SPI_FLAGS_AUX_SPI(x) ((x&1)<<8)
+#define PI_SPI_FLAGS_RESVD(x)   ((x&7)<<5)
+#define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
+#define PI_SPI_FLAGS_MODE(x)    ((x&3))
 
 /* Longest busy delay */
 
@@ -1886,20 +1896,24 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
+An auxiliary SPI device is available on the B+ and may be
+selected by setting the A bit in the flags.  The auxiliary
+device has 3 chip selects and a selectable word size in bits.
+
 . .
  spiChan: 0-1
  spiBaud: >1
-spiFlags: 0-0xFF
+spiFlags: see below
 . .
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
-PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
+PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
 
-spiFlags consists of the least significant 8 bits.
+spiFlags consists of the least significant 22 bits.
 
 . .
-7 6 5 4 3 2 1 0
-n n n n W P m m
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
 . .
 
 mm defines the SPI mode.
@@ -1912,13 +1926,30 @@ Mode POL PHA
  3    1   1
 . .
 
-P is 0 for active low chip select (normal) and 1 for active high.
+px is 0 if CEx is active low (default) and 1 for active high.
 
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
+auxiliary device is only present on the B+.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
+SPI device only.
 
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
+if W is not set.  Standard SPI device only.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.  Auxiliary SPI
+device only.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.  Auxiliary SPI
+device only.
+
+bbbbbb defines the word size in bits (0-32).  The default (0)
+sets 8 bits per word.  Auxiliary SPI device only.
 
 The other bits in flags should be set to zero.
 D*/
@@ -2614,7 +2645,7 @@ micros: the number of microseconds to sleep
 
 Returns the actual length of the delay in microseconds.
 
-Delays of 50 microseconds or less use busy waits.
+Delays of 100 microseconds or less use busy waits.
 D*/
 
 
@@ -3230,6 +3261,15 @@ typedef struct
 } gpioPulse_t;
 . .
 
+gpioSample_t::
+. .
+typedef struct
+{
+   uint32_t tick;
+   uint32_t level;
+} gpioSample_t;
+. .
+
 gpioSignalFunc_t::
 . .
 typedef void (*gpioSignalFunc_t) (int signum);
@@ -3415,7 +3455,7 @@ pulseLen::
 
 *pulses::
 
-An array of pulsed to be added to a waveform.
+An array of pulses to be added to a waveform.
 
 pulsewidth::0, 500-2500
 . .
@@ -3546,32 +3586,7 @@ A SPI channel, 0 or 1.
 
 spiFlags::
 
-spiFlags consists of the least significant 8 bits.
-
-. .
-7 6 5 4 3 2 1 0
-n n n n W P m m
-. .
-
-mm defines the SPI mode.
-
-. .
-Mode POL PHA
- 0    0   0
- 1    0   1
- 2    1   0
- 3    1   1
-. .
-
-P is 0 for active low chip select (normal) and 1 for active high.
-
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
-
-nnnn defines the number of bytes (0-15) to write before switching
-the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
-
-The other bits in flags should be set to zero.
+See [*spiOpen*].
 
 spiSS::
 
@@ -3903,6 +3918,7 @@ after this command is issued.
 #define PI_UNKNOWN_COMMAND  -88 // unknown command
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
+#define PI_NO_AUX_SPI       -91 // need a B+ for auxiliary SPI
 
 /*DEF_E*/
 

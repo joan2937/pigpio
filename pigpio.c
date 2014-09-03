@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 20 */
+/* pigpio version 21 */
 
 #include <stdio.h>
 #include <string.h>
@@ -286,6 +286,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define DMA_BUS_ADR 0x40000000
 
+#define AUX_BASE   0x20215000
 #define CLK_BASE   0x20101000
 #define DMA_BASE   0x20007000
 #define DMA15_BASE 0x20E05000
@@ -294,9 +295,8 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define PWM_BASE   0x2020C000
 #define SPI_BASE   0x20204000
 #define SYST_BASE  0x20003000
-#define UART0_BASE 0x20201000
-#define UART1_BASE 0x20215000
 
+#define AUX_LEN   0xD8
 #define CLK_LEN   0xA8
 #define DMA_LEN   0x1000 /* allow access to all channels */
 #define GPIO_LEN  0xB4
@@ -491,23 +491,21 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define SPI_LTOH 4
 #define SPI_DC   5
 
-#define SPI_CS_LEN_LONG  (1<<25)
-#define SPI_CS_DMA_LEN   (1<<24)
-#define SPI_CS_CSPOL2    (1<<23)
-#define SPI_CS_CSPOL1    (1<<22)
-#define SPI_CS_CSPOL0    (1<<21)
-#define SPI_CS_RXF       (1<<20)
-#define SPI_CS_RXR       (1<<19)
-#define SPI_CS_TXD       (1<<18)
-#define SPI_CS_RXD       (1<<17)
-#define SPI_CS_DONE      (1<<16)
-#define SPI_CS_LEN       (1<<13)
-#define SPI_CS_REN       (1<<12)
-#define SPI_CS_ADCS      (1<<11)
-#define SPI_CS_INTR      (1<<10)
-#define SPI_CS_INTD      (1<<9)
-#define SPI_CS_DMAEN     (1<<8)
-#define SPI_CS_TA        (1<<7)
+#define SPI_CS_LEN_LONG    (1<<25)
+#define SPI_CS_DMA_LEN     (1<<24)
+#define SPI_CS_CSPOLS(x) ((x)<<21)
+#define SPI_CS_RXF         (1<<20)
+#define SPI_CS_RXR         (1<<19)
+#define SPI_CS_TXD         (1<<18)
+#define SPI_CS_RXD         (1<<17)
+#define SPI_CS_DONE        (1<<16)
+#define SPI_CS_LEN         (1<<13)
+#define SPI_CS_REN         (1<<12)
+#define SPI_CS_ADCS        (1<<11)
+#define SPI_CS_INTR        (1<<10)
+#define SPI_CS_INTD        (1<<9)
+#define SPI_CS_DMAEN       (1<<8)
+#define SPI_CS_TA          (1<<7)
 #define SPI_CS_CSPOL(x)  ((x)<<6)
 #define SPI_CS_CLEAR(x)  ((x)<<4)
 #define SPI_CS_MODE(x)   ((x)<<2)
@@ -527,13 +525,87 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define SPI_CS1     1
 #define SPI_CS2     2
 
-/* SPI gpios. */
+/* standard SPI gpios (ALT0) */
 
 #define PI_SPI_CE0   8
 #define PI_SPI_CE1   7
 #define PI_SPI_SCLK 11
 #define PI_SPI_MISO  9
 #define PI_SPI_MOSI 10
+
+/* auxiliary SPI gpios (ALT4) */
+
+#define PI_ASPI_CE0  18
+#define PI_ASPI_CE1  17
+#define PI_ASPI_CE2  16
+#define PI_ASPI_MISO 19
+#define PI_ASPI_MOSI 20
+#define PI_ASPI_SCLK 21
+
+/* AUX */
+
+#define AUX_IRQ     0
+#define AUX_ENABLES 1
+
+#define AUX_MU_IO_REG   16
+#define AUX_MU_IER_REG  17
+#define AUX_MU_IIR_REG  18
+#define AUX_MU_LCR_REG  19
+#define AUX_MU_MCR_REG  20
+#define AUX_MU_LSR_REG  21
+#define AUX_MU_MSR_REG  22
+#define AUX_MU_SCRATCH  23
+#define AUX_MU_CNTL_REG 24
+#define AUX_MU_STAT_REG 25
+#define AUX_MU_BAUD_REG 26
+
+#define AUX_SPI0_CNTL0_REG 32
+#define AUX_SPI0_CNTL1_REG 33
+#define AUX_SPI0_STAT_REG  34
+#define AUX_SPI0_PEEK_REG  35
+
+#define AUX_SPI0_IO_REG    40
+#define AUX_SPI0_TX_HOLD   44
+
+#define AUX_SPI1_CNTL0_REG 48
+#define AUX_SPI1_CNTL1_REG 49
+#define AUX_SPI1_STAT_REG  50
+#define AUX_SPI1_PEEK_REG  51
+
+#define AUX_SPI1_IO_REG    56
+#define AUX_SPI1_TX_HOLD   60
+
+#define AUXENB_SPI2 (1<<2)
+#define AUXENB_SPI1 (1<<1)
+#define AUXENB_UART (1<<0)
+
+#define AUXSPI_CNTL0_SPEED(x)      ((x)<<20)
+#define AUXSPI_CNTL0_CS(x)         ((x)<<17)
+#define AUXSPI_CNTL0_POSTINP         (1<<16)
+#define AUXSPI_CNTL0_VAR_CS          (1<<15)
+#define AUXSPI_CNTL0_VAR_WIDTH       (1<<14)
+#define AUXSPI_CNTL0_DOUT_HOLD(x)  ((x)<<12)
+#define AUXSPI_CNTL0_ENABLE          (1<<11)
+#define AUXSPI_CNTL0_IN_RISING(x)  ((x)<<10)
+#define AUXSPI_CNTL0_CLR_FIFOS       (1<<9)
+#define AUXSPI_CNTL0_OUT_RISING(x) ((x)<<8)
+#define AUXSPI_CNTL0_INVERT_CLK(x) ((x)<<7)
+#define AUXSPI_CNTL0_MSB_FIRST(x)  ((x)<<6)
+#define AUXSPI_CNTL0_SHIFT_LEN(x)  ((x)<<0)
+
+#define AUXSPI_CNTL1_CS_HIGH(x)  ((x)<<8)
+#define AUXSPI_CNTL1_TX_IRQ        (1<<7)
+#define AUXSPI_CNTL1_DONE_IRQ      (1<<6)
+#define AUXSPI_CNTL1_MSB_FIRST(x)((x)<<1)
+#define AUXSPI_CNTL1_KEEP_INPUT    (1<<0)
+
+#define AUXSPI_STAT_TX_FIFO(x) ((x)<<28)
+#define AUXSPI_STAT_RX_FIFO(x) ((x)<<20)
+#define AUXSPI_STAT_TX_FULL      (1<<10)
+#define AUXSPI_STAT_TX_EMPTY     (1<<9)
+#define AUXSPI_STAT_RX_EMPTY     (1<<7)
+#define AUXSPI_STAT_BUSY         (1<<6)
+#define AUXSPI_STAT_BITS(x)    ((x)<<0)
 
 /* --------------------------------------------------------------- */
 
@@ -781,6 +853,19 @@ typedef struct
    uint32_t flags;
 } spiInfo_t;
 
+#define PI_SPI_FLAGS_CHANNEL(x)    ((x&7)<<29)
+
+#define PI_SPI_FLAGS_GET_CHANNEL(x) (((x)>>29)&7)
+#define PI_SPI_FLAGS_GET_BITLEN(x)  (((x)>>16)&63)
+#define PI_SPI_FLAGS_GET_RX_LSB(x)  (((x)>>15)&1)
+#define PI_SPI_FLAGS_GET_TX_LSB(x)  (((x)>>14)&1)
+#define PI_SPI_FLAGS_GET_3WREN(x)   (((x)>>10)&15)
+#define PI_SPI_FLAGS_GET_3WIRE(x)   (((x)>>9)&1)
+#define PI_SPI_FLAGS_GET_AUX_SPI(x) (((x)>>8)&1)
+#define PI_SPI_FLAGS_GET_RESVD(x)   (((x)>>5)&7)
+#define PI_SPI_FLAGS_GET_CSPOLS(x)  (((x)>>2)&7)
+#define PI_SPI_FLAGS_GET_MODE(x)     ((x)&3)
+
 typedef struct
 {
    uint32_t startTick;
@@ -982,16 +1067,17 @@ static dmaIPage_t * * dmaIPhys = MAP_FAILED;
 static dmaOPage_t * * dmaOVirt = MAP_FAILED;
 static dmaOPage_t * * dmaOPhys = MAP_FAILED;
 
-static volatile uint32_t  * clkReg  = MAP_FAILED;
-static volatile uint32_t  * dmaReg  = MAP_FAILED;
-static volatile uint32_t  * gpioReg = MAP_FAILED;
-static volatile uint32_t  * pcmReg  = MAP_FAILED;
-static volatile uint32_t  * pwmReg  = MAP_FAILED;
-static volatile uint32_t  * spiReg  = MAP_FAILED;
-static volatile uint32_t  * systReg = MAP_FAILED;
+static volatile uint32_t * auxReg  = MAP_FAILED;
+static volatile uint32_t * clkReg  = MAP_FAILED;
+static volatile uint32_t * dmaReg  = MAP_FAILED;
+static volatile uint32_t * gpioReg = MAP_FAILED;
+static volatile uint32_t * pcmReg  = MAP_FAILED;
+static volatile uint32_t * pwmReg  = MAP_FAILED;
+static volatile uint32_t * spiReg  = MAP_FAILED;
+static volatile uint32_t * systReg = MAP_FAILED;
 
-static volatile uint32_t  * dmaIn   = MAP_FAILED;
-static volatile uint32_t  * dmaOut  = MAP_FAILED;
+static volatile uint32_t * dmaIn   = MAP_FAILED;
+static volatile uint32_t * dmaOut  = MAP_FAILED;
 
 /* constant data */
 
@@ -2852,6 +2938,10 @@ int i2cClose(unsigned handle)
 
 /* ======================================================================= */
 
+/*SPI */
+
+static uint32_t spi_dummy; /* only used to prevent warning */
+
 static unsigned old_mode_ce0;
 static unsigned old_mode_ce1;
 static unsigned old_mode_sclk;
@@ -2861,52 +2951,223 @@ static unsigned old_mode_mosi;
 static uint32_t old_spi_cs;
 static uint32_t old_spi_clk;
 
-static uint32_t spi_dummy; /* only used to prevent warning */
+static unsigned old_mode_ace0;
+static unsigned old_mode_ace1;
+static unsigned old_mode_ace2;
+static unsigned old_mode_asclk;
+static unsigned old_mode_amiso;
+static unsigned old_mode_amosi;
 
-static void spiInit(void)
+static uint32_t old_spi_cntl0;
+static uint32_t old_spi_cntl1;
+
+static void spiInit(uint32_t flags)
 {
-   old_mode_ce0  = gpioGetMode(PI_SPI_CE0);
-   old_mode_ce1  = gpioGetMode(PI_SPI_CE1);
-   old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
-   old_mode_miso = gpioGetMode(PI_SPI_MISO);
-   old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
+   int resvd;
 
-   gpioSetMode(PI_SPI_CE0, PI_ALT0);
-   gpioSetMode(PI_SPI_CE1, PI_ALT0);
-   gpioSetMode(PI_SPI_SCLK, PI_ALT0);
-   gpioSetMode(PI_SPI_MISO, PI_ALT0);
-   gpioSetMode(PI_SPI_MOSI, PI_ALT0);
+   resvd = PI_SPI_FLAGS_GET_RESVD(flags);
 
-   old_spi_cs  = spiReg[SPI_CS];
-   old_spi_clk = spiReg[SPI_CLK];
+   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
+   {
+      /* enable module and access to registers */
+
+      auxReg[AUX_ENABLES] |= AUXENB_SPI1;
+
+      /* save original state */
+
+      old_mode_ace0  = gpioGetMode(PI_ASPI_CE0);
+      old_mode_ace1  = gpioGetMode(PI_ASPI_CE1);
+      old_mode_ace2  = gpioGetMode(PI_ASPI_CE2);
+      old_mode_asclk = gpioGetMode(PI_ASPI_SCLK);
+      old_mode_amiso = gpioGetMode(PI_ASPI_MISO);
+      old_mode_amosi = gpioGetMode(PI_ASPI_MOSI);
+
+      old_spi_cntl0 = auxReg[AUX_SPI0_CNTL0_REG];
+      old_spi_cntl1 = auxReg[AUX_SPI0_CNTL1_REG];
+
+      /* set gpios to SPI mode */
+
+      if (!(resvd&1)) gpioSetMode(PI_ASPI_CE0,  PI_ALT4);
+      if (!(resvd&2)) gpioSetMode(PI_ASPI_CE1,  PI_ALT4);
+      if (!(resvd&4)) gpioSetMode(PI_ASPI_CE2,  PI_ALT4);
+
+      gpioSetMode(PI_ASPI_SCLK, PI_ALT4);
+      gpioSetMode(PI_ASPI_MISO, PI_ALT4);
+      gpioSetMode(PI_ASPI_MOSI, PI_ALT4);
+   }
+   else
+   {
+      /* save original state */
+
+      old_mode_ce0  = gpioGetMode(PI_SPI_CE0);
+      old_mode_ce1  = gpioGetMode(PI_SPI_CE1);
+      old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
+      old_mode_miso = gpioGetMode(PI_SPI_MISO);
+      old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
+
+      old_spi_cs  = spiReg[SPI_CS];
+      old_spi_clk = spiReg[SPI_CLK];
+
+      /* set gpios to SPI mode */
+
+      if (!(resvd&1)) gpioSetMode(PI_SPI_CE0,  PI_ALT0);
+      if (!(resvd&2)) gpioSetMode(PI_SPI_CE1,  PI_ALT0);
+
+      gpioSetMode(PI_SPI_SCLK, PI_ALT0);
+      gpioSetMode(PI_SPI_MISO, PI_ALT0);
+      gpioSetMode(PI_SPI_MOSI, PI_ALT0);
+   }
 }
 
-static void spiTerm(void)
-{  
-   gpioSetMode(PI_SPI_CE0, old_mode_ce0);
-   gpioSetMode(PI_SPI_CE1, old_mode_ce1);
-   gpioSetMode(PI_SPI_SCLK, old_mode_sclk);
-   gpioSetMode(PI_SPI_MISO, old_mode_miso);
-   gpioSetMode(PI_SPI_MOSI, old_mode_mosi);
+void spiTerm(uint32_t flags)
+{
+   int resvd;
 
-   spiReg[SPI_CS]  = old_spi_cs;
-   spiReg[SPI_CLK] = old_spi_clk;
+   resvd = PI_SPI_FLAGS_GET_RESVD(flags);
+
+   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
+   {
+      /* restore original state */
+
+      if (!(resvd&1)) gpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
+      if (!(resvd&2)) gpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
+      if (!(resvd&4)) gpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
+
+      gpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
+      gpioSetMode(PI_ASPI_MISO, old_mode_amiso);
+      gpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
+
+      auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
+      auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
+   }
+   else
+   {
+      /* restore original state */
+
+      if (!(resvd&1)) gpioSetMode(PI_SPI_CE0,  old_mode_ce0);
+      if (!(resvd&2)) gpioSetMode(PI_SPI_CE1,  old_mode_ce1);
+
+      gpioSetMode(PI_SPI_SCLK, old_mode_sclk);
+      gpioSetMode(PI_SPI_MISO, old_mode_miso);
+      gpioSetMode(PI_SPI_MOSI, old_mode_mosi);
+
+      spiReg[SPI_CS]  = old_spi_cs;
+      spiReg[SPI_CLK] = old_spi_clk;
+   }
 }
 
-#define PI_SPI_FLAGS_CHAN(x)  ((x)<<30)
+uint32_t _spiTXBits(char *buf, int pos, int bitlen, int msbf)
+{
+   uint32_t bits=0;
 
-/*
-3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
-1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-C C - - - - - - - - - - - - - - - - - - - - - - N N N N 3 P M M
+   if (buf)
+   {
+      if      (bitlen <=  8) bits = *((( uint8_t*)buf)+pos);
+      else if (bitlen <= 16) bits = *(((uint16_t*)buf)+pos);
+      else                   bits = *(((uint32_t*)buf)+pos);
 
-CC   channel
-NNNN switch to 3-wire after NNNN bytes
-3    3-wire part
-P    CS polarity
-MM   mode
-*/
-static void spiGo(
+      if (msbf) bits <<= (32-bitlen);
+   }
+
+   return bits;
+}
+
+void _spiRXBits(char *buf, int pos, int bitlen, int msbf, uint32_t bits)
+{
+   if (buf)
+   {
+      if (!msbf) bits >>= (32-bitlen);
+
+      if      (bitlen <=  8) *((( uint8_t*)buf)+pos) = bits;
+      else if (bitlen <= 16) *(((uint16_t*)buf)+pos) = bits;
+      else                   *(((uint32_t*)buf)+pos) = bits;
+   }
+}
+
+
+void spiGoA(
+   unsigned speed,    /* bits per second */
+   uint32_t flags,    /* flags           */
+   char     *txBuf,   /* tx buffer       */
+   char     *rxBuf,   /* rx buffer       */
+   unsigned count)    /* number of bytes */
+{
+   char bit_cs;
+   char bit_ir[4] = {1, 0, 1, 0};
+   char bit_or[4] = {0, 1, 0, 1};
+   char bit_ic[4] = {0, 0, 1, 1};
+
+   int mode, bitlen, txmsbf, rxmsbf, channel;
+   unsigned txCnt=0;
+   unsigned rxCnt=0;
+   uint32_t spiDefaults;
+   uint32_t statusReg;
+   int txFull, rxEmpty;
+
+   channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
+   mode   =  PI_SPI_FLAGS_GET_MODE   (flags);
+   bitlen =  PI_SPI_FLAGS_GET_BITLEN (flags);
+   if (!bitlen) bitlen = 8;
+   txmsbf = !PI_SPI_FLAGS_GET_TX_LSB (flags);
+   rxmsbf = !PI_SPI_FLAGS_GET_RX_LSB (flags);
+
+   bit_cs = ~PI_SPI_FLAGS_GET_CSPOLS(flags);
+   bit_cs = (1<<channel) ^ bit_cs;
+   bit_cs &= 7;
+
+   spiDefaults = AUXSPI_CNTL0_SPEED(125000000/speed)   |
+                 AUXSPI_CNTL0_CS(bit_cs)               |
+                 AUXSPI_CNTL0_IN_RISING(bit_ir[mode])  |
+                 AUXSPI_CNTL0_OUT_RISING(bit_or[mode]) |
+                 AUXSPI_CNTL0_INVERT_CLK(bit_ic[mode]) |
+                 AUXSPI_CNTL0_MSB_FIRST(txmsbf)        |
+                 AUXSPI_CNTL0_SHIFT_LEN(bitlen);
+
+   auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
+
+   auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | spiDefaults;
+   auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
+
+   while ((txCnt < count) || (rxCnt < count))
+   {
+      statusReg = auxReg[AUX_SPI0_STAT_REG];
+
+      rxEmpty = statusReg & AUXSPI_STAT_RX_EMPTY;
+
+      txFull = (((statusReg>>28)&15) > 2);
+
+      if (rxCnt < count)
+      {
+         if (!rxEmpty)
+         {
+            _spiRXBits(rxBuf, rxCnt++, bitlen, rxmsbf, auxReg[AUX_SPI0_IO_REG]);
+         }
+      }
+
+      if (txCnt < count)
+      {
+         if (!txFull)
+         {
+            if (txCnt != (count-1))
+            {
+               auxReg[AUX_SPI0_TX_HOLD] =
+                  _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
+            }
+            else
+            {
+               auxReg[AUX_SPI0_IO_REG] =
+                  _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
+            }
+         }
+      }
+   }
+
+   while ((auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY)) ;
+
+   auxReg[AUX_SPI0_CNTL0_REG] = spiDefaults; /* stop */
+}
+
+static void spiGoS(
    unsigned speed,
    uint32_t flags,
    char     *txBuf,
@@ -2917,17 +3178,20 @@ static void spiGo(
    unsigned rxCnt=0;
    unsigned cnt, cnt4w, cnt3w;
    uint32_t spiDefaults;
-   unsigned mode, channel, cspol, flag3w, ren3w;
+   unsigned mode, channel, cspol, cspols, flag3w, ren3w;
+   uint32_t status;
 
-   mode =     flags       & 3;
-   cspol  =  (flags >> 2) & 1;
-   flag3w =  (flags >> 3) & 1;
-   ren3w =   (flags >> 4) & 15;
-   channel = (flags >> 30) & 3;
+   channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
+   mode   =  PI_SPI_FLAGS_GET_MODE   (flags);
+   cspols =  PI_SPI_FLAGS_GET_CSPOLS(flags);
+   cspol  =  (cspols>>channel) & 1;
+   flag3w =  PI_SPI_FLAGS_GET_3WIRE(flags);
+   ren3w =   PI_SPI_FLAGS_GET_3WREN(flags);
 
-   spiDefaults = SPI_CS_MODE(mode)   |
-                 SPI_CS_CS(channel)  |
-                 SPI_CS_CSPOL(cspol) |
+   spiDefaults = SPI_CS_MODE(mode)     |
+                 SPI_CS_CSPOLS(cspols) |
+                 SPI_CS_CS(channel)    |
+                 SPI_CS_CSPOL(cspol)   |
                  SPI_CS_CLEAR(3);
 
    if (flag3w)
@@ -2957,18 +3221,20 @@ static void spiGo(
 
    while((txCnt < cnt) || (rxCnt < cnt))
    {
-      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
-      {
-         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
-         else       spiReg[SPI_FIFO] = 0;
-         txCnt++;
-      }
+      status = spiReg[SPI_CS];
 
-      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
+      while((rxCnt < cnt) && ((status & SPI_CS_RXD)))
       {
          if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
          else       spi_dummy    = spiReg[SPI_FIFO];
          rxCnt++;
+      }
+
+      while((txCnt < cnt) && ((status & SPI_CS_TXD)))
+      {
+         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
+         else       spiReg[SPI_FIFO] = 0;
+         txCnt++;
       }
    }
 
@@ -2978,22 +3244,24 @@ static void spiGo(
 
    cnt += cnt3w;
 
+   spiReg[SPI_CS] |= SPI_CS_REN;
+
    while((txCnt < cnt) || (rxCnt < cnt))
    {
-      spiReg[SPI_CS] |= SPI_CS_REN;
+      status = spiReg[SPI_CS];
 
-      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
-      {
-         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
-         else       spiReg[SPI_FIFO] = 0;
-         txCnt++;
-      }
-
-      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
+      while((rxCnt < cnt) && ((status & SPI_CS_RXD)))
       {
          if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
          else       spi_dummy    = spiReg[SPI_FIFO];
          rxCnt++;
+      }
+
+      while((txCnt < cnt) && ((status & SPI_CS_TXD)))
+      {
+         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
+         else       spiReg[SPI_FIFO] = 0;
+         txCnt++;
       }
    }
 
@@ -3002,13 +3270,30 @@ static void spiGo(
    spiReg[SPI_CS] = spiDefaults; /* stop */
 }
 
-static int spiAnyOpen(void)
+static void spiGo(
+   unsigned speed,
+   uint32_t flags,
+   char     *txBuf,
+   char     *rxBuf,
+   unsigned count)
 {
-   int i;
+   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
+      spiGoA(speed, flags, txBuf, rxBuf, count);
+   else
+      spiGoS(speed, flags, txBuf, rxBuf, count);
+}
+
+static int spiAnyOpen(uint32_t flags)
+{
+   int i, aux;
+
+   aux = PI_SPI_FLAGS_GET_AUX_SPI(flags);
 
    for (i=0; i<PI_SPI_SLOTS; i++)
    {
-      if (spiInfo[i].state == PI_SPI_OPENED) return 1;
+      if ((spiInfo[i].state == PI_SPI_OPENED) &&
+         (PI_SPI_FLAGS_GET_AUX_SPI(spiInfo[i].flags) == aux))
+            return 1;
    }
    return 0;
 }
@@ -3022,16 +3307,26 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
 
    CHECK_INITED;
 
-   if (spiChan >= PI_NUM_SPI_CHANNEL)
+   if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags))
+   {
+      if (gpioHardwareRevision() < 16)
+         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI, need a B+");
+
+      i = PI_NUM_AUX_SPI_CHANNEL;
+   }
+   else
+      i = PI_NUM_STD_SPI_CHANNEL;
+
+   if (spiChan >= i)
       SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
 
-   if (!spiBaud)
+   if ((spiBaud < MIN_SPI_SPEED) || (spiBaud > MAX_SPI_SPEED))
       SOFT_ERROR(PI_BAD_SPI_SPEED, "bad spiBaud (%d)", spiBaud);
 
-   if (spiFlags > 256)
+   if (spiFlags > (1<<22))
       SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
 
-   if (!spiAnyOpen()) spiInit(); /* initialise on first open */
+   if (!spiAnyOpen(spiFlags)) spiInit(spiFlags); /* initialise on first open */
 
    slot = -1;
 
@@ -3049,7 +3344,7 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
       SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
 
    spiInfo[slot].speed = spiBaud;
-   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHAN(spiChan);
+   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
 
    return slot;
 }
@@ -3068,7 +3363,8 @@ int spiClose(unsigned handle)
 
    spiInfo[handle].state = PI_I2C_CLOSED;
 
-   if (!spiAnyOpen()) spiTerm(); /* terminate on last close */
+   if (!spiAnyOpen(spiInfo[handle].flags))
+      spiTerm(spiInfo[handle].flags); /* terminate on last close */
 
    return 0;
 }
@@ -4979,6 +5275,11 @@ static int initPeripherals(void)
    if (pcmReg == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap pcm failed (%m)");
 
+   auxReg  = initMapMem(fdMem, AUX_BASE,  AUX_LEN);
+
+   if (auxReg == MAP_FAILED)
+      SOFT_ERROR(PI_INIT_FAILED, "mmap aux failed (%m)");
+
    return 0;
 }
 
@@ -5120,9 +5421,10 @@ static int initDMAcbs(void)
    DBG(DBG_STARTUP, "dmaBloc=%08X dmaIn=%08X",
       (uint32_t)dmaBloc, (uint32_t)dmaIn);
 
-   DBG(DBG_STARTUP, "gpioReg=%08X pwmReg=%08X pcmReg=%08X clkReg=%08X",
+   DBG(DBG_STARTUP,
+      "gpioReg=%08X pwmReg=%08X pcmReg=%08X clkReg=%08X auxReg=%08X",
       (uint32_t)gpioReg, (uint32_t)pwmReg,
-      (uint32_t)pcmReg,  (uint32_t)clkReg); 
+      (uint32_t)pcmReg,  (uint32_t)clkReg, (uint32_t)auxReg); 
 
    for (i=0; i<DMAI_PAGES; i++)
       DBG(DBG_STARTUP, "dmaIPhys[%d]=%08X", i, (uint32_t)dmaIPhys[i]);
@@ -5431,6 +5733,7 @@ static void initClearGlobals(void)
    dmaVirt = MAP_FAILED;
    dmaPhys = MAP_FAILED;
 
+   auxReg  = MAP_FAILED;
    clkReg  = MAP_FAILED;
    dmaReg  = MAP_FAILED;
    gpioReg = MAP_FAILED;
@@ -5485,6 +5788,7 @@ static void initReleaseResources(void)
 
    /* release mmap'd memory */
 
+   if (auxReg  != MAP_FAILED) munmap((void *)auxReg,  AUX_LEN);
    if (clkReg  != MAP_FAILED) munmap((void *)clkReg,  CLK_LEN);
    if (dmaReg  != MAP_FAILED) munmap((void *)dmaReg,  DMA_LEN);
    if (gpioReg != MAP_FAILED) munmap((void *)gpioReg, GPIO_LEN);
@@ -5493,6 +5797,7 @@ static void initReleaseResources(void)
    if (systReg != MAP_FAILED) munmap((void *)systReg, SYST_LEN);
    if (spiReg  != MAP_FAILED) munmap((void *)spiReg,  SPI_LEN);
 
+   auxReg  = MAP_FAILED;
    clkReg  = MAP_FAILED;
    dmaReg  = MAP_FAILED;
    gpioReg = MAP_FAILED;

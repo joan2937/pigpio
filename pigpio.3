@@ -2371,13 +2371,20 @@ active low chip select.
 .br
 
 .br
+An auxiliary SPI device is available on the B+ and may be
+selected by setting the A bit in the flags.  The auxiliary
+device has 3 chip selects and a selectable word size in bits.
+
+.br
+
+.br
 
 .EX
  spiChan: 0-1
 .br
  spiBaud: >1
 .br
-spiFlags: 0-0xFF
+spiFlags: see below
 .br
 
 .EE
@@ -2386,21 +2393,21 @@ spiFlags: 0-0xFF
 
 .br
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
-PI_BAD_SPI_SPEED, PI_BAD_FLAGS, or PI_SPI_OPEN_FAILED.
+PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
 
 .br
 
 .br
-spiFlags consists of the least significant 8 bits.
+spiFlags consists of the least significant 22 bits.
 
 .br
 
 .br
 
 .EX
-7 6 5 4 3 2 1 0
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
 .br
-n n n n W P m m
+ b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
 .br
 
 .EE
@@ -2431,19 +2438,51 @@ Mode POL PHA
 .br
 
 .br
-P is 0 for active low chip select (normal) and 1 for active high.
+px is 0 if CEx is active low (default) and 1 for active high.
 
 .br
 
 .br
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
+ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+
+.br
+
+.br
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
+auxiliary device is only present on the B+.
+
+.br
+
+.br
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
+SPI device only.
 
 .br
 
 .br
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
+if W is not set.  Standard SPI device only.
+
+.br
+
+.br
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.  Auxiliary SPI
+device only.
+
+.br
+
+.br
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.  Auxiliary SPI
+device only.
+
+.br
+
+.br
+bbbbbb defines the word size in bits (0-32).  The default (0)
+sets 8 bits per word.  Auxiliary SPI device only.
 
 .br
 
@@ -3611,7 +3650,7 @@ Returns the actual length of the delay in microseconds.
 .br
 
 .br
-Delays of 50 microseconds or less use busy waits.
+Delays of 100 microseconds or less use busy waits.
 
 .IP "\fBuint32_t gpioTick(void)\fP"
 .IP "" 4
@@ -4728,6 +4767,26 @@ typedef struct
 
 .br
 
+.IP "\fBgpioSample_t\fP" 0
+
+.EX
+typedef struct
+.br
+{
+.br
+   uint32_t tick;
+.br
+   uint32_t level;
+.br
+} gpioSample_t;
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fBgpioSignalFunc_t\fP" 0
 
 .EX
@@ -5195,7 +5254,7 @@ PI_PUD_UP 2
 .br
 
 .br
-An array of pulsed to be added to a waveform.
+An array of pulses to be added to a waveform.
 
 .br
 
@@ -5519,64 +5578,7 @@ A SPI channel, 0 or 1.
 .br
 
 .br
-spiFlags consists of the least significant 8 bits.
-
-.br
-
-.br
-
-.EX
-7 6 5 4 3 2 1 0
-.br
-n n n n W P m m
-.br
-
-.EE
-
-.br
-
-.br
-mm defines the SPI mode.
-
-.br
-
-.br
-
-.EX
-Mode POL PHA
-.br
- 0    0   0
-.br
- 1    0   1
-.br
- 2    1   0
-.br
- 3    1   1
-.br
-
-.EE
-
-.br
-
-.br
-P is 0 for active low chip select (normal) and 1 for active high.
-
-.br
-
-.br
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
-
-.br
-
-.br
-nnnn defines the number of bytes (0-15) to write before switching
-the MOSI line to MISO to read data.  This field is ignored
-if W is not set.
-
-.br
-
-.br
-The other bits in flags should be set to zero.
+See \fBspiOpen\fP.
 
 .br
 
@@ -6173,6 +6175,8 @@ A 16-bit word value.
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 .br
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
+.br
+#define PI_NO_AUX_SPI       -91 // need a B+ for auxiliary SPI
 .br
 
 .br

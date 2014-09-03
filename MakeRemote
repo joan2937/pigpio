@@ -23,7 +23,8 @@ install:	$(LIB)
 	sudo install -m 0644 libpigpiod_if.a /usr/local/lib
 	sudo install -m 0755 -d              /usr/local/bin
 	sudo install -m 0755 pigs            /usr/local/bin
-	sudo python setup.py install
+	sudo python2 setup.py install
+	sudo python3 setup.py install
 	sudo install -m 0755 -d              /usr/local/man/man1
 	sudo install -m 0644 *.1             /usr/local/man/man1
 	sudo install -m 0755 -d              /usr/local/man/man3
