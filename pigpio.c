@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 21 */
+/* pigpio version 22 */
 
 #include <stdio.h>
 #include <string.h>
@@ -925,14 +925,6 @@ typedef struct
    int      mode;
 } wfRx_t;
 
-typedef struct
-{
-   uint16_t botCB;  /* first CB used by wave */
-   uint16_t topCB;  /* last CB used by wave */
-   uint16_t botOOL;
-   uint16_t topOOL;
-} waveInfo_t;
-
 union my_smbus_data
 {
    uint8_t  byte;
@@ -991,7 +983,7 @@ static wfStats_t wfStats=
    0, 0, (DMAO_PAGES * CBS_PER_OPAGE)
 };
 
-static waveInfo_t waveInfo[PI_MAX_WAVES];
+static rawWaveInfo_t waveInfo[PI_MAX_WAVES];
 
 static volatile wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
@@ -3179,7 +3171,6 @@ static void spiGoS(
    unsigned cnt, cnt4w, cnt3w;
    uint32_t spiDefaults;
    unsigned mode, channel, cspol, cspols, flag3w, ren3w;
-   uint32_t status;
 
    channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
    mode   =  PI_SPI_FLAGS_GET_MODE   (flags);
@@ -3221,16 +3212,14 @@ static void spiGoS(
 
    while((txCnt < cnt) || (rxCnt < cnt))
    {
-      status = spiReg[SPI_CS];
-
-      while((rxCnt < cnt) && ((status & SPI_CS_RXD)))
+      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
       {
          if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
          else       spi_dummy    = spiReg[SPI_FIFO];
          rxCnt++;
       }
 
-      while((txCnt < cnt) && ((status & SPI_CS_TXD)))
+      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
       {
          if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
          else       spiReg[SPI_FIFO] = 0;
@@ -3248,16 +3237,14 @@ static void spiGoS(
 
    while((txCnt < cnt) || (rxCnt < cnt))
    {
-      status = spiReg[SPI_CS];
-
-      while((rxCnt < cnt) && ((status & SPI_CS_RXD)))
+      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
       {
          if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
          else       spi_dummy    = spiReg[SPI_FIFO];
          rxCnt++;
       }
 
-      while((txCnt < cnt) && ((status & SPI_CS_TXD)))
+      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
       {
          if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
          else       spiReg[SPI_FIFO] = 0;
@@ -5924,7 +5911,7 @@ uint32_t rawWaveGetOut(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-void waveSetRawOut(int pos, uint32_t value)
+void rawWaveSetOut(int pos, uint32_t value)
 {
    int page, slot;
 
@@ -5962,6 +5949,16 @@ void rawWaveSetIn(int pos, uint32_t value)
       waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
       dmaOVirt[page]->OOL[slot] = value;
    }
+}
+
+/* ----------------------------------------------------------------------- */
+
+rawWaveInfo_t rawWaveInfo(int wave_id)
+{
+   rawWaveInfo_t dummy = {-1, -1, -1, -1};
+
+   if ((wave_id >=0) && (wave_id < PI_MAX_WAVES)) return waveInfo[wave_id];
+   else                                           return dummy;
 }
 
 /* ----------------------------------------------------------------------- */

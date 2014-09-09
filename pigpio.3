@@ -2380,9 +2380,9 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
- spiChan: 0-1
+ spiChan: 0-1 (0-2 for B+ auxiliary device)
 .br
- spiBaud: >1
+ spiBaud: 32K-125M (values above 30M are unlikely to work)
 .br
 spiFlags: see below
 .br
@@ -4254,6 +4254,25 @@ lVal: the value to write
 .br
 Not intended for general use.
 
+.IP "\fBrawWaveInfo_t rawWaveInfo(int wave_id)\fP"
+.IP "" 4
+Gets details about the wave with id wave_id.
+
+.br
+
+.br
+
+.EX
+wave_id: the wave of interest
+.br
+
+.EE
+
+.br
+
+.br
+Not intended for general use.
+
 .IP "\fBint getBitInBytes(int bitPos, char *buf, int numBits)\fP"
 .IP "" 4
 Returns the value of the bit bitPos bits from the start of buf.  Returns
@@ -5376,6 +5395,30 @@ typedef struct
 
 .br
 
+.IP "\fBrawWaveInfo_t\fP" 0
+
+.EX
+typedef struct
+.br
+{
+.br
+   uint16_t botCB;  // first CB used by wave
+.br
+   uint16_t topCB;  // last CB used by wave
+.br
+   uint16_t botOOL; // last OOL used by wave
+.br
+   uint16_t topOOL; // first OOL used by wave
+.br
+} rawWaveInfo_t;
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fB*rxBuf\fP" 0
 
 .br
@@ -5567,7 +5610,7 @@ The number of bits to transfer in a raw SPI transaction.
 .br
 
 .br
-A SPI channel, 0 or 1.
+A SPI channel, 0-2.
 
 .br
 

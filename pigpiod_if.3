@@ -2238,9 +2238,9 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
-spi_channel: 0-1.
+spi_channel: 0-1 (0-2 for B+ auxiliary device).
 .br
-   spi_baud: >1.
+   spi_baud: 32K-125M (values above 30M are unlikely to work).
 .br
   spi_flags: see below.
 .br
@@ -3310,7 +3310,7 @@ The speed in bits per second to use for the SPI device.
 .br
 
 .IP "\fBspi_channel\fP" 0
-A SPI channel, 0 or 1.
+A SPI channel, 0-2.
 
 .br
 

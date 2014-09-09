@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 21
+#define PIGPIO_VERSION 22
 
 /*TEXT
 
@@ -291,6 +291,7 @@ rawWaveGetOut              Not intended for general use
 rawWaveSetOut              Not intended for general use
 rawWaveGetIn               Not intended for general use
 rawWaveSetIn               Not intended for general use
+rawWaveInfo                Not intended for general use
 rawDumpWave                Not intended for general use
 rawDumpScript              Not intended for general use
 
@@ -353,6 +354,14 @@ uint32_t gpioOff;
 uint32_t usDelay;
 uint32_t flags;
 } rawWave_t;
+
+typedef struct
+{
+   uint16_t botCB;  /* first CB used by wave  */
+   uint16_t topCB;  /* last CB used by wave   */
+   uint16_t botOOL; /* last OOL used by wave  */
+   uint16_t topOOL; /* first OOL used by wave */
+} rawWaveInfo_t;
 
 typedef struct
 {
@@ -1901,8 +1910,8 @@ selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
- spiChan: 0-1
- spiBaud: >1
+ spiChan: 0-1 (0-2 for B+ auxiliary device)
+ spiBaud: 32K-125M (values above 30M are unlikely to work)
 spiFlags: see below
 . .
 
@@ -3018,6 +3027,18 @@ Not intended for general use.
 D*/
 
 /*F*/
+rawWaveInfo_t rawWaveInfo(int wave_id);
+/*D
+Gets details about the wave with id wave_id.
+
+. .
+wave_id: the wave of interest
+. .
+
+Not intended for general use.
+D*/
+
+/*F*/
 int getBitInBytes(int bitPos, char *buf, int numBits);
 /*D
 Returns the value of the bit bitPos bits from the start of buf.  Returns
@@ -3510,6 +3531,17 @@ typedef struct
 } rawWave_t;
 . .
 
+rawWaveInfo_t::
+. .
+typedef struct
+{
+   uint16_t botCB;  // first CB used by wave
+   uint16_t topCB;  // last CB used by wave
+   uint16_t botOOL; // last OOL used by wave
+   uint16_t topOOL; // first OOL used by wave
+} rawWaveInfo_t;
+. .
+
 *rxBuf::
 
 A pointer to a buffer to receive data.
@@ -3582,7 +3614,7 @@ The number of bits to transfer in a raw SPI transaction.
 
 spiChan::
 
-A SPI channel, 0 or 1.
+A SPI channel, 0-2.
 
 spiFlags::
 

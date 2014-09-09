@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 9
+#define PIGPIOD_IF_VERSION 10
 
 /*TEXT
 
@@ -1569,8 +1569,8 @@ selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
-spi_channel: 0-1.
-   spi_baud: >1.
+spi_channel: 0-1 (0-2 for B+ auxiliary device).
+   spi_baud: 32K-125M (values above 30M are unlikely to work).
   spi_flags: see below.
 . .
 
@@ -2117,7 +2117,7 @@ spi_baud::
 The speed in bits per second to use for the SPI device.
 
 spi_channel::
-A SPI channel, 0 or 1.
+A SPI channel, 0-2.
 
 spi_flags::
 See [*spi_open*].

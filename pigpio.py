@@ -246,7 +246,7 @@ import os
 import atexit
 import codecs
 
-VERSION = "1.11"
+VERSION = "1.12"
 
 exceptions = True
 
@@ -2193,8 +2193,8 @@ class pi():
       device has 3 chip selects and a selectable word size in bits.
 
 
-      spi_channel:= 0 or 1, the SPI channel.
-         spi_baud:= >0, the transmission rate in bits per second.
+      spi_channel:= 0-1 (0-2 for B+ auxiliary device).
+         spi_baud:= 32K-125M (values above 30M are unlikely to work).
         spi_flags:= see below.
 
       Normally you would only use the [*spi_**] functions if
@@ -3086,10 +3086,10 @@ def xref():
    spi_*:
    One of the spi_ functions.
 
-   spi_baud: 1-
+   spi_baud: 32K-125M
    The transmission rate in bits per second.
 
-   spi_channel: 0-1
+   spi_channel: 0-2
    A SPI channel.
 
    spi_flags: 32 bit

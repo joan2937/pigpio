@@ -49,7 +49,8 @@ x_pigpio.c, pig2vcd.c, and pigpiod.c show examples of interfacing
 with the pigpio library.
 
 pigs.c, pigpio.py, x_pigpiod_if.c, x_pigpio.py, x_pigs, and x_pipe
-show examples of interfacing with the pigpio daemon.
+show examples of interfacing with the pigpio daemon.  x_pipe uses
+the pipe interface, the others use the socket interface.
 
 DAEMON
 
@@ -57,7 +58,7 @@ To launch the daemon do
 
 sudo pigpiod (pigpiod -? for options)
 
-Once the daemon is launched the socket and fifo interfaces will be
+Once the daemon is launched the socket and pipe interfaces will be
 available.
 
 When the library starts it locks
@@ -70,15 +71,15 @@ SOCKET INTERFACE
 
 Use pigs for the socket interface (pigs help for help).
 
-FIFO INTERFACE
+PIPE INTERFACE
 
-The fifo interface accepts commands written to /dev/pigpio.
+The pipe interface accepts commands written to /dev/pigpio.
 
 Results are read from /dev/pigout.
 
 Errors are output on /dev/pigerr.
 
-To test the fifo interface perhaps do
+To test the pipe interface perhaps do
 
 cat /dev/pigout &
 cat /dev/pigerr &
