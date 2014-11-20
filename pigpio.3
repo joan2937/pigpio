@@ -479,7 +479,7 @@ Arduino style: analogWrite
 
 .br
 This and the servo functionality use the DMA and PWM or PCM peripherals
-to control and schedule the pulse lengths and duty cycles.
+to control and schedule the pulse lengths and dutycycles.
 
 .br
 
@@ -506,6 +506,31 @@ gpioPWM(23, 0);   // Sets gpio23 full off.
 .br
 
 .EE
+
+.IP "\fBint gpioGetPWMdutycycle(unsigned user_gpio)\fP"
+.IP "" 4
+Returns the PWM dutycycle setting for the gpio.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+
+.EE
+
+.br
+
+.br
+Returns between 0 (off) and range (fully on) if OK, otherwise
+PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+
+.br
+
+.br
+Range defaults to 255.
 
 .IP "\fBint gpioSetPWMrange(unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
@@ -859,7 +884,7 @@ Firstly set the desired PWM frequency using \fBgpioSetPWMfrequency\fP.
 .br
 Then set the PWM range using \fBgpioSetPWMrange\fP to 1E6/frequency.
 Doing this allows you to use units of microseconds when setting
-the servo pulse width.
+the servo pulsewidth.
 
 .br
 
@@ -885,6 +910,26 @@ gpioSetPWMrange(25, 2500);
 .br
 Thereafter use the PWM command to move the servo,
 e.g. gpioPWM(25, 1500) will set a 1500 us pulse.
+
+.IP "\fBint gpioGetServoPulsewidth(unsigned user_gpio)\fP"
+.IP "" 4
+Returns the servo pulsewidth setting for the gpio.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+
+.EE
+
+.br
+
+.br
+Returns , 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
+if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 
 .IP "\fBint gpioSetAlertFunc(unsigned user_gpio, gpioAlertFunc_t f)\fP"
 .IP "" 4
@@ -6024,6 +6069,12 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_GDC   83
+.br
+#define PI_CMD_GPW   84
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -6221,6 +6272,10 @@ A 16-bit word value.
 .br
 #define PI_NO_AUX_SPI       -91 // need a B+ for auxiliary SPI
 .br
+#define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
+.br
+#define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
+.br
 
 .br
 
@@ -6258,9 +6313,9 @@ A 16-bit word value.
 .br
 #define PI_DEFAULT_UPDATE_MASK_R2        0xFBC7CF9C
 .br
-#define PI_DEFAULT_UPDATE_MASK_R3        0x80400FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_R3        0x0080400FFFFFFCLL
 .br
-
+#define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
 .br
 
 .EE

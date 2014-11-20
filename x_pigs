@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=22
+VERSION=23
 
 GPIO=4
 
@@ -15,6 +15,10 @@ GPIO=4
 # sudo pigpiod # if not already running on the Pi
 # export PIGPIO_ADDR=pi_host # to specify the Pi if testing remotely
 # ./x_pigs
+#
+# Some tests are statistical in nature and so may on occasion fail.
+# Repeated failures on the same test or many failures in a group
+# of tests indicate a problem.
 #
 
 s=$(pigs bc1 0)
@@ -42,7 +46,7 @@ s=$(pigs bs2 0)
 if [[ $s = "" ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 s=$(pigs h)
-if [[ ${#s} = 4684 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
+if [[ ${#s} = 4778 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
 
 s=$(pigs hwver)
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
@@ -144,10 +148,16 @@ if [[ $s = "" ]]; then echo "PUD-e ok"; else echo "PUD-e fail ($s)"; fi
 
 s=$(pigs p $GPIO 128)
 if [[ $s = "" ]]; then echo "PWM-a ok"; else echo "PWM-a fail ($s)"; fi
+s=$(pigs gdc $GPIO)
+if [[ $s = 128 ]]; then echo "GDC-a ok"; else echo "GDC-a fail ($s)"; fi
 s=$(pigs pwm $GPIO 64)
 if [[ $s = "" ]]; then echo "PWM-b ok"; else echo "PWM-b fail ($s)"; fi
+s=$(pigs GDC $GPIO)
+if [[ $s = 64 ]]; then echo "GDC-b ok"; else echo "GDC-b fail ($s)"; fi
 s=$(pigs pwm $GPIO 0)
 if [[ $s = "" ]]; then echo "PWM-c ok"; else echo "PWM-c fail ($s)"; fi
+s=$(pigs gdc $GPIO)
+if [[ $s = 0 ]]; then echo "GDC-c ok"; else echo "GDC-c fail ($s)"; fi
 s=$(pigs m $GPIO r)
 if [[ $s = "" ]]; then echo "PWM-d ok"; else echo "PWM-d fail ($s)"; fi
 
@@ -164,10 +174,16 @@ if [[ $s = "" ]]; then echo "READ-e ok"; else echo "READ-e fail ($s)"; fi
 
 s=$(pigs s $GPIO 500)
 if [[ $s = "" ]]; then echo "SERVO-a ok"; else echo "SERVO-a fail ($s)"; fi
+s=$(pigs gpw $GPIO)
+if [[ $s = 500 ]]; then echo "GPW-a ok"; else echo "GPW-a fail ($s)"; fi
 s=$(pigs servo $GPIO 2500)
 if [[ $s = "" ]]; then echo "SERVO-b ok"; else echo "SERVO-b fail ($s)"; fi
+s=$(pigs gpw $GPIO)
+if [[ $s = 2500 ]]; then echo "GPW-b ok"; else echo "GPW-b fail ($s)"; fi
 s=$(pigs servo $GPIO 0)
 if [[ $s = "" ]]; then echo "SERVO-c ok"; else echo "SERVO-c fail ($s)"; fi
+s=$(pigs gpw $GPIO)
+if [[ $s = 0 ]]; then echo "GPW-c ok"; else echo "GPW-c fail ($s)"; fi
 s=$(pigs w $GPIO 1)
 if [[ $s = "" ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 

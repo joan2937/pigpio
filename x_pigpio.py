@@ -5,11 +5,14 @@
 #* All the tests make extensive use of gpio 4 (pin P1-7).   *
 #* Ensure that either nothing or just a LED is connected to *
 #* gpio 4 before running any of the tests.                  *
+#*                                                          *
+#* Some tests are statistical in nature and so may on       *
+#* occasion fail.  Repeated failures on the same test or    *
+#* many failures in a group of tests indicate a problem.    *
 #************************************************************
 
 import sys
 import time
-import codecs
 import struct
 
 import pigpio
@@ -17,9 +20,19 @@ import pigpio
 GPIO=4
 
 def STRCMP(r, s):
-   if r != codecs.latin_1_encode(s)[0]:
-      print(r, codecs.latin_1_encode(s)[0])
+
+   if sys.hexversion > 0x03000000:
+
+      if type(r) == type(""):
+         r = bytearray(r, 'latin-1')
+
+      if type(s) == type(""):
+         s = bytearray(s, 'latin-1')
+
+   if r != s:
+      print(r, s)
       return 0
+
    else:
       return 1
 
@@ -87,51 +100,58 @@ def t2():
    t2cb = pi.callback(GPIO, pigpio.EITHER_EDGE, t2cbf)
 
    pi.set_PWM_dutycycle(GPIO, 0)
+   dc = pi.get_PWM_dutycycle(GPIO)
+   CHECK(2, 2, dc, 0, 0, "get PWM dutycycle")
+
    time.sleep(0.5) # allow old notifications to flush
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 2, f, 0, 0, "set PWM dutycycle, callback")
+   CHECK(2, 3, f, 0, 0, "set PWM dutycycle, callback")
+
 
    pi.set_PWM_dutycycle(GPIO, 128)
+   dc = pi.get_PWM_dutycycle(GPIO)
+   CHECK(2, 4, dc, 128, 0, "get PWM dutycycle")
+
    time.sleep(1)
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 3, f, 40, 10, "set PWM dutycycle, callback")
+   CHECK(2, 5, f, 40, 10, "set PWM dutycycle, callback")
 
    pi.set_PWM_frequency(GPIO,100)
    f = pi.get_PWM_frequency(GPIO)
-   CHECK(2, 4, f, 100, 0, "set/get PWM frequency")
+   CHECK(2, 6, f, 100, 0, "set/get PWM frequency")
 
    time.sleep(1)
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 5, f, 400, 5, "callback")
+   CHECK(2, 7, f, 400, 5, "callback")
 
    pi.set_PWM_frequency(GPIO,1000)
    f = pi.get_PWM_frequency(GPIO)
-   CHECK(2, 6, f, 1000, 0, "set/get PWM frequency")
+   CHECK(2, 8, f, 1000, 0, "set/get PWM frequency")
 
    time.sleep(1)
    oc = t2_count
    time.sleep(2)
    f = t2_count - oc
-   CHECK(2, 7, f, 4000, 5, "callback")
+   CHECK(2, 9, f, 4000, 5, "callback")
 
    r = pi.get_PWM_range(GPIO)
-   CHECK(2, 8, r, 255, 0, "get PWM range")
-
-   rr = pi.get_PWM_real_range(GPIO)
-   CHECK(2, 9, rr, 200, 0, "get PWM real range")
-
-   pi.set_PWM_range(GPIO, 2000)
-   r = pi.get_PWM_range(GPIO)
-   CHECK(2, 10, r, 2000, 0, "set/get PWM range")
+   CHECK(2, 10, r, 255, 0, "get PWM range")
 
    rr = pi.get_PWM_real_range(GPIO)
    CHECK(2, 11, rr, 200, 0, "get PWM real range")
+
+   pi.set_PWM_range(GPIO, 2000)
+   r = pi.get_PWM_range(GPIO)
+   CHECK(2, 12, r, 2000, 0, "set/get PWM range")
+
+   rr = pi.get_PWM_real_range(GPIO)
+   CHECK(2, 13, rr, 200, 0, "get PWM real range")
 
    pi.set_PWM_dutycycle(GPIO, 0)
 
@@ -175,6 +195,10 @@ def t3():
    for x in pw:
       t += 1
       pi.set_servo_pulsewidth(GPIO, x)
+      v = pi.get_servo_pulsewidth(GPIO)
+      CHECK(3, t, v, int(x), 0, "get servo pulsewidth")
+
+      t += 1
       time.sleep(1)
       t3_reset = True
       time.sleep(4)
@@ -187,15 +211,19 @@ def t3():
    pi.set_servo_pulsewidth(GPIO, 0)
    pi.set_PWM_frequency(GPIO, 1000)
    f = pi.get_PWM_frequency(GPIO)
-   CHECK(3, 4, f, 1000, 0, "set/get PWM frequency")
+   CHECK(3, 7, f, 1000, 0, "set/get PWM frequency")
 
    rr = pi.set_PWM_range(GPIO, 100)
-   CHECK(3, 5, rr, 200, 0, "set PWM range")
+   CHECK(3, 8, rr, 200, 0, "set PWM range")
 
-   t = 5
+   t = 8
    for x in dc:
       t += 1
       pi.set_PWM_dutycycle(GPIO, x*100)
+      v = pi.get_PWM_dutycycle(GPIO)
+      CHECK(3, t, v, int(x*100), 0, "get PWM dutycycle")
+
+      t += 1
       time.sleep(1)
       t3_reset = True
       time.sleep(2)
@@ -684,9 +712,9 @@ def tb():
    b = pi.i2c_read_byte_data(h, 48)
    CHECK(11, 7, b, 2, 0, "i2c read byte data")
 
-   exp = "[aB\x08cD\xAAgHj\xFD]"
+   exp = b"[aB\x08cD\xAAgHj\xFD]"
 
-   e = pi.i2c_write_device(h, '\x1D' + exp)
+   e = pi.i2c_write_device(h, b'\x1D'+ exp)
    CHECK(11, 8, e, 0, 0, "i2c write device")
 
    e = pi.i2c_write_device(h, '\x1D')
@@ -706,10 +734,9 @@ def tb():
    b = pi.i2c_read_byte_data(h, 0x1d)
    CHECK(11, 14, b, 0x55, 0, "i2c read byte data")
 
-   exps = b"[1234567890#]"
    exp  =  "[1234567890#]"
 
-   e = pi.i2c_write_block_data(h, 0x1C, exps)
+   e = pi.i2c_write_block_data(h, 0x1C, exp)
    CHECK(11, 15, e, 0, 0, "i2c write block data")
 
    e = pi.i2c_write_device(h, '\x1D')

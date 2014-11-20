@@ -28,6 +28,10 @@ TEST (optional)
 * All the tests make extensive use of gpio 4 (pin P1/J8-7).*
 * Ensure that either nothing or just a LED is connected to *
 * gpio 4 before running any of the tests.                  *
+*                                                          *
+* Some tests are statistical in nature and so may on       *
+* occasion fail.  Repeated failures on the same test or    *
+* many failures in a group of tests indicate a problem.    *
 ************************************************************
 
 To test the library do

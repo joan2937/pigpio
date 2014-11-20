@@ -7,6 +7,10 @@ sudo ./x_pigpio
 * All the tests make extensive use of gpio 4 (pin P1-7).   *
 * Ensure that either nothing or just a LED is connected to *
 * gpio 4 before running any of the tests.                  *
+*                                                          *
+* Some tests are statistical in nature and so may on       *
+* occasion fail.  Repeated failures on the same test or    *
+* many failures in a group of tests indicate a problem.    *
 ************************************************************
 */
 
@@ -87,7 +91,7 @@ void t2cb(int gpio, int level, uint32_t tick)
 
 void t2()
 {
-   int f, r, rr, oc;
+   int dc, f, r, rr, oc;
 
    printf("PWM dutycycle/range/frequency tests.\n");
 
@@ -99,48 +103,54 @@ void t2()
    gpioSetAlertFunc(GPIO, t2cb);
 
    gpioPWM(GPIO, 0);
+   dc = gpioGetPWMdutycycle(GPIO);
+   CHECK(2, 2, dc, 0, 0, "get PWM dutycycle");
+
    time_sleep(0.5); /* allow old notifications to flush */
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
-   CHECK(2, 2, f, 0, 0, "set PWM dutycycle, callback");
+   CHECK(2, 3, f, 0, 0, "set PWM dutycycle, callback");
 
    gpioPWM(GPIO, 128);
+   dc = gpioGetPWMdutycycle(GPIO);
+   CHECK(2, 4, dc, 128, 0, "get PWM dutycycle");
+
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
-   CHECK(2, 3, f, 40, 5, "set PWM dutycycle, callback");
+   CHECK(2, 5, f, 40, 5, "set PWM dutycycle, callback");
 
    gpioSetPWMfrequency(GPIO, 100);
    f = gpioGetPWMfrequency(GPIO);
-   CHECK(2, 4, f, 100, 0, "set/get PWM frequency");
+   CHECK(2, 6, f, 100, 0, "set/get PWM frequency");
 
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
-   CHECK(2, 5, f, 400, 1, "callback");
+   CHECK(2, 7, f, 400, 1, "callback");
 
    gpioSetPWMfrequency(GPIO, 1000);
    f = gpioGetPWMfrequency(GPIO);
-   CHECK(2, 6, f, 1000, 0, "set/get PWM frequency");
+   CHECK(2, 8, f, 1000, 0, "set/get PWM frequency");
 
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
-   CHECK(2, 7, f, 4000, 1, "callback");
+   CHECK(2, 9, f, 4000, 1, "callback");
 
    r = gpioGetPWMrange(GPIO);
-   CHECK(2, 8, r, 255, 0, "get PWM range");
-
-   rr = gpioGetPWMrealRange(GPIO);
-   CHECK(2, 9, rr, 200, 0, "get PWM real range");
-
-   gpioSetPWMrange(GPIO, 2000);
-   r = gpioGetPWMrange(GPIO);
-   CHECK(2, 10, r, 2000, 0, "set/get PWM range");
+   CHECK(2, 10, r, 255, 0, "get PWM range");
 
    rr = gpioGetPWMrealRange(GPIO);
    CHECK(2, 11, rr, 200, 0, "get PWM real range");
+
+   gpioSetPWMrange(GPIO, 2000);
+   r = gpioGetPWMrange(GPIO);
+   CHECK(2, 12, r, 2000, 0, "set/get PWM range");
+
+   rr = gpioGetPWMrealRange(GPIO);
+   CHECK(2, 13, rr, 200, 0, "get PWM real range");
 
    gpioPWM(GPIO, 0);
 }
@@ -200,7 +210,7 @@ void t3()
 
    float on, off;
 
-   int t;
+   int t, v;
 
    int pw[3]={500, 1500, 2500};
    int dc[4]={20, 40, 60, 80};
@@ -212,32 +222,38 @@ void t3()
    for (t=0; t<3; t++)
    {
       gpioServo(GPIO, pw[t]);
+      v = gpioGetServoPulsewidth(GPIO);
+      CHECK(3, t+t+1, v, pw[t], 0, "get servo pulsewidth");
+
       time_sleep(1);
       t3_reset = 1;
       time_sleep(4);
       on = t3_on;
       off = t3_off;
-      CHECK(3, 1+t, (1E3*(on+off))/on, 2E7/pw[t], 1,
+      CHECK(3, t+t+2, (1E3*(on+off))/on, 2E7/pw[t], 1,
           "set servo pulsewidth");
    }
 
    gpioServo(GPIO, 0);
    gpioSetPWMfrequency(GPIO, 1000);
    f = gpioGetPWMfrequency(GPIO);
-   CHECK(3, 4, f, 1000, 0, "set/get PWM frequency");
+   CHECK(3, 7, f, 1000, 0, "set/get PWM frequency");
 
    rr = gpioSetPWMrange(GPIO, 100);
-   CHECK(3, 5, rr, 200, 0, "set PWM range");
+   CHECK(3, 8, rr, 200, 0, "set PWM range");
 
    for (t=0; t<4; t++)
    {
       gpioPWM(GPIO, dc[t]);
+      v = gpioGetPWMdutycycle(GPIO);
+      CHECK(3, t+t+9, v, dc[t], 0, "get PWM dutycycle");
+
       time_sleep(1);
       t3_reset = 1;
       time_sleep(2);
       on = t3_on;
       off = t3_off;
-      CHECK(3, 6+t, (1E3*on)/(on+off), 1E1*dc[t], 1,
+      CHECK(3, t+t+10, (1E3*on)/(on+off), 1E1*dc[t], 1,
          "set PWM dutycycle");
    }
 

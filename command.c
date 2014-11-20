@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 21+
+This version is for pigpio version 23+
 */
 
 #include <stdio.h>
@@ -40,7 +40,7 @@ This version is for pigpio version 21+
 
 cmdInfo_t cmdInfo[]=
 {
-   /* num         str   vfyt retv */
+   /* num          str    vfyt retv */
 
    {PI_CMD_BC1,   "BC1",   111, 1}, // gpioWrite_Bits_0_31_Clear
    {PI_CMD_BC2,   "BC2",   111, 1}, // gpioWrite_Bits_32_53_Clear
@@ -50,6 +50,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
    {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
+
+   {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
+   {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
 
    {PI_CMD_HELP,  "H",     101, 5}, // cmdUsage
    {PI_CMD_HELP,  "HELP",  101, 5}, // cmdUsage
@@ -217,6 +220,9 @@ BR1              Read bank 1 gpios.\n\
 BR2              Read bank 2 gpios.\n\
 BS1 bits         Set specified gpios in bank 2.\n\
 BS2 bits         Set specified gpios in bank 2.\n\
+\n\
+GDC u            Get PWM dutycycle for gpio.\n\
+GPW u            Get servo pulsewidth for gpio.\n\
 \n\
 H/HELP           Display command help.\n\
 \n\
@@ -457,6 +463,8 @@ static errInfo_t errInfo[]=
    {PI_SPI_XFER_FAILED  , "spi xfer/read/write failed"},
    {PI_BAD_POINTER      , "bad (NULL) pointer"},
    {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
+   {PI_NOT_PWM_GPIO     , "gpio is not in use for PWM"},
+   {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
 
 };
 
@@ -577,7 +585,7 @@ int cmdParse(
 
          break;
 
-      case 112: /* I2CC
+      case 112: /* GDC  GPW  I2CC
                    I2CRB MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
                    WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR

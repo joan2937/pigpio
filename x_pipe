@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=22
+VERSION=23
 
 GPIO=4
 
@@ -14,6 +14,10 @@ GPIO=4
 # To run the script
 # sudo pigpiod # if not already running
 # ./x_pipe # on the Pi running pigpiod
+#
+# Some tests are statistical in nature and so may on occasion fail.
+# Repeated failures on the same test or many failures in a group
+# of tests indicate a problem.
 #
 
 echo "bc1 0" >/dev/pigpio
@@ -194,12 +198,21 @@ if [[ $s = 0 ]]; then echo "PUD-e ok"; else echo "PUD-e fail ($s)"; fi
 echo "p $GPIO 128" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PWM-a ok"; else echo "PWM-a fail ($s)"; fi
+echo "gdc $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 128 ]]; then echo "GDC-a ok"; else echo "GDC-a fail ($s)"; fi
 echo "pwm $GPIO 64" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PWM-b ok"; else echo "PWM-b fail ($s)"; fi
+echo "GDC $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 64 ]]; then echo "GDC-b ok"; else echo "GDC-b fail ($s)"; fi
 echo "pwm $GPIO 0" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PWM-c ok"; else echo "PWM-c fail ($s)"; fi
+echo "gdc $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "GDC-c ok"; else echo "GDC-c fail ($s)"; fi
 echo "m $GPIO r" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PWM-d ok"; else echo "PWM-d fail ($s)"; fi
@@ -223,12 +236,21 @@ if [[ $s = 0 ]]; then echo "READ-e ok"; else echo "READ-e fail ($s)"; fi
 echo "s $GPIO 500" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SERVO-a ok"; else echo "SERVO-a fail ($s)"; fi
+echo "gpw $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 500 ]]; then echo "GPW-a ok"; else echo "GPW-a fail ($s)"; fi
 echo "servo $GPIO 2500" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SERVO-b ok"; else echo "SERVO-b fail ($s)"; fi
+echo "GPW $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 2500 ]]; then echo "GPW-b ok"; else echo "GPW-b fail ($s)"; fi
 echo "servo $GPIO 0" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SERVO-c ok"; else echo "SERVO-c fail ($s)"; fi
+echo "gpw $GPIO" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s = 0 ]]; then echo "GPW-c ok"; else echo "GPW-c fail ($s)"; fi
 echo "w $GPIO 1" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi

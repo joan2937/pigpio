@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 22 */
+/* pigpio version 23 */
 
 #include <stdio.h>
 #include <string.h>
@@ -746,7 +746,7 @@ typedef struct
    uint8_t  is;
    uint8_t  pad;
    uint16_t width;
-   uint16_t range; /* duty cycles specified by 0 .. range */
+   uint16_t range; /* dutycycles specified by 0 .. range */
    uint16_t freqIdx;
 } gpioInfo_t;
 
@@ -1337,6 +1337,10 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
             res = PI_SOME_PERMITTED;
          }
          break;
+
+      case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
+
+      case PI_CMD_GPW: res = gpioGetServoPulsewidth(p[1]); break;
 
       case PI_CMD_HELP: break;
 
@@ -6068,6 +6072,8 @@ int gpioInitialise(void)
    struct sockaddr_in server;
    char * portStr;
    unsigned port;
+   struct sched_param param;
+
 
    clock_gettime(CLOCK_REALTIME, &libStarted);
 
@@ -6088,10 +6094,11 @@ int gpioInitialise(void)
    {
       i = gpioHardwareRevision();
 
-      if      (i == 0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
-      else if (i <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
-      else if (i < 16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
-      else             gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
+      if      (i ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
+      else if (i == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+      else if (i <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
+      else if (i <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+      else              gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
 
       gpioMaskSet = 1;
    }
@@ -6109,6 +6116,10 @@ int gpioInitialise(void)
       close(fdMem);
       fdMem = -1;
    }
+
+   param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+
+   sched_setscheduler(0, SCHED_FIFO, &param);
 
    initClock(1); /* initialise main clock */
 
@@ -6409,6 +6420,23 @@ int gpioPWM(unsigned gpio, unsigned val)
    return 0;
 }
 
+/* ----------------------------------------------------------------------- */
+
+int gpioGetPWMdutycycle(unsigned gpio)
+{
+   DBG(DBG_USER, "gpio=%d", gpio);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (gpioInfo[gpio].is != GPIO_PWM)
+      SOFT_ERROR(PI_NOT_PWM_GPIO, "not a PWM gpio (%d)", gpio);
+
+   return gpioInfo[gpio].width;
+}
+
 
 /* ----------------------------------------------------------------------- */
 
@@ -6585,6 +6613,24 @@ int gpioServo(unsigned gpio, unsigned val)
    gpioInfo[gpio].width=val;
 
    return 0;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+int gpioGetServoPulsewidth(unsigned gpio)
+{
+   DBG(DBG_USER, "gpio=%d", gpio);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (gpioInfo[gpio].is != GPIO_SERVO)
+      SOFT_ERROR(PI_NOT_SERVO_GPIO, "not a servo gpio (%d)", gpio);
+
+   return gpioInfo[gpio].width;
 }
 
 

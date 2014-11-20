@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 10
+#define PIGPIOD_IF_VERSION 11
 
 /*TEXT
 
@@ -115,8 +115,10 @@ gpio_read                  Read a gpio
 gpio_write                 Write a gpio
 
 set_PWM_dutycycle          Start/stop PWM pulses on a gpio
+get_PWM_dutycycle          Get the PWM dutycycle in use on a gpio
 
 set_servo_pulsewidth       Start/stop servo pulses on a gpio
+get_servo_pulsewidth       Get the servo pulsewidth in use on a gpio
 
 callback                   Create gpio level change callback
 callback_ex                Create gpio level change callback
@@ -450,6 +452,18 @@ default range of 255.
 D*/
 
 /*F*/
+int get_PWM_dutycycle(unsigned user_gpio);
+/*D
+Return the PWM dutycycle in use on a gpio.
+
+. .
+user_gpio: 0-31.
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+D*/
+
+/*F*/
 int set_PWM_range(unsigned user_gpio, unsigned range);
 /*D
 Set the range of PWM values to be used on the gpio.
@@ -598,7 +612,7 @@ Firstly set the desired PWM frequency using [*set_PWM_frequency*].
 
 Then set the PWM range using [*set_PWM_range*] to 1E6/Hz.
 Doing this allows you to use units of microseconds when setting
-the servo pulse width.
+the servo pulsewidth.
 
 E.g. If you want to update a servo connected to gpio 25 at 400Hz
 
@@ -609,6 +623,18 @@ set_PWM_range(25, 2500);
 
 Thereafter use the [*set_PWM_dutycycle*] function to move the servo,
 e.g. set_PWM_dutycycle(25, 1500) will set a 1500 us pulse. 
+D*/
+
+/*F*/
+int get_servo_pulsewidth(unsigned user_gpio);
+/*D
+Return the servo pulsewidth in use on a gpio.
+
+. .
+user_gpio: 0-31.
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 D*/
 
 /*F*/

@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 16+
+This version is for pigpio version 23+
 */
 
 #ifndef COMMAND_H
@@ -38,7 +38,7 @@ This version is for pigpio version 16+
 #include "pigpio.h"
 
 #define CMD_MAX_PARAM 512
-#define CMD_MAX_EXTENSION 8192
+#define CMD_MAX_EXTENSION (1<<16)
 
 #define CMD_UNKNOWN_CMD   -1
 #define CMD_BAD_PARAMETER -2

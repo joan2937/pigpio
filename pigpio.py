@@ -109,7 +109,10 @@ read                      Read a gpio
 write                     Write a gpio
 
 set_PWM_dutycycle         Start/stop PWM pulses on a gpio
+get_PWM_dutycycle         Get PWM dutycycle set on a gpio
+
 set_servo_pulsewidth      Start/Stop servo pulses on a gpio
+get_servo_pulsewidth      Get servo pulsewidth set on a gpio
 
 callback                  Create gpio level change callback
 wait_for_edge             Wait for gpio level change
@@ -244,9 +247,8 @@ import time
 import threading
 import os
 import atexit
-import codecs
 
-VERSION = "1.12"
+VERSION = "1.13"
 
 exceptions = True
 
@@ -390,6 +392,10 @@ _PI_CMD_SERR =80
 _PI_CMD_SERW =81
 _PI_CMD_SERDA=82
 
+_PI_CMD_GDC  =83
+_PI_CMD_GPW  =84
+
+
 
 _PI_CMD_NOIB= 99
 
@@ -487,6 +493,8 @@ PI_UNKNOWN_COMMAND  =-88
 PI_SPI_XFER_FAILED  =-89
 _PI_BAD_POINTER     =-90
 PI_NO_AUX_SPI       =-91
+PI_NOT_PWM_GPIO     =-92
+PI_NOT_SERVO_GPIO   =-93
 
 # pigpio error text
 
@@ -580,6 +588,9 @@ _errors=[
    [PI_SPI_XFER_FAILED   , "SPI xfer/read/write failed"],
    [_PI_BAD_POINTER      , "bad (NULL) pointer"],
    [PI_NO_AUX_SPI        , "need a B+ for auxiliary SPI"],
+   [PI_NOT_PWM_GPIO      , "gpio is not in use for PWM"],
+   [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
+
 ]
 
 class _socklock:
@@ -648,12 +659,23 @@ def tickDiff(t1, t2):
       tDiff += (1 << 32)
    return tDiff
 
-if sys.version < '3':
+# A couple of hacks to cope with different string handling
+# between various Python versions
+# 3 != 2.7.8 != 2.7.3
+
+if sys.hexversion < 0x03000000:
    def _b(x):
       return x
 else:
    def _b(x):
-      return codecs.latin_1_encode(x)[0]
+      return x.encode('latin-1')
+
+if sys.hexversion < 0x02070800:
+   def _str(x):
+      return buffer(x)
+else:
+   def _str(x):
+      return x
 
 def u2i(number):
    """
@@ -996,6 +1018,26 @@ class pi():
       return _u2i(_pigpio_command(
          self.sl, _PI_CMD_PWM, user_gpio, int(dutycycle)))
 
+   def get_PWM_dutycycle(self, user_gpio):
+      """
+      Returns the PWM dutycycle being used on the gpio.
+
+      user_gpio:= 0-31.
+
+      Returns the PWM dutycycle.
+
+      ...
+      pi.set_PWM_dutycycle(4, 25)
+      print(pi.get_PWM_dutycycle(4))
+      25
+
+      pi.set_PWM_dutycycle(4, 203)
+      print(pi.get_PWM_dutycycle(4))
+      203
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_GDC, user_gpio, 0))
+
    def set_PWM_range(self, user_gpio, range_):
       """
       Sets the range of PWM values to be used on the gpio.
@@ -1109,6 +1151,26 @@ class pi():
    """
       return _u2i(_pigpio_command(
          self.sl, _PI_CMD_SERVO, user_gpio, int(pulsewidth)))
+
+   def get_servo_pulsewidth(self, user_gpio):
+      """
+      Returns the servo pulsewidth being used on the gpio.
+
+      user_gpio:= 0-31.
+
+      Returns the servo pulsewidth.
+
+      ...
+      pi.set_servo_pulsewidth(4, 525)
+      print(pi.get_servo_pulsewidth(4))
+      525
+
+      pi.set_servo_pulsewidth(4, 2130)
+      print(pi.get_servo_pulsewidth(4))
+      2130
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_GPW, user_gpio, 0))
 
    def notify_open(self):
       """
@@ -2616,7 +2678,7 @@ class pi():
          _pigpio_command(self.sl, _PI_CMD_PROCP, script_id, 0, False))
       if bytes > 0:
          data = self._rxbuf(bytes)
-         pars = struct.unpack('11i', data)
+         pars = struct.unpack('11i', _str(data))
          status = pars[0]
          params = pars[1:]
       else:

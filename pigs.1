@@ -351,6 +351,78 @@ ERROR: no permission to update one or more gpios
 
 .br
 
+.IP "\fBGDC u\fP - Get gpio PWM dutycycle"
+.IP "" 4
+
+.br
+This command returns the PWM dutycycle in use on gpio \fBu\fP.
+
+.br
+Upon success the dutycycle is returned.  On error a negative
+status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs p 4 129
+.br
+$ pigs gdc 4
+.br
+129
+.br
+
+.br
+pigs gdc 5
+.br
+-92
+.br
+ERROR: gpio is not in use for PWM
+.br
+
+.EE
+
+.br
+
+.IP "\fBGPW u\fP - Get gpio servo pulsewidth"
+.IP "" 4
+
+.br
+This command returns the servo pulsewidth in use on gpio \fBu\fP.
+
+.br
+Upon success the servo pulsewidth is returned.  On error a negative
+status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs s 4 1235
+.br
+$ pigs gpw 4
+.br
+1235
+.br
+
+.br
+$ pigs gpw 9
+.br
+-93
+.br
+ERROR: gpio is not in use for servo pulses
+.br
+
+.EE
+
+.br
+This command returns
+.br
+
 .IP "\fBH/HELP \fP - Display command help"
 .IP "" 4
 This command displays a brief list of the commands and their parameters.
@@ -1194,7 +1266,7 @@ $ pigs np 0
 .IP "" 4
 
 .br
-This command starts PWM on gpio \fBu\fP with duty cycle \fBv\fP.  The duty cycle
+This command starts PWM on gpio \fBu\fP with dutycycle \fBv\fP.  The dutycycle
 varies from 0 (off) to range (fully on).  The range defaults to 255.
 
 .br
@@ -1203,7 +1275,7 @@ will be returned.
 
 .br
 This and the servo functionality use the DMA and PWM or PCM peripherals
-to control and schedule the pulse lengths and duty cycles.
+to control and schedule the pulsewidths and dutycycles.
 
 .br
 The \fBPRS\fP command may be used to change the default range of 255.
@@ -1290,7 +1362,7 @@ $ pigs pfg 4
 .br
 
 .br
-pigs pfg 34
+$ pigs pfg 34
 .br
 ERROR: gpio not 0-31
 .br
@@ -1800,7 +1872,7 @@ Upon success nothing is returned.  On error a negative status code
 will be returned.
 
 .br
-The servo pulse width may be 0 (off), 500 (most anti-clockwise)
+The servo pulsewidth may be 0 (off), 500 (most anti-clockwise)
 to 2500 (most clockwise).
 
 .br

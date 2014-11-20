@@ -438,6 +438,25 @@ Notes
 The \fBset_PWM_range\fP function may be used to change the
 default range of 255.
 
+.IP "\fBint get_PWM_dutycycle(unsigned user_gpio)\fP"
+.IP "" 4
+Return the PWM dutycycle in use on a gpio.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31.
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+
 .IP "\fBint set_PWM_range(unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
 Set the range of PWM values to be used on the gpio.
@@ -712,7 +731,7 @@ Firstly set the desired PWM frequency using \fBset_PWM_frequency\fP.
 .br
 Then set the PWM range using \fBset_PWM_range\fP to 1E6/Hz.
 Doing this allows you to use units of microseconds when setting
-the servo pulse width.
+the servo pulsewidth.
 
 .br
 
@@ -737,6 +756,25 @@ set_PWM_range(25, 2500);
 Thereafter use the \fBset_PWM_dutycycle\fP function to move the servo,
 e.g. set_PWM_dutycycle(25, 1500) will set a 1500 us pulse.
 .br
+
+.IP "\fBint get_servo_pulsewidth(unsigned user_gpio)\fP"
+.IP "" 4
+Return the servo pulsewidth in use on a gpio.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31.
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 
 .IP "\fBint notify_open(void)\fP"
 .IP "" 4

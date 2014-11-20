@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 10 */
+/* PIGPIOD_IF_VERSION 11 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -548,6 +548,9 @@ int gpio_write(unsigned gpio, unsigned level)
 int set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle)
    {return pigpio_command(gPigCommand, PI_CMD_PWM, user_gpio, dutycycle);}
 
+int get_PWM_dutycycle(unsigned user_gpio)
+   {return pigpio_command(gPigCommand, PI_CMD_GDC, user_gpio, 0);}
+
 int set_PWM_range(unsigned user_gpio, unsigned range)
    {return pigpio_command(gPigCommand, PI_CMD_PRS, user_gpio, range);}
 
@@ -565,6 +568,9 @@ int get_PWM_frequency(unsigned user_gpio)
 
 int set_servo_pulsewidth(unsigned user_gpio, unsigned pulsewidth)
    {return pigpio_command(gPigCommand, PI_CMD_SERVO, user_gpio, pulsewidth);}
+
+int get_servo_pulsewidth(unsigned user_gpio)
+   {return pigpio_command(gPigCommand, PI_CMD_GPW, user_gpio, 0);}
 
 int notify_open(void)
    {return pigpio_command(gPigCommand, PI_CMD_NO, 0, 0);}

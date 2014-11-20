@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 22
+#define PIGPIO_VERSION 23
 
 /*TEXT
 
@@ -119,8 +119,10 @@ gpioRead                   Read a gpio
 gpioWrite                  Write a gpio
 
 gpioPWM                    Start/stop PWM pulses on a gpio
+gpioGetPWMdutycycle        Get dutycycle setting on a gpio
 
 gpioServo                  Start/stop servo pulses on a gpio
+gpioGetServoPulsewidth     Get pulsewidth setting on a gpio
 
 gpioDelay                  Delay for a number of microseconds
 
@@ -504,8 +506,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_NUM_AUX_SPI_CHANNEL 3
 #define PI_NUM_STD_SPI_CHANNEL 2
 
-#define PI_MAX_I2C_DEVICE_COUNT 8192
-#define PI_MAX_SPI_DEVICE_COUNT 8192
+#define PI_MAX_I2C_DEVICE_COUNT (1<<16)
+#define PI_MAX_SPI_DEVICE_COUNT (1<<16)
 
 #define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
 #define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
@@ -765,7 +767,7 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_BAD_DUTYCYCLE.
 Arduino style: analogWrite
 
 This and the servo functionality use the DMA and PWM or PCM peripherals
-to control and schedule the pulse lengths and duty cycles.
+to control and schedule the pulse lengths and dutycycles.
 
 The [*gpioSetPWMrange*] function may be used to change the default
 range of 255.
@@ -777,6 +779,22 @@ gpioPWM(18, 128); // Sets gpio18 half on.
 
 gpioPWM(23, 0);   // Sets gpio23 full off.
 ...
+D*/
+
+
+/*F*/
+int gpioGetPWMdutycycle(unsigned user_gpio);
+/*D
+Returns the PWM dutycycle setting for the gpio.
+
+. .
+user_gpio: 0-31
+. .
+
+Returns between 0 (off) and range (fully on) if OK, otherwise
+PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+
+Range defaults to 255.
 D*/
 
 
@@ -964,7 +982,7 @@ Firstly set the desired PWM frequency using [*gpioSetPWMfrequency*].
 
 Then set the PWM range using [*gpioSetPWMrange*] to 1E6/frequency.
 Doing this allows you to use units of microseconds when setting
-the servo pulse width.
+the servo pulsewidth.
 
 E.g. If you want to update a servo connected to gpio25 at 400Hz
 
@@ -976,6 +994,20 @@ gpioSetPWMrange(25, 2500);
 
 Thereafter use the PWM command to move the servo,
 e.g. gpioPWM(25, 1500) will set a 1500 us pulse.
+D*/
+
+
+/*F*/
+int gpioGetServoPulsewidth(unsigned user_gpio);
+/*D
+Returns the servo pulsewidth setting for the gpio.
+
+. .
+user_gpio: 0-31
+. .
+
+Returns , 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
+if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 D*/
 
 
@@ -3795,6 +3827,9 @@ PARAMS*/
 #define PI_CMD_SERW  81
 #define PI_CMD_SERDA 82
 
+#define PI_CMD_GDC   83
+#define PI_CMD_GPW   84
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -3951,6 +3986,8 @@ after this command is issued.
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
 #define PI_NO_AUX_SPI       -91 // need a B+ for auxiliary SPI
+#define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
+#define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
 
 /*DEF_E*/
 
@@ -3970,8 +4007,8 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_R0        0xFFFFFFFF
 #define PI_DEFAULT_UPDATE_MASK_R1        0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_R2        0xFBC7CF9C
-#define PI_DEFAULT_UPDATE_MASK_R3        0x80400FFFFFFCLL
-
+#define PI_DEFAULT_UPDATE_MASK_R3        0x0080400FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
 /*DEF_E*/
 
 #endif
