@@ -1,0 +1,6 @@
+A program showing how to use the gpioSetGetSamplesFunc function to set a callback for accumulated gpio state changes over the last millisecond.
+
+A frequency count is generated for each monitored gpio (frequencies up to 500KHz and beyond).
+
+Generally the method used is more complicated but more efficient than frequency counter 1.
+

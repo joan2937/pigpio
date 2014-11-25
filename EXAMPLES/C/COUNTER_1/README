@@ -1,0 +1,3 @@
+A program showing how to use the gpioSetAlertFunc function to set a callback for gpio state changes.
+
+A frequency count is generated for each monitored gpio (frequencies up to 500KHz and beyond).
