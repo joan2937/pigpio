@@ -1,0 +1,4 @@
+A program to passively sniff I2C transactions (100kHz bus maximum) and display the results.
+
+This C program uses pigpio notifications.
+
