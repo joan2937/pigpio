@@ -1,0 +1,2 @@
+Class to read the relative humidity and temperature from a DHT22/AM2302 sensor.
+
