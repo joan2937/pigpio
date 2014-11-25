@@ -16,7 +16,7 @@ sudo ./PCF8591
 */
 
 /*
-Connect Pi 5V - VCC, Ground - Ground, SDA - SDA, SCL - SCL.
+Connect Pi 3V3 - VCC, Ground - Ground, SDA - SDA, SCL - SCL.
 */
 
 #define PCF8591_I2C_ADDR 0x48

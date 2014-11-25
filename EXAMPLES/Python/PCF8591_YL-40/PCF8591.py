@@ -10,7 +10,7 @@ import pigpio
 # sudo pigpiod
 # ./PCF8591.py
 
-# Connect Pi 5V - VCC, Ground - Ground, SDA - SDA, SCL - SCL.
+# Connect Pi 3V3 - VCC, Ground - Ground, SDA - SDA, SCL - SCL.
 
 YL_40=0x48
 
