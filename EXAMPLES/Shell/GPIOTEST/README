@@ -1,0 +1,7 @@
+This bash script tests the user gpios.
+
+Everything should be disconnected from the gpios.
+
+The pigpio daemon must be running (sudo pigpiod).
+
+Video at http://youtu.be/sCJFLKWaxHo
