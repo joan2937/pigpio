@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 14+
+This version is for pigpio version 24+
 */
 
 #include <sys/types.h>
@@ -52,7 +52,6 @@ This program starts the pigpio library as a daemon.
 static unsigned bufferSizeMilliseconds = PI_DEFAULT_BUFFER_MILLIS;
 static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
-static unsigned clockSource            = PI_DEFAULT_CLK_SOURCE;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
@@ -91,7 +90,6 @@ void usage()
       "   -p value, socket port, 1024-32000,            default 8888\n" \
       "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
       "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
-      "   -u value, clock source, 0=OSC 1=PLLD,         default PLLD\n" \
       "   -x mask,  gpios which may be updated,         default board user gpios\n" \
       "EXAMPLE\n" \
       "sudo pigpiod -s 2 -b 200 -f\n" \
@@ -106,7 +104,7 @@ static void initOpts(int argc, char *argv[])
    uint64_t mask;
    char * endptr;
 
-   while ((opt = getopt(argc, argv, "b:d:e:fkp:s:t:u:x:")) != -1)
+   while ((opt = getopt(argc, argv, "b:d:e:fkp:s:t:x:")) != -1)
    {
       i = -1;
 
@@ -173,13 +171,6 @@ static void initOpts(int argc, char *argv[])
             if ((i >= PI_CLOCK_PWM) && (i <= PI_CLOCK_PCM))
                clockPeripheral = i;
             else fatal("invalid -t option (%d)", i);
-            break;
-
-         case 'u':
-            i = atoi(optarg);
-            if ((i >= PI_CLOCK_OSC) && (i <= PI_CLOCK_PLLD))
-               clockSource = i;
-            else fatal("invalid -u option (%d)", i);
             break;
 
          case 'x':
@@ -261,7 +252,7 @@ int main(int argc, char **argv)
 
    gpioCfgBufferSize(bufferSizeMilliseconds);
 
-   gpioCfgClock(clockMicros, clockPeripheral, clockSource);
+   gpioCfgClock(clockMicros, clockPeripheral, 0);
 
    gpioCfgInterfaces(ifFlags);
 
@@ -318,3 +309,4 @@ int main(int argc, char **argv)
 
    return 0;
 }
+

@@ -1,12 +1,13 @@
 """
-pigpio is a Python module for the Raspberry which allows control
-of the general purpose input outputs (gpios).
+pigpio is a Python module for the Raspberry which talks to
+the pigpio daemon to allow control of the general purpose
+input outputs (gpios).
 
 [http://abyz.co.uk/rpi/pigpio/python.html]
 
 *Features*
 
-o pigpio Python module can be running on Windows, Macs, or Linux
+o the pigpio Python module can run on Windows, Macs, or Linux
 
 o controls one or more Pi's
 
@@ -39,7 +40,7 @@ accurate to within a few microseconds.
 
 A number of settings are determined when the pigpio daemon is started.
 
-o the sample rate (1, 2, 4, 5, 8, or 10us, default 5us).
+o the sample rate (1, 2, 4, 5, 8, or 10 us, default 5 us).
 
 o the set of gpios which may be updated (generally written to).  The
   default set is those available on the Pi board revision.
@@ -151,6 +152,9 @@ bb_serial_read_open       Open a gpio for bit bang serial reads
 bb_serial_read            Read bit bang serial data from  a gpio
 bb_serial_read_close      Close a gpio for bit bang serial reads
 
+hardware_clock            Start hardware clock on supported gpios
+hardware_PWM              Start hardware PWM on supported gpios
+
 Scripts
 
 store_script              Store a script
@@ -248,7 +252,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.13"
+VERSION = "1.14"
 
 exceptions = True
 
@@ -395,7 +399,8 @@ _PI_CMD_SERDA=82
 _PI_CMD_GDC  =83
 _PI_CMD_GPW  =84
 
-
+_PI_CMD_HC   =85
+_PI_CMD_HP   =86
 
 _PI_CMD_NOIB= 99
 
@@ -495,6 +500,15 @@ _PI_BAD_POINTER     =-90
 PI_NO_AUX_SPI       =-91
 PI_NOT_PWM_GPIO     =-92
 PI_NOT_SERVO_GPIO   =-93
+PI_NOT_HCLK_GPIO    =-94
+PI_NOT_HPWM_GPIO    =-95
+PI_BAD_HPWM_FREQ    =-96
+PI_BAD_HPWM_DUTY    =-97
+PI_BAD_HCLK_FREQ    =-98
+PI_BAD_HCLK_PASS    =-99
+PI_HPWM_ILLEGAL     =-100
+PI_BAD_DATABITS     =-101
+PI_BAD_STOPBITS     =-102
 
 # pigpio error text
 
@@ -516,7 +530,7 @@ _errors=[
    [PI_BAD_WDOG_TIMEOUT  , "timeout not 0-60000"],
    [_PI_NO_ALERT_FUNC    , "DEPRECATED"],
    [_PI_BAD_CLK_PERIPH   , "clock peripheral not 0-1"],
-   [_PI_BAD_CLK_SOURCE   , "clock source not 0-1"],
+   [_PI_BAD_CLK_SOURCE   , "DEPRECATED"],
    [_PI_BAD_CLK_MICROS   , "clock micros not 1, 2, 4, 5, 8, or 10"],
    [_PI_BAD_BUF_MILLIS   , "buf millis not 100-10000"],
    [PI_BAD_DUTYRANGE     , "dutycycle range not 25-40000"],
@@ -533,7 +547,7 @@ _errors=[
    [_PI_INITIALISED      , "function called after gpioInitialise"],
    [_PI_BAD_WAVE_MODE    , "waveform mode not 0-1"],
    [_PI_BAD_CFG_INTERNAL , "bad parameter in gpioCfgInternals call"],
-   [PI_BAD_WAVE_BAUD     , "baud rate not 100-250000"],
+   [PI_BAD_WAVE_BAUD     , "baud rate not 50-250000(RX)/1000000(TX)"],
    [PI_TOO_MANY_PULSES   , "waveform has too many pulses"],
    [PI_TOO_MANY_CHARS    , "waveform has too many chars"],
    [PI_NOT_SERIAL_GPIO   , "no serial read in progress on gpio"],
@@ -542,17 +556,17 @@ _errors=[
    [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
    [PI_BAD_WVSM_COMMND   , "bad WVSM subcommand"],
    [PI_BAD_WVSP_COMMND   , "bad WVSP subcommand"],
-   [PI_BAD_PULSELEN      , "trigger pulse length > 100"],
+   [PI_BAD_PULSELEN      , "trigger pulse length not 1-100"],
    [PI_BAD_SCRIPT        , "invalid script"],
    [PI_BAD_SCRIPT_ID     , "unknown script id"],
    [PI_BAD_SER_OFFSET    , "add serial data offset > 30 minute"],
    [PI_GPIO_IN_USE       , "gpio already in use"],
    [PI_BAD_SERIAL_COUNT  , "must read at least a byte at a time"],
-   [PI_BAD_PARAM_NUM     , "script parameter must be 0-9"],
+   [PI_BAD_PARAM_NUM     , "script parameter id not 0-9"],
    [PI_DUP_TAG           , "script has duplicate tag"],
    [PI_TOO_MANY_TAGS     , "script has too many tags"],
    [PI_BAD_SCRIPT_CMD    , "illegal script command"],
-   [PI_BAD_VAR_NUM       , "script variable must be 0-149"],
+   [PI_BAD_VAR_NUM       , "script variable id not 0-149"],
    [PI_NO_SCRIPT_ROOM    , "no more room for scripts"],
    [PI_NO_MEMORY         , "can't allocate temporary memory"],
    [PI_SOCK_READ_FAILED  , "socket read failed"],
@@ -590,6 +604,15 @@ _errors=[
    [PI_NO_AUX_SPI        , "need a B+ for auxiliary SPI"],
    [PI_NOT_PWM_GPIO      , "gpio is not in use for PWM"],
    [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
+   [PI_NOT_HCLK_GPIO     , "gpio has no hardware clock"],
+   [PI_NOT_HPWM_GPIO     , "gpio has no hardware PWM"],
+   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 5-250K"],
+   [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-1000"],
+   [PI_BAD_HCLK_FREQ     , "hardware clock frequency not 4689-25M"],
+   [PI_BAD_HCLK_PASS     , "need password to use hardware clock 1"],
+   [PI_HPWM_ILLEGAL      , "illegal, PWM in use for main clock"],
+   [PI_BAD_DATABITS      , "serial data bits not 1-32"],
+   [PI_BAD_STOPBITS      , "serial (half) stop bits not 2-8"],
 
 ]
 
@@ -677,11 +700,11 @@ else:
    def _str(x):
       return x
 
-def u2i(number):
+def u2i(uint32):
    """
    Converts a 32 bit unsigned number to signed.
 
-   number:= an unsigned 32 bit number
+   uint32:= an unsigned 32 bit number
 
    ...
    print(u2i(4294967272))
@@ -691,19 +714,19 @@ def u2i(number):
    ...
    """
    mask = (2 ** 32) - 1
-   if number & (1 << 31):
-      v = number | ~mask
+   if uint32 & (1 << 31):
+      v = uint32 | ~mask
    else:
-      v = number & mask
+      v = uint32 & mask
    return v
 
-def _u2i(number):
+def _u2i(uint32):
    """
    Converts a 32 bit unsigned number to signed.  If the number
    is negative it indicates an error.  On error a pigpio
    exception will be raised if exceptions is True.
    """
-   v = u2i(number)
+   v = u2i(uint32)
    if v < 0:
       if exceptions:
          raise error(error_text(v))
@@ -1388,6 +1411,107 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_BS2, bits, 0))
 
+   def hardware_clock(self, gpio, clkfreq):
+      """
+      Starts a hardware clock on a gpio at the specified frequency.
+
+         gpio:= see description
+      clkfreq:= 0 (off) or 4689-250M
+
+
+      Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
+      PI_NOT_HCLK_GPIO, PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
+
+      The same clock is available on multiple gpios.  The latest
+      frequency setting will be used by all gpios which share a clock.
+
+      The gpio must be one of the following.
+
+      . .
+      4   clock 0  All models
+      5   clock 1  A+/B+ and compute module only (reserved for system use)
+      6   clock 2  A+/B+ and compute module only
+      20  clock 0  A+/B+ and compute module only
+      21  clock 1  All models but Rev.2 B (reserved for system use)
+
+      32  clock 0  Compute module only
+      34  clock 0  Compute module only
+      42  clock 1  Compute module only (reserved for system use)
+      43  clock 2  Compute module only
+      44  clock 1  Compute module only (reserved for system use)
+      . .
+
+      Access to clock 1 is protected by a password as its use will
+      likely crash the Pi.  The password is given by or'ing 0x5A000000
+      with the gpio number.
+
+      ...
+      pi.hardware_clock(4, 5000) # 5 KHz clock on gpio 4
+
+      pi.hardware_clock(4, 40000000) # 40 MHz clock on gpio 4
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_HC, gpio, clkfreq))
+
+   def hardware_PWM(self, gpio, PWMfreq, PWMduty):
+      """
+      Starts hardware PWM on a gpio at the specified
+      frequency and dutycycle.
+
+      NOTE: Any waveform started by [*wave_send_once*],
+      [*wave_send_repeat*], [*wave_tx_start*], or
+      [*wave_tx_repeat*] will be cancelled.
+
+      This function is only valid if the pigpio main clock is PCM.
+      The main clock defaults to PCM but may be overridden when the
+      pigpio daemon is started (option -t).
+
+         gpio:= see descripton
+      PWMfreq:= 0 (off) or 5-250K
+      PWMduty:= 0 (off) to 1000 (fully on).
+
+      Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
+      PI_NOT_HPWM_GPIO, PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ.
+
+      Both PWM channels share the same clock and the same update
+      frequency.  The latest frequency setting will be used by
+      both PWM channels. The same PWM channel is available on
+      multiple gpios.  The latest dutycycle setting will be used
+      by all gpios which share a PWM channel.
+
+      The gpio must be one of the following.
+
+      . .
+      12  PWM channel 0  A+/B+ and compute module only
+      13  PWM channel 1  A+/B+ and compute module only
+      18  PWM channel 0  All models
+      19  PWM channel 1  A+/B+ and compute module only
+
+      40  PWM channel 0  Compute module only
+      41  PWM channel 1  Compute module only
+      45  PWM channel 1  Compute module only
+      52  PWM channel 0  Compute module only
+      53  PWM channel 1  Compute module only
+      . .
+
+      ...
+      pi.hardware_PWM(18, 800, 250) # 800Hz 25% dutycycle
+
+      pi.hardware_PWM(18, 2000, 750) # 2000Hz 75% dutycycle
+      ...
+      """
+      # pigpio message format
+
+      # I p1 gpio
+      # I p2 PWMfreq
+      # I p3 4
+      ## extension ##
+      # I PWMdutycycle
+      extents = [struct.pack("I", PWMduty)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_HP, gpio, PWMfreq, 4, extents))
+
+
    def get_current_tick(self):
       """
       Returns the current system tick.
@@ -1549,49 +1673,60 @@ class pi():
       else:
          return 0
 
-   def wave_add_serial(self, user_gpio, bb_baud, offset, data):
+   def wave_add_serial(
+      self, user_gpio, bb_baud, data, offset=0, bb_bits=8, bb_stop=2):
       """
       Adds a waveform representing serial data to the existing
-      waveform (if any).  The serial data starts offset
+      waveform (if any).  The serial data starts [*offset*]
       microseconds from the start of the waveform.
 
       user_gpio:= gpio to transmit data.  You must set the gpio mode
                   to output.
         bb_baud:= baud rate to use.
-         offset:= number of microseconds from the starts of the
-                  waveform.
            data:= the bytes to write.
+         offset:= number of microseconds from the starts of the
+                  waveform, default 0.
+        bb_bits:= number of data bits, default 8.
+        bb_stop:= number of stop half bits, default 2.
 
       Returns the new total number of pulses in the current waveform.
 
-      The serial data is formatted as one start bit, eight data bits,
-      and one stop bit.
+      The serial data is formatted as one start bit, [*bb_bits*]
+      data bits, and [*bb_stop*]/2 stop bits.
 
       It is legal to add serial data streams with different baud
       rates to the same waveform.
 
+      The bytes required for each character depend upon [*bb_bits*].
+
+      For [*bb_bits*] 1-8 there will be one byte per character. 
+      For [*bb_bits*] 9-16 there will be two bytes per character. 
+      For [*bb_bits*] 17-32 there will be four bytes per character.
+
       ...
-      pi.wave_add_serial(4, 300, 0, 'Hello world')
+      pi.wave_add_serial(4, 300, 'Hello world')
 
-      pi.wave_add_serial(4, 300, 0, b"Hello world")
+      pi.wave_add_serial(4, 300, b"Hello world")
 
-      pi.wave_add_serial(4, 300, 0, b'\\x23\\x01\\x00\\x45')
+      pi.wave_add_serial(4, 300, b'\\x23\\x01\\x00\\x45')
 
-      pi.wave_add_serial(17, 38400, 5000, [23, 128, 234])
+      pi.wave_add_serial(17, 38400, [23, 128, 234], 5000)
       ...
       """
       # pigpio message format
 
       # I p1 gpio
       # I p2 bb_baud
-      # I p3 len+4
+      # I p3 len+12
       ## extension ##
+      # I bb_bits
+      # I bb_stop
       # I offset
       # s len data bytes
       if len(data):
-         extents = [struct.pack("I", offset), data]
+         extents = [struct.pack("III", bb_bits, bb_stop, offset), data]
          return _u2i(_pigpio_command_ext(
-            self.sl, _PI_CMD_WVAS, user_gpio, bb_baud, len(data)+4, extents))
+            self.sl, _PI_CMD_WVAS, user_gpio, bb_baud, len(data)+12, extents))
       else:
          return 0
 
@@ -1663,6 +1798,9 @@ class pi():
       This function is deprecated and will be removed.
 
       Use [*wave_create*]/[*wave_send_**] instead.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVGO, 0, 0))
 
@@ -1671,6 +1809,9 @@ class pi():
       This function is deprecated and will be removed.
 
       Use [*wave_create*]/[*wave_send_**] instead.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVGOR, 0, 0))
 
@@ -1678,6 +1819,9 @@ class pi():
       """
       Transmits the waveform with id wave_id.  The waveform is sent
       once.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
 
       wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
 
@@ -1694,6 +1838,9 @@ class pi():
       Transmits the waveform with id wave_id.  The waveform repeats
       until wave_tx_stop is called or another call to [*wave_send_**]
       is made.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
 
       wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
 
@@ -2719,7 +2866,7 @@ class pi():
         bb_baud:= 300-250000, the baud rate.
 
       The serial data is held in a cyclic buffer and is read using
-      bb_serial_read.
+      [*bb_serial_read*].
 
       It is the caller's responsibility to read data from the cyclic
       buffer in a timely fashion.
@@ -2923,6 +3070,16 @@ def xref():
    bb_baud: 100 - 250000
    The baud rate used for the transmission of bit bang serial data.
 
+   bb_bits: 1-32
+
+   The number of data bits to be used when adding serial data to a
+   waveform.
+
+   bb_stop: 2-8
+
+   The number of (half) stop bits to be used when adding serial data
+   to a waveform.
+
    bit: 0-1
    A value of 0 or 1.
 
@@ -2937,6 +3094,9 @@ def xref():
 
    byte_val: 0-255
    A whole number.
+
+   clkfreq: 4689-250M
+   The hardware clock frequency.
 
    count:
    The number of bytes of data to be transferred.
@@ -2966,70 +3126,87 @@ def xref():
    RISING_EDGE = 0
 
    errnum: <0
-   PI_BAD_DUTYCYCLE = -8 
-   PI_BAD_DUTYRANGE = -21 
-   PI_BAD_FLAGS = -77 
-   PI_BAD_GPIO = -3 
-   PI_BAD_HANDLE = -25 
-   PI_BAD_I2C_ADDR = -75 
-   PI_BAD_I2C_BUS = -74 
-   PI_BAD_LEVEL = -5 
-   PI_BAD_MICS_DELAY = -64 
-   PI_BAD_MILS_DELAY = -65 
-   PI_BAD_MODE = -4 
-   PI_BAD_PARAM = -81 
-   PI_BAD_PARAM_NUM = -52 
-   PI_BAD_PUD = -6 
-   PI_BAD_PULSELEN = -46 
-   PI_BAD_PULSEWIDTH = -7 
-   PI_BAD_SCRIPT = -47 
-   PI_BAD_SCRIPT_CMD = -55 
-   PI_BAD_SCRIPT_ID = -48 
-   PI_BAD_SERIAL_COUNT = -51 
-   PI_BAD_SER_DEVICE = -79 
-   PI_BAD_SER_OFFSET = -49 
-   PI_BAD_SER_SPEED = -80 
-   PI_BAD_SPI_CHANNEL = -76 
-   PI_BAD_SPI_COUNT = -84 
-   PI_BAD_SPI_SPEED = -78 
-   PI_BAD_TAG = -63 
-   PI_BAD_USER_GPIO = -2 
-   PI_BAD_VAR_NUM = -56 
-   PI_BAD_WAVE_BAUD = -35 
-   PI_BAD_WAVE_ID = -66 
-   PI_BAD_WDOG_TIMEOUT = -15 
-   PI_BAD_WVSC_COMMND = -43 
-   PI_BAD_WVSM_COMMND = -44 
-   PI_BAD_WVSP_COMMND = -45 
-   PI_DUP_TAG = -53 
-   PI_EMPTY_WAVEFORM = -69 
-   PI_GPIO_IN_USE = -50 
-   PI_I2C_OPEN_FAILED = -71 
-   PI_I2C_READ_FAILED = -83 
-   PI_I2C_WRITE_FAILED = -82 
-   PI_NOT_HALTED = -62 
-   PI_NOT_PERMITTED = -41 
-   PI_NOT_SERIAL_GPIO = -38 
-   PI_NO_HANDLE = -24 
-   PI_NO_MEMORY = -58 
-   PI_NO_SCRIPT_ROOM = -57 
-   PI_NO_WAVEFORM_ID = -70 
-   PI_SER_OPEN_FAILED = -72 
-   PI_SER_READ_FAILED = -86 
-   PI_SER_READ_NO_DATA = -87 
-   PI_SER_WRITE_FAILED = -85 
-   PI_SOCK_READ_FAILED = -59 
-   PI_SOCK_WRIT_FAILED = -60 
-   PI_SOME_PERMITTED = -42 
-   PI_SPI_OPEN_FAILED = -73 
-   PI_SPI_XFER_FAILED = -89 
-   PI_TOO_MANY_CBS = -67 
-   PI_TOO_MANY_CHARS = -37 
-   PI_TOO_MANY_OOL = -68 
-   PI_TOO_MANY_PARAM = -61 
-   PI_TOO_MANY_PULSES = -36 
-   PI_TOO_MANY_TAGS = -54 
-   PI_UNKNOWN_COMMAND = -88 
+   PI_BAD_DATABITS = -101
+   PI_BAD_DUTYCYCLE = -8
+   PI_BAD_DUTYRANGE = -21
+   PI_BAD_FLAGS = -77
+   PI_BAD_GPIO = -3
+   PI_BAD_HANDLE = -25
+   PI_BAD_HCLK_FREQ = -98
+   PI_BAD_HCLK_PASS = -99
+   PI_BAD_HPWM_DUTY = -97
+   PI_BAD_HPWM_FREQ = -96
+   PI_BAD_I2C_ADDR = -75
+   PI_BAD_I2C_BUS = -74
+   PI_BAD_LEVEL = -5
+   PI_BAD_MICS_DELAY = -64
+   PI_BAD_MILS_DELAY = -65
+   PI_BAD_MODE = -4
+   PI_BAD_PARAM = -81
+   PI_BAD_PARAM_NUM = -52
+   PI_BAD_PUD = -6
+   PI_BAD_PULSELEN = -46
+   PI_BAD_PULSEWIDTH = -7
+   PI_BAD_SCRIPT = -47
+   PI_BAD_SCRIPT_CMD = -55
+   PI_BAD_SCRIPT_ID = -48
+   PI_BAD_SERIAL_COUNT = -51
+   PI_BAD_SER_DEVICE = -79
+   PI_BAD_SER_OFFSET = -49
+   PI_BAD_SER_SPEED = -80
+   PI_BAD_SPI_CHANNEL = -76
+   PI_BAD_SPI_COUNT = -84
+   PI_BAD_SPI_SPEED = -78
+   PI_BAD_STOPBITS = -102
+   PI_BAD_TAG = -63
+   PI_BAD_USER_GPIO = -2
+   PI_BAD_VAR_NUM = -56
+   PI_BAD_WAVE_BAUD = -35
+   PI_BAD_WAVE_ID = -66
+   PI_BAD_WDOG_TIMEOUT = -15
+   PI_BAD_WVSC_COMMND = -43
+   PI_BAD_WVSM_COMMND = -44
+   PI_BAD_WVSP_COMMND = -45
+   PI_DUP_TAG = -53
+   PI_EMPTY_WAVEFORM = -69
+   PI_GPIO_IN_USE = -50
+   PI_HPWM_ILLEGAL = -100
+   PI_I2C_OPEN_FAILED = -71
+   PI_I2C_READ_FAILED = -83
+   PI_I2C_WRITE_FAILED = -82
+   PI_NOT_HALTED = -62
+   PI_NOT_HCLK_GPIO = -94
+   PI_NOT_HPWM_GPIO = -95
+   PI_NOT_PERMITTED = -41
+   PI_NOT_PWM_GPIO = -92
+   PI_NOT_SERIAL_GPIO = -38
+   PI_NOT_SERVO_GPIO = -93
+   PI_NO_AUX_SPI = -91
+   PI_NO_HANDLE = -24
+   PI_NO_MEMORY = -58
+   PI_NO_SCRIPT_ROOM = -57
+   PI_NO_WAVEFORM_ID = -70
+   PI_SCRIPT_FAILED = 4
+   PI_SCRIPT_HALTED = 1
+   PI_SCRIPT_INITING = 0
+   PI_SCRIPT_RUNNING = 2
+   PI_SCRIPT_WAITING = 3
+   PI_SER_OPEN_FAILED = -72
+   PI_SER_READ_FAILED = -86
+   PI_SER_READ_NO_DATA = -87
+   PI_SER_WRITE_FAILED = -85
+   PI_SOCK_READ_FAILED = -59
+   PI_SOCK_WRIT_FAILED = -60
+   PI_SOME_PERMITTED = -42
+   PI_SPI_OPEN_FAILED = -73
+   PI_SPI_XFER_FAILED = -89
+   PI_TOO_MANY_CBS = -67
+   PI_TOO_MANY_CHARS = -37
+   PI_TOO_MANY_OOL = -68
+   PI_TOO_MANY_PARAM = -61
+   PI_TOO_MANY_PULSES = -36
+   PI_TOO_MANY_TAGS = -54
+   PI_UNKNOWN_COMMAND = -88
 
    frequency: 0-40000
    Defines the frequency to be used for PWM on a gpio.
@@ -3117,6 +3294,12 @@ def xref():
    pulsewidth:
    The servo pulsewidth in microseconds.  0 switches pulses off.
 
+   PWMduty: 0-1000
+   The hardware PWM dutycycle.
+
+   PWMfreq: 5-250K
+   The hardware PWM frequency.
+
    range_: 25-40000
    Defines the limits for the [*dutycycle*] parameter.
 
@@ -3165,6 +3348,9 @@ def xref():
 
    tty:
    A Pi serial tty device, e.g. /dev/ttyAMA0, /dev/ttyUSB0
+
+   uint32:
+   An unsigned 32 bit number.
 
    user_gpio: 0-31
    A Broadcom numbered gpio.

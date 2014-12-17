@@ -396,7 +396,7 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 6, e, 0, 0, "serial read open");
 
    gpioWaveClear();
-   e = gpioWaveAddSerial(GPIO, BAUD, 5000000, strlen(TEXT), TEXT);
+   e = gpioWaveAddSerial(GPIO, BAUD, 8, 2, 5000000, strlen(TEXT), TEXT);
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial");
 
    e = gpioWaveTxStart(PI_WAVE_MODE_ONE_SHOT);
@@ -416,10 +416,10 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 12, e, 0, 0, "serial read close");
 
    c = gpioWaveGetMicros();
-   CHECK(5, 13, c, 6158704, 0, "wave get micros");
+   CHECK(5, 13, c, 6158148, 0, "wave get micros");
 
    c = gpioWaveGetHighMicros();
-   CHECK(5, 14, c, 6158704, 0, "wave get high micros");
+   CHECK(5, 14, c, 6158148, 0, "wave get high micros");
 
    c = gpioWaveGetMaxMicros();
    CHECK(5, 15, c, 1800000000, 0, "wave get max micros");

@@ -1516,11 +1516,11 @@ else
 
 .EE
 
-.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned bbBaud, unsigned offset, unsigned numChar, char *str)\fP"
+.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned bbBaud, unsigned bbBits, unsigned bbStop, unsigned offset, unsigned numBytes, char *str)\fP"
 .IP "" 4
 This function adds a waveform representing serial data to the
-existing waveform (if any).  The serial data starts offset microseconds
-from the start of the waveform.
+existing waveform (if any).  The serial data starts offset
+microseconds from the start of the waveform.
 
 .br
 
@@ -1529,11 +1529,15 @@ from the start of the waveform.
 .EX
 user_gpio: 0-31
 .br
-   bbBaud: 100-250000
+   bbBaud: 100-1000000
+.br
+   bbBits: 1-32
+.br
+   bbStop: 2-8
 .br
    offset: 0-
 .br
-  numChar: 1-
+ numBytes: 1-
 .br
       str: an array of chars (which may contain nulls)
 .br
@@ -1544,20 +1548,45 @@ user_gpio: 0-31
 
 .br
 Returns the new total number of pulses in the current waveform if OK,
-otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_TOO_MANY_CHARS,
-PI_BAD_SER_OFFSET, or PI_TOO_MANY_PULSES.
+otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_BAD_DATABITS,
+PI_BAD_STOPBITS, PI_TOO_MANY_CHARS, PI_BAD_SER_OFFSET,
+or PI_TOO_MANY_PULSES.
 
 .br
 
 .br
-The serial data is formatted as one start bit, eight data bits, and one
-stop bit.
+NOTES:
+
+.br
+
+.br
+The serial data is formatted as one start bit, bbBits data bits, and
+bbStop/2 stop bits.
 
 .br
 
 .br
 It is legal to add serial data streams with different baud rates to
 the same waveform.
+
+.br
+
+.br
+numBytes is the number of bytes of data in str.
+
+.br
+
+.br
+The bytes required for each character depend upon bbBits.
+
+.br
+
+.br
+For bbBits 1-8 there will be one byte per character.
+.br
+For bbBits 9-16 there will be two bytes per character.
+.br
+For bbBits 17-32 there will be four bytes per character.
 
 .br
 
@@ -1582,7 +1611,7 @@ str = "Hello world!";
 .br
 
 .br
-gpioWaveAddSerial(4, 9600, 0, strlen(str), str);
+gpioWaveAddSerial(4, 9600, 8, 2, 0, strlen(str), str);
 .br
 
 .br
@@ -1592,7 +1621,7 @@ for (i=0; i<MSG_LEN; i++) data[i] = i;
 .br
 // Data added is offset 1 second from the waveform start.
 .br
-gpioWaveAddSerial(4, 9600, 1000000, MSG_LEN, data);
+gpioWaveAddSerial(4, 9600, 8, 2, 1000000, MSG_LEN, data);
 .br
 
 .EE
@@ -1736,6 +1765,11 @@ determines whether the waveform is sent once or cycles endlessly.
 .br
 
 .br
+NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
+
+.br
+
+.br
 
 .EX
 wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
@@ -1759,6 +1793,11 @@ otherwise PI_BAD_WAVE_MODE.
 .IP "" 4
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
+
+.br
+
+.br
+NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
 
 .br
 
@@ -2922,8 +2961,8 @@ Returns 0 if OK.
 .br
 
 .br
-The function is passed a pointer to the samples and the number
-of samples.
+The function is passed a pointer to the samples (an array of
+\fBgpioSample_t\fP),  and the number of samples.
 
 .br
 
@@ -2975,8 +3014,8 @@ Returns 0 if OK.
 .br
 
 .br
-The function is passed a pointer to the samples, the number
-of samples, and the userdata pointer.
+The function is passed a pointer to the samples (an array of
+\fBgpioSample_t\fP), the number of samples, and the userdata pointer.
 
 .br
 
@@ -3554,6 +3593,154 @@ gpioWrite_Bits_32_53_Set((1<<(32-32)) | (1<<(40-32)) | (1<<(53-32)));
 
 .EE
 
+.IP "\fBint gpioHardwareClock(unsigned gpio, unsigned clkfreq)\fP"
+.IP "" 4
+Starts a hardware clock on a gpio at the specified frequency.
+
+.br
+
+.br
+
+.EX
+   gpio: see description
+.br
+clkfreq: 0 (off) or 4689-250M
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
+PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
+
+.br
+
+.br
+The same clock is available on multiple gpios.  The latest
+frequency setting will be used by all gpios which share a clock.
+
+.br
+
+.br
+The gpio must be one of the following.
+
+.br
+
+.br
+
+.EX
+4   clock 0  All models
+.br
+5   clock 1  A+/B+ and compute module only (reserved for system use)
+.br
+6   clock 2  A+/B+ and compute module only
+.br
+20  clock 0  A+/B+ and compute module only
+.br
+21  clock 1  All models but Rev.2 B (reserved for system use)
+.br
+
+.br
+32  clock 0  Compute module only
+.br
+34  clock 0  Compute module only
+.br
+42  clock 1  Compute module only (reserved for system use)
+.br
+43  clock 2  Compute module only
+.br
+44  clock 1  Compute module only (reserved for system use)
+.br
+
+.EE
+
+.br
+
+.br
+Access to clock 1 is protected by a password as its use will likely
+crash the Pi.  The password is given by or'ing 0x5A000000 with the
+gpio number.
+
+.IP "\fBint gpioHardwarePWM(unsigned gpio, unsigned PWMfreq, unsigned PWMduty)\fP"
+.IP "" 4
+Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+
+.br
+
+.br
+NOTE: Any waveform started by \fBgpioWaveTxSend\fP or \fBgpioWaveTxStart\fP
+will be cancelled.
+
+.br
+
+.br
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden by a call to
+\fBgpioCfgClock\fP.
+
+.br
+
+.br
+
+.EX
+   gpio: see description
+.br
+PWMfreq: 0 (off) or 5-250K
+.br
+PWMduty: 0 (off) to 1000 (fully on).
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HPWM_GPIO,
+PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ, or PI_HPWM_ILLEGAL.
+
+.br
+
+.br
+Both PWM channels share the same clock and the same update frequency.
+The latest frequency setting will be used by both PWM channels. The
+same PWM channel is available on multiple gpios.  The latest
+dutycycle setting will be used by all gpios which share a PWM channel.
+
+.br
+
+.br
+The gpio must be one of the following.
+
+.br
+
+.br
+
+.EX
+12  PWM channel 0  A+/B+ and compute module only
+.br
+13  PWM channel 1  A+/B+ and compute module only
+.br
+18  PWM channel 0  All models
+.br
+19  PWM channel 1  A+/B+ and compute module only
+.br
+
+.br
+40  PWM channel 0  Compute module only
+.br
+41  PWM channel 1  Compute module only
+.br
+45  PWM channel 1  Compute module only
+.br
+52  PWM channel 0  Compute module only
+.br
+53  PWM channel 1  Compute module only
+.br
+
+.EE
+
 .IP "\fBint gpioTime(unsigned timetype, int *seconds, int *micros)\fP"
 .IP "" 4
 Updates the seconds and micros variables with the current time.
@@ -3890,7 +4077,7 @@ sample   4       8  12  18   31   55  107  ---
 .IP "\fBint gpioCfgClock(unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource)\fP"
 .IP "" 4
 Configures pigpio to use a particualar sample rate timed by a specified
-peripheral and clock source.
+peripheral.
 
 .br
 
@@ -3901,7 +4088,7 @@ peripheral and clock source.
 .br
 cfgPeripheral: 0 (PWM), 1 (PCM)
 .br
-    cfgSource: 0 (OSC), 1 (PLLD)
+    cfgSource: deprecated, value is ignored
 .br
 
 .EE
@@ -3909,14 +4096,12 @@ cfgPeripheral: 0 (PWM), 1 (PCM)
 .br
 
 .br
-The timings are provided by the specified peripheral (PWM or PCM)
-using the frequency source (OSC or PLLD).
+The timings are provided by the specified peripheral (PWM or PCM).
 
 .br
 
 .br
-The default setting is 5 microseconds using the PCM peripheral
-with the PLLD source.
+The default setting is 5 microseconds using the PCM peripheral.
 
 .br
 
@@ -4438,9 +4623,59 @@ serial data.
 .br
 
 .EX
-PI_WAVE_MIN_BAUD 100
+PI_BB_MIN_BAUD 50
 .br
-PI_WAVE_MAX_BAUD 250000
+PI_BB_RX_MAX_BAUD 250000
+.br
+PI_BB_TX_MAX_BAUD 1000000
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBbbBits\fP: 1-32" 0
+
+.br
+
+.br
+The number of data bits to be used when adding serial data to a
+waveform.
+
+.br
+
+.br
+
+.EX
+#define PI_MIN_WAVE_DATABITS 1
+.br
+#define PI_MAX_WAVE_DATABITS 32
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBbbStop\fP: 2-8" 0
+
+.br
+
+.br
+The number of (half) stop bits to be used when adding serial data
+to a waveform.
+
+.br
+
+.br
+
+.EX
+#define PI_MIN_WAVE_HALFSTOPBITS 2
+.br
+#define PI_MAX_WAVE_HALFSTOPBITS 8
 .br
 
 .EE
@@ -4580,16 +4815,7 @@ purposes.
 .br
 
 .br
-The clock source used for the timing of DMA transfers.  May be the 19.2MHz
-crystal or the 500MHz PLL.
-
-.EX
-PI_CLOCK_OSC 0
-.br
-PI_CLOCK_PLLD 1
-.br
-
-.EE
+Deprecated.
 
 .br
 
@@ -4630,6 +4856,29 @@ A number specifying a configuration item.
 
 .br
 A single character, an 8 bit quantity able to store 0-255.
+
+.br
+
+.br
+
+.IP "\fBclkfreq\fP: 4689-250M" 0
+
+.br
+
+.br
+The hardware clock frequency.
+
+.br
+
+.br
+
+.EX
+#define PI_HW_CLK_MIN_FREQ 4689
+.br
+#define PI_HW_CLK_MAX_FREQ 250000000
+.br
+
+.EE
 
 .br
 
@@ -5167,13 +5416,14 @@ The number of bits stored in a buffer.
 
 .br
 
-.IP "\fBnumChar\fP" 0
+.IP "\fBnumBytes\fP" 0
 
 .br
 
 .br
-The number of characters in a string (used when the string might contain
-null characters, which would normally terminate the string).
+The number of bytes used to store characters in a string.  Depending
+on the number of bits per character there may be 1, 2, or 4 bytes
+per character.
 
 .br
 
@@ -5332,6 +5582,42 @@ PI_SERVO_OFF 0
 PI_MIN_SERVO_PULSEWIDTH 500
 .br
 PI_MAX_SERVO_PULSEWIDTH 2500
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBPWMduty\fP: 0-1000" 0
+The hardware PWM dutycycle.
+
+.br
+
+.br
+
+.EX
+#define PI_HW_PWM_RANGE 1000
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBPWMfreq\fP: 5-250K" 0
+The hardware PWM frequency.
+
+.br
+
+.br
+
+.EX
+#define PI_HW_PWM_MIN_FREQ 5
+.br
+#define PI_HW_PWM_MAX_FREQ 250000
 .br
 
 .EE
@@ -6075,6 +6361,12 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_HC    85
+.br
+#define PI_CMD_HP    86
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -6120,7 +6412,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_CLK_PERIPH   -17 // clock peripheral not 0-1
 .br
-#define PI_BAD_CLK_SOURCE   -18 // clock source not 0-1
+#define PI_BAD_CLK_SOURCE   -18 // DEPRECATED
 .br
 #define PI_BAD_CLK_MICROS   -19 // clock micros not 1, 2, 4, 5, 8, or 10
 .br
@@ -6158,7 +6450,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
 .br
-#define PI_BAD_WAVE_BAUD    -35 // baud rate not 100-250000
+#define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
 .br
 #define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses
 .br
@@ -6180,7 +6472,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_WVSP_COMMND  -45 // bad WVSP subcommand
 .br
-#define PI_BAD_PULSELEN     -46 // trigger pulse length > 100
+#define PI_BAD_PULSELEN     -46 // trigger pulse length not 1-100
 .br
 #define PI_BAD_SCRIPT       -47 // invalid script
 .br
@@ -6192,7 +6484,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_SERIAL_COUNT -51 // must read at least a byte at a time
 .br
-#define PI_BAD_PARAM_NUM    -52 // script parameter must be 0-9
+#define PI_BAD_PARAM_NUM    -52 // script parameter id not 0-9
 .br
 #define PI_DUP_TAG          -53 // script has duplicate tag
 .br
@@ -6200,7 +6492,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_SCRIPT_CMD   -55 // illegal script command
 .br
-#define PI_BAD_VAR_NUM      -56 // script variable must be 0-149
+#define PI_BAD_VAR_NUM      -56 // script variable id not 0-149
 .br
 #define PI_NO_SCRIPT_ROOM   -57 // no more room for scripts
 .br
@@ -6210,7 +6502,7 @@ A 16-bit word value.
 .br
 #define PI_SOCK_WRIT_FAILED -60 // socket write failed
 .br
-#define PI_TOO_MANY_PARAM   -61 // too many script parameters > 10
+#define PI_TOO_MANY_PARAM   -61 // too many script parameters (> 10)
 .br
 #define PI_NOT_HALTED       -62 // script already running or failed
 .br
@@ -6276,6 +6568,24 @@ A 16-bit word value.
 .br
 #define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
 .br
+#define PI_NOT_HCLK_GPIO    -94 // gpio has no hardware clock
+.br
+#define PI_NOT_HPWM_GPIO    -95 // gpio has no hardware PWM
+.br
+#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-250K
+.br
+#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1000
+.br
+#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-25M
+.br
+#define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
+.br
+#define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
+.br
+#define PI_BAD_DATABITS    -101 // serial data bits not 1-32
+.br
+#define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
+.br
 
 .br
 
@@ -6290,8 +6600,6 @@ A 16-bit word value.
 #define PI_DEFAULT_CLK_MICROS            5
 .br
 #define PI_DEFAULT_CLK_PERIPHERAL        PI_CLOCK_PCM
-.br
-#define PI_DEFAULT_CLK_SOURCE            PI_CLOCK_PLLD
 .br
 #define PI_DEFAULT_IF_FLAGS              0
 .br

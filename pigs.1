@@ -420,8 +420,6 @@ ERROR: gpio is not in use for servo pulses
 .EE
 
 .br
-This command returns
-.br
 
 .IP "\fBH/HELP \fP - Display command help"
 .IP "" 4
@@ -439,6 +437,140 @@ $ pigs h
 .br
 $ pigs help
 .br
+
+.EE
+
+.br
+
+.IP "\fBHC g cf\fP - Set hardware clock frequency"
+.IP "" 4
+This command sets the hardware clock associated with gpio \fBg\fP to
+frequency \fBcf\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs hc 4 5000 # start a 5 KHz clock on gpio 4 (clock 0)
+.br
+
+.br
+$ pigs hc 5 5000000 # start a 5 MHz clcok on gpio 5 (clock 1)
+.br
+-99
+.br
+ERROR: need password to use hardware clock 1
+.br
+
+.EE
+
+.br
+The same clock is available on multiple gpios.  The latest
+frequency setting will be used by all gpios which share a clock.
+
+.br
+The gpio must be one of the following.
+
+.br
+
+.EX
+4   clock 0  All models
+5   clock 1  A+/B+ and compute module only (reserved for system use)
+6   clock 2  A+/B+ and compute module only
+20  clock 0  A+/B+ and compute module only
+21  clock 1  All models but Rev.2 B (reserved for system use)
+
+.EE
+
+.br
+
+.EX
+32  clock 0  Compute module only
+34  clock 0  Compute module only
+42  clock 1  Compute module only (reserved for system use)
+43  clock 2  Compute module only
+44  clock 1  Compute module only (reserved for system use)
+
+.EE
+
+.br
+Access to clock 1 is protected by a password as its use will
+likely crash the Pi.  The password is given by or'ing 0x5A000000
+with the gpio number.
+
+.br
+
+.IP "\fBHP g pf pdc\fP - Set hardware PWM frequency and dutycycle"
+.IP "" 4
+This command sets the hardware PWM associated with gpio \fBg\fP to
+frequency \fBpf\fP with dutycycle \fBpdc\fP.
+
+.br
+NOTE: Any waveform started by \fBWVGO\fP, \fBWVGOR\fP, \fBWVTX\fP or
+\fBWVTXR\fP will be cancelled.
+
+.br
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden when the pigpio
+daemon is started (option -t).
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+$ pigs hp 18 100 900
+.br
+
+.br
+$ pigs hp 19 100 100
+.br
+
+.br
+$ pigs hp 19 1 100
+.br
+-96
+.br
+ERROR: hardware PWM frequency not 5-250K
+.br
+
+.EE
+
+.br
+Both PWM channels share the same clock and the same update frequency.
+The latest frequency setting will be used by both PWM channels. The
+same PWM channel is available on multiple gpios.  The latest
+dutycycle setting will be used by all gpios which share a PWM channel.
+
+.br
+The gpio must be one of the following.
+
+.br
+
+.EX
+12  PWM channel 0  A+/B+ and compute module only
+13  PWM channel 1  A+/B+ and compute module only
+18  PWM channel 0  All models
+19  PWM channel 1  A+/B+ and compute module only
+
+.EE
+
+.br
+
+.EX
+40  PWM channel 0  Compute module only
+41  PWM channel 1  Compute module only
+45  PWM channel 1  Compute module only
+52  PWM channel 0  Compute module only
+53  PWM channel 1  Compute module only
 
 .EE
 
@@ -2603,20 +2735,36 @@ $ pigs wvag 0 0 10000 0x10 0x80 1000 0x80 0x10 9000
 
 .br
 
-.IP "\fBWVAS u b o bvs\fP - Add serial data to waveform"
+.IP "\fBWVAS u b db sb o bvs\fP - Add serial data to waveform"
 .IP "" 4
 
 .br
 This command adds a waveform representing serial data \fBbvs\fP to
 gpio \fBu\fP at \fBb\fP baud to the existing waveform (if any).
-The serial data starts \fBo\fP microseconds from the start of the waveform.
+The serial data starts \fBo\fP microseconds from the start of the
+waveform.
 
 .br
 Upon success the total number of pulses in the waveform so far is
 returned.  On error a negative status code will be returned.
 
 .br
-Data with different baud rates may be added to the same wavefrom.
+The serial data is formatted as one start bit, \fBdb\fP data bits, and
+\fBsb\fP/2 stop bits.
+
+.br
+It is legal to add serial data streams with different baud rates to
+the same waveform.
+
+.br
+The bytes required for each character depend upon \fBdb\fP.
+
+.br
+For \fBdb\fP 1-8 there will be one byte per character.
+.br
+For \fBdb\fP 9-16 there will be two bytes per character.
+.br
+For \fBdb\fP 17-32 there will be four bytes per character.
 
 .br
 
@@ -2624,13 +2772,13 @@ Data with different baud rates may be added to the same wavefrom.
 .br
 
 .EX
-$ pigs wvas 4 9600 0 0x30 0x31 0x32 0x33
+$ pigs wvas 4 9600 8 2 0 0x30 0x31 0x32 0x33
 .br
 23
 .br
 
 .br
-$ pigs wvas 7 38400 0 0x41 0x42
+$ pigs wvas 7 38400 8 2 0 0x41 0x42
 .br
 35
 .br
@@ -2809,6 +2957,9 @@ ERROR: non existent wave id
 This command transmits the current waveform.  The waveform is sent once.
 
 .br
+NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
+
+.br
 Upon success the number of DMA control blocks in the waveform is returned.
 On error a negative status code will be returned.
 
@@ -2819,6 +2970,9 @@ On error a negative status code will be returned.
 
 .br
 This command transmits the current waveform.  The waveform is sent repeatedly.
+
+.br
+NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
 
 .br
 Upon success the number of DMA control blocks in the waveform is returned.
@@ -3004,6 +3158,9 @@ $ pigs wvsp 2
 This command transmits the waveform with id \fBwid\fP once.
 
 .br
+NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
+
+.br
 Upon success the number of DMA control blocks in the waveform is returned.
 On error a negative status code will be returned.
 
@@ -3035,6 +3192,9 @@ ERROR: non existent wave id
 
 .br
 This command transmits the waveform with id \fBwid\fP repeatedly.
+
+.br
+NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
 
 .br
 Upon success the number of DMA control blocks in the waveform is returned.
@@ -3099,6 +3259,16 @@ The command expects one or more byte values.
 
 .IP "\fBc\fP - SPI channel (0-1)" 0
 The command expects a SPI channel.
+
+.br
+
+.IP "\fBcf\fP - hardware clock frequency (4689-250M)" 0
+The command expects a frequency.
+
+.br
+
+.IP "\fBdb\fP - serial data bits (1-32)" 0
+The command expects the number of data bits per serial character.
 
 .br
 
@@ -3263,6 +3433,16 @@ The command expects 0 to 10 numbers as parameters to be passed to the script.
 
 .br
 
+.IP "\fBpdc\fP - hardware PWM dutycycle (0-1000)" 0
+The command expects a dutycycle.
+
+.br
+
+.IP "\fBpf\fP - hardware PWM frequency (5-250K)" 0
+The command expects a frequency.
+
+.br
+
 .IP "\fBpl\fP - pulse length (1-50)" 0
 The command expects a pulse length in microseconds.
 
@@ -3270,6 +3450,11 @@ The command expects a pulse length in microseconds.
 
 .IP "\fBr\fP - register (0-255)" 0
 The command expects an I2C register number.
+
+.br
+
+.IP "\fBsb\fP - serial stop (half) bits (2-8)" 0
+The command expects the number of stop (half) bits per serial character.
 
 .br
 

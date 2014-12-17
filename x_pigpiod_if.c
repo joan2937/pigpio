@@ -1,6 +1,6 @@
 /*
 gcc -o x_pigpiod_if x_pigpiod_if.c -lpigpiod_if -lrt -lpthread
-sudo ./x_pigpiod_if
+./x_pigpiod_if
 
 *** WARNING ************************************************
 *                                                          *
@@ -370,7 +370,7 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 6, e, 0, 0, "serial read open");
 
    wave_clear();
-   e = wave_add_serial(GPIO, BAUD, 5000000, strlen(TEXT), TEXT);
+   e = wave_add_serial(GPIO, BAUD, 8, 2, 5000000, strlen(TEXT), TEXT);
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial");
 
    e = wave_tx_start();
@@ -395,11 +395,11 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 12, e, 0, 0, "serial read close");
 
    c = wave_get_micros();
-   CHECK(5, 13, c, 6158704, 0, "wave get micros");
+   CHECK(5, 13, c, 6158148, 0, "wave get micros");
 
    c = wave_get_high_micros();
-   if (c >= 6158704) c = 6158704;
-   CHECK(5, 14, c, 6158704, 0, "wave get high micros");
+   if (c > 6158148) c = 6158148;
+   CHECK(5, 14, c, 6158148, 0, "wave get high micros");
 
    c = wave_get_max_micros();
    CHECK(5, 15, c, 1800000000, 0, "wave get max micros");

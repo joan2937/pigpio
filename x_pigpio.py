@@ -371,7 +371,7 @@ To the lascivious pleasing of a lute.
    CHECK(5, 6, e, 0, 0, "serial read open")
 
    pi.wave_clear()
-   e = pi.wave_add_serial(GPIO, BAUD, 5000000, TEXT)
+   e = pi.wave_add_serial(GPIO, BAUD, TEXT, 5000000)
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial")
 
    e = pi.wave_tx_start()
@@ -396,7 +396,7 @@ To the lascivious pleasing of a lute.
    CHECK(5, 12, e, 0, 0, "serial read close")
 
    c = pi.wave_get_micros()
-   CHECK(5, 13, c, 6158704, 0, "wave get micros")
+   CHECK(5, 13, c, 6158148, 0, "wave get micros")
 
    CHECK(5, 14, 0, 0, 0, "NOT APPLICABLE")
 
@@ -439,7 +439,7 @@ To the lascivious pleasing of a lute.
    e = pi.wave_tx_stop()
    CHECK(5, 27, e, 0, 0, "wave tx stop")
 
-   e = pi.wave_add_serial(GPIO, BAUD, 5000000, TEXT)
+   e = pi.wave_add_serial(GPIO, BAUD, TEXT, 5000000)
    CHECK(5, 28, e, 3405, 0, "wave add serial")
 
    w2 = pi.wave_create()

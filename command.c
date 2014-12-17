@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 23+
+This version is for pigpio version 24+
 */
 
 #include <stdio.h>
@@ -56,6 +56,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_HELP,  "H",     101, 5}, // cmdUsage
    {PI_CMD_HELP,  "HELP",  101, 5}, // cmdUsage
+
+   {PI_CMD_HC,    "HC",    121, 0}, // gpioHardwareClock
+   {PI_CMD_HP,    "HP",    131, 0}, // gpioHardwarePWM
 
    {PI_CMD_HWVER, "HWVER", 101, 4}, // gpioHardwareRevision
 
@@ -226,6 +229,9 @@ GPW u            Get servo pulsewidth for gpio.\n\
 \n\
 H/HELP           Display command help.\n\
 \n\
+HC g cf          Set hardware clock frequency.\n\
+HP g pf pdc      Set hardware PWM frequency and dutycycle.\n\
+\n\
 HWVER            Get hardware version.\n\
 \n\
 I2CC h           Close I2C handle.\n\
@@ -314,7 +320,8 @@ W/WRITE g L      Write level to gpio.\n\
 WDOG u v         Set millisecond watchdog on gpio.\n\
 \n\
 WVAG trips       Wave add generic pulses.\n\
-WVAS u b o bvs   Wave add serial data with offset for gpio at baud.\n\
+WVAS u b db hb   Wave add serial data for gpio u at b baud, db databits,\n\
+     o bvs            hb (half)stopbits, offset o micros from wave start.\n\
 WVBSY            Check if wave busy.\n\
 WVCLR            Wave clear.\n\
 WVCRE            Create wave from added pulses.\n\
@@ -332,8 +339,11 @@ WVTXR wid        Transmit wave repeatedly.\n\
 bits  = a mask where (1<<g) is set for each gpio g of interest.\n\
 bv    = byte value (0-255).\n\
 bvs   = one or more byte values (0-255).\n\
+cf    = hardware clock frequency (4689-25M).\n\
+db    = data bits (1-32).\n\
 g     = any gpio (0-53).\n\
 h     = handle (>=0).\n\
+hb    = (half) stop bits (2-8).\n\
 ib    = I2C bus (0-1).\n\
 id    = I2C device (0-127).\n\
 if    = I2C flags (0).\n\
@@ -343,7 +353,9 @@ num   = number of bytes to read.\n\
 o     = offset (>=0).\n\
 p     = pud (ODU).\n\
 pars  = 0 to 10 parameters for script.\n\
-pl    = pulse length (1-50).\n\
+pdc   = hardware PWM dutycycle (0-1000).\n\
+pf    = hardware PWM frequency (5-250K).\n\
+pl    = pulse length (1-100).\n\
 r     = register.\n\
 sid   = script id (>=0).\n\
 sb    = SPI baud.\n\
@@ -389,7 +401,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_WDOG_TIMEOUT , "timeout not 0-60000"},
    {PI_NO_ALERT_FUNC    , "DEPRECATED"},
    {PI_BAD_CLK_PERIPH   , "clock peripheral not 0-1"},
-   {PI_BAD_CLK_SOURCE   , "clock source not 0-1"},
+   {PI_BAD_CLK_SOURCE   , "DEPRECATED"},
    {PI_BAD_CLK_MICROS   , "clock micros not 1, 2, 4, 5, 8, or 10"},
    {PI_BAD_BUF_MILLIS   , "buf millis not 100-10000"},
    {PI_BAD_DUTYRANGE    , "dutycycle range not 25-40000"},
@@ -406,7 +418,7 @@ static errInfo_t errInfo[]=
    {PI_INITIALISED      , "function called after gpioInitialise"},
    {PI_BAD_WAVE_MODE    , "waveform mode not 0-1"},
    {PI_BAD_CFG_INTERNAL , "bad parameter in gpioCfgInternals call"},
-   {PI_BAD_WAVE_BAUD    , "baud rate not 100-250000"},
+   {PI_BAD_WAVE_BAUD    , "baud rate not 50-250K(RX)/50-1M(TX)"},
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
    {PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"},
@@ -417,22 +429,22 @@ static errInfo_t errInfo[]=
    {PI_BAD_WVSC_COMMND  , "bad WVSC subcommand"},
    {PI_BAD_WVSM_COMMND  , "bad WVSM subcommand"},
    {PI_BAD_WVSP_COMMND  , "bad WVSP subcommand"},
-   {PI_BAD_PULSELEN     , "trigger pulse > 100 microseconds"},
+   {PI_BAD_PULSELEN     , "trigger pulse length not 1-100"},
    {PI_BAD_SCRIPT       , "invalid script"},
    {PI_BAD_SCRIPT_ID    , "unknown script id"},
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},
    {PI_GPIO_IN_USE      , "gpio already in use"},
    {PI_BAD_SERIAL_COUNT , "must read at least a byte at a time"},
-   {PI_BAD_PARAM_NUM    , "script parameter must be 0-9"},
+   {PI_BAD_PARAM_NUM    , "script parameter id not 0-9"},
    {PI_DUP_TAG          , "script has duplicate tag"},
    {PI_TOO_MANY_TAGS    , "script has too many tags"},
    {PI_BAD_SCRIPT_CMD   , "illegal script command"},
-   {PI_BAD_VAR_NUM      , "script variable must be 0-149"},
+   {PI_BAD_VAR_NUM      , "script variable id not 0-149"},
    {PI_NO_SCRIPT_ROOM   , "no more room for scripts"},
    {PI_NO_MEMORY        , "can't allocate temporary memory"},
    {PI_SOCK_READ_FAILED , "socket read failed"},
    {PI_SOCK_WRIT_FAILED , "socket write failed"},
-   {PI_TOO_MANY_PARAM   , "too many script parameters > 10"},
+   {PI_TOO_MANY_PARAM   , "too many script parameters (> 10)"},
    {PI_NOT_HALTED       , "script already running or failed"},
    {PI_BAD_TAG          , "script has unresolved tag"},
    {PI_BAD_MICS_DELAY   , "bad MICS delay (too large)"},
@@ -465,6 +477,16 @@ static errInfo_t errInfo[]=
    {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
    {PI_NOT_PWM_GPIO     , "gpio is not in use for PWM"},
    {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
+   {PI_NOT_HCLK_GPIO    , "gpio has no hardware clock"},
+   {PI_NOT_HPWM_GPIO    , "gpio has no hardware PWM"},
+   {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 5-250K"},
+   {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-1000"},
+   {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-25M"},
+   {PI_BAD_HCLK_PASS    , "need password to use hardware clock 1"},
+   {PI_HPWM_ILLEGAL     , "illegal, PWM in use for main clock"},
+   {PI_BAD_DATABITS     , "serial data bits not 1-32"},
+   {PI_BAD_STOPBITS     , "serial (half) stop bits not 2-8"},
+
 
 };
 
@@ -535,8 +557,8 @@ int cmdParse(
    char *p8;
    int32_t *p32;
    char c;
-   uint32_t tp1;
-   int8_t to1;
+   uint32_t tp1, tp2, tp3;
+   int8_t to1, to2, to3;
 
    /* Check that ext is big enough for the largest message. */
    if (ext_len < (4 * CMD_MAX_PARAM)) return CMD_EXT_TOO_SMALL;
@@ -659,7 +681,7 @@ int cmdParse(
 
          break;
 
-      case 121: /* I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
+      case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
                    PWM  S  SERVO  SLR  SLRO  W  WDOG  WRITE
 
                    Two positive parameters.
@@ -756,7 +778,7 @@ int cmdParse(
 
          break;
 
-      case 131: /* I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SPIO  TRIG
+      case 131: /* HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SPIO  TRIG
 
                    Three positive parameters.
                 */
@@ -926,21 +948,29 @@ int cmdParse(
                    p2 baud
                    p3 len + 4
                    ---------
+                   uint32_t databits
+                   uint32_t stophalfbits
                    uint32_t offset
                    uint8_t[len]
                 */
          ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
          ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
          ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp2, &to2);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp3, &to3);
 
          if ((ctl->opt[1] == CMD_NUMERIC) && ((int)p[1] >= 0) &&
              (ctl->opt[2] == CMD_NUMERIC) && ((int)p[2] > 0) &&
-             (to1 == CMD_NUMERIC))
+             (to1 == CMD_NUMERIC) &&
+             (to2 == CMD_NUMERIC) &&
+             (to3 == CMD_NUMERIC))
          {
             pars = 0;
 
             memcpy(ext, &tp1, 4);
-            p8 = ext + 4;
+            memcpy(ext+4, &tp2, 4);
+            memcpy(ext+8, &tp3, 4);
+            p8 = ext + 12;
             while (pars < CMD_MAX_PARAM)
             {
                ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
@@ -953,7 +983,7 @@ int cmdParse(
                else break;
             }
 
-            p[3] = pars + 4;
+            p[3] = pars + 12;
 
             if (pars > 0) valid = 1;
          }

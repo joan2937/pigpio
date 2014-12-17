@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 11
+#define PIGPIOD_IF_VERSION 12
 
 /*TEXT
 
@@ -161,6 +161,9 @@ notify_close               Close a notification
 bb_serial_read_open        Opens a gpio for bit bang serial reads
 bb_serial_read             Reads bit bang serial data from a gpio
 bb_serial_read_close       Closes a gpio for bit bang serial reads
+
+hardware_clock             Start hardware clock on supported gpios
+hardware_PWM               Start hardware PWM on supported gpios
 
 SCRIPTS
 
@@ -823,6 +826,88 @@ A status of PI_SOME_PERMITTED indicates that the user is not
 allowed to write to one or more of the gpios.
 D*/
 
+
+/*F*/
+int hardware_clock(unsigned gpio, unsigned clkfreq);
+/*D
+Starts a hardware clock on a gpio at the specified frequency.
+
+. .
+     gpio: see description
+frequency: 0 (off) or 4689-250M
+. .
+
+Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
+PI_NOT_HCLK_GPIO, PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
+
+The same clock is available on multiple gpios.  The latest
+frequency setting will be used by all gpios which share a clock.
+
+The gpio must be one of the following.
+
+. .
+4   clock 0  All models
+5   clock 1  A+/B+ and compute module only (reserved for system use)
+6   clock 2  A+/B+ and compute module only
+20  clock 0  A+/B+ and compute module only
+21  clock 1  All models but Rev.2 B (reserved for system use)
+
+32  clock 0  Compute module only
+34  clock 0  Compute module only
+42  clock 1  Compute module only (reserved for system use)
+43  clock 2  Compute module only
+44  clock 1  Compute module only (reserved for system use)
+. .
+
+Access to clock 1 is protected by a password as its use will likely
+crash the Pi.  The password is given by or'ing 0x5A000000 with the
+gpio number.
+D*/
+
+
+/*F*/
+int hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
+/*D
+Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+
+NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*], [*wave_tx_start*], or [*wave_tx_repeat*] will be cancelled.
+
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden when the pigpio
+daemon is started (option -t).
+
+. .
+   gpio: see descripton
+PWMfreq: 0 (off) or 5-250K
+PWMduty: 0 (off) to 1000 (fully on).
+. .
+
+Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
+PI_NOT_HPWM_GPIO, PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ,
+or PI_HPWM_ILLEGAL.
+
+Both PWM channels share the same clock and the same update frequency.
+The latest frequency setting will be used by both PWM channels. The
+same PWM channel is available on multiple gpios.  The latest
+dutycycle setting will be used by all gpios which share a PWM channel.
+
+The gpio must be one of the following.
+
+. .
+12  PWM channel 0  A+/B+ and compute module only
+13  PWM channel 1  A+/B+ and compute module only
+18  PWM channel 0  All models
+19  PWM channel 1  A+/B+ and compute module only
+
+40  PWM channel 0  Compute module only
+41  PWM channel 1  Compute module only
+45  PWM channel 1  Compute module only
+52  PWM channel 0  Compute module only
+53  PWM channel 1  Compute module only
+. .
+D*/
+
+
 /*F*/
 uint32_t get_current_tick(void);
 /*D
@@ -917,32 +1002,43 @@ D*/
 
 /*F*/
 int wave_add_serial
-   (unsigned user_gpio, unsigned bbBaud, unsigned offset,
-    unsigned numChar, char *str);
+   (unsigned user_gpio, unsigned bbBaud, unsigned bbBits,
+    unsigned bbStop, unsigned offset, unsigned numBytes, char *str);
 /*D
 This function adds a waveform representing serial data to the
-existing waveform (if any).  The serial data starts offset microseconds
-from the start of the waveform.
+existing waveform (if any).  The serial data starts offset
+microseconds from the start of the waveform.
 
 . .
 user_gpio: 0-31.
    bbBaud: 100-250000
+   bbBits: number of data bits (1-32)
+   bbStop: number of stop half bits (2-8)
    offset: 0-
-  numChar: 1-
+ numBytes: 1-
       str: an array of chars.
 . .
 
 Returns the new total number of pulses in the current waveform if OK,
-otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_TOO_MANY_CHARS, or
-PI_TOO_MANY_PULSES.
+otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD, PI_BAD_DATABITS,
+PI_BAD_STOP_BITS, PI_TOO_MANY_CHARS, PI_BAD_SER_OFFSET,
+or PI_TOO_MANY_PULSES.
 
 NOTES:
 
-The serial data is formatted as one start bit, eight data bits, and one
-stop bit.
+The serial data is formatted as one start bit, [*bbBits*] data bits,
+and [*bbStop*]/2 stop bits.
 
 It is legal to add serial data streams with different baud rates to
 the same waveform.
+
+[*numBytes*] is the number of bytes of data in str.
+
+The bytes required for each character depend upon [*bbBits*].
+
+For [*bbBits*] 1-8 there will be one byte per character. 
+For [*bbBits*] 9-16 there will be two bytes per character. 
+For [*bbBits*] 17-32 there will be four bytes per character.
 D*/
 
 /*F*/
@@ -1017,15 +1113,21 @@ D*/
 /*F*/
 int wave_tx_start(void);
 /*D
-This function is deprecated and should no longer be used.  Use
-[*wave_create*]/[*wave_send_**] instead.
+This function is deprecated and should no longer be used.
+
+Use [*wave_create*]/[*wave_send_**] instead.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 D*/
 
 /*F*/
 int wave_tx_repeat(void);
 /*D
-This function is deprecated and should no longer be used.  Use
-[*wave_create*]/[*wave_send_**] instead.
+This function is deprecated and should no longer be used.
+
+Use [*wave_create*]/[*wave_send_**] instead.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 D*/
 
 /*F*/
@@ -1033,6 +1135,8 @@ int wave_send_once(unsigned wave_id);
 /*D
 This function transmits the waveform with id wave_id.  The waveform
 is sent once.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 . .
 wave_id: >=0, as returned by [*wave_create*].
@@ -1048,6 +1152,8 @@ int wave_send_repeat(unsigned wave_id);
 This function transmits the waveform with id wave_id.  The waveform
 cycles until cancelled (either by the sending of a new waveform or
 by [*wave_tx_stop*]).
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 . .
 wave_id: >=0, as returned by [*wave_create*].
@@ -1898,6 +2004,26 @@ PI_WAVE_MIN_BAUD 100
 PI_WAVE_MAX_BAUD 250000
 . .
 
+bbBits::1-32
+
+The number of data bits to be used when adding serial data to a
+waveform.
+
+. .
+#define PI_MIN_WAVE_DATABITS 1
+#define PI_MAX_WAVE_DATABITS 32
+. .
+
+bbStop::2-8
+
+The number of (half) stop bits to be used when adding serial data
+to a waveform.
+
+. .
+#define PI_MIN_WAVE_HALFSTOPBITS 2
+#define PI_MAX_WAVE_HALFSTOPBITS 8
+. .
+
 bit::
 A value of 0 or 1.
 
@@ -1935,9 +2061,11 @@ typedef void (*CBFuncEx_t)
    (unsigned user_gpio, unsigned level, uint32_t tick, void * user);
 . .
 
-
 char::
 A single character, an 8 bit quantity able to store 0-255.
+
+clkfreq::4689-250M
+The hardware clock frequency.
 
 count::
 The number of bytes to be transferred in an I2C, SPI, or Serial
@@ -2050,9 +2178,10 @@ PI_ALT4 3
 PI_ALT5 2
 . .
 
-numChar::
-The number of characters in a string (used when the string might contain
-null characters, which would normally terminate the string).
+numBytes::
+The number of bytes used to store characters in a string.  Depending
+on the number of bits per character there may be 1, 2, or 4 bytes
+per character.
 
 numPar:: 0-10
 The number of parameters passed to a script.
@@ -2103,6 +2232,20 @@ PI_MIN_SERVO_PULSEWIDTH 500
 PI_MAX_SERVO_PULSEWIDTH 2500
 . .
 
+PWMduty::0-1000
+The hardware PWM dutycycle.
+
+. .
+#define PI_HW_PWM_RANGE 1000
+. .
+
+PWMfreq::5-250K
+The hardware PWM frequency.
+
+. .
+#define PI_HW_PWM_MIN_FREQ 5
+#define PI_HW_PWM_MAX_FREQ 250000
+. .
 
 range::25-40000
 The permissible dutycycle values are 0-range.
