@@ -457,6 +457,15 @@ user_gpio: 0-31.
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
+.br
+
+.br
+For normal PWM the dutycycle will be out of the defined range
+for the gpio (see \fBget_PWM_range\fP).  If a hardware clock is
+active on the gpio the reported dutycycle will be 500 (out of 1000).
+If hardware PWM is active on the gpio the reported dutycycle
+will be out of a 1000.
+
 .IP "\fBint set_PWM_range(unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
 Set the range of PWM values to be used on the gpio.
@@ -535,6 +544,12 @@ user_gpio: 0-31.
 Returns the dutycycle range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
 
+.br
+
+.br
+If a hardware clock or hardware PWM is active on the gpio the
+reported range will be 1000.
+
 .IP "\fBint get_PWM_real_range(unsigned user_gpio)\fP"
 .IP "" 4
 Get the real underlying range of PWM values being used on the gpio.
@@ -554,6 +569,12 @@ user_gpio: 0-31.
 .br
 Returns the real range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
+
+.br
+
+.br
+If a hardware clock or hardware PWM is active on the gpio the
+reported real range will be 1000.
 
 .IP "\fBint set_PWM_frequency(unsigned user_gpio, unsigned frequency)\fP"
 .IP "" 4
@@ -651,6 +672,15 @@ user_gpio: 0-31.
 .br
 
 .EE
+
+.br
+
+.br
+For normal PWM the frequency will be that defined for the gpio by
+\fBset_PWM_frequency\fP.  If a hardware clock is active on the gpio the
+reported frequency will be that set by \fBhardware_clock\fP.  If hardware
+PWM is active on the gpio the reported frequency will be that set by
+\fBhardware_PWM\fP.
 
 .br
 
@@ -1892,7 +1922,7 @@ script_id: >=0, as returned by \fBstore_script\fP.
 .br
 The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 
-.IP "\fBint bb_serial_read_open(unsigned user_gpio, unsigned bbBaud)\fP"
+.IP "\fBint bb_serial_read_open(unsigned user_gpio, unsigned bbBaud, unsigned bbBits)\fP"
 .IP "" 4
 This function opens a gpio for bit bang reading of serial data.
 
@@ -1904,6 +1934,8 @@ This function opens a gpio for bit bang reading of serial data.
 user_gpio: 0-31.
 .br
    bbBaud: 100-250000
+.br
+   bbBits: 1-32
 .br
 
 .EE
@@ -1950,6 +1982,19 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
 or PI_NOT_SERIAL_GPIO.
+
+.br
+
+.br
+The bytes returned for each character depend upon the number of
+data bits \fBbbBits\fP specified in the \fBbb_serial_read_open\fP command.
+
+.br
+
+.br
+For \fBbbBits\fP 1-8 there will be one byte per character.
+For \fBbbBits\fP 9-16 there will be two bytes per character.
+For \fBbbBits\fP 17-32 there will be four bytes per character.
 
 .IP "\fBint bb_serial_read_close(unsigned user_gpio)\fP"
 .IP "" 4

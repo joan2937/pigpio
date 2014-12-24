@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=24
+VERSION=25
 
 GPIO=4
 
@@ -258,7 +258,7 @@ if [[ $s = 0 ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 echo "wvclr" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
-echo "slro $GPIO 1200" >/dev/pigpio
+echo "slro $GPIO 1200 8" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
 echo "wvas $GPIO 1200 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e" >/dev/pigpio

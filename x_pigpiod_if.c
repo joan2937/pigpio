@@ -366,7 +366,7 @@ To the lascivious pleasing of a lute.\n\
    e = wave_tx_stop();
    CHECK(5, 5, e, 0, 0, "wave tx stop");
 
-   e = bb_serial_read_open(GPIO, BAUD);
+   e = bb_serial_read_open(GPIO, BAUD, 8);
    CHECK(5, 6, e, 0, 0, "serial read open");
 
    wave_clear();

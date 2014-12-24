@@ -362,6 +362,13 @@ Upon success the dutycycle is returned.  On error a negative
 status code will be returned.
 
 .br
+For normal PWM the dutycycle will be out of the defined range
+for the gpio (see \fBPRG\fP).  If a hardware clock is active on
+the gpio the reported dutycycle will be 500 (out of 1000).
+If hardware PWM is active on the gpio the reported dutycycle
+will be out of a 1000.
+
+.br
 
 \fBExample\fP
 .br
@@ -1483,6 +1490,13 @@ Upon success the PWM frequency is returned.  On error a negative
 status code will be returned.
 
 .br
+For normal PWM the frequency will be that defined for the gpio
+by \fBPFS\fP.  If a hardware clock is active on the gpio
+the reported frequency will be that set by \fBHC\fP.
+If hardware PWM is active on the gpio the reported frequency
+will be that set by \fBHP\fP.
+
+.br
 
 \fBExample\fP
 .br
@@ -1609,6 +1623,10 @@ This command returns the dutycycle range for gpio \fBu\fP.
 .br
 Upon success the range is returned.  On error a negative status code
 will be returned.
+
+.br
+If a hardware clock or hardware PWM is active on the gpio the reported
+range will be 1000.
 
 .br
 
@@ -1837,6 +1855,10 @@ ERROR: unknown script id
 
 .br
 This command returns the real underlying range used by gpio \fBu\fP.
+
+.br
+If a hardware clock or hardware PWM is active on the gpio the
+reported range will be 1000.
 
 .br
 Upon success the real range is returned.  On error a negative status code
@@ -2270,6 +2292,17 @@ is returned.  On error a negative status code will be returned.
 The gpio \fBu\fP should have been initialised with the \fBSLRO\fP command.
 
 .br
+The bytes returned for each character depend upon the number of
+data bits \fBdb\fP specified in the \fBSLRO\fP command.
+
+.br
+For \fBdb\fP 1-8 there will be one byte per character.
+.br
+For \fBdb\fP 9-16 there will be two bytes per character.
+.br
+For \fBdb\fP 17-32 there will be four bytes per character.
+
+.br
 
 \fBExample\fP
 .br
@@ -2315,12 +2348,12 @@ ERROR: no serial read in progress on gpio
 
 .br
 
-.IP "\fBSLRO u b\fP - Open gpio for bit bang serial data"
+.IP "\fBSLRO u b db\fP - Open gpio for bit bang serial data"
 .IP "" 4
 
 .br
 This command opens gpio \fBu\fP for reading bit bang serial data
-at \fBb\fP baud.
+at \fBb\fP baud and \fBdb\fP data bits.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -2339,11 +2372,11 @@ in a timely fashion.
 .br
 
 .EX
-$ pigs slro 23 19200
+$ pigs slro 23 19200 8
 .br
 
 .br
-$ pigs slro 23 19200
+$ pigs slro 23 19200 8
 .br
 -50
 .br

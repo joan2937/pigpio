@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 12
+#define PIGPIOD_IF_VERSION 13
 
 /*TEXT
 
@@ -464,6 +464,12 @@ user_gpio: 0-31.
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+
+For normal PWM the dutycycle will be out of the defined range
+for the gpio (see [*get_PWM_range*]).  If a hardware clock is
+active on the gpio the reported dutycycle will be 500 (out of 1000).
+If hardware PWM is active on the gpio the reported dutycycle
+will be out of a 1000.
 D*/
 
 /*F*/
@@ -507,6 +513,9 @@ user_gpio: 0-31.
 
 Returns the dutycycle range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
+
+If a hardware clock or hardware PWM is active on the gpio the
+reported range will be 1000.
 D*/
 
 /*F*/
@@ -520,6 +529,9 @@ user_gpio: 0-31.
 
 Returns the real range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
+
+If a hardware clock or hardware PWM is active on the gpio the
+reported real range will be 1000.
 D*/
 
 /*F*/
@@ -574,6 +586,12 @@ Get the frequency of PWM being used on the gpio.
 . .
 user_gpio: 0-31.
 . .
+
+For normal PWM the frequency will be that defined for the gpio by
+[*set_PWM_frequency*].  If a hardware clock is active on the gpio the
+reported frequency will be that set by [*hardware_clock*].  If hardware
+PWM is active on the gpio the reported frequency will be that set by
+[*hardware_PWM*].
 
 Returns the frequency (in hertz) used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
@@ -1343,13 +1361,14 @@ The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 D*/
 
 /*F*/
-int bb_serial_read_open(unsigned user_gpio, unsigned bbBaud);
+int bb_serial_read_open(unsigned user_gpio, unsigned bbBaud, unsigned bbBits);
 /*D
 This function opens a gpio for bit bang reading of serial data.
 
 . .
 user_gpio: 0-31.
    bbBaud: 100-250000
+   bbBits: 1-32
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
@@ -1376,6 +1395,13 @@ user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
 
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
 or PI_NOT_SERIAL_GPIO.
+
+The bytes returned for each character depend upon the number of
+data bits [*bbBits*] specified in the [*bb_serial_read_open*] command.
+
+For [*bbBits*] 1-8 there will be one byte per character.
+For [*bbBits*] 9-16 there will be two bytes per character.
+For [*bbBits*] 17-32 there will be four bytes per character.
 D*/
 
 /*F*/

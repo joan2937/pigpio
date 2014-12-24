@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 24+
+This version is for pigpio version 25+
 */
 
 #include <stdio.h>
@@ -136,7 +136,7 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
    {PI_CMD_SLRC,  "SLRC",  112, 0}, // gpioSerialReadClose
-   {PI_CMD_SLRO,  "SLRO",  121, 0}, // gpioSerialReadOpen
+   {PI_CMD_SLRO,  "SLRO",  131, 0}, // gpioSerialReadOpen
 
    {PI_CMD_SPIC,  "SPIC",  112, 0}, // spiClose
    {PI_CMD_SPIO,  "SPIO",  131, 2}, // spiOpen
@@ -303,7 +303,7 @@ SERWB h bv       Write byte to serial handle.\n\
 \n\
 SLR u num        Read bit bang serial data from gpio.\n\
 SLRC u           Close gpio for bit bang serial data.\n\
-SLRO u b         Open gpio for bit bang serial data.\n\
+SLRO u b db      Open gpio for bit bang serial data.\n\
 \n\
 SPIC h           SPI close handle.\n\
 SPIO sc sb sf    SPI open channel at baud with flags.\n\
@@ -682,7 +682,7 @@ int cmdParse(
          break;
 
       case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
-                   PWM  S  SERVO  SLR  SLRO  W  WDOG  WRITE
+                   PWM  S  SERVO  SLR  W  WDOG  WRITE
 
                    Two positive parameters.
                 */
@@ -778,7 +778,7 @@ int cmdParse(
 
          break;
 
-      case 131: /* HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SPIO  TRIG
+      case 131: /* HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SLRO  SPIO  TRIG
 
                    Three positive parameters.
                 */

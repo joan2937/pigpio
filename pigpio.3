@@ -530,7 +530,16 @@ PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 .br
 
 .br
-Range defaults to 255.
+For normal PWM the dutycycle will be out of the defined range
+for the gpio (see \fBgpioGetPWMrange\fP).  If a hardware clock is
+active on the gpio the reported dutycycle will be 500 (out of 1000).
+If hardware PWM is active on the gpio the reported dutycycle
+will be out of a 1000.
+
+.br
+
+.br
+Normal PWM range defaults to 255.
 
 .IP "\fBint gpioSetPWMrange(unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
@@ -618,6 +627,12 @@ user_gpio: 0-31
 .br
 
 .br
+If a hardware clock or hardware PWM is active on the gpio
+the reported range will be 1000.
+
+.br
+
+.br
 \fBExample\fP
 .br
 
@@ -641,6 +656,12 @@ user_gpio: 0-31
 .br
 
 .EE
+
+.br
+
+.br
+If a hardware clock or hardware PWM is active on the gpio
+the reported real range will be 1000.
 
 .br
 
@@ -781,6 +802,15 @@ user_gpio: 0-31
 .br
 
 .EE
+
+.br
+
+.br
+For normal PWM the frequency will be that defined for the gpio by
+\fBgpioSetPWMfrequency\fP.  If a hardware clock is active on the gpio
+the reported frequency will be that set by \fBgpioHardwareClock\fP.
+If hardware PWM is active on the gpio the reported frequency
+will be that set by \fBgpioHardwarePWM\fP.
 
 .br
 
@@ -1884,7 +1914,7 @@ waveform created since \fBgpioInitialise\fP was called.
 This function returns the maximum possible size of a waveform in DMA
 control blocks.
 
-.IP "\fBint gpioSerialReadOpen(unsigned user_gpio, unsigned bbBaud)\fP"
+.IP "\fBint gpioSerialReadOpen(unsigned user_gpio, unsigned bbBaud, unsigned bbBits)\fP"
 .IP "" 4
 This function opens a gpio for bit bang reading of serial data.
 
@@ -1897,6 +1927,8 @@ user_gpio: 0-31
 .br
    bbBaud: 100-250000
 .br
+   bbBits: 1-32
+.br
 
 .EE
 
@@ -1904,7 +1936,7 @@ user_gpio: 0-31
 
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
-or PI_GPIO_IN_USE.
+PI_BAD_DATABITS, or PI_GPIO_IN_USE.
 
 .br
 
@@ -1942,6 +1974,19 @@ user_gpio: 0-31, previously opened with \fBgpioSerialReadOpen\fP
 .br
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
 or PI_NOT_SERIAL_GPIO.
+
+.br
+
+.br
+The bytes returned for each character depend upon the number of
+data bits \fBbbBits\fP specified in the \fBgpioSerialReadOpen\fP command.
+
+.br
+
+.br
+For \fBbbBits\fP 1-8 there will be one byte per character.
+For \fBbbBits\fP 9-16 there will be two bytes per character.
+For \fBbbBits\fP 17-32 there will be four bytes per character.
 
 .IP "\fBint gpioSerialReadClose(unsigned user_gpio)\fP"
 .IP "" 4

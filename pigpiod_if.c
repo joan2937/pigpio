@@ -864,8 +864,24 @@ int stop_script(unsigned script_id)
 int delete_script(unsigned script_id)
    {return pigpio_command(gPigCommand, PI_CMD_PROCD, script_id, 0, 1);}
 
-int bb_serial_read_open(unsigned user_gpio, unsigned baud)
-   {return pigpio_command(gPigCommand, PI_CMD_SLRO, user_gpio, baud, 1);}
+int bb_serial_read_open(unsigned user_gpio, unsigned baud, uint32_t bbBits)
+{
+   gpioExtent_t ext[1];
+   
+   /*
+   p1=user_gpio
+   p2=baud
+   p3=4
+   ## extension ##
+   unsigned bbBits
+   */
+
+   ext[0].size = sizeof(uint32_t);
+   ext[0].ptr = &bbBits;
+
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_SLRO, user_gpio, baud, 4, 1, ext, 1);
+}
 
 int bb_serial_read(unsigned user_gpio, void *buf, size_t bufSize)
 {

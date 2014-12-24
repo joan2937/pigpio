@@ -392,7 +392,7 @@ To the lascivious pleasing of a lute.\n\
 
    /* gpioSerialReadOpen changes the alert function */
 
-   e = gpioSerialReadOpen(GPIO, BAUD);
+   e = gpioSerialReadOpen(GPIO, BAUD, 8);
    CHECK(5, 6, e, 0, 0, "serial read open");
 
    gpioWaveClear();

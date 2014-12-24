@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=24
+VERSION=25
 
 GPIO=4
 
@@ -189,7 +189,7 @@ if [[ $s = "" ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 
 s=$(pigs wvclr)
 if [[ $s = "" ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
-s=$(pigs slro $GPIO 1200)
+s=$(pigs slro $GPIO 1200 8)
 if [[ $s = "" ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
 s=$(pigs wvas $GPIO 1200 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e)
 if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi

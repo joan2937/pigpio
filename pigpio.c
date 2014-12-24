@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 24 */
+/* pigpio version 25 */
 
 #include <stdio.h>
 #include <string.h>
@@ -924,20 +924,22 @@ typedef struct
 typedef struct
 {
    int      gpio;
-   char   * buf;
+   char    *buf;
    uint32_t bufSize;
    int      readPos;
    int      writePos;
-   uint32_t baud;
-   uint32_t fullBit;
-   uint32_t halfBit;
-   int      timeout;
-   uint32_t startBitTick;
-   uint32_t nextBitDiff;
+   uint32_t baud; /* 50-250000 */
+   uint32_t fullBit; /* nanoseconds */
+   uint32_t halfBit; /* nanoseconds */
+   int      timeout; /* millisconds */
+   uint32_t startBitTick; /* microseconds */
+   uint32_t nextBitDiff; /* nanoseconds */
    int      bit;
-   int      byte;
+   uint32_t data;
+   int      bytes; /* 1, 2, 4 */
    int      level;
    int      mode;
+   int      dataBits; /* 1-32 */
 } wfRx_t;
 
 union my_smbus_data
@@ -1007,7 +1009,7 @@ static wfStats_t wfStats=
 
 static rawWaveInfo_t waveInfo[PI_MAX_WAVES];
 
-static volatile wfRx_t wfRx[PI_MAX_USER_GPIO+1];
+static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
 static int waveOutBotCB  = 0;
 static int waveOutTopCB  = NUM_WAVE_CBS;
@@ -1116,6 +1118,8 @@ CC: 00 CLK0, 01 CLK1, 10 CLK2
  gpio44 GPCLK1 ALT0 Compute module only (reserved for system use)
 */
 
+uint32_t hw_clk_freq[3];
+
 uint8_t clkDef[PI_MAX_GPIO + 1] =
 {
  /*             0     1     2     3     4     5     6     7     8     9 */
@@ -1145,6 +1149,9 @@ uint8_t clkDef[PI_MAX_GPIO + 1] =
  gpio52 pwm0 ALT1
  gpio53 pwm1 ALT1
 */
+
+uint32_t hw_pwm_freq[2];
+uint32_t hw_pwm_duty[2];
 
 uint8_t PWMDef[PI_MAX_GPIO + 1] =
 {
@@ -1666,7 +1673,9 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_SLRC: res = gpioSerialReadClose(p[1]); break;
 
-      case PI_CMD_SLRO: res = gpioSerialReadOpen(p[1], p[2]); break;
+      case PI_CMD_SLRO:
+            memcpy(&p[4], buf, 4);
+            res = gpioSerialReadOpen(p[1], p[2], p[4]); break;
 
 
 
@@ -2262,44 +2271,48 @@ static int wave2Cbs(unsigned wave_mode)
 
 /* ----------------------------------------------------------------------- */
 
-static void waveRxSerial(volatile wfRx_t *s, int level, uint32_t tick)
+static void waveRxSerial(wfRx_t *s, int level, uint32_t tick)
 {
-   int diffTicks;
+   int diffTicks, lastLevel;
    int newWritePos;
 
    if (s->bit >= 0)
    {
       diffTicks = tick - s->startBitTick;
 
-      if (level != PI_TIMEOUT) s->level = level;
+      if (level != PI_TIMEOUT)
+      {
+         s->level = level;
+         lastLevel = !level;
+      }
+      else lastLevel = s->level;
 
-      while ((s->bit < 9) && (diffTicks > s->nextBitDiff))
+      while ((s->bit <= s->dataBits) && (diffTicks > (s->nextBitDiff/1000)))
       {
          if (s->bit)
          {
-            if (!(s->level)) s->byte |= (1<<(s->bit-1));
+            if (lastLevel) s->data |= (1<<(s->bit-1));
          }
-         else s->byte = 0;
+         else s->data = 0;
 
          ++(s->bit);
 
          s->nextBitDiff += s->fullBit;
       }
 
-      if (s->bit == 9)
+      if (s->bit > s->dataBits)
       {
-         s->buf[s->writePos] = s->byte;
+         memcpy(s->buf + s->writePos, &s->data, s->bytes);
 
          /* don't let writePos catch readPos */
 
-         newWritePos = s->writePos;
-
-         if (++newWritePos >= s->bufSize) newWritePos = 0;
+         newWritePos = (s->writePos + s->bytes) % (s->bufSize);
 
          if (newWritePos != s->readPos) s->writePos = newWritePos;
 
-         if (level == 0) /* true transition high->low, not a timeout */
+         if (level == 0)
          {
+            gpioSetWatchdog(s->gpio, s->timeout);
             s->bit          = 0;
             s->startBitTick = tick;
             s->nextBitDiff  = s->halfBit;
@@ -5741,6 +5754,7 @@ static void initClock(int mainClock)
 
    clkSrc  = CLK_CTL_SRC_PLLD;
    clkDivI = 50 * micros; /* 10      MHz - 1      MHz */
+   //if (!mainClock) clkDivI = 40 * micros;
    clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
    clkDivF = 0;
    clkMash = 0;
@@ -6387,35 +6401,34 @@ static void switchFunctionOff(unsigned gpio)
    unsigned clock, pwm;
    int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
 
-   if (gpio <= PI_MAX_GPIO)
+   switch (gpioInfo[gpio].is)
    {
-      switch (gpioInfo[gpio].is)
-      {
-         case GPIO_SERVO:
-            /* switch servo off */
-            myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
-            gpioInfo[gpio].width = 0;
-            break;
+      case GPIO_SERVO:
+         /* switch servo off */
+         myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
+         gpioInfo[gpio].width = 0;
+         break;
 
-         case GPIO_PWM:
-            /* switch pwm off */
-            myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
-            gpioInfo[gpio].width = 0;
-            break;
+      case GPIO_PWM:
+         /* switch pwm off */
+         myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
+         gpioInfo[gpio].width = 0;
+         break;
 
-         case GPIO_HW_CLK:
-            /* switch hardware clock off */
-            clock = (clkDef[gpio] >> 4) & 3;
-            clkReg[cctl[clock]] = CLK_PASSWD | CLK_CTL_KILL;
-            break;
+      case GPIO_HW_CLK:
+         /* switch hardware clock off */
+         clock = (clkDef[gpio] >> 4) & 3;
+         clkReg[cctl[clock]] = CLK_PASSWD | CLK_CTL_KILL;
+         gpioInfo[gpio].width = 0;
+         break;
 
-         case GPIO_HW_PWM:
-            /* switch hardware PWM off */
-            pwm = (PWMDef[gpio] >> 4) & 3;
-            if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
-            else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
-            break;
-      }
+      case GPIO_HW_PWM:
+         /* switch hardware PWM off */
+         pwm = (PWMDef[gpio] >> 4) & 3;
+         if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
+         else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
+         gpioInfo[gpio].width = 0;
+         break;
    }
 }
 
@@ -6428,6 +6441,7 @@ static void stopHardwarePWM(void)
       if (gpioInfo[i].is == GPIO_HW_PWM)
       {
          switchFunctionOff(i);
+
          gpioInfo[i].is = GPIO_UNDEFINED;
       }
    }
@@ -6456,11 +6470,10 @@ int gpioSetMode(unsigned gpio, unsigned mode)
 
    if (mode != old_mode)
    {
-      if (gpio <= PI_MAX_USER_GPIO)
-      {
-         switchFunctionOff(gpio);
-         gpioInfo[gpio].is = GPIO_UNDEFINED;
-      }
+      switchFunctionOff(gpio);
+
+      gpioInfo[gpio].is = GPIO_UNDEFINED;
+
       gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
    }
 
@@ -6552,17 +6565,14 @@ int gpioWrite(unsigned gpio, unsigned level)
    {
       if (gpioInfo[gpio].is != GPIO_WRITE)
       {
-         if (gpioInfo[gpio].is == GPIO_UNDEFINED)
-         {
-            /* stop a glitch between setting mode then level */
-            if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
-            else                 *(gpioReg + GPSET0 + BANK) = BIT;
-         }
-         else
-         {
-            switchFunctionOff(gpio);
-         }
+         /* stop a glitch between setting mode then level */
+         if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
+         else                 *(gpioReg + GPSET0 + BANK) = BIT;
+
+         switchFunctionOff(gpio);
+
          gpioSetMode(gpio, PI_OUTPUT);
+
          gpioInfo[gpio].is = GPIO_WRITE;
       }
    }
@@ -6590,14 +6600,10 @@ int gpioPWM(unsigned gpio, unsigned val)
 
    if (gpioInfo[gpio].is != GPIO_PWM)
    {
-      if (gpioInfo[gpio].is == GPIO_UNDEFINED)
-      {
-      }
-      else
-      {
-         switchFunctionOff(gpio);
-      }
+      switchFunctionOff(gpio);
+
       gpioSetMode(gpio, PI_OUTPUT);
+
       gpioInfo[gpio].is = GPIO_PWM;
    }
 
@@ -6612,6 +6618,8 @@ int gpioPWM(unsigned gpio, unsigned val)
 
 int gpioGetPWMdutycycle(unsigned gpio)
 {
+   unsigned pwm;
+
    DBG(DBG_USER, "gpio=%d", gpio);
 
    CHECK_INITED;
@@ -6619,10 +6627,21 @@ int gpioGetPWMdutycycle(unsigned gpio)
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if (gpioInfo[gpio].is != GPIO_PWM)
-      SOFT_ERROR(PI_NOT_PWM_GPIO, "not a PWM gpio (%d)", gpio);
+   switch (gpioInfo[gpio].is)
+   {
+      case GPIO_PWM:
+         return gpioInfo[gpio].width;
 
-   return gpioInfo[gpio].width;
+      case GPIO_HW_PWM:
+         pwm = (PWMDef[gpio] >> 4) & 3;
+         return hw_pwm_duty[pwm];
+
+      case GPIO_HW_CLK:
+         return PI_HW_PWM_RANGE/2;
+
+      default:
+         SOFT_ERROR(PI_NOT_PWM_GPIO, "not a PWM gpio (%d)", gpio);
+   }
 }
 
 
@@ -6676,7 +6695,15 @@ int gpioGetPWMrange(unsigned gpio)
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   return gpioInfo[gpio].range;
+   switch (gpioInfo[gpio].is)
+   {
+      case GPIO_HW_PWM:
+      case GPIO_HW_CLK:
+         return PI_HW_PWM_RANGE;
+
+      default:
+         return gpioInfo[gpio].range;
+   }
 }
 
 
@@ -6691,7 +6718,15 @@ int gpioGetPWMrealRange(unsigned gpio)
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   return pwmRealRange[gpioInfo[gpio].freqIdx];
+   switch (gpioInfo[gpio].is)
+   {
+      case GPIO_HW_PWM:
+      case GPIO_HW_CLK:
+         return PI_HW_PWM_RANGE;
+
+      default:
+         return pwmRealRange[gpioInfo[gpio].freqIdx];
+   }
 }
 
 
@@ -6751,6 +6786,8 @@ int gpioSetPWMfrequency(unsigned gpio, unsigned frequency)
 
 int gpioGetPWMfrequency(unsigned gpio)
 {
+   unsigned pwm, clock;
+
    DBG(DBG_USER, "gpio=%d", gpio);
 
    CHECK_INITED;
@@ -6758,7 +6795,19 @@ int gpioGetPWMfrequency(unsigned gpio)
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   return pwmFreq[gpioInfo[gpio].freqIdx];
+   switch (gpioInfo[gpio].is)
+   {
+      case GPIO_HW_PWM:
+         pwm = (PWMDef[gpio] >> 4) & 3;
+         return hw_pwm_freq[pwm];
+
+      case GPIO_HW_CLK:
+         clock = (clkDef[gpio] >> 4) & 3;
+         return hw_clk_freq[clock];
+
+      default:
+         return pwmFreq[gpioInfo[gpio].freqIdx];
+   }
 }
 
 
@@ -6783,14 +6832,10 @@ int gpioServo(unsigned gpio, unsigned val)
 
    if (gpioInfo[gpio].is != GPIO_SERVO)
    {
-      if (gpioInfo[gpio].is == GPIO_UNDEFINED)
-      {
-      }
-      else
-      {
-         switchFunctionOff(gpio);
-      }
+      switchFunctionOff(gpio);
+
       gpioSetMode(gpio, PI_OUTPUT);
+
       gpioInfo[gpio].is = GPIO_SERVO;
    }
 
@@ -7435,11 +7480,11 @@ int gpioWaveGetMaxCbs(void)
 
 /*-------------------------------------------------------------------------*/
 
-int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud)
+int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud, unsigned bbBits)
 {
    int bitTime, timeout;
 
-   DBG(DBG_USER, "gpio=%d bbBaud=%d", gpio, bbBaud);
+   DBG(DBG_USER, "gpio=%d bbBaud=%d bbBits=%d", gpio, bbBaud, bbBits);
 
    CHECK_INITED;
 
@@ -7450,12 +7495,17 @@ int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud)
       SOFT_ERROR(PI_BAD_WAVE_BAUD,
          "gpio %d, bad baud rate (%d)", gpio, bbBaud);
 
+   if ((bbBits < PI_MIN_WAVE_DATABITS) || (bbBits > PI_MAX_WAVE_DATABITS))
+      SOFT_ERROR(PI_BAD_DATABITS,
+         "gpio %d, bad data bits (%d)", gpio, bbBits);
+
    if (wfRx[gpio].mode != PI_WFRX_NONE)
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", gpio);
 
-   bitTime = MILLION / bbBaud;
+   bitTime = (1000 * MILLION) / bbBaud; /* nanoseconds */
 
-   timeout  = (10 * bitTime)/1000;
+   timeout  = ((bbBits+2) * bitTime)/MILLION; /* milliseconds */
+
    if (timeout < 1) timeout = 1;
 
    wfRx[gpio].gpio     = gpio;
@@ -7464,11 +7514,16 @@ int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud)
    wfRx[gpio].mode     = PI_WFRX_SERIAL;
    wfRx[gpio].baud     = bbBaud;
    wfRx[gpio].timeout  = timeout;
-   wfRx[gpio].fullBit  = bitTime;
-   wfRx[gpio].halfBit  = bitTime/2;
+   wfRx[gpio].fullBit  = bitTime;         /* nanoseconds */
+   wfRx[gpio].halfBit  = (bitTime/2)+500; /* nanoseconds (500 for rounding) */
    wfRx[gpio].readPos  = 0;
    wfRx[gpio].writePos = 0;
    wfRx[gpio].bit      = -1;
+   wfRx[gpio].dataBits = bbBits;
+
+   if      (bbBits <  9) wfRx[gpio].bytes = 1;
+   else if (bbBits < 17) wfRx[gpio].bytes = 2;
+   else                  wfRx[gpio].bytes = 4;
 
    gpioSetAlertFunc(gpio, waveRxBit);
 
@@ -7505,6 +7560,10 @@ int gpioSerialRead(unsigned gpio, void *buf, size_t bufSize)
       else                   bytes = p->bufSize - p->readPos;
 
       if (bytes > bufSize) bytes = bufSize;
+
+      /* copy in multiples of the data size in bytes */
+
+      bytes = (bytes / p->bytes) * p->bytes;
 
       if (buf) memcpy(buf, p->buf+p->readPos, bytes);
 
@@ -8426,6 +8485,10 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    {
       if (chooseBestClock(&clkInf, frequency, CLK_SRCS, cfreq))
       {
+         /* record the clock frequency */
+
+         hw_clk_freq[clock] = frequency;
+
          initHWClk(cctl[clock], cdiv[clock],
             csrc[clkInf.clock], clkInf.div, clkInf.frac, mash);
 
@@ -8496,6 +8559,11 @@ int gpioHardwarePWM(
    {
       if (chooseBestClock(&clkInf, frequency, CLK_SRCS, cfreq))
       {
+         /* record the PWM frequency and dutycycle */
+
+         hw_pwm_freq[pwm] = frequency / PI_HW_PWM_RANGE;
+         hw_pwm_duty[pwm] = dutycycle;
+
          /* Abort any waveform transmission in progress */
 
          if (gpioWaveTxBusy()) gpioWaveTxStop();
@@ -8535,14 +8603,10 @@ int gpioHardwarePWM(
 
          if (gpioInfo[gpio].is != GPIO_HW_PWM)
          {
-            if (gpioInfo[gpio].is == GPIO_UNDEFINED)
-            {
-            }
-            else
-            {
-               switchFunctionOff(gpio);
-            }
+            switchFunctionOff(gpio);
+
             gpioSetMode(gpio, mode);
+
             gpioInfo[gpio].is = GPIO_HW_PWM;
          }
       }

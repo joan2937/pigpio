@@ -252,7 +252,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.14"
+VERSION = "1.15"
 
 exceptions = True
 
@@ -1049,6 +1049,13 @@ class pi():
 
       Returns the PWM dutycycle.
 
+
+      For normal PWM the dutycycle will be out of the defined range
+      for the gpio (see [*get_PWM_range*]).  If a hardware clock is
+      active on the gpio the reported dutycycle will be 500
+      (out of 1000).  If hardware PWM is active on the gpio the
+      reported dutycycle will be out of a 1000.
+
       ...
       pi.set_PWM_dutycycle(4, 25)
       print(pi.get_PWM_dutycycle(4))
@@ -1082,6 +1089,9 @@ class pi():
 
       user_gpio:= 0-31.
 
+      If a hardware clock or hardware PWM is active on the gpio
+      the reported range will be 1000.
+
       ...
       pi.set_PWM_range(9, 500)
       print(pi.get_PWM_range(9))
@@ -1096,6 +1106,9 @@ class pi():
       used on the gpio.
 
       user_gpio:= 0-31.
+
+      If a hardware clock or hardware PWM is active on the gpio
+      the reported real range will be 1000.
 
       ...
       pi.set_PWM_frequency(4, 800)
@@ -1134,6 +1147,12 @@ class pi():
       user_gpio:= 0-31.
 
       Returns the frequency (in Hz) used for the gpio.
+
+      For normal PWM the frequency will be that defined for the gpio
+      by [*set_PWM_frequency*].  If a hardware clock is active on the
+      gpio the reported frequency will be that set by [*hardware_clock*].
+      If hardware PWM is active on the gpio the reported frequency
+      will be that set by [*hardware_PWM*].
 
       ...
       pi.set_PWM_frequency(4,0)
@@ -1684,7 +1703,7 @@ class pi():
                   to output.
         bb_baud:= baud rate to use.
            data:= the bytes to write.
-         offset:= number of microseconds from the starts of the
+         offset:= number of microseconds from the start of the
                   waveform, default 0.
         bb_bits:= number of data bits, default 8.
         bb_stop:= number of stop half bits, default 2.
@@ -2858,12 +2877,13 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_PROCD, script_id, 0))
 
-   def bb_serial_read_open(self, user_gpio, bb_baud):
+   def bb_serial_read_open(self, user_gpio, bb_baud, bb_bits=8):
       """
       Opens a gpio for bit bang reading of serial data.
 
       user_gpio:= 0-31, the gpio to use.
         bb_baud:= 300-250000, the baud rate.
+        bb_bits:= 1-32, the number of bits per word, default 8.
 
       The serial data is held in a cyclic buffer and is read using
       [*bb_serial_read*].
@@ -2876,8 +2896,16 @@ class pi():
       status = pi.bb_serial_read_open(17, 9600)
       ...
       """
-      return _u2i(_pigpio_command(
-         self.sl, _PI_CMD_SLRO, user_gpio, bb_baud))
+      # pigpio message format
+
+      # I p1 user_gpio
+      # I p2 bb_baud
+      # I p3 4
+      ## extension ##
+      # I bb_bits
+      extents = [struct.pack("I", bb_bits)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_SLRO, user_gpio, bb_baud, 4, extents))
 
    def bb_serial_read(self, user_gpio):
       """
@@ -2889,6 +2917,14 @@ class pi():
       bytearray containing the bytes.  If there was an error the
       number of bytes read will be less than zero (and will contain
       the error code).
+
+      The bytes returned for each character depend upon the number of
+      data bits [*bb_bits*] specified in the [*bb_serial_read_open*]
+      command.
+
+      For [*bb_bits*] 1-8 there will be one byte per character.
+      For [*bb_bits*] 9-16 there will be two bytes per character.
+      For [*bb_bits*] 17-32 there will be four bytes per character.
 
       ...
       (count, data) = pi.bb_serial_read(4)
