@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 26 */
+/* pigpio version 27 */
 
 #include <stdio.h>
 #include <string.h>
@@ -283,10 +283,9 @@ bit 0 READ_LAST_NOT_SET_ERROR
    }                                                               \
    while (0)
 
-#define DMA_BUS_ADR 0x40000000
-
 static volatile unsigned int piModel = 1;
 static volatile unsigned int PI_PERI_BASE = 0x20000000;
+static volatile unsigned int DMA_BUS_ADR  = 0x40000000;
 
 #define AUX_BASE   (PI_PERI_BASE + 0x00215000)
 #define CLK_BASE   (PI_PERI_BASE + 0x00101000)
@@ -8932,11 +8931,13 @@ unsigned gpioHardwareRevision(void)
             {
                piModel = 1;
                PI_PERI_BASE = 0x20000000;
+               DMA_BUS_ADR  = 0x40000000;
             }
             else if (strstr (buf, "ARMv7") != NULL)
             {
                piModel = 2;
                PI_PERI_BASE = 0x3F000000;
+               DMA_BUS_ADR  = 0xC0000000;
             }
          }
 
