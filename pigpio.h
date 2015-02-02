@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 25
+#define PIGPIO_VERSION 26
 
 /*TEXT
 
@@ -351,8 +351,9 @@ uint32_t gpioOff;
 uint32_t usDelay;
 } gpioPulse_t;
 
-#define WAVE_FLAG_READ 1
-#define WAVE_FLAG_TICK 2
+#define WAVE_FLAG_READ  1
+#define WAVE_FLAG_TICK  2
+#define WAVE_FLAG_COUNT 4
 
 typedef struct
 {
@@ -383,13 +384,13 @@ int clk_us;  /* clock micros             */
 } rawSPI_t;
 
 typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
-unsigned long info;
-unsigned long src;
-unsigned long dst;
-unsigned long length;
-unsigned long stride;
-unsigned long next;
-unsigned long pad[2];
+uint32_t info;
+uint32_t src;
+uint32_t dst;
+uint32_t length;
+uint32_t stride;
+uint32_t next;
+uint32_t pad[2];
 } rawCbs_t;
 
 typedef void (*gpioAlertFunc_t)    (int      gpio,
@@ -479,8 +480,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 /* hardware PWM */
 
 #define PI_HW_PWM_MIN_FREQ 5
-#define PI_HW_PWM_MAX_FREQ 250000
-#define PI_HW_PWM_RANGE 1000
+#define PI_HW_PWM_MAX_FREQ 50000
+#define PI_HW_PWM_RANGE 5000
 
 /* hardware clock */
 
@@ -2083,8 +2084,8 @@ handle: >=0, as returned by a call to [*spiOpen*]
  count: the number of bytes to read
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 
@@ -2100,8 +2101,8 @@ handle: >=0, as returned by a call to [*spiOpen*]
  count: the number of bytes to write
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 /*F*/
@@ -2118,8 +2119,8 @@ handle: >=0, as returned by a call to [*spiOpen*]
  count: the number of bytes to transfer
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 
@@ -3053,6 +3054,48 @@ D*/
 
 
 /*F*/
+int gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned count);
+/*D
+This function is available for user customisation.
+
+It returns a single integer value.
+
+. .
+ arg1: >=0
+ arg2: >=0
+ argx: extra (byte) arguments
+count: number of extra arguments
+. .
+
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+D*/
+
+
+/*F*/
+int gpioCustom2(unsigned arg1, char *argx, unsigned count,
+                char *retBuf, unsigned retMax);
+/*D
+This function is available for user customisation.
+
+It differs from gpioCustom1 in that it returns an array of bytes
+rather than just an integer.
+
+The returned value is an integer indicating the number of returned bytes.
+. .
+  arg1: >=0
+  argx: extra (byte) arguments
+ count: number of extra arguments
+retBuf: buffer for returned bytes
+retMax: maximum number of bytes to return
+. .
+
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+The number of returned bytes must be retMax or less.
+D*/
+
+
+/*F*/
 int gpioCfgInternals(unsigned cfgWhat, int cfgVal);
 /*D
 Used to tune internal settings.
@@ -3686,7 +3729,7 @@ PWMduty::0-1000
 The hardware PWM dutycycle.
 
 . .
-#define PI_HW_PWM_RANGE 1000
+#define PI_HW_PWM_RANGE 5000
 . .
 
 PWMfreq::5-250K
@@ -3694,7 +3737,7 @@ The hardware PWM frequency.
 
 . .
 #define PI_HW_PWM_MIN_FREQ 5
-#define PI_HW_PWM_MAX_FREQ 250000
+#define PI_HW_PWM_MAX_FREQ 50000
 . .
 
 range::25-40000
@@ -4013,6 +4056,9 @@ PARAMS*/
 #define PI_CMD_HC    85
 #define PI_CMD_HP    86
 
+#define PI_CMD_CF1   87
+#define PI_CMD_CF2   88
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -4173,13 +4219,20 @@ after this command is issued.
 #define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // gpio has no hardware clock
 #define PI_NOT_HPWM_GPIO    -95 // gpio has no hardware PWM
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-250K
-#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1000
+#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-50K
+#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-5000
 #define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-25M
 #define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
 #define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
 #define PI_BAD_DATABITS    -101 // serial data bits not 1-32
 #define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
+#define PI_MSG_TOOBIG      -103 // socket/pipe message too big
+
+#define PI_PIGIF_ERR_0    -2000
+#define PI_PIGIF_ERR_99   -2099
+
+#define PI_CUSTOM_ERR_0   -3000
+#define PI_CUSTOM_ERR_999 -3999
 
 /*DEF_E*/
 

@@ -234,6 +234,11 @@ serial_write_byte         Writes a byte to a serial device
 
 serial_data_available     Returns number of bytes ready to be read
 
+CUSTOM
+
+custom_1                  User custom function 1
+custom_2                  User custom function 2
+
 Utility
 
 get_current_tick          Get current tick (microseconds)
@@ -401,6 +406,9 @@ _PI_CMD_GPW  =84
 
 _PI_CMD_HC   =85
 _PI_CMD_HP   =86
+
+_PI_CMD_CF1  =87
+_PI_CMD_CF2  =88
 
 _PI_CMD_NOIB= 99
 
@@ -606,8 +614,8 @@ _errors=[
    [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
    [PI_NOT_HCLK_GPIO     , "gpio has no hardware clock"],
    [PI_NOT_HPWM_GPIO     , "gpio has no hardware PWM"],
-   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 5-250K"],
-   [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-1000"],
+   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 5-50K"],
+   [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-5000"],
    [PI_BAD_HCLK_FREQ     , "hardware clock frequency not 4689-25M"],
    [PI_BAD_HCLK_PASS     , "need password to use hardware clock 1"],
    [PI_HPWM_ILLEGAL      , "illegal, PWM in use for main clock"],
@@ -1486,8 +1494,8 @@ class pi():
       pigpio daemon is started (option -t).
 
          gpio:= see descripton
-      PWMfreq:= 0 (off) or 5-250K
-      PWMduty:= 0 (off) to 1000 (fully on).
+      PWMfreq:= 0 (off) or 5-50K
+      PWMduty:= 0 (off) to 5000 (fully on).
 
       Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
       PI_NOT_HPWM_GPIO, PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ.
@@ -1514,9 +1522,9 @@ class pi():
       . .
 
       ...
-      pi.hardware_PWM(18, 800, 250) # 800Hz 25% dutycycle
+      pi.hardware_PWM(18, 800, 1250) # 800Hz 25% dutycycle
 
-      pi.hardware_PWM(18, 2000, 750) # 2000Hz 75% dutycycle
+      pi.hardware_PWM(18, 2000, 3750) # 2000Hz 75% dutycycle
       ...
       """
       # pigpio message format
@@ -2953,6 +2961,81 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRC, user_gpio, 0))
 
+   def custom_1(self, arg1=0, arg2=0, argx=[]):
+      """
+      Calls a pigpio function customised by the user.
+
+      arg1:= >=0, default 0.
+      arg2:= >=0, default 0.
+      argx:= extra arguments (each 0-255), default empty.
+
+      The returned value is an integer which by convention
+      should be >=0 for OK and <0 for error.
+
+      ...
+      value = pi.custom_1()
+
+      value = pi.custom_1(23)
+
+      value = pi.custom_1(0, 55)
+
+      value = pi.custom_1(23, 56, [1, 5, 7])
+
+      value = pi.custom_1(23, 56, b"hello")
+
+      value = pi.custom_1(23, 56, "hello")
+      ...
+      """
+      # I p1 arg1
+      # I p2 arg2
+      # I p3 len
+      ## extension ##
+      # s len argx bytes
+
+      return u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_CF1, arg1, arg2, len(argx), [argx]))
+
+   def custom_2(self, arg1=0, argx=[], retMax=8192):
+      """
+      Calls a pigpio function customised by the user.
+
+        arg1:= >=0, default 0.
+        argx:= extra arguments (each 0-255), default empty.
+      retMax:= >=0, maximum number of bytes to return, default 8192.
+
+      The returned value is a tuple of the number of bytes
+      returned and a bytearray containing the bytes.  If
+      there was an error the number of bytes read will be
+      less than zero (and will contain the error code).
+
+      ...
+      (count, data) = pi.custom_2()
+
+      (count, data) = pi.custom_2(23)
+
+      (count, data) = pi.custom_2(23, [1, 5, 7])
+
+      (count, data) = pi.custom_2(23, b"hello")
+
+      (count, data) = pi.custom_2(23, "hello", 128)
+      ...
+      """
+      # I p1 arg1
+      # I p2 retMax
+      # I p3 len
+      ## extension ##
+      # s len argx bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_CF2, arg1, retMax, len(argx), [argx], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
    def callback(self, user_gpio, edge=RISING_EDGE, func=None):
       """
       Calls a user supplied function (a callback) whenever the
@@ -3042,9 +3125,6 @@ class pi():
 
       self.sl = _socklock()
       self._notify  = None
-
-      self._host = ''
-      self._port = 8888
 
       self._host = host
       self._port = int(port)

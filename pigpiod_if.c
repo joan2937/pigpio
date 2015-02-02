@@ -1313,6 +1313,58 @@ int serial_read(unsigned handle, char *buf, unsigned count)
 int serial_data_available(unsigned handle)
    {return pigpio_command(gPigCommand, PI_CMD_SERDA, handle, 0, 1);}
 
+int custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=arg1
+   p2=arg2
+   p3=count
+   ## extension ##
+   char argx[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = argx;
+
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_CF1, arg1, arg2, count, 1, ext, 1);
+}
+
+
+int custom_2(unsigned arg1, char *argx, unsigned count,
+             char *retBuf, uint32_t retMax)
+{
+   int bytes;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=arg1
+   p2=retMax
+   p3=count
+   ## extension ##
+   char argx[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = argx;
+
+   bytes = pigpio_command_ext
+      (gPigCommand, PI_CMD_CF2, arg1, retMax, count, 1, ext, 0);
+
+   if (bytes > 0)
+   {
+      /* get the data */
+      recv(gPigCommand, retBuf, bytes, MSG_WAITALL);
+   }
+
+   pthread_mutex_unlock(&command_mutex);
+
+   return bytes;
+}
+
+
 int callback(unsigned user_gpio, unsigned edge, CBFunc_t f)
    {return intCallback(user_gpio, edge, f, 0, 0);}
 

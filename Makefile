@@ -1,3 +1,4 @@
+#
 CC	= gcc
 AR      = ar
 RANLIB  = ranlib
@@ -80,12 +81,12 @@ $(LIB2):	$(OBJ2)
 
 # generated using gcc -MM *.c
 
-x_pigpio.o: x_pigpio.c pigpio.h
-x_pigpiod_if.o: x_pigpiod_if.c
 command.o: command.c pigpio.h command.h
 pig2vcd.o: pig2vcd.c pigpio.h
-pigpio.o: pigpio.c pigpio.h command.h
+pigpio.o: pigpio.c pigpio.h command.h custom.cext
 pigpiod.o: pigpiod.c pigpio.h
 pigpiod_if.o: pigpiod_if.c pigpio.h command.h pigpiod_if.h
 pigs.o: pigs.c pigpio.h command.h
+x_pigpio.o: x_pigpio.c pigpio.h
+x_pigpiod_if.o: x_pigpiod_if.c pigpiod_if.h pigpio.h
 

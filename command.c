@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 25+
+This version is for pigpio version 26+
 */
 
 #include <stdio.h>
@@ -50,6 +50,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
    {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
+
+   {PI_CMD_CF1,   "CF1",   195, 2}, // gpioCustom1
+   {PI_CMD_CF2,   "CF2",   195, 6}, // gpioCustom2
 
    {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
    {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
@@ -217,163 +220,167 @@ cmdInfo_t cmdInfo[]=
 
 
 char * cmdUsage = "\
-BC1 bits         Clear specified gpios in bank 1.\n\
-BC2 bits         Clear specified gpios in bank 2.\n\
-BR1              Read bank 1 gpios.\n\
-BR2              Read bank 2 gpios.\n\
-BS1 bits         Set specified gpios in bank 2.\n\
-BS2 bits         Set specified gpios in bank 2.\n\
+BC1 bits         Clear specified gpios in bank 1\n\
+BC2 bits         Clear specified gpios in bank 2\n\
+BR1              Read bank 1 gpios\n\
+BR2              Read bank 2 gpios\n\
+BS1 bits         Set specified gpios in bank 2\n\
+BS2 bits         Set specified gpios in bank 2\n\
 \n\
-GDC u            Get PWM dutycycle for gpio.\n\
-GPW u            Get servo pulsewidth for gpio.\n\
+CF1 uvs          Custom function 1\n\
+CF2 uvs          Custom function 2\n\
 \n\
-H/HELP           Display command help.\n\
+GDC u            Get PWM dutycycle for gpio\n\
+GPW u            Get servo pulsewidth for gpio\n\
 \n\
-HC g cf          Set hardware clock frequency.\n\
-HP g pf pdc      Set hardware PWM frequency and dutycycle.\n\
+H/HELP           Display command help\n\
 \n\
-HWVER            Get hardware version.\n\
+HC g cf          Set hardware clock frequency\n\
+HP g pf pdc      Set hardware PWM frequency and dutycycle\n\
 \n\
-I2CC h           Close I2C handle.\n\
-I2CO ib id if    Open I2C bus and device with flags.\n\
+HWVER            Get hardware version\n\
 \n\
-I2CPC h r wv     smb Process Call: exchange register with word.\n\
-I2CPK h r bvs    smb Block Process Call: exchange data bytes with register.\n\
+I2CC h           Close I2C handle\n\
+I2CO ib id if    Open I2C bus and device with flags\n\
 \n\
-I2CRB h r        smb Read Byte Data: read byte from register.\n\
-I2CRD h num      i2c Read bytes.\n\
-I2CRI h r num    smb Read I2C Block Data: read bytes from register.\n\
-I2CRK h r        smb Read Block Data: read data from register.\n\
-I2CRS h          smb Read Byte: read byte.\n\
-I2CRW h r        smb Read Word Data: read word from register.\n\
+I2CPC h r wv     smb Process Call: exchange register with word\n\
+I2CPK h r bvs    smb Block Process Call: exchange data bytes with register\n\
 \n\
-I2CWB h r bv     smb Write Byte Data: write byte to register.\n\
-I2CWD h bvs      i2c Write data.\n\
-I2CWI h r bvs    smb Write I2C Block Data.\n\
-I2CWK h r bvs    smb Write Block Data: write data to register.\n\
-I2CWQ h bit      smb Write Quick: write bit.\n\
-I2CWS h bv       smb Write Byte: write byte.\n\
-I2CWW h r wv     smb Write Word Data: write word to register.\n\
+I2CRB h r        smb Read Byte Data: read byte from register\n\
+I2CRD h num      i2c Read bytes\n\
+I2CRI h r num    smb Read I2C Block Data: read bytes from register\n\
+I2CRK h r        smb Read Block Data: read data from register\n\
+I2CRS h          smb Read Byte: read byte\n\
+I2CRW h r        smb Read Word Data: read word from register\n\
 \n\
-M/MODES g m      Set gpio mode.\n\
-MG/MODEG g       Get gpio mode.\n\
+I2CWB h r bv     smb Write Byte Data: write byte to register\n\
+I2CWD h bvs      i2c Write data\n\
+I2CWI h r bvs    smb Write I2C Block Data\n\
+I2CWK h r bvs    smb Write Block Data: write data to register\n\
+I2CWQ h bit      smb Write Quick: write bit\n\
+I2CWS h bv       smb Write Byte: write byte\n\
+I2CWW h r wv     smb Write Word Data: write word to register\n\
 \n\
-MICS v           Delay for microseconds.\n\
-MILS v           Delay for milliseconds.\n\
+M/MODES g m      Set gpio mode\n\
+MG/MODEG g       Get gpio mode\n\
 \n\
-NB h bits        Start notification.\n\
-NC h             Close notification.\n\
-NO               Request a notification.\n\
-NP h             Pause notification.\n\
+MICS v           Delay for microseconds\n\
+MILS v           Delay for milliseconds\n\
 \n\
-P/PWM u v        Set gpio PWM value.\n\
+NB h bits        Start notification\n\
+NC h             Close notification\n\
+NO               Request a notification\n\
+NP h             Pause notification\n\
 \n\
-PARSE t          Validate script.\n\
+P/PWM u v        Set gpio PWM value\n\
 \n\
-PFG u            Get gpio PWM frequency.\n\
-PFS u v          Set gpio PWM frequency.\n\
+PARSE t          Validate script\n\
 \n\
-PIGPV            Get pigpio library version.\n\
+PFG u            Get gpio PWM frequency\n\
+PFS u v          Set gpio PWM frequency\n\
 \n\
-PRG u            Get gpio PWM range.\n\
+PIGPV            Get pigpio library version\n\
 \n\
-PROC t           Store script.\n\
-PROCD sid        Delete script.\n\
-PROCP sid        Get script status and parameters.\n\
-PROCR sid pars   Run script.\n\
-PROCS sid        Stop script.\n\
+PRG u            Get gpio PWM range\n\
 \n\
-PRRG u           Get gpio PWM real range.\n\
-PRS u v          Set gpio PWM range.\n\
+PROC t           Store script\n\
+PROCD sid        Delete script\n\
+PROCP sid        Get script status and parameters\n\
+PROCR sid pars   Run script\n\
+PROCS sid        Stop script\n\
 \n\
-PUD g p          Set gpio pull up/down.\n\
+PRRG u           Get gpio PWM real range\n\
+PRS u v          Set gpio PWM range\n\
 \n\
-R/READ g         Read gpio level.\n\
+PUD g p          Set gpio pull up/down\n\
 \n\
-S/SERVO u v      Set gpio servo pulsewidth.\n\
+R/READ g         Read gpio level\n\
 \n\
-SERC h           Close serial handle.\n\
-SERDA h          Check for serial data ready to read.\n\
-SERO srd srb srf Open serial device at baud with flags.\n\
+S/SERVO u v      Set gpio servo pulsewidth\n\
 \n\
-SERR h num       Read bytes from serial handle.\n\
-SERRB            Read byte from serial handle.\n\
-SERW h bvs       Write bytes to serial handle.\n\
-SERWB h bv       Write byte to serial handle.\n\
+SERC h           Close serial handle\n\
+SERDA h          Check for serial data ready to read\n\
+SERO srd srb srf Open serial device at baud with flags\n\
 \n\
-SLR u num        Read bit bang serial data from gpio.\n\
-SLRC u           Close gpio for bit bang serial data.\n\
-SLRO u b db      Open gpio for bit bang serial data.\n\
+SERR h num       Read bytes from serial handle\n\
+SERRB h          Read byte from serial handle\n\
+SERW h bvs       Write bytes to serial handle\n\
+SERWB h bv       Write byte to serial handle\n\
 \n\
-SPIC h           SPI close handle.\n\
-SPIO sc sb sf    SPI open channel at baud with flags.\n\
-SPIR h num       SPI read bytes from handle.\n\
-SPIW h bvs       SPI write bytes to handle.\n\
-SPIX h bvs       SPI transfer bytes to handle.\n\
+SLR u num        Read bit bang serial data from gpio\n\
+SLRC u           Close gpio for bit bang serial data\n\
+SLRO u b db      Open gpio for bit bang serial data\n\
 \n\
-T/TICK           Get current tick.\n\
+SPIC h           SPI close handle\n\
+SPIO sc sb sf    SPI open channel at baud with flags\n\
+SPIR h num       SPI read bytes from handle\n\
+SPIW h bvs       SPI write bytes to handle\n\
+SPIX h bvs       SPI transfer bytes to handle\n\
 \n\
-TRIG u pl L      Trigger level for micros on gpio.\n\
+T/TICK           Get current tick\n\
 \n\
-W/WRITE g L      Write level to gpio.\n\
+TRIG u pl L      Trigger level for micros on gpio\n\
 \n\
-WDOG u v         Set millisecond watchdog on gpio.\n\
+W/WRITE g L      Write level to gpio\n\
 \n\
-WVAG trips       Wave add generic pulses.\n\
+WDOG u v         Set millisecond watchdog on gpio\n\
+\n\
+WVAG trips       Wave add generic pulses\n\
 WVAS u b db hb   Wave add serial data for gpio u at b baud, db databits,\n\
-     o bvs            hb (half)stopbits, offset o micros from wave start.\n\
-WVBSY            Check if wave busy.\n\
-WVCLR            Wave clear.\n\
-WVCRE            Create wave from added pulses.\n\
-WVDEL wid        Delete waves w and higher.\n\
-WVGO             Wave transmit (DEPRECATED).\n\
-WVGOR            Wave transmit repeatedly (DEPRECATED).\n\
-WVHLT            Wave stop.\n\
-WVNEW            Start a new empty wave.\n\
-WVSC ws          Wave get DMA control block stats.\n\
-WVSM ws          Wave get micros stats.\n\
-WVSP ws          Wave get pulses stats.\n\
-WVTX wid         Transmit wave as one-shot.\n\
-WVTXR wid        Transmit wave repeatedly.\n\
+     o bvs            hb (half)stopbits, offset o micros from wave start\n\
+WVBSY            Check if wave busy\n\
+WVCLR            Wave clear\n\
+WVCRE            Create wave from added pulses\n\
+WVDEL wid        Delete waves w and higher\n\
+WVGO             Wave transmit (DEPRECATED)\n\
+WVGOR            Wave transmit repeatedly (DEPRECATED)\n\
+WVHLT            Wave stop\n\
+WVNEW            Start a new empty wave\n\
+WVSC ws          Wave get DMA control block stats\n\
+WVSM ws          Wave get micros stats\n\
+WVSP ws          Wave get pulses stats\n\
+WVTX wid         Transmit wave as one-shot\n\
+WVTXR wid        Transmit wave repeatedly\n\
 \n\
-bits  = a mask where (1<<g) is set for each gpio g of interest.\n\
-bv    = byte value (0-255).\n\
-bvs   = one or more byte values (0-255).\n\
-cf    = hardware clock frequency (4689-25M).\n\
-db    = data bits (1-32).\n\
-g     = any gpio (0-53).\n\
-h     = handle (>=0).\n\
-hb    = (half) stop bits (2-8).\n\
-ib    = I2C bus (0-1).\n\
-id    = I2C device (0-127).\n\
-if    = I2C flags (0).\n\
-L     = level (0-1).\n\
-m     = mode (RW540123).\n\
-num   = number of bytes to read.\n\
-o     = offset (>=0).\n\
-p     = pud (ODU).\n\
-pars  = 0 to 10 parameters for script.\n\
-pdc   = hardware PWM dutycycle (0-1000).\n\
-pf    = hardware PWM frequency (5-250K).\n\
-pl    = pulse length (1-100).\n\
-r     = register.\n\
-sid   = script id (>=0).\n\
-sb    = SPI baud.\n\
-sc    = SPI channel (0-1).\n\
-sf    = SPI flags (0-3).\n\
-srd   = serial device (/dev/tty*).\n\
-srb   = serial baud rate.\n\
-srf   = serial flags (0).\n\
-t     = text.\n\
-trips = 1 or more triplets of gpios on, gpios off, delay.\n\
-u     = user gpio (0-31).\n\
-v     = value.\n\
-w     = wave id (>=0).\n\
-ws    = 0=now, 1=high, 2=max.\n\
-wv    = word value (0-65535).\n\
+bits  = a mask where (1<<g) is set for each gpio g of interest\n\
+bv    = byte value (0-255)\n\
+bvs   = one or more byte values (0-255)\n\
+cf    = hardware clock frequency (4689-25M)\n\
+db    = data bits (1-32)\n\
+g     = any gpio (0-53)\n\
+h     = handle (>=0)\n\
+hb    = (half) stop bits (2-8)\n\
+ib    = I2C bus (0-1)\n\
+id    = I2C device (0-127)\n\
+if    = I2C flags (0)\n\
+L     = level (0-1)\n\
+m     = mode (RW540123)\n\
+num   = number of bytes to read\n\
+o     = offset (>=0)\n\
+p     = pud (ODU)\n\
+pars  = 0 to 10 parameters for script\n\
+pdc   = hardware PWM dutycycle (0-5000)\n\
+pf    = hardware PWM frequency (5-50K)\n\
+pl    = pulse length (1-100)\n\
+r     = register\n\
+sid   = script id (>=0)\n\
+sb    = SPI baud\n\
+sc    = SPI channel (0-1)\n\
+sf    = SPI flags (0-3)\n\
+srd   = serial device (/dev/tty*)\n\
+srb   = serial baud rate\n\
+srf   = serial flags (0)\n\
+t     = text\n\
+trips = 1 or more triplets of gpios on, gpios off, delay\n\
+u     = user gpio (0-31)\n\
+uvs   = zero or more values >= 0, any after the first two must <= 255\n\
+v     = value\n\
+w     = wave id (>=0)\n\
+ws    = 0=now, 1=high, 2=max\n\
+wv    = word value (0-65535)\n\
 \n\
 Numbers may be entered as hex (prefix 0x), octal (prefix 0),\n\
-otherwise they are assumed to be decimal.\n\
+otherwise they are assumed to be decimal\n\
 ";
 
 typedef struct
@@ -479,8 +486,8 @@ static errInfo_t errInfo[]=
    {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
    {PI_NOT_HCLK_GPIO    , "gpio has no hardware clock"},
    {PI_NOT_HPWM_GPIO    , "gpio has no hardware PWM"},
-   {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 5-250K"},
-   {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-1000"},
+   {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 5-50K"},
+   {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-5000"},
    {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-25M"},
    {PI_BAD_HCLK_PASS    , "need password to use hardware clock 1"},
    {PI_HPWM_ILLEGAL     , "illegal, PWM in use for main clock"},
@@ -936,6 +943,52 @@ int cmdParse(
             p[3] = pars;
 
             if (pars > 0) valid = 1;
+         }
+
+         break;
+
+      case 195: /* CF1  CF2
+
+                   Zero or more parameters, first two >=0, rest 0-255.
+                */
+         valid = 1;
+
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+
+         if (ctl->opt[1] == CMD_NUMERIC)
+         {
+            if ((int)p[1] >= 0)
+            {
+               ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+
+               if (ctl->opt[2] == CMD_NUMERIC)
+               {
+                  if ((int)p[2] >= 0)
+                  {
+                     pars = 0;
+                     p8 = ext;
+
+                     while (pars < CMD_MAX_PARAM)
+                     {
+                        ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+                        if (to1 == CMD_NUMERIC)
+                        {
+                           if (((int)tp1>=0) && ((int)tp1<=255))
+                           {
+                              pars++;
+                              *p8++ = tp1;
+                           }
+                           else valid = 0;
+                        }
+                        else break;
+                     }
+
+                     p[3] = pars;
+                  }
+                  else valid = 0;
+               }
+            }
+            else valid = 0;
          }
 
          break;

@@ -248,6 +248,11 @@ serial_read                Reads bytes from a serial device
 
 serial_data_available      Returns number of bytes ready to be read
 
+CUSTOM
+
+custom_1                   User custom function 1
+custom_2                   User custom function 2
+
 UTILITIES
 
 get_current_tick           Get current tick (microseconds)
@@ -896,8 +901,8 @@ daemon is started (option -t).
 
 . .
    gpio: see descripton
-PWMfreq: 0 (off) or 5-250K
-PWMduty: 0 (off) to 1000 (fully on).
+PWMfreq: 0 (off) or 5-50K
+PWMduty: 0 (off) to 5000 (fully on).
 . .
 
 Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -1804,8 +1809,8 @@ handle: >=0, as returned by a call to [*spi_open*].
  count: the number of bytes to read.
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 /*F*/
@@ -1820,8 +1825,8 @@ handle: >=0, as returned by a call to [*spi_open*].
  count: the number of bytes to write.
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 /*F*/
@@ -1838,8 +1843,8 @@ handle: >=0, as returned by a call to [*spi_open*].
  count: the number of bytes to transfer.
 . .
 
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 /*F*/
@@ -1943,6 +1948,48 @@ handle: >=0, as returned by a call to [*serial_open*].
 Returns the number of bytes of data available (>=0) if OK,
 otherwise PI_BAD_HANDLE.
 D*/
+
+/*F*/
+int custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned count);
+/*D
+This function is available for user customisation.
+
+It returns a single integer value.
+
+. .
+ arg1: >=0
+ arg2: >=0
+ argx: extra (byte) arguments
+count: number of extra arguments
+. .
+
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+D*/
+
+
+/*F*/
+int custom_2(unsigned arg1, char *argx, unsigned count,
+             char *retBuf, unsigned retMax);
+/*D
+This function is available for user customisation.
+
+It differs from custom_1 in that it returns an array of bytes
+rather than just an integer.
+
+The return value is an integer indicating the number of returned bytes.
+. .
+  arg1: >=0
+  argx: extra (byte) arguments
+ count: number of extra arguments
+retBuf: buffer for returned data
+retMax: maximum number of bytes to return
+. .
+
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+Note, the number of returned bytes will be retMax or less.
+D*/
+
 
 /*F*/
 int callback(unsigned user_gpio, unsigned edge, CBFunc_t f);
