@@ -1,0 +1,2 @@
+Class to read the relative humidity and temperature from a DHT11 sensor.
+It implements the iterator python protocol.
