@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=27
+VERSION=28
 
 GPIO=4
 

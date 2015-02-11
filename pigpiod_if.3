@@ -1207,9 +1207,9 @@ daemon is started (option -t).
 .EX
    gpio: see descripton
 .br
-PWMfreq: 0 (off) or 5-250K
+PWMfreq: 0 (off) or 5-50K
 .br
-PWMduty: 0 (off) to 1000 (fully on).
+PWMduty: 0 (off) to 5000 (fully on).
 .br
 
 .EE
@@ -2671,8 +2671,8 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint spi_write(unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2696,8 +2696,8 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint spi_xfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)\fP"
 .IP "" 4
@@ -2724,8 +2724,8 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint serial_open(char *ser_tty, unsigned ser_baud, unsigned ser_flags)\fP"
 .IP "" 4
@@ -2886,6 +2886,75 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 Returns the number of bytes of data available (>=0) if OK,
 otherwise PI_BAD_HANDLE.
+
+.IP "\fBint custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned count)\fP"
+.IP "" 4
+This function is available for user customisation.
+
+.br
+
+.br
+It returns a single integer value.
+
+.br
+
+.br
+
+.EX
+ arg1: >=0
+.br
+ arg2: >=0
+.br
+ argx: extra (byte) arguments
+.br
+count: number of extra arguments
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+.IP "\fBint custom_2(unsigned arg1, char *argx, unsigned count, char *retBuf, unsigned retMax)\fP"
+.IP "" 4
+This function is available for user customisation.
+
+.br
+
+.br
+It differs from custom_1 in that it returns an array of bytes
+rather than just an integer.
+
+.br
+
+.br
+The return value is an integer indicating the number of returned bytes.
+
+.EX
+  arg1: >=0
+.br
+  argx: extra (byte) arguments
+.br
+ count: number of extra arguments
+.br
+retBuf: buffer for returned data
+.br
+retMax: maximum number of bytes to return
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+.br
+
+.br
+Note, the number of returned bytes will be retMax or less.
 
 .IP "\fBint callback(unsigned user_gpio, unsigned edge, CBFunc_t f)\fP"
 .IP "" 4

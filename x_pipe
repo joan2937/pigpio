@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=27
+VERSION=28
 
 GPIO=4
 
@@ -159,6 +159,7 @@ read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PROCS($p) ok"; else echo "PROCS($p) fail ($s)"; fi
 
 echo "procd $p" >/dev/pigpio
+sleep 0.1
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "PROCD($p) ok"; else echo "PROCD($p) fail ($s)"; fi
 

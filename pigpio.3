@@ -2659,8 +2659,8 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint spiWrite(unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2684,8 +2684,8 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)\fP"
 .IP "" 4
@@ -2712,8 +2712,8 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or
-PI_SPI_XFER_FAILED.
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
 .IP "\fBint serOpen(char *sertty, unsigned serBaud, unsigned serFlags)\fP"
 .IP "" 4
@@ -4309,6 +4309,75 @@ The default setting (0) is that both interfaces are enabled.
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
 
+.IP "\fBint gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned count)\fP"
+.IP "" 4
+This function is available for user customisation.
+
+.br
+
+.br
+It returns a single integer value.
+
+.br
+
+.br
+
+.EX
+ arg1: >=0
+.br
+ arg2: >=0
+.br
+ argx: extra (byte) arguments
+.br
+count: number of extra arguments
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+.IP "\fBint gpioCustom2(unsigned arg1, char *argx, unsigned count, char *retBuf, unsigned retMax)\fP"
+.IP "" 4
+This function is available for user customisation.
+
+.br
+
+.br
+It differs from gpioCustom1 in that it returns an array of bytes
+rather than just an integer.
+
+.br
+
+.br
+The returned value is an integer indicating the number of returned bytes.
+
+.EX
+  arg1: >=0
+.br
+  argx: extra (byte) arguments
+.br
+ count: number of extra arguments
+.br
+retBuf: buffer for returned bytes
+.br
+retMax: maximum number of bytes to return
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK, less than 0 indicates a user defined error.
+
+.br
+
+.br
+The number of returned bytes must be retMax or less.
+
 .IP "\fBint gpioCfgInternals(unsigned cfgWhat, int cfgVal)\fP"
 .IP "" 4
 Used to tune internal settings.
@@ -5643,7 +5712,7 @@ The hardware PWM dutycycle.
 .br
 
 .EX
-#define PI_HW_PWM_RANGE 1000
+#define PI_HW_PWM_RANGE 5000
 .br
 
 .EE
@@ -5662,7 +5731,7 @@ The hardware PWM frequency.
 .EX
 #define PI_HW_PWM_MIN_FREQ 5
 .br
-#define PI_HW_PWM_MAX_FREQ 250000
+#define PI_HW_PWM_MAX_FREQ 50000
 .br
 
 .EE
@@ -6412,6 +6481,12 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_CF1   87
+.br
+#define PI_CMD_CF2   88
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -6617,9 +6692,9 @@ A 16-bit word value.
 .br
 #define PI_NOT_HPWM_GPIO    -95 // gpio has no hardware PWM
 .br
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-250K
+#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-50K
 .br
-#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1000
+#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-5000
 .br
 #define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-25M
 .br
@@ -6630,6 +6705,20 @@ A 16-bit word value.
 #define PI_BAD_DATABITS    -101 // serial data bits not 1-32
 .br
 #define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
+.br
+#define PI_MSG_TOOBIG      -103 // socket/pipe message too big
+.br
+
+.br
+#define PI_PIGIF_ERR_0    -2000
+.br
+#define PI_PIGIF_ERR_99   -2099
+.br
+
+.br
+#define PI_CUSTOM_ERR_0   -3000
+.br
+#define PI_CUSTOM_ERR_999 -3999
 .br
 
 .br

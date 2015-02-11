@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 27 */
+/* pigpio version 28 */
 
 #include <stdio.h>
 #include <string.h>
@@ -283,9 +283,15 @@ bit 0 READ_LAST_NOT_SET_ERROR
    }                                                               \
    while (0)
 
-static volatile unsigned int piModel = 1;
-static volatile unsigned int PI_PERI_BASE = 0x20000000;
-static volatile unsigned int DMA_BUS_ADR  = 0x40000000;
+#define PI_PERI_PHYS 0x7E000000
+
+static void *dummy = MAP_FAILED;
+
+static volatile uint32_t piModel = 1;
+
+static volatile uint32_t PI_PERI_BASE   = 0x20000000;
+static volatile uint32_t DMA_BUS_ADR    = 0x40000000;
+static volatile uint32_t DMA_BUS_CACHE  = 0x00000000;
 
 #define AUX_BASE   (PI_PERI_BASE + 0x00215000)
 #define CLK_BASE   (PI_PERI_BASE + 0x00101000)
@@ -894,6 +900,9 @@ typedef struct
    uint32_t emitFrags;
    uint32_t maxSamples;
    uint32_t numSamples;
+   uint32_t DMARestarts;
+   uint32_t DMAInits;
+   uint32_t dmaInitCbsCount;
 } gpioStats_t;
 
 typedef struct
@@ -1199,6 +1208,9 @@ static void intScriptBits(void);
 static int  gpioNotifyOpenInBand(int fd);
 static void initHWClk
    (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH);
+static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
+static void flushDMA(void);
+
 
 /* ======================================================================= */
 
@@ -1327,6 +1339,8 @@ static void myOffPageSlot(int pos, int * page, int * slot)
 
 static void myLvsPageSlot(int pos, int * page, int * slot)
 {
+//   *page = pos%DMAI_PAGES;
+//   *slot = pos/DMAI_PAGES;
    *page = pos/LVS_PER_IPAGE;
    *slot = pos%LVS_PER_IPAGE;
 }
@@ -1335,6 +1349,8 @@ static void myLvsPageSlot(int pos, int * page, int * slot)
 
 static void myTckPageSlot(int pos, int * page, int * slot)
 {
+//   *page = pos%DMAI_PAGES;
+//   *slot = pos/DMAI_PAGES;
    *page = pos/TCK_PER_IPAGE;
    *slot = pos%TCK_PER_IPAGE;
 }
@@ -2175,14 +2191,14 @@ static int wave2Cbs(unsigned wave_mode)
       p->info   = NORMAL_DMA |
                   DMA_DEST_DREQ |
                   DMA_PERIPHERAL_MAPPING(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
    }
    else
    {
       p->info   = NORMAL_DMA |
                   DMA_DEST_DREQ |
                   DMA_PERIPHERAL_MAPPING(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
    }
 
    p->src    = (uint32_t) (&dmaOPhys[0]->periphData) | DMA_BUS_ADR;
@@ -2203,7 +2219,7 @@ static int wave2Cbs(unsigned wave_mode)
 
          p->info   = NORMAL_DMA;
          p->src    = waveOOLPOadr(botOOL++) | DMA_BUS_ADR;
-         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | 0x7e000000;
+         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_PHYS;
          p->length = 4;
          p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
       }
@@ -2218,7 +2234,7 @@ static int wave2Cbs(unsigned wave_mode)
 
          p->info   = NORMAL_DMA;
          p->src    = waveOOLPOadr(botOOL++) | DMA_BUS_ADR;
-         p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | 0x7e000000;
+         p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_PHYS;
          p->length = 4;
          p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
       }
@@ -2230,7 +2246,7 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | 0x7e000000;
+         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_PHYS;
          p->dst    = waveOOLPOadr(--topOOL) | DMA_BUS_ADR;
          p->length = 4;
          p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
@@ -2243,7 +2259,7 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | 0x7e000000;
+         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_PHYS;
          p->dst    = waveOOLPOadr(--topOOL) | DMA_BUS_ADR;
          p->length = 4;
          p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
@@ -2330,7 +2346,7 @@ static int wave2Cbs(unsigned wave_mode)
                         DMA_DEST_DREQ |
                         DMA_PERIPHERAL_MAPPING(2);
 
-            p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+            p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
          }
          else
          {
@@ -2338,7 +2354,7 @@ static int wave2Cbs(unsigned wave_mode)
                         DMA_DEST_DREQ |
                         DMA_PERIPHERAL_MAPPING(5);
 
-            p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+            p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
          }
 
          p->src    = (uint32_t) (&dmaOPhys[0]->periphData) | DMA_BUS_ADR;
@@ -2607,7 +2623,8 @@ int i2cWriteQuick(unsigned handle, unsigned bit)
    if (bit > 1)
       SOFT_ERROR(PI_BAD_PARAM, "bad bit (%d)", bit);
 
-   err = my_smbus_access(i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
+   err = my_smbus_access(
+      i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
 
    if (err < 0) return PI_I2C_WRITE_FAILED;
 
@@ -3117,7 +3134,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
       system("/sbin/modprobe i2c_dev");
       system("/sbin/modprobe i2c_bcm2708");
 
-      usleep(100000);
+      myGpioDelay(100000);
 
       if ((fd = open(dev, O_RDWR)) < 0)
       {
@@ -3274,7 +3291,7 @@ static void spiGoA(
       auxReg[AUX_SPI0_CNTL0_REG] =
          AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
 
-      usleep(10);
+      myGpioDelay(10);
 
       auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
 
@@ -3438,15 +3455,12 @@ static void spiGo(
    char     *rxBuf,
    unsigned count)
 {
-   DBG(0, "spiGo");
    if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
    {
-      DBG(0, "spiGoA");
       spiGoA(speed, flags, txBuf, rxBuf, count);
    }
    else
    {
-      DBG(0, "spiGoS");
       spiGoS(speed, flags, txBuf, rxBuf, count);
    }
 }
@@ -4037,8 +4051,7 @@ static unsigned dmaNowAtICB(void)
          endTick = systReg[SYST_CLO];
 
          if (endTick != startTick)
-              gpioStats.cbTicks += (endTick - startTick);
-         else gpioStats.cbTicks ++;
+            gpioStats.cbTicks += (endTick - startTick);
 
          gpioStats.cbCalls++;
 
@@ -4179,7 +4192,7 @@ static void dmaGpioOnCb(int b, int pos)
 
    p->info   = NORMAL_DMA;
    p->src    = dmaGpioOnAdr(pos) | DMA_BUS_ADR;
-   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | 0x7e000000;
+   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_PHYS;
    p->length = 4;
    p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
 }
@@ -4193,7 +4206,7 @@ static void dmaTickCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | 0x7e000000;
+   p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_PHYS;
    p->dst    = dmaTickAdr(pos) | DMA_BUS_ADR;
    p->length = 4;
    p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
@@ -4209,7 +4222,7 @@ static void dmaGpioOffCb(int b, int pos)
 
    p->info   = NORMAL_DMA;
    p->src    = dmaGpioOffAdr(pos) | DMA_BUS_ADR;
-   p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | 0x7e000000;
+   p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_PHYS;
    p->length = 4;
    p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
 }
@@ -4223,7 +4236,7 @@ static void dmaReadLevelsCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | 0x7e000000;
+   p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_PHYS;
    p->dst    = dmaReadLevelsAdr(pos) | DMA_BUS_ADR;
    p->length = 4;
    p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
@@ -4240,12 +4253,12 @@ static void dmaDelayCb(int b)
    if (gpioCfg.clockPeriph == PI_CLOCK_PCM)
    {
       p->info   = NORMAL_DMA | TIMED_DMA(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
    }
    else
    {
       p->info   = NORMAL_DMA | TIMED_DMA(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | 0x7e000000;
+      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
    }
 
    p->src    = dmaPwmDataAdr(b%DMAI_PAGES) | DMA_BUS_ADR;
@@ -4264,6 +4277,8 @@ static void dmaInitCbs(void)
    /* set up the DMA control blocks */
 
    DBG(DBG_STARTUP, "");
+
+   gpioStats.dmaInitCbsCount++;
 
    b = -1;
    level = 0;
@@ -4386,6 +4401,7 @@ static void * pthAlertThread(void *x)
    int numSamples, d;
    int b, n, v;
    int err;
+   int stopped;
    char fifo[32];
 
    req.tv_sec = 0;
@@ -4407,8 +4423,35 @@ static void * pthAlertThread(void *x)
    cycle = (oldSlot/PULSE_PER_CYCLE);
    pulse = (oldSlot%PULSE_PER_CYCLE);
 
+   stopped = 0;
+
    while (1)
    {
+
+      if (dmaIn[DMA_CONBLK_AD])
+      {
+         if (stopped)
+         {
+            DBG(1, "****** GOING ******");
+            stopped = 0;
+         }
+      }
+      else
+      {
+         if (!stopped)
+         {
+            DBG(1, "****** STOPPED ******");
+            stopped = 1;
+         }
+         dmaInitCbs();
+         flushDMA();
+         myGpioDelay(5000); /* let DMA run for a while */
+         initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+         myGpioDelay(5000); /* let DMA run for a while */
+         oldSlot = 0;
+         gpioStats.DMARestarts++;
+      }
+
       gpioStats.alertTicks++;
 
       req.tv_nsec = 850000;
@@ -5161,6 +5204,13 @@ static void * pthFifoThread(void *x)
    flags = fcntl(fileno(outFifo), F_GETFL, 0);
    fcntl(fileno(outFifo), F_SETFL, flags | O_NONBLOCK);
 
+   /* don't start until DMA started */
+
+   while (!DMAstarted) myGpioDelay(1000);
+
+   myGpioDelay(20000); /* let DMA run for a while */
+
+
    while (1)
    {
       if (fgets(buf, sizeof(buf), inpFifo) == NULL)
@@ -5382,6 +5432,12 @@ static void * pthSocketThread(void *x)
    
    c = sizeof(struct sockaddr_in);
 
+   /* don't start until DMA started */
+
+   while (!DMAstarted) myGpioDelay(1000);
+
+   myGpioDelay(20000); /* let DMA run for a while */
+
    while ((fdC =
       accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c)))
    {
@@ -5484,7 +5540,7 @@ static int initZaps
          PROT_READ|PROT_WRITE,
          MAP_SHARED|MAP_FIXED|MAP_LOCKED|MAP_NORESERVE,
          fdMem,
-         (uint32_t)dmaP[n] | 0x40000000
+         (uint32_t)dmaP[n] | DMA_BUS_CACHE
       );
 
       pageAdr2 += PAGE_SIZE;
@@ -5649,6 +5705,31 @@ static int initDMAblock(int pagemapFd, int block)
    return 0;
 }
 
+#define FLUSH_PAGES 1000
+
+static void flushDMA(void)
+{
+   static int val = 0;
+
+   if (dummy != MAP_FAILED) munmap(dummy, FLUSH_PAGES*PAGE_SIZE);
+
+   dummy = MAP_FAILED;
+
+   dummy = mmap(
+       0, (FLUSH_PAGES*PAGE_SIZE),
+       PROT_READ|PROT_WRITE|PROT_EXEC,
+       MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED,
+       -1, 0);
+
+   if (dummy == MAP_FAILED)
+   {
+      DBG(0, "mmap dummy failed (%m)");
+   }
+   else
+   {
+      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
+   }
+}
 
 /* ----------------------------------------------------------------------- */
 
@@ -5739,8 +5820,6 @@ static int initDMAcbs(void)
 
    for (i=0; i<DMAI_PAGES; i++)
       DBG(DBG_STARTUP, "dmaIPhys[%d]=%08X", i, (uint32_t)dmaIPhys[i]);
-
-   dmaInitCbs();
 
    if (gpioCfg.dbgLevel >= DBG_DMACBS)
    {
@@ -5945,8 +6024,6 @@ static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
                      DMA_PANIC_PRIORITY(8) |
                      DMA_PRIORITY(8)       |
                      DMA_ACTIVATE;
-
-   DMAstarted = 1;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -6390,6 +6467,81 @@ void rawDumpScript(unsigned script_id)
 
 /* ======================================================================= */
 
+void startPi1DMA(void)
+{
+   dmaInitCbs();
+
+   flushDMA();
+
+   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+
+   gpioStats.DMAInits++;
+}
+
+void startPi2DMA(void)
+{
+   int i, running, looped, firstCB, passedFirst;
+
+   for (i=0; i<150; i++)
+   {
+      dmaInitCbs();
+
+      flushDMA();
+   }
+
+   running = 0;
+
+   while (!running)
+   {
+      dmaInitCbs();
+      flushDMA();
+
+      initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+
+      gpioStats.DMAInits++;
+
+      myGpioDelay(20000);
+      i = dmaNowAtICB();
+
+      if (i)
+      {
+         firstCB = i;
+
+         passedFirst = 0;
+
+         looped = 0;
+
+         while (looped < 10)
+         {
+            dmaInitCbs();
+            flushDMA();
+
+            myGpioDelay(1000);
+            i = dmaNowAtICB();
+
+            if (i < firstCB)
+            {
+               if (i)
+               {
+                  if (passedFirst)
+                  {
+                     looped++;
+                     running = 1;
+                     passedFirst = 0;
+                  }
+               }
+               else
+               {
+                  running = 0;
+                  looped = 1000;
+               }
+            }
+            else passedFirst = 1;
+         }
+      }
+   }
+}
+
 int gpioInitialise(void)
 {
    int i;
@@ -6495,10 +6647,16 @@ int gpioInitialise(void)
       pthSocketRunning = 1;
    }
 
-   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+   if (piModel == 1)
+      startPi1DMA();
+   else
+      startPi2DMA();
+
+   DMAstarted = 1;
 
    return PIGPIO_VERSION;
  }
+
 
 /* ----------------------------------------------------------------------- */
 
@@ -6527,7 +6685,10 @@ void gpioTerminate(void)
 
       if (gpioCfg.showStats)
       {
-         fprintf(stderr, "micros=%d\n", gpioCfg.clockMicros);
+         fprintf(stderr,
+            "micros=%d dmaInitCbs=%d DMA inits=%d DMA restarts=%d\n",
+             gpioCfg.clockMicros, gpioStats.dmaInitCbsCount,
+             gpioStats.DMAInits, gpioStats.DMARestarts);
 
          fprintf(stderr, "samples %u maxSamples %u maxEmit %u emitFrags %u\n",
             gpioStats.numSamples, gpioStats.maxSamples,
@@ -8914,10 +9075,13 @@ unsigned gpioHardwareRevision(void)
    FILE * filp;
    char buf[512];
    char term;
+   int chars=4; /* number of chars in revision string */
 
    DBG(DBG_USER, "");
 
    if (rev) return rev;
+
+   piModel = 0;
 
    filp = fopen ("/proc/cpuinfo", "r");
 
@@ -8925,30 +9089,39 @@ unsigned gpioHardwareRevision(void)
    {
       while (fgets(buf, sizeof(buf), filp) != NULL)
       {
-         if (!strncmp("model name", buf, 10))
+         if (piModel == 0)
          {
-            if (strstr (buf, "ARMv6") != NULL)
+            if (!strncasecmp("model name", buf, 10))
             {
-               piModel = 1;
-               PI_PERI_BASE = 0x20000000;
-               DMA_BUS_ADR  = 0x40000000;
-            }
-            else if (strstr (buf, "ARMv7") != NULL)
-            {
-               piModel = 2;
-               PI_PERI_BASE = 0x3F000000;
-               DMA_BUS_ADR  = 0xC0000000;
+               if (strstr (buf, "ARMv6") != NULL)
+               {
+                  piModel = 1;
+                  chars = 4;
+                  PI_PERI_BASE  = 0x20000000;
+                  DMA_BUS_ADR   = 0x40000000;
+                  DMA_BUS_CACHE = 0x40000000;
+               }
+               else if (strstr (buf, "ARMv7") != NULL)
+               {
+                  piModel = 2;
+                  chars = 6;
+                  PI_PERI_BASE  = 0x3F000000;
+                  DMA_BUS_ADR   = 0xC0000000;
+                  DMA_BUS_CACHE = 0x00000000;
+               }
             }
          }
 
-         if (!strncmp("Revision", buf, 8))
+         if (!strncasecmp("revision", buf, 8))
          {
-            if (sscanf(buf+strlen(buf)-5, "%x%c", &rev, &term) == 2)
+            if (sscanf(buf+strlen(buf)-(chars+1),
+               "%x%c", &rev, &term) == 2)
             {
                if (term != '\n') rev = 0;
             }
          }
       }
+
       fclose(filp);
    }
    return rev;
