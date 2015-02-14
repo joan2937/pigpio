@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=28
+VERSION=29
 
 GPIO=4
 
@@ -197,7 +197,7 @@ s=$(pigs m $GPIO w)
 if [[ $s = "" ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
 s=$(pigs wvgo)
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
-sleep 0.1
+sleep 0.2
 s=$(pigs slr $GPIO 100)
 e="15 109 121 32 110 97 109 101 32 105 115 32 106 111 97 110"
 if [[ $s = $e ]]

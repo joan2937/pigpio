@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 28 */
+/* pigpio version 29 */
 
 #include <stdio.h>
 #include <string.h>
@@ -284,8 +284,6 @@ bit 0 READ_LAST_NOT_SET_ERROR
    while (0)
 
 #define PI_PERI_PHYS 0x7E000000
-
-static void *dummy = MAP_FAILED;
 
 static volatile uint32_t piModel = 1;
 
@@ -742,6 +740,8 @@ static volatile uint32_t DMA_BUS_CACHE  = 0x00000000;
 
 #define PI_MASH_MAX_FREQ 23800000
 
+#define FLUSH_PAGES 1024
+
 /* --------------------------------------------------------------- */
 
 typedef void (*callbk_t) ();
@@ -901,7 +901,6 @@ typedef struct
    uint32_t maxSamples;
    uint32_t numSamples;
    uint32_t DMARestarts;
-   uint32_t DMAInits;
    uint32_t dmaInitCbsCount;
 } gpioStats_t;
 
@@ -1209,7 +1208,6 @@ static int  gpioNotifyOpenInBand(int fd);
 static void initHWClk
    (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH);
 static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
-static void flushDMA(void);
 
 
 /* ======================================================================= */
@@ -1390,6 +1388,41 @@ static int myPermit(unsigned gpio)
       return 1;
    else
       return 0;
+}
+
+static void flushMemory(void)
+{
+   static int val = 0;
+
+   void *dummy;
+
+   dummy = mmap(
+       0, (FLUSH_PAGES*PAGE_SIZE),
+       PROT_READ|PROT_WRITE|PROT_EXEC,
+       MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED,
+       -1, 0);
+
+   if (dummy == MAP_FAILED)
+   {
+      DBG(DBG_STARTUP, "mmap dummy failed (%m)");
+   }
+   else
+   {
+      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
+      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
+      munmap(dummy, FLUSH_PAGES*PAGE_SIZE);
+   }
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void waitForDMAstarted(void)
+{
+   while (!DMAstarted)
+   {
+      if (piModel == 1) myGpioDelay(1000);
+      else flushMemory();
+   }
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4408,9 +4441,7 @@ static void * pthAlertThread(void *x)
 
    /* don't start until DMA started */
 
-   while (!DMAstarted) myGpioDelay(1000);
-
-   myGpioDelay(20000); /* let DMA run for a while */
+   waitForDMAstarted();
 
    reportedLevel = gpioReg[GPLEV0];
 
@@ -4432,7 +4463,7 @@ static void * pthAlertThread(void *x)
       {
          if (stopped)
          {
-            DBG(1, "****** GOING ******");
+            DBG(DBG_STARTUP, "****** GOING ******");
             stopped = 0;
          }
       }
@@ -4440,16 +4471,21 @@ static void * pthAlertThread(void *x)
       {
          if (!stopped)
          {
-            DBG(1, "****** STOPPED ******");
+            DBG(DBG_STARTUP, "****** STOPPED ******");
             stopped = 1;
          }
-         dmaInitCbs();
-         flushDMA();
-         myGpioDelay(5000); /* let DMA run for a while */
-         initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
-         myGpioDelay(5000); /* let DMA run for a while */
-         oldSlot = 0;
-         gpioStats.DMARestarts++;
+
+         myGpioDelay(5000);
+
+         if (DMAstarted)
+         {
+            dmaInitCbs();
+            flushMemory();
+            initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+            myGpioDelay(5000); /* let DMA run for a while */
+            oldSlot = dmaCurrentSlot(dmaNowAtICB());
+            gpioStats.DMARestarts++;
+         }
       }
 
       gpioStats.alertTicks++;
@@ -5206,10 +5242,7 @@ static void * pthFifoThread(void *x)
 
    /* don't start until DMA started */
 
-   while (!DMAstarted) myGpioDelay(1000);
-
-   myGpioDelay(20000); /* let DMA run for a while */
-
+   waitForDMAstarted();
 
    while (1)
    {
@@ -5434,9 +5467,7 @@ static void * pthSocketThread(void *x)
 
    /* don't start until DMA started */
 
-   while (!DMAstarted) myGpioDelay(1000);
-
-   myGpioDelay(20000); /* let DMA run for a while */
+   waitForDMAstarted();
 
    while ((fdC =
       accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c)))
@@ -5672,6 +5703,10 @@ static int initDMAblock(int pagemapFd, int block)
 
    memset((void *)dmaBloc[block], 0, (PAGES_PER_BLOCK*PAGE_SIZE));
 
+   memset((void *)dmaBloc[block], 0xFF, (PAGES_PER_BLOCK*PAGE_SIZE));
+
+   memset((void *)dmaBloc[block], 0, (PAGES_PER_BLOCK*PAGE_SIZE));
+
    pageNum = block * PAGES_PER_BLOCK;
 
    dmaVirt[pageNum] = mmap(
@@ -5703,32 +5738,6 @@ static int initDMAblock(int pagemapFd, int block)
    if (!ok) SOFT_ERROR(PI_INIT_FAILED, "initZaps failed");
 
    return 0;
-}
-
-#define FLUSH_PAGES 1000
-
-static void flushDMA(void)
-{
-   static int val = 0;
-
-   if (dummy != MAP_FAILED) munmap(dummy, FLUSH_PAGES*PAGE_SIZE);
-
-   dummy = MAP_FAILED;
-
-   dummy = mmap(
-       0, (FLUSH_PAGES*PAGE_SIZE),
-       PROT_READ|PROT_WRITE|PROT_EXEC,
-       MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED,
-       -1, 0);
-
-   if (dummy == MAP_FAILED)
-   {
-      DBG(0, "mmap dummy failed (%m)");
-   }
-   else
-   {
-      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
-   }
 }
 
 /* ----------------------------------------------------------------------- */
@@ -5985,7 +5994,6 @@ static void initClock(int mainClock)
 
    clkSrc  = CLK_CTL_SRC_PLLD;
    clkDivI = 50 * micros; /* 10      MHz - 1      MHz */
-   //if (!mainClock) clkDivI = 40 * micros;
    clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
    clkDivF = 0;
    clkMash = 0;
@@ -6467,81 +6475,6 @@ void rawDumpScript(unsigned script_id)
 
 /* ======================================================================= */
 
-void startPi1DMA(void)
-{
-   dmaInitCbs();
-
-   flushDMA();
-
-   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
-
-   gpioStats.DMAInits++;
-}
-
-void startPi2DMA(void)
-{
-   int i, running, looped, firstCB, passedFirst;
-
-   for (i=0; i<150; i++)
-   {
-      dmaInitCbs();
-
-      flushDMA();
-   }
-
-   running = 0;
-
-   while (!running)
-   {
-      dmaInitCbs();
-      flushDMA();
-
-      initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
-
-      gpioStats.DMAInits++;
-
-      myGpioDelay(20000);
-      i = dmaNowAtICB();
-
-      if (i)
-      {
-         firstCB = i;
-
-         passedFirst = 0;
-
-         looped = 0;
-
-         while (looped < 10)
-         {
-            dmaInitCbs();
-            flushDMA();
-
-            myGpioDelay(1000);
-            i = dmaNowAtICB();
-
-            if (i < firstCB)
-            {
-               if (i)
-               {
-                  if (passedFirst)
-                  {
-                     looped++;
-                     running = 1;
-                     passedFirst = 0;
-                  }
-               }
-               else
-               {
-                  running = 0;
-                  looped = 1000;
-               }
-            }
-            else passedFirst = 1;
-         }
-      }
-   }
-}
-
 int gpioInitialise(void)
 {
    int i;
@@ -6647,10 +6580,15 @@ int gpioInitialise(void)
       pthSocketRunning = 1;
    }
 
-   if (piModel == 1)
-      startPi1DMA();
-   else
-      startPi2DMA();
+   myGpioDelay(10000);
+
+   dmaInitCbs();
+
+   flushMemory();
+
+   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+
+   myGpioDelay(20000);
 
    DMAstarted = 1;
 
@@ -6672,23 +6610,19 @@ void gpioTerminate(void)
    {
       /* reset DMA */
 
+      DMAstarted = 0;
+
       dmaIn[DMA_CS] = DMA_CHANNEL_RESET;
       dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
 
-      /* reset PWM */
-
-      pwmReg[PWM_CTL] = 0;
-
       libInitialised = 0;
-
-      DMAstarted = 0;
 
       if (gpioCfg.showStats)
       {
          fprintf(stderr,
-            "micros=%d dmaInitCbs=%d DMA inits=%d DMA restarts=%d\n",
+            "micros=%d dmaInitCbs=%d DMA restarts=%d\n",
              gpioCfg.clockMicros, gpioStats.dmaInitCbsCount,
-             gpioStats.DMAInits, gpioStats.DMARestarts);
+             gpioStats.DMARestarts);
 
          fprintf(stderr, "samples %u maxSamples %u maxEmit %u emitFrags %u\n",
             gpioStats.numSamples, gpioStats.maxSamples,
