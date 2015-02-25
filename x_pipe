@@ -1,7 +1,5 @@
 #!/bin/bash
 
-VERSION=29
-
 GPIO=4
 
 #
@@ -19,6 +17,12 @@ GPIO=4
 # Repeated failures on the same test or many failures in a group
 # of tests indicate a problem.
 #
+
+echo "Testing pipe I/F"
+
+echo "pigpv" >/dev/pigpio
+read -t 1 s </dev/pigout
+echo "pigpio version $s"
 
 echo "bc1 0" >/dev/pigpio
 read -t 1 s </dev/pigout
@@ -122,10 +126,6 @@ if [[ $s = 10 ]]; then echo "PFS-a ok"; else echo "PFS-a fail ($s)"; fi
 echo "pfs $GPIO 800" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
-
-echo "pigpv" >/dev/pigpio
-read -t 1 s </dev/pigout
-if [[ $s = $VERSION ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 echo "prs $GPIO 255" >/dev/pigpio
 read -t 1 s </dev/pigout

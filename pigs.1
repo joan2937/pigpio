@@ -236,7 +236,7 @@ will be returned.
 .br
 
 .EX
-$ pigs bc2 0x8000 # clear gpio 47 (activity LED on B+)
+$ pigs bc2 0x8000 # clear gpio 47 (activity LED on A+/B+/Pi2)
 .br
 
 .br
@@ -336,7 +336,7 @@ will be returned.
 .br
 
 .EX
-$ pigs bs2 0x40 # set gpio 38 (enable high current mode B+)
+$ pigs bs2 0x40 # set gpio 38 (enable high current mode A+/B+/Pi2)
 .br
 
 .br
@@ -348,6 +348,26 @@ ERROR: no permission to update one or more gpios
 .br
 
 .EE
+
+.br
+
+.IP "\fBCF1 uvs\fP - Custom function 1"
+.IP "" 4
+
+.br
+This command calls a user customised function.  The meaning of
+any paramaters and the returned value is defined by the
+customiser.
+
+.br
+
+.IP "\fBCF2 uvs\fP - Custom function 2"
+.IP "" 4
+
+.br
+This command calls a user customised function.  The meaning of
+any paramaters and the returned value is defined by the
+customiser.
 
 .br
 
@@ -363,10 +383,15 @@ status code will be returned.
 
 .br
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see \fBPRG\fP).  If a hardware clock is active on
-the gpio the reported dutycycle will be 500 (out of 1000).
+for the gpio (see \fBPRG\fP).
+
+.br
+If a hardware clock is active on the gpio the reported
+dutycycle will be 500000 (500k) out of 1000000 (1M).
+
+.br
 If hardware PWM is active on the gpio the reported dutycycle
-will be out of a 1000.
+will be out of a 1000000 (1M).
 
 .br
 
@@ -452,7 +477,7 @@ $ pigs help
 .IP "\fBHC g cf\fP - Set hardware clock frequency"
 .IP "" 4
 This command sets the hardware clock associated with gpio \fBg\fP to
-frequency \fBcf\fP.
+frequency \fBcf\fP. Frequencies above 30MHz are unlikely to work.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -488,10 +513,10 @@ The gpio must be one of the following.
 
 .EX
 4   clock 0  All models
-5   clock 1  A+/B+ and compute module only (reserved for system use)
-6   clock 2  A+/B+ and compute module only
-20  clock 0  A+/B+ and compute module only
-21  clock 1  All models but Rev.2 B (reserved for system use)
+5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2 and compute module only
+20  clock 0  A+/B+/Pi2 and compute module only
+21  clock 1  All models but Type 2 B (reserved for system use)
 
 .EE
 
@@ -516,7 +541,8 @@ with the gpio number.
 .IP "\fBHP g pf pdc\fP - Set hardware PWM frequency and dutycycle"
 .IP "" 4
 This command sets the hardware PWM associated with gpio \fBg\fP to
-frequency \fBpf\fP with dutycycle \fBpdc\fP.
+frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
+are unlikely to work.
 
 .br
 NOTE: Any waveform started by \fBWVGO\fP, \fBWVGOR\fP, \fBWVTX\fP or
@@ -534,28 +560,27 @@ will be returned.
 .br
 
 .EX
-$ pigs hp 18 100 4000 # 80% dutycycle
+$ pigs hp 18 100 800000 # 80% dutycycle
 .br
 
 .br
-$ pigs hp 19 100 1000 # 20% dutycycle
+$ pigs hp 19 100 200000 # 20% dutycycle
 .br
 
 .br
-$ pigs hp 19 1 100
+$ pigs hp 19 125000001 100000
 .br
 -96
 .br
-ERROR: hardware PWM frequency not 5-50K
+ERROR: hardware PWM frequency not 1-125M
 .br
 
 .EE
 
 .br
-Both PWM channels share the same clock and the same update frequency.
-The latest frequency setting will be used by both PWM channels. The
-same PWM channel is available on multiple gpios.  The latest
-dutycycle setting will be used by all gpios which share a PWM channel.
+The same PWM channel is available on multiple gpios.  The latest
+frequency and dutycycle setting will be used by all gpios which
+share a PWM channel.
 
 .br
 The gpio must be one of the following.
@@ -563,10 +588,10 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+ and compute module only
-13  PWM channel 1  A+/B+ and compute module only
+12  PWM channel 0  A+/B+/Pi2 and compute module only
+13  PWM channel 1  A+/B+/Pi2 and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+ and compute module only
+19  PWM channel 1  A+/B+/Pi2 and compute module only
 
 .EE
 
@@ -588,7 +613,7 @@ The gpio must be one of the following.
 This command returns the hardware revision of the Pi.
 
 .br
-The hardware revision is found in the last 4 characters on the Revision
+The hardware revision is found in the last 4 characters on the Type sion
 line of /proc/cpuinfo.
 
 .br
@@ -596,22 +621,11 @@ If the hardware revision can not be found or is not a valid hexadecimal
 number the command returns 0.
 
 .br
-The revision number can be used to determine the assignment of gpios to pins.
+The revision number can be used to determine the assignment of gpios
+to pins (see \fBg\fP).
 
 .br
 There are currently three types of board.
-
-.br
-Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13.
-
-.br
-Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13, and
-gpios 28-31 on P5.
-
-.br
-Type 3 has a 40 pin connector rather than the 26 pin connector of
-the earlier boards.  Gpios 0 to 27 are brought out to the connector
-(although gpios 0 and 1 are reserved).
 
 .br
 Type 1 boards have hardware revision numbers of 2 and 3.
@@ -620,7 +634,7 @@ Type 1 boards have hardware revision numbers of 2 and 3.
 Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
 
 .br
-Type 3 boards have hardware revision number 16.
+Type 3 boards have hardware revision numbers of 16 or greater.
 
 .br
 for "Revision : 0002" the command returns 2.
@@ -1491,8 +1505,13 @@ status code will be returned.
 
 .br
 For normal PWM the frequency will be that defined for the gpio
-by \fBPFS\fP.  If a hardware clock is active on the gpio
-the reported frequency will be that set by \fBHC\fP.
+by \fBPFS\fP.
+
+.br
+If a hardware clock is active on the gpio the reported frequency
+will be that set by \fBHC\fP.
+
+.br
 If hardware PWM is active on the gpio the reported frequency
 will be that set by \fBHP\fP.
 
@@ -1626,7 +1645,7 @@ will be returned.
 
 .br
 If a hardware clock or hardware PWM is active on the gpio the reported
-range will be 1000.
+range will be 1000000 (1M).
 
 .br
 
@@ -1857,12 +1876,15 @@ ERROR: unknown script id
 This command returns the real underlying range used by gpio \fBu\fP.
 
 .br
-If a hardware clock or hardware PWM is active on the gpio the
-reported range will be 1000.
+If a hardware clock is active on the gpio the reported
+real range will be 1000000 (1M).
 
 .br
-Upon success the real range is returned.  On error a negative status code
-will be returned.
+If hardware PWM is active on the gpio the reported real range
+will be approximately 250M divided by the set PWM frequency.
+
+.br
+On error a negative status code will be returned.
 
 .br
 See \fBPRS\fP.
@@ -2412,7 +2434,7 @@ may be used to modify the default behaviour of 4-wire operation,
 mode 0, active low chip select.
 
 .br
-An auxiliary SPI device is available on the B+ and may be
+An auxiliary SPI device is available on the A+/B+/Pi2 and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -2431,6 +2453,9 @@ The flags consists of the least significant 22 bits.
 
 .br
 mm defines the SPI mode.
+
+.br
+Warning:  modes 1 and 3 do not appear to work on the auxiliary device.
 
 .br
 
@@ -2456,7 +2481,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the B+.
+auxiliary device is only present on the A+/B+/Pi2.
 
 .br
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
@@ -3334,8 +3359,11 @@ Bank 2 consists of gpio32 through gpio53.
 
 .br
 All the gpios which are safe for the user to read and write are in bank 1.
-Not all gpios in bank 1 are safe though. Rev.1 boards have 17 safe gpios.
-Rev.2 boards have 21. Rev.3 boards have 26.
+Not all gpios in bank 1 are safe though. Type 1 boards have 17 safe gpios.
+Type 2 boards have 21. Type 3 boards have 26.
+
+.br
+See \fBHWVER\fP.
 
 .br
 The user gpios are marked with an X in the following table.
@@ -3343,15 +3371,15 @@ The user gpios are marked with an X in the following table.
 .br
 
 .EX
-         0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-Rev.1    X  X  -  -  X  -  -  X  X  X  X  X  -  -  X  X
-Rev.2    -  -  X  X  X  -  -  X  X  X  X  X  -  -  X  X
-Rev.3          X  X  X  X  X  X  X  X  X  X  X  X  X  X
-                                                     
-        16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
-Rev.1    -  X  X  -  -  X  X  X  X  X  -  -  -  -  -  -
-Rev.2    -  X  X  -  -  -  X  X  X  X  -  X  X  X  X  X
-Rev.3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
+          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+Type 1    X  X  -  -  X  -  -  X  X  X  X  X  -  -  X  X
+Type 2    -  -  X  X  X  -  -  X  X  X  X  X  -  -  X  X
+Type 3          X  X  X  X  X  X  X  X  X  X  X  X  X  X
+                                                      
+         16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+Type 1    -  X  X  -  -  X  X  X  X  X  -  -  -  -  -  -
+Type 2    -  X  X  -  -  -  X  X  X  X  -  X  X  X  X  X
+Type 3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
 
 .EE
 
@@ -3466,17 +3494,17 @@ The command expects 0 to 10 numbers as parameters to be passed to the script.
 
 .br
 
-.IP "\fBpdc\fP - hardware PWM dutycycle (0-1000)" 0
+.IP "\fBpdc\fP - hardware PWM dutycycle (0-1000000)" 0
 The command expects a dutycycle.
 
 .br
 
-.IP "\fBpf\fP - hardware PWM frequency (5-250K)" 0
+.IP "\fBpf\fP - hardware PWM frequency (1-125M)" 0
 The command expects a frequency.
 
 .br
 
-.IP "\fBpl\fP - pulse length (1-50)" 0
+.IP "\fBpl\fP - pulse length (1-100)" 0
 The command expects a pulse length in microseconds.
 
 .br
@@ -3542,6 +3570,12 @@ are only used on safe gpios.
 
 .br
 See \fBg\fP
+
+.br
+
+.IP "\fBuvs\fP - values" 0
+The command expects an arbitrary number of >=0 values (possibly none).
+Any after the first two must be <= 255.
 
 .br
 
@@ -3766,7 +3800,8 @@ Each script has
 .br
 .SS Commands
 .br
-All the normal pigs commands may be used within a script.
+All the normal pigs commands may be used within a script.  However
+commands which return more than an integer will be of little use.
 
 .br
 The following commands are only legal within a script.

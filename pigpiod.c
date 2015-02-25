@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 24+
+This version is for pigpio version 30+
 */
 
 #include <sys/types.h>
@@ -56,6 +56,7 @@ static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
+static unsigned memAllocMode           = PI_DEFAULT_MEM_ALLOC_MODE;
 static uint64_t updateMask             = -1;
 
 static int updateMaskSet = 0;
@@ -82,6 +83,7 @@ void usage()
 {
    fprintf(stderr, "\n" \
       "Usage: sudo pigpiod [OPTION] ...\n" \
+      "   -a value, DMA mode, 0=AUTO, 1=PMAP, 2=MBOX,   default AUTO\n" \
       "   -b value, gpio sample buffer in milliseconds, default 120\n" \
       "   -d value, primary DMA channel, 0-14,          default 14\n" \
       "   -e value, secondary DMA channel, 0-6,         default 5\n" \
@@ -104,12 +106,19 @@ static void initOpts(int argc, char *argv[])
    uint64_t mask;
    char * endptr;
 
-   while ((opt = getopt(argc, argv, "b:d:e:fkp:s:t:x:")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:d:e:fkp:s:t:x:")) != -1)
    {
       i = -1;
 
       switch (opt)
       {
+         case 'a':
+            i = atoi(optarg);
+            if ((i >= PI_MEM_ALLOC_AUTO) && (i <= PI_MEM_ALLOC_MAILBOX))
+               memAllocMode = i;
+            else fatal("invalid -a option (%d)", i);
+            break;
+
          case 'b':
             i = atoi(optarg);
             if ((i >= PI_BUF_MILLIS_MIN) && (i <= PI_BUF_MILLIS_MAX))
@@ -259,6 +268,8 @@ int main(int argc, char **argv)
    gpioCfgDMAchannels(DMAprimaryChannel, DMAsecondaryChannel);
 
    gpioCfgSocketPort(socketPort);
+
+   gpioCfgMemAlloc(memAllocMode);
 
    if (updateMaskSet) gpioCfgPermissions(updateMask);
 

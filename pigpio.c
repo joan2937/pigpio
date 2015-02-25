@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 29 */
+/* pigpio version 30 */
 
 #include <stdio.h>
 #include <string.h>
@@ -283,23 +283,23 @@ bit 0 READ_LAST_NOT_SET_ERROR
    }                                                               \
    while (0)
 
-#define PI_PERI_PHYS 0x7E000000
-
 static volatile uint32_t piModel = 1;
 
-static volatile uint32_t PI_PERI_BASE   = 0x20000000;
-static volatile uint32_t DMA_BUS_ADR    = 0x40000000;
-static volatile uint32_t DMA_BUS_CACHE  = 0x00000000;
+#define PI_PERI_BUS 0x7E000000
 
-#define AUX_BASE   (PI_PERI_BASE + 0x00215000)
-#define CLK_BASE   (PI_PERI_BASE + 0x00101000)
-#define DMA_BASE   (PI_PERI_BASE + 0x00007000)
-#define DMA15_BASE (PI_PERI_BASE + 0x00E05000)
-#define GPIO_BASE  (PI_PERI_BASE + 0x00200000)
-#define PCM_BASE   (PI_PERI_BASE + 0x00203000)
-#define PWM_BASE   (PI_PERI_BASE + 0x0020C000)
-#define SPI_BASE   (PI_PERI_BASE + 0x00204000)
-#define SYST_BASE  (PI_PERI_BASE + 0x00003000)
+static volatile uint32_t pi_peri_phys = 0x20000000;
+static volatile uint32_t pi_dram_bus  = 0x40000000;
+static volatile uint32_t pi_mem_flag  = 0x00000004;
+
+#define AUX_BASE   (pi_peri_phys + 0x00215000)
+#define CLK_BASE   (pi_peri_phys + 0x00101000)
+#define DMA_BASE   (pi_peri_phys + 0x00007000)
+#define DMA15_BASE (pi_peri_phys + 0x00E05000)
+#define GPIO_BASE  (pi_peri_phys + 0x00200000)
+#define PCM_BASE   (pi_peri_phys + 0x00203000)
+#define PWM_BASE   (pi_peri_phys + 0x0020C000)
+#define SPI_BASE   (pi_peri_phys + 0x00204000)
+#define SYST_BASE  (pi_peri_phys + 0x00003000)
 
 #define AUX_LEN   0xD8
 #define CLK_LEN   0xA8
@@ -742,6 +742,22 @@ static volatile uint32_t DMA_BUS_CACHE  = 0x00000000;
 
 #define FLUSH_PAGES 1024
 
+#define MB_DEV_MAJOR 100
+
+#define MB_IOCTL _IOWR(MB_DEV_MAJOR, 0, char *)
+
+#define MB_DEV "/dev/pigpio-mb"
+
+#define BUS_TO_PHYS(x) ((x)&~0xC0000000)
+
+#define MB_END_TAG 0
+#define MB_PROCESS_REQUEST 0
+
+#define MB_ALLOCATE_MEMORY_TAG 0x3000C
+#define MB_LOCK_MEMORY_TAG     0x3000D
+#define MB_UNLOCK_MEMORY_TAG   0x3000E
+#define MB_RELEASE_MEMORY_TAG  0x3000F
+
 /* --------------------------------------------------------------- */
 
 typedef void (*callbk_t) ();
@@ -915,6 +931,7 @@ typedef struct
    unsigned ifFlags;
    int      dbgLevel;
    unsigned showStats;
+   unsigned memAllocMode;
 } gpioCfg_t;
 
 typedef struct
@@ -973,6 +990,14 @@ typedef struct
    unsigned clock;
 } clkInf_t;
 
+typedef struct
+{
+   unsigned  handle;        /* mbAllocateMemory() */
+   uintptr_t bus_addr;      /* mbLockMemory() */
+   uintptr_t *virtual_addr; /* mbMapMem() */
+   unsigned  size;          /* in bytes */
+} DMAMem_t;
+
 /* --------------------------------------------------------------- */
 
 /* initialise once then preserve */
@@ -988,6 +1013,7 @@ static volatile gpioCfg_t gpioCfg =
    PI_DEFAULT_IF_FLAGS,
    0,
    0,
+   PI_DEFAULT_MEM_ALLOC_MODE,
 };
 
 static volatile gpioStats_t gpioStats;
@@ -1081,16 +1107,19 @@ static FILE * outFifo = NULL;
 static int fdLock = -1;
 static int fdMem  = -1;
 static int fdSock = -1;
+static int fdPmap = -1;
+static int fdMbox = -1;
 
-static dmaPage_t * * dmaBloc = MAP_FAILED;
+static DMAMem_t *dmaMboxBlk = MAP_FAILED;
+static uintptr_t * * dmaPMapBlk = MAP_FAILED;
 static dmaPage_t * * dmaVirt = MAP_FAILED;
-static dmaPage_t * * dmaPhys = MAP_FAILED;
+static dmaPage_t * * dmaBus = MAP_FAILED;
 
 static dmaIPage_t * * dmaIVirt = MAP_FAILED;
-static dmaIPage_t * * dmaIPhys = MAP_FAILED;
+static dmaIPage_t * * dmaIBus = MAP_FAILED;
 
 static dmaOPage_t * * dmaOVirt = MAP_FAILED;
-static dmaOPage_t * * dmaOPhys = MAP_FAILED;
+static dmaOPage_t * * dmaOBus = MAP_FAILED;
 
 static volatile uint32_t * auxReg  = MAP_FAILED;
 static volatile uint32_t * clkReg  = MAP_FAILED;
@@ -1161,6 +1190,7 @@ uint8_t clkDef[PI_MAX_GPIO + 1] =
 
 uint32_t hw_pwm_freq[2];
 uint32_t hw_pwm_duty[2];
+uint32_t hw_pwm_real_range[2];
 
 uint8_t PWMDef[PI_MAX_GPIO + 1] =
 {
@@ -1337,8 +1367,6 @@ static void myOffPageSlot(int pos, int * page, int * slot)
 
 static void myLvsPageSlot(int pos, int * page, int * slot)
 {
-//   *page = pos%DMAI_PAGES;
-//   *slot = pos/DMAI_PAGES;
    *page = pos/LVS_PER_IPAGE;
    *slot = pos%LVS_PER_IPAGE;
 }
@@ -1347,8 +1375,6 @@ static void myLvsPageSlot(int pos, int * page, int * slot)
 
 static void myTckPageSlot(int pos, int * page, int * slot)
 {
-//   *page = pos%DMAI_PAGES;
-//   *slot = pos/DMAI_PAGES;
    *page = pos/TCK_PER_IPAGE;
    *slot = pos%TCK_PER_IPAGE;
 }
@@ -2080,6 +2106,159 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 
 /* ======================================================================= */
 
+/*
+https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+*/
+
+int mbCreate(void)
+{
+   /* <0 error */
+
+   unlink(MB_DEV);
+
+   return mknod(MB_DEV, S_IFCHR|0600, makedev(MB_DEV_MAJOR, 0));
+}
+
+int mbOpen(void)
+{
+   /* <0 error */
+
+   return open(MB_DEV, 0);
+}
+
+void mbClose(int fd)
+{
+   close(fd);
+}
+
+static int mbProperty(int fd, void *buf)
+{
+   return ioctl(fd, MB_IOCTL, buf);
+}
+
+unsigned mbAllocateMemory(
+   int fd, unsigned size, unsigned align, unsigned flags)
+{
+   int i=1;
+   unsigned p[32];
+
+   p[i++] = MB_PROCESS_REQUEST;
+   p[i++] = MB_ALLOCATE_MEMORY_TAG;
+   p[i++] = 12;
+   p[i++] = 12;
+   p[i++] = size;
+   p[i++] = align;
+   p[i++] = flags;
+   p[i++] = MB_END_TAG;
+   p[0] = i*sizeof *p;
+
+   mbProperty(fd, p);
+
+   return p[5];
+}
+
+unsigned mbLockMemory(int fd, unsigned handle)
+{
+   int i=1;
+   unsigned p[32];
+
+   p[i++] = MB_PROCESS_REQUEST;
+   p[i++] = MB_LOCK_MEMORY_TAG;
+   p[i++] = 4;
+   p[i++] = 4;
+   p[i++] = handle;
+   p[i++] = MB_END_TAG;
+   p[0] = i*sizeof *p;
+
+   mbProperty(fd, p);
+
+   return p[5];
+}
+
+unsigned mbUnlockMemory(int fd, unsigned handle)
+{
+   int i=1;
+   unsigned p[32];
+
+   p[i++] = MB_PROCESS_REQUEST;
+   p[i++] = MB_UNLOCK_MEMORY_TAG;
+   p[i++] = 4;
+   p[i++] = 4;
+   p[i++] = handle;
+   p[i++] = MB_END_TAG;
+   p[0] = i*sizeof *p;
+
+   mbProperty(fd, p);
+
+   return p[5];
+}
+
+unsigned mbReleaseMemory(int fd, unsigned handle)
+{
+   int i=1;
+   unsigned p[32];
+
+   p[i++] = MB_PROCESS_REQUEST;
+   p[i++] = MB_RELEASE_MEMORY_TAG;
+   p[i++] = 4;
+   p[i++] = 4;
+   p[i++] = handle;
+   p[i++] = MB_END_TAG;
+   p[0] = i*sizeof *p;
+
+   mbProperty(fd, p);
+
+   return p[5];
+}
+
+void *mbMapMem(unsigned base, unsigned size)
+{
+   void *mem = MAP_FAILED;
+
+   mem = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fdMem, base);
+
+   return mem;
+}
+
+int mbUnmapMem(void *addr, unsigned size)
+{
+   /* 0 okay, -1 fail */
+   return munmap(addr, size);
+}
+
+void mbDMAFree(DMAMem_t *DMAMemP)
+{
+   if (DMAMemP->handle)
+   {
+      mbUnmapMem(DMAMemP->virtual_addr, DMAMemP->size);
+      mbUnlockMemory(fdMbox, DMAMemP->handle);
+      mbReleaseMemory(fdMbox, DMAMemP->handle);
+      DMAMemP->handle = 0;
+   }
+}
+
+int mbDMAAlloc(DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
+{
+   DMAMemP->size = size;
+
+   DMAMemP->handle =
+      mbAllocateMemory(fdMbox, size, PAGE_SIZE, pi_mem_flag);
+
+   if (DMAMemP->handle)
+   {
+      DMAMemP->bus_addr = mbLockMemory(fdMbox, DMAMemP->handle);
+
+      DMAMemP->virtual_addr =
+         mbMapMem(BUS_TO_PHYS(DMAMemP->bus_addr), size);
+
+      return 1;
+   }
+   return 0;
+}
+
+
+/* ======================================================================= */
+
 rawCbs_t * rawWaveCBAdr(int cbNum)
 {
    int page, slot;
@@ -2100,7 +2279,7 @@ static uint32_t waveCbPOadr(int pos)
    page = pos/CBS_PER_OPAGE;
    slot = pos%CBS_PER_OPAGE;
 
-   return (uint32_t) &dmaOPhys[page]->cb[slot];
+   return (uint32_t) &dmaOBus[page]->cb[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -2131,7 +2310,7 @@ static uint32_t waveOOLPOadr(int pos)
 
    waveOOLPageSlot(pos, &page, &slot);
 
-   return (uint32_t) &dmaOPhys[page]->OOL[slot];
+   return (uint32_t) &dmaOBus[page]->OOL[slot];
 }
 
 
@@ -2224,19 +2403,19 @@ static int wave2Cbs(unsigned wave_mode)
       p->info   = NORMAL_DMA |
                   DMA_DEST_DREQ |
                   DMA_PERIPHERAL_MAPPING(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
    }
    else
    {
       p->info   = NORMAL_DMA |
                   DMA_DEST_DREQ |
                   DMA_PERIPHERAL_MAPPING(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
    }
 
-   p->src    = (uint32_t) (&dmaOPhys[0]->periphData) | DMA_BUS_ADR;
+   p->src    = (uint32_t) (&dmaOBus[0]->periphData);
    p->length = 4 * 20 / PI_WF_MICROS; /* 20 micros delay */
-   p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+   p->next   = waveCbPOadr(botCB);
 
    repeatCB = botCB;
 
@@ -2251,10 +2430,10 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = waveOOLPOadr(botOOL++) | DMA_BUS_ADR;
-         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_PHYS;
+         p->src    = waveOOLPOadr(botOOL++);
+         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
          p->length = 4;
-         p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+         p->next   = waveCbPOadr(botCB);
       }
 
       if (waves[i].gpioOff)
@@ -2266,10 +2445,10 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = waveOOLPOadr(botOOL++) | DMA_BUS_ADR;
-         p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_PHYS;
+         p->src    = waveOOLPOadr(botOOL++);
+         p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_BUS;
          p->length = 4;
-         p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+         p->next   = waveCbPOadr(botCB);
       }
 
       if (waves[i].flags & WAVE_FLAG_READ)
@@ -2279,10 +2458,10 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_PHYS;
-         p->dst    = waveOOLPOadr(--topOOL) | DMA_BUS_ADR;
+         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_BUS;
+         p->dst    = waveOOLPOadr(--topOOL);
          p->length = 4;
-         p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+         p->next   = waveCbPOadr(botCB);
       }
 
       if (waves[i].flags & WAVE_FLAG_TICK)
@@ -2292,10 +2471,10 @@ static int wave2Cbs(unsigned wave_mode)
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
-         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_PHYS;
-         p->dst    = waveOOLPOadr(--topOOL) | DMA_BUS_ADR;
+         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_BUS;
+         p->dst    = waveOOLPOadr(--topOOL);
          p->length = 4;
-         p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+         p->next   = waveCbPOadr(botCB);
       }
 
       if (waves[i].flags & WAVE_FLAG_COUNT)
@@ -2304,7 +2483,7 @@ static int wave2Cbs(unsigned wave_mode)
 
          baseCB = botCB;
 
-         def_next = waveCbPOadr(baseCB+(3*PI_WAVE_COUNT_BLOCKS)) | DMA_BUS_ADR;
+         def_next = waveCbPOadr(baseCB+(3*PI_WAVE_COUNT_BLOCKS));
 
          /* set up all the OOLs */
          for (b=0; b < (PI_WAVE_COUNT_BLOCKS*(PI_WAVE_COUNT_LENGTH+1)); b++)
@@ -2312,7 +2491,7 @@ static int wave2Cbs(unsigned wave_mode)
 
          for (b=0; b<PI_WAVE_COUNT_BLOCKS; b++)
             rawWaveSetIn( (b*(PI_WAVE_COUNT_LENGTH+1))+1,
-               waveCbPOadr (baseCB+((b*PI_WAVE_COUNT_BLOCKS)+3)) | DMA_BUS_ADR);
+               waveCbPOadr (baseCB+((b*PI_WAVE_COUNT_BLOCKS)+3)));
 
          rawWaveSetIn
             (((PI_WAVE_COUNT_BLOCKS-1)*(PI_WAVE_COUNT_LENGTH+1))+7, 0);
@@ -2326,11 +2505,11 @@ static int wave2Cbs(unsigned wave_mode)
             p->info = NORMAL_DMA;
 
             p->src = waveOOLPOadr
-               (topOOL-((b+1)*(PI_WAVE_COUNT_LENGTH+1))) | DMA_BUS_ADR;
-            p->dst = (waveCbPOadr(botCB+1) + 20) | DMA_BUS_ADR;
+               (topOOL-((b+1)*(PI_WAVE_COUNT_LENGTH+1)));
+            p->dst = (waveCbPOadr(botCB+1) + 20);
 
             p->length = 4;
-            p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+            p->next   = waveCbPOadr(botCB);
 
             /* copy BOTTOM to TOP */
 
@@ -2339,12 +2518,12 @@ static int wave2Cbs(unsigned wave_mode)
             p->info   = NORMAL_DMA;
 
             p->src = waveOOLPOadr
-               (topOOL-((b+1)*(PI_WAVE_COUNT_LENGTH+1))) | DMA_BUS_ADR;
+               (topOOL-((b+1)*(PI_WAVE_COUNT_LENGTH+1)));
             p->dst = waveOOLPOadr
-               (topOOL-(1+(b*(PI_WAVE_COUNT_LENGTH+1)))) | DMA_BUS_ADR;
+               (topOOL-(1+(b*(PI_WAVE_COUNT_LENGTH+1))));
 
             p->length = 4;
-            p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+            p->next   = waveCbPOadr(botCB);
 
             /* shift all down one */
 
@@ -2353,13 +2532,13 @@ static int wave2Cbs(unsigned wave_mode)
             p->info   = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
 
             p->src = waveOOLPOadr
-               (topOOL-(((b+1)*(PI_WAVE_COUNT_LENGTH+1))-1)) | DMA_BUS_ADR;
+               (topOOL-(((b+1)*(PI_WAVE_COUNT_LENGTH+1))-1));
             p->dst = waveOOLPOadr
-               (topOOL-(((b+1)*(PI_WAVE_COUNT_LENGTH+1))-0)) | DMA_BUS_ADR;
+               (topOOL-(((b+1)*(PI_WAVE_COUNT_LENGTH+1))-0));
 
             p->length = PI_WAVE_COUNT_LENGTH*4;
             p->next   = waveCbPOadr
-               (baseCB+(3*PI_WAVE_COUNT_BLOCKS)) | DMA_BUS_ADR;
+               (baseCB+(3*PI_WAVE_COUNT_BLOCKS));
          }
 
          topOOL -= PI_WAVE_COUNT_BLOCKS * (PI_WAVE_COUNT_LENGTH+1);
@@ -2379,7 +2558,7 @@ static int wave2Cbs(unsigned wave_mode)
                         DMA_DEST_DREQ |
                         DMA_PERIPHERAL_MAPPING(2);
 
-            p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+            p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
          }
          else
          {
@@ -2387,12 +2566,12 @@ static int wave2Cbs(unsigned wave_mode)
                         DMA_DEST_DREQ |
                         DMA_PERIPHERAL_MAPPING(5);
 
-            p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+            p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
          }
 
-         p->src    = (uint32_t) (&dmaOPhys[0]->periphData) | DMA_BUS_ADR;
+         p->src    = (uint32_t) (&dmaOBus[0]->periphData);
          p->length = 4 * ((waves[i].usDelay+half)/PI_WF_MICROS);
-         p->next   = waveCbPOadr(botCB) | DMA_BUS_ADR;
+         p->next   = waveCbPOadr(botCB);
       }
    }
 
@@ -2400,7 +2579,7 @@ static int wave2Cbs(unsigned wave_mode)
    {
       if (wave_mode == PI_WAVE_MODE_ONE_SHOT)
            p->next = 0;
-      else p->next = waveCbPOadr(repeatCB) | DMA_BUS_ADR;
+      else p->next = waveCbPOadr(repeatCB);
    }
 
    status = botCB - waveOutBotCB;
@@ -4003,24 +4182,52 @@ int serDataAvailable(unsigned handle)
 static int chooseBestClock
    (clkInf_t *clkInf, unsigned f, unsigned numc, unsigned *cf)
 {
-   unsigned c;
-   unsigned div, frac, basef, offby, best_offby, valid;
+   int c, valid, offby, offby2, best_offby;
+   uint32_t div;
+   uint64_t frac;
 
    valid = 0;
    best_offby = 0;
 
    for (c=0; c<numc; c++)
    {
-      basef = cf[c];
-      div = basef / f;
-      frac = basef - (div * f);
-      frac = (frac * 4096) / f;
-
-      offby = basef - (div * f) - ((frac * f) / 4096);
+      div = cf[c] / f;
 
       if ((div > 1) && (div < 4096))
       {
-         if ((!valid) || (offby < best_offby))
+         if (f < PI_MASH_MAX_FREQ)
+         {
+            frac = cf[c] - (div * f);
+            frac = (frac * 4096) / f;
+            offby = cf[c] - (div * f) - ((frac * f) / 4096);
+            if (frac < 4095)
+            {
+               offby2 = cf[c] - (div * f) - (((frac+1) * f) / 4096);
+               if (offby2 < 0) offby2 = -offby2;
+               if (offby2 < offby)
+               {
+                  offby = offby2;
+                  frac++;
+               }
+            }
+         }
+         else
+         {
+            frac = 0;
+            offby = cf[c] - (div * f);
+            if (div < 4095)
+            {
+               offby2 = cf[c] - ((div+1) * f);
+               if (offby2 < 0) offby2 = -offby2;
+               if (offby2 < offby)
+               {
+                  offby = offby2;
+                  div++;
+               }
+            }
+         }
+
+         if ((!valid) || (offby <= best_offby))
          {
             valid = 1;
             clkInf->div = div;
@@ -4077,7 +4284,7 @@ static unsigned dmaNowAtICB(void)
 
    while (1)
    {
-      cb = (cbAddr - ((int)dmaIPhys[page] | DMA_BUS_ADR)) / 32;
+      cb = (cbAddr - ((int)dmaIBus[page])) / 32;
 
       if (cb < CBS_PER_IPAGE)
       {
@@ -4120,7 +4327,7 @@ unsigned rawWaveCB(void)
 
    while (1)
    {
-      cb = (cbAddr - ((int)dmaOPhys[page] | DMA_BUS_ADR)) / 32;
+      cb = (cbAddr - ((int)dmaOBus[page])) / 32;
 
       if (cb < CBS_PER_OPAGE)
       {
@@ -4155,7 +4362,7 @@ static unsigned dmaCurrentSlot(unsigned pos)
 
 static uint32_t dmaPwmDataAdr(int pos)
 {
-   return (uint32_t) &dmaIPhys[pos]->periphData;
+   return (uint32_t) &dmaIBus[pos]->periphData;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4167,7 +4374,7 @@ static uint32_t dmaGpioOnAdr(int pos)
    page = pos/ON_PER_IPAGE;
    slot = pos%ON_PER_IPAGE;
 
-   return (uint32_t) &dmaIPhys[page]->gpioOn[slot];
+   return (uint32_t) &dmaIBus[page]->gpioOn[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4178,7 +4385,7 @@ static uint32_t dmaGpioOffAdr(int pos)
 
    myOffPageSlot(pos, &page, &slot);
 
-   return (uint32_t) &dmaIPhys[page]->gpioOff[slot];
+   return (uint32_t) &dmaIBus[page]->gpioOff[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4189,7 +4396,7 @@ static uint32_t dmaTickAdr(int pos)
 
    myTckPageSlot(pos, &page, &slot);
 
-   return (uint32_t) &dmaIPhys[page]->tick[slot];
+   return (uint32_t) &dmaIBus[page]->tick[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4200,7 +4407,7 @@ static uint32_t dmaReadLevelsAdr(int pos)
 
    myLvsPageSlot(pos, &page, &slot);
 
-   return (uint32_t) &dmaIPhys[page]->level[slot];
+   return (uint32_t) &dmaIBus[page]->level[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4212,7 +4419,7 @@ static uint32_t dmaCbAdr(int pos)
    page = (pos/CBS_PER_IPAGE);
    slot = (pos%CBS_PER_IPAGE);
 
-   return (uint32_t) &dmaIPhys[page]->cb[slot];
+   return (uint32_t) &dmaIBus[page]->cb[slot];
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4224,10 +4431,10 @@ static void dmaGpioOnCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = dmaGpioOnAdr(pos) | DMA_BUS_ADR;
-   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_PHYS;
+   p->src    = dmaGpioOnAdr(pos);
+   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
    p->length = 4;
-   p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
+   p->next   = dmaCbAdr(b+1);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4239,10 +4446,10 @@ static void dmaTickCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_PHYS;
-   p->dst    = dmaTickAdr(pos) | DMA_BUS_ADR;
+   p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_BUS;
+   p->dst    = dmaTickAdr(pos);
    p->length = 4;
-   p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
+   p->next   = dmaCbAdr(b+1);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4254,10 +4461,10 @@ static void dmaGpioOffCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = dmaGpioOffAdr(pos) | DMA_BUS_ADR;
-   p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_PHYS;
+   p->src    = dmaGpioOffAdr(pos);
+   p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_BUS;
    p->length = 4;
-   p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
+   p->next   = dmaCbAdr(b+1);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4269,10 +4476,10 @@ static void dmaReadLevelsCb(int b, int pos)
    p = dmaCB2adr(b);
 
    p->info   = NORMAL_DMA;
-   p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_PHYS;
-   p->dst    = dmaReadLevelsAdr(pos) | DMA_BUS_ADR;
+   p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_BUS;
+   p->dst    = dmaReadLevelsAdr(pos);
    p->length = 4;
-   p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
+   p->next   = dmaCbAdr(b+1);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4286,17 +4493,17 @@ static void dmaDelayCb(int b)
    if (gpioCfg.clockPeriph == PI_CLOCK_PCM)
    {
       p->info   = NORMAL_DMA | TIMED_DMA(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
    }
    else
    {
       p->info   = NORMAL_DMA | TIMED_DMA(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_PHYS;
+      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
    }
 
-   p->src    = dmaPwmDataAdr(b%DMAI_PAGES) | DMA_BUS_ADR;
+   p->src    = dmaPwmDataAdr(b%DMAI_PAGES);
    p->length = 4;
-   p->next   = dmaCbAdr(b+1) | DMA_BUS_ADR;
+   p->next   = dmaCbAdr(b+1);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -4338,7 +4545,7 @@ static void dmaInitCbs(void)
 
    p = dmaCB2adr(b);
 
-   p->next = dmaCbAdr(0) | DMA_BUS_ADR;
+   p->next = dmaCbAdr(0);
 
    DBG(DBG_STARTUP, "DMA page type count = %d", sizeof(dmaIPage_t));
 
@@ -4469,19 +4676,19 @@ static void * pthAlertThread(void *x)
       }
       else
       {
-         if (!stopped)
-         {
-            DBG(DBG_STARTUP, "****** STOPPED ******");
-            stopped = 1;
-         }
+         stopped = 1;
 
          myGpioDelay(5000);
 
          if (DMAstarted)
          {
+            /* should never be executed, leave code just in case */
+
+            gpioCfg.showStats = 1;
+
             dmaInitCbs();
             flushMemory();
-            initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
+            initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIBus[0]);
             myGpioDelay(5000); /* let DMA run for a while */
             oldSlot = dmaCurrentSlot(dmaNowAtICB());
             gpioStats.DMARestarts++;
@@ -4544,10 +4751,23 @@ static void * pthAlertThread(void *x)
 
             diff += (TICKSLOTS/2);
 
-            if (diff < 0) gpioStats.diffTick[0]++;
+            if (diff < 0)
+            {
+               /* shouldn't happen */
+
+               gpioCfg.showStats = 1;
+
+               gpioStats.diffTick[0]++;
+            }
 
             else if (diff >= TICKSLOTS)
+            {
+               /* shouldn't happen */
+
+               gpioCfg.showStats = 1;
+
                gpioStats.diffTick[TICKSLOTS-1]++;
+            }
 
             else gpioStats.diffTick[diff]++;
          }
@@ -5524,66 +5744,6 @@ static int initGrabLockFile(void)
 
 /* ----------------------------------------------------------------------- */
 
-static int initZaps
-(
-   int       pmapFd,
-   dmaPage_t *dmaV1,
-   dmaPage_t *dmaV2[],
-   dmaPage_t *dmaP[],
-   int       pages)
-{
-   int n;
-   long index;
-   off_t offset;
-   ssize_t t;
-   int status;
-   uint32_t pageAdr2;
-   unsigned long long pa;
-
-   DBG(DBG_STARTUP, "");
-
-   status = 0;
-
-   pageAdr2 = (uint32_t) dmaV2[0];
-
-   index  = ((uint32_t)dmaV1 / PAGE_SIZE) * 8;
-
-   offset = lseek(pmapFd, index, SEEK_SET);
-
-   if (offset != index)
-      SOFT_ERROR(PI_INIT_FAILED, "lseek pagemap failed (%m)");
-
-   for (n=0; n<pages; n++)
-   {
-      t = read(pmapFd, &pa, sizeof(pa));
-
-      if (t != sizeof(pa))
-         SOFT_ERROR(PI_INIT_FAILED, "read pagemap failed (%m)");
-
-      DBG(DBG_STARTUP, "pf%d=%016llX", n, pa);
-
-      dmaP[n] = (dmaPage_t *) (uint32_t) (PAGE_SIZE * (pa & 0xFFFFFFFF));
-
-      dmaV2[n] = mmap
-      (
-         (void *)pageAdr2,
-         PAGE_SIZE,
-         PROT_READ|PROT_WRITE,
-         MAP_SHARED|MAP_FIXED|MAP_LOCKED|MAP_NORESERVE,
-         fdMem,
-         (uint32_t)dmaP[n] | DMA_BUS_CACHE
-      );
-
-      pageAdr2 += PAGE_SIZE;
-
-      if (dmaP[n] == 0) status = 1;
-   }
-
-   return status;
-}
-
-/* ----------------------------------------------------------------------- */
-
 static uint32_t * initMapMem(int fd, uint32_t addr, uint32_t len)
 {
     return (uint32_t *) mmap(0, len,
@@ -5683,29 +5843,89 @@ static int initPeripherals(void)
 
 /* ----------------------------------------------------------------------- */
 
-static int initDMAblock(int pagemapFd, int block)
+static int initZaps
+   (int  pmapFd, void *virtualBase, int  basePage, int  pages)
+{
+   int n;
+   long index;
+   off_t offset;
+   ssize_t t;
+   uint32_t physical;
+   int status;
+   uint32_t pageAdr;
+   unsigned long long pa;
+
+   DBG(DBG_STARTUP, "");
+
+   status = 0;
+
+   pageAdr = (uint32_t) dmaVirt[basePage];
+
+   index  = ((uint32_t)virtualBase / PAGE_SIZE) * 8;
+
+   offset = lseek(pmapFd, index, SEEK_SET);
+
+   if (offset != index)
+      SOFT_ERROR(PI_INIT_FAILED, "lseek pagemap failed (%m)");
+
+   for (n=0; n<pages; n++)
+   {
+      t = read(pmapFd, &pa, sizeof(pa));
+
+      if (t != sizeof(pa))
+         SOFT_ERROR(PI_INIT_FAILED, "read pagemap failed (%m)");
+
+      DBG(DBG_STARTUP, "pf%d=%016llX", n, pa);
+
+      physical = 0x3FFFFFFF & (PAGE_SIZE * (pa & 0xFFFFFFFF));
+
+      if (physical)
+      {
+         dmaBus[basePage+n] = (dmaPage_t *) (physical | pi_dram_bus);
+
+         dmaVirt[basePage+n] = mmap
+         (
+            (void *)pageAdr,
+            PAGE_SIZE,
+            PROT_READ|PROT_WRITE,
+            MAP_SHARED|MAP_FIXED|MAP_LOCKED|MAP_NORESERVE,
+            fdMem,
+            physical
+         );
+      }
+      else status = 1;
+
+      pageAdr += PAGE_SIZE;
+   }
+
+   return status;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static int initPagemapBlock(int block)
 {
    int trys, ok;
    unsigned pageNum;
 
-   DBG(DBG_STARTUP, "");
+   DBG(DBG_STARTUP, "block=%d", block);
 
-   dmaBloc[block] = mmap(
+   dmaPMapBlk[block] = mmap(
        0, (PAGES_PER_BLOCK*PAGE_SIZE),
        PROT_READ|PROT_WRITE,
        MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED,
        -1, 0);
 
-   if (dmaBloc[block] == MAP_FAILED)
+   if (dmaPMapBlk[block] == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap dma block %d failed (%m)", block);
 
    /* force allocation of physical memory */
 
-   memset((void *)dmaBloc[block], 0, (PAGES_PER_BLOCK*PAGE_SIZE));
+   memset((void *)dmaPMapBlk[block], 0xAA, (PAGES_PER_BLOCK*PAGE_SIZE));
 
-   memset((void *)dmaBloc[block], 0xFF, (PAGES_PER_BLOCK*PAGE_SIZE));
+   memset((void *)dmaPMapBlk[block], 0xFF, (PAGES_PER_BLOCK*PAGE_SIZE));
 
-   memset((void *)dmaBloc[block], 0, (PAGES_PER_BLOCK*PAGE_SIZE));
+   memset((void *)dmaPMapBlk[block], 0, (PAGES_PER_BLOCK*PAGE_SIZE));
 
    pageNum = block * PAGES_PER_BLOCK;
 
@@ -5725,10 +5945,9 @@ static int initDMAblock(int pagemapFd, int block)
 
    while ((trys < 10) && !ok)
    {
-      if (initZaps(pagemapFd,
-                    dmaBloc[block],
-                    &dmaVirt[pageNum],
-                    &dmaPhys[pageNum],
+      if (initZaps(fdPmap,
+                    dmaPMapBlk[block],
+                    pageNum,
                     PAGES_PER_BLOCK) == 0) ok = 1;
       else myGpioDelay(50000);
 
@@ -5740,14 +5959,42 @@ static int initDMAblock(int pagemapFd, int block)
    return 0;
 }
 
+static int initMboxBlock(int block)
+{
+   int n, ok;
+   unsigned page;
+   uintptr_t virtualAdr;
+   uintptr_t busAdr;
+
+   DBG(DBG_STARTUP, "block=%d", block);
+
+   ok = mbDMAAlloc
+      (&dmaMboxBlk[block], PAGES_PER_BLOCK * PAGE_SIZE, pi_mem_flag);
+
+   if (!ok) SOFT_ERROR(PI_INIT_FAILED, "init mbox zaps failed");
+
+   page = block * PAGES_PER_BLOCK;
+
+   virtualAdr = (uintptr_t) dmaMboxBlk[block].virtual_addr;
+   busAdr = dmaMboxBlk[block].bus_addr;
+
+   for (n=0; n<PAGES_PER_BLOCK; n++)
+   {
+      dmaVirt[page+n] = (dmaPage_t *) virtualAdr;
+      dmaBus[page+n] = (dmaPage_t *) busAdr;
+      virtualAdr += PAGE_SIZE;
+      busAdr += PAGE_SIZE;
+   }
+
+   return 0;
+}
+
 /* ----------------------------------------------------------------------- */
 
-static int initDMAcbs(void)
+static int initAllocDMAMem(void)
 {
-   int pid;
-   char str[64];
-   int pagemapFd;
    int i, servoCycles, superCycles;
+   int status;
 
    DBG(DBG_STARTUP, "");
 
@@ -5771,16 +6018,7 @@ static int initDMAcbs(void)
       gpioCfg.bufferMilliseconds, gpioCfg.clockMicros,
       bufferBlocks, bufferCycles);
 
-   /* allocate memory for pointers to virtual and physical pages */
-
-   dmaBloc = mmap(
-       0, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
-       PROT_READ|PROT_WRITE,
-       MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
-       -1, 0);
-
-   if (dmaBloc == MAP_FAILED)
-      SOFT_ERROR(PI_INIT_FAILED, "mmap dma virtual failed (%m)");
+   /* allocate memory for pointers to virtual and bus memory pages */
 
    dmaVirt = mmap(
        0, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
@@ -5791,36 +6029,92 @@ static int initDMAcbs(void)
    if (dmaVirt == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap dma virtual failed (%m)");
 
-   dmaPhys = mmap(
+   dmaBus = mmap(
        0, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
        PROT_READ|PROT_WRITE,
        MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
        -1, 0);
 
-   if (dmaPhys == MAP_FAILED)
-      SOFT_ERROR(PI_INIT_FAILED, "mmap dma physical failed (%m)");
+   if (dmaBus == MAP_FAILED)
+      SOFT_ERROR(PI_INIT_FAILED, "mmap dma bus failed (%m)");
 
-   dmaIPhys = (dmaIPage_t **) dmaPhys;
    dmaIVirt = (dmaIPage_t **) dmaVirt;
+   dmaIBus  = (dmaIPage_t **) dmaBus;
 
-   dmaOPhys = (dmaOPage_t **)(dmaPhys + (PAGES_PER_BLOCK*bufferBlocks));
    dmaOVirt = (dmaOPage_t **)(dmaVirt + (PAGES_PER_BLOCK*bufferBlocks));
+   dmaOBus  = (dmaOPage_t **)(dmaBus  + (PAGES_PER_BLOCK*bufferBlocks));
 
-   pid = getpid();
+   if ((gpioCfg.memAllocMode == PI_MEM_ALLOC_PAGEMAP) ||
+       ((gpioCfg.memAllocMode == PI_MEM_ALLOC_AUTO) &&
+        (gpioCfg.bufferMilliseconds > PI_DEFAULT_BUFFER_MILLIS)))
+   {
+      /* pagemap allocation of DMA memory */
 
-   sprintf(str, "/proc/%d/pagemap", pid);
+      dmaPMapBlk = mmap(
+          0, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
+          PROT_READ|PROT_WRITE,
+          MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
+          -1, 0);
 
-   pagemapFd = open(str, O_RDONLY);
-  
-   if (pagemapFd < 0)
-      SOFT_ERROR(PI_INIT_FAILED, "open pagemap failed(%m)");
+      if (dmaPMapBlk == MAP_FAILED)
+         SOFT_ERROR(PI_INIT_FAILED, "pagemap mmap block failed (%m)");
 
-   for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++) initDMAblock(pagemapFd, i);
+      fdPmap = open("/proc/self/pagemap", O_RDONLY);
 
-   close(pagemapFd);
+      if (fdPmap < 0)
+         SOFT_ERROR(PI_INIT_FAILED, "pagemap open failed(%m)");
 
-   DBG(DBG_STARTUP, "dmaBloc=%08X dmaIn=%08X",
-      (uint32_t)dmaBloc, (uint32_t)dmaIn);
+      for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++)
+      {
+         status = initPagemapBlock(i);
+         if (status < 0)
+         {
+            close(fdPmap);
+            return status;
+         }
+      }
+
+      close(fdPmap);
+
+      DBG(DBG_STARTUP, "dmaPMapBlk=%08X dmaIn=%08X",
+         (uint32_t)dmaPMapBlk, (uint32_t)dmaIn);
+   }
+   else
+   {
+      /* mailbox allocation of DMA memory */
+
+      dmaMboxBlk = mmap(
+          0, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(DMAMem_t),
+          PROT_READ|PROT_WRITE,
+          MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED,
+          -1, 0);
+
+      if (dmaMboxBlk == MAP_FAILED)
+         SOFT_ERROR(PI_INIT_FAILED, "mmap mbox block failed (%m)");
+
+      if (mbCreate() < 0)
+         SOFT_ERROR(PI_INIT_FAILED, "mbox create failed(%m)");
+
+      fdMbox = mbOpen();
+
+      if (fdMbox < 0)
+         SOFT_ERROR(PI_INIT_FAILED, "mbox open failed(%m)");
+
+      for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++)
+      {
+         status = initMboxBlock(i);
+         if (status < 0)
+         {
+            mbClose(fdMbox);
+            return status;
+         }
+      }
+
+      mbClose(fdMbox);
+
+      DBG(DBG_STARTUP, "dmaMboxBlk=%08X dmaIn=%08X",
+         (uint32_t)dmaMboxBlk, (uint32_t)dmaIn);
+   }
 
    DBG(DBG_STARTUP,
       "gpioReg=%08X pwmReg=%08X pcmReg=%08X clkReg=%08X auxReg=%08X",
@@ -5828,7 +6122,7 @@ static int initDMAcbs(void)
       (uint32_t)pcmReg,  (uint32_t)clkReg, (uint32_t)auxReg); 
 
    for (i=0; i<DMAI_PAGES; i++)
-      DBG(DBG_STARTUP, "dmaIPhys[%d]=%08X", i, (uint32_t)dmaIPhys[i]);
+      DBG(DBG_STARTUP, "dmaIBus[%d]=%08X", i, (uint32_t)dmaIBus[i]);
 
    if (gpioCfg.dbgLevel >= DBG_DMACBS)
    {
@@ -6019,7 +6313,7 @@ static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
 
    dmaAddr[DMA_CS] = DMA_INTERRUPT_STATUS | DMA_END_FLAG;
 
-   dmaAddr[DMA_CONBLK_AD] = cbAddr | DMA_BUS_ADR;
+   dmaAddr[DMA_CONBLK_AD] = cbAddr;
 
    /* clear READ/FIFO/READ_LAST_NOT_SET error bits */
 
@@ -6129,9 +6423,10 @@ static void initClearGlobals(void)
    fdMem  = -1;
    fdSock = -1;
 
-   dmaBloc = MAP_FAILED;
+   dmaMboxBlk = MAP_FAILED;
+   dmaPMapBlk = MAP_FAILED;
    dmaVirt = MAP_FAILED;
-   dmaPhys = MAP_FAILED;
+   dmaBus  = MAP_FAILED;
 
    auxReg  = MAP_FAILED;
    clkReg  = MAP_FAILED;
@@ -6206,6 +6501,14 @@ static void initReleaseResources(void)
    systReg = MAP_FAILED;
    spiReg  = MAP_FAILED;
 
+   if (dmaBus != MAP_FAILED)
+   {
+      munmap(dmaBus,
+         PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
+   }
+
+   dmaBus = MAP_FAILED;
+
    if (dmaVirt != MAP_FAILED)
    {
       for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS); i++)
@@ -6219,30 +6522,33 @@ static void initReleaseResources(void)
 
    dmaVirt = MAP_FAILED;
 
-   if (dmaPhys != MAP_FAILED)
-   {
-      for (i=0; i<PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS); i++)
-      {
-         munmap(dmaPhys[i], PAGE_SIZE);
-      }
-
-      munmap(dmaPhys,
-         PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
-   }
-
-   dmaPhys = MAP_FAILED;
-
-   if (dmaBloc != MAP_FAILED)
+   if (dmaPMapBlk != MAP_FAILED)
    {
       for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++)
       {
-         munmap(dmaBloc[i], PAGES_PER_BLOCK*PAGE_SIZE);
+         munmap(dmaPMapBlk[i], PAGES_PER_BLOCK*PAGE_SIZE);
       }
 
-      munmap(dmaBloc, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
+      munmap(dmaPMapBlk, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
    }
 
-   dmaBloc = MAP_FAILED;
+   dmaPMapBlk = MAP_FAILED;
+
+   if (dmaMboxBlk != MAP_FAILED)
+   {
+      fdMbox = mbOpen();
+
+      for (i=0; i<(bufferBlocks+PI_WAVE_BLOCKS); i++)
+      {
+         mbDMAFree(&dmaMboxBlk[bufferBlocks+PI_WAVE_BLOCKS-i-1]);
+      }
+
+      mbClose(fdMbox);
+
+      munmap(dmaMboxBlk, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(DMAMem_t));
+   }
+
+   dmaMboxBlk = MAP_FAILED;
 
    if (inpFifo != NULL)
    {
@@ -6276,7 +6582,140 @@ static void initReleaseResources(void)
       close(fdSock);
       fdSock = -1;
    }
+
+   if (fdPmap != -1)
+   {
+      close(fdPmap);
+      fdPmap = -1;
+   }
+
+   if (fdMbox != -1)
+   {
+      close(fdMbox);
+      fdMbox = -1;
+   }
 }
+
+int initInitialise(void)
+{
+   int i;
+   struct sockaddr_in server;
+   char * portStr;
+   unsigned port;
+   struct sched_param param;
+
+   waveClockInited = 0;
+
+   clock_gettime(CLOCK_REALTIME, &libStarted);
+
+   DBG(DBG_STARTUP, "");
+
+   if (libInitialised) return PIGPIO_VERSION;
+
+   initClearGlobals();
+
+   if (initCheckPermitted() < 0) return PI_INIT_FAILED;
+
+   fdLock = initGrabLockFile();
+
+   if (fdLock < 0)
+      SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
+
+   if (!gpioMaskSet)
+   {
+      i = gpioHardwareRevision();
+
+      if      (i ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
+      else if (i == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+      else if (i <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
+      else if (i <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+      else              gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
+
+      gpioMaskSet = 1;
+   }
+
+   sigSetHandler();
+
+   if (initPeripherals() < 0) return PI_INIT_FAILED;
+
+   if (initAllocDMAMem() < 0) return PI_INIT_FAILED;
+
+   /* done with /dev/mem */
+
+   if (fdMem != -1)
+   {
+      close(fdMem);
+      fdMem = -1;
+   }
+
+   param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+
+   sched_setscheduler(0, SCHED_FIFO, &param);
+
+   initClock(1); /* initialise main clock */
+
+   libInitialised = 1;
+
+   atexit(gpioTerminate);
+
+   if (pthread_attr_init(&pthAttr))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_init failed (%m)");
+
+   if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
+
+   if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
+
+   pthAlertRunning = 1;
+
+   if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
+   {
+      if (pthread_create(&pthFifo, &pthAttr, pthFifoThread, &i))
+         SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
+
+      pthFifoRunning = 1;
+   }
+
+   if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
+   {
+      fdSock = socket(AF_INET , SOCK_STREAM , 0);
+
+      if (fdSock == -1)
+         SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
+   
+      portStr = getenv(PI_ENVPORT);
+
+      if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
+
+      server.sin_family = AF_INET;
+      server.sin_addr.s_addr = INADDR_ANY;
+      server.sin_port = htons(port);
+   
+      if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
+         SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+
+      if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
+         SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
+
+      pthSocketRunning = 1;
+   }
+
+   myGpioDelay(10000);
+
+   dmaInitCbs();
+
+   flushMemory();
+
+   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIBus[0]);
+
+   myGpioDelay(20000);
+
+   DMAstarted = 1;
+
+   return PIGPIO_VERSION;
+}
+
 
 /* ======================================================================= */
 
@@ -6477,123 +6916,17 @@ void rawDumpScript(unsigned script_id)
 
 int gpioInitialise(void)
 {
-   int i;
-   struct sockaddr_in server;
-   char * portStr;
-   unsigned port;
-   struct sched_param param;
+   int status;
 
-   waveClockInited = 0;
+   status = initInitialise();
 
-   clock_gettime(CLOCK_REALTIME, &libStarted);
-
-   DBG(DBG_STARTUP, "");
-
-   if (libInitialised) return PIGPIO_VERSION;
-
-   initClearGlobals();
-
-   if (initCheckPermitted() < 0) return PI_INIT_FAILED;
-
-   fdLock = initGrabLockFile();
-
-   if (fdLock < 0)
-      SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
-
-   if (!gpioMaskSet)
+   if (status < 0)
    {
-      i = gpioHardwareRevision();
-
-      if      (i ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
-      else if (i == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-      else if (i <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
-      else if (i <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
-      else              gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
-
-      gpioMaskSet = 1;
+      initReleaseResources();
    }
 
-   sigSetHandler();
-
-   if (initPeripherals() < 0) return PI_INIT_FAILED;
-
-   if (initDMAcbs() < 0) return PI_INIT_FAILED;
-
-   /* done with /dev/mem */
-
-   if (fdMem != -1)
-   {
-      close(fdMem);
-      fdMem = -1;
-   }
-
-   param.sched_priority = sched_get_priority_max(SCHED_FIFO);
-
-   sched_setscheduler(0, SCHED_FIFO, &param);
-
-   initClock(1); /* initialise main clock */
-
-   libInitialised = 1;
-
-   atexit(gpioTerminate);
-
-   if (pthread_attr_init(&pthAttr))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_init failed (%m)");
-
-   if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
-
-   if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
-
-   pthAlertRunning = 1;
-
-   if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
-   {
-      if (pthread_create(&pthFifo, &pthAttr, pthFifoThread, &i))
-         SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
-
-      pthFifoRunning = 1;
-   }
-
-   if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
-   {
-      fdSock = socket(AF_INET , SOCK_STREAM , 0);
-
-      if (fdSock == -1)
-         SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
-   
-      portStr = getenv(PI_ENVPORT);
-
-      if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
-
-      server.sin_family = AF_INET;
-      server.sin_addr.s_addr = INADDR_ANY;
-      server.sin_port = htons(port);
-   
-      if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
-         SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
-
-      if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
-         SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
-
-      pthSocketRunning = 1;
-   }
-
-   myGpioDelay(10000);
-
-   dmaInitCbs();
-
-   flushMemory();
-
-   initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIPhys[0]);
-
-   myGpioDelay(20000);
-
-   DMAstarted = 1;
-
-   return PIGPIO_VERSION;
- }
+   return status;
+}
 
 
 /* ----------------------------------------------------------------------- */
@@ -6620,21 +6953,32 @@ void gpioTerminate(void)
       if (gpioCfg.showStats)
       {
          fprintf(stderr,
-            "micros=%d dmaInitCbs=%d DMA restarts=%d\n",
-             gpioCfg.clockMicros, gpioStats.dmaInitCbsCount,
-             gpioStats.DMARestarts);
+            "If you didn't request stats please cut & paste the\n"
+            "following and e-mail to pigpio@abyz.co.uk\n");
 
-         fprintf(stderr, "samples %u maxSamples %u maxEmit %u emitFrags %u\n",
+         fprintf(stderr,
+            "#####################################################\n");
+
+         fprintf(stderr,
+            "micros=%d allocMode=%d dmaInitCbs=%d DMARestarts=%d\n",
+             gpioCfg.clockMicros, gpioCfg.memAllocMode,
+             gpioStats.dmaInitCbsCount, gpioStats.DMARestarts);
+
+         fprintf(stderr,
+            "samples %u maxSamples %u maxEmit %u emitFrags %u\n",
             gpioStats.numSamples, gpioStats.maxSamples,
             gpioStats.maxEmit, gpioStats.emitFrags);
 
-         fprintf(stderr, "cb time %d, calls %u alert ticks %u\n",
+         fprintf(stderr, "cbTicks %d, cbCalls %u alertTicks %u\n",
             gpioStats.cbTicks, gpioStats.cbCalls, gpioStats.alertTicks);
 
          for (i=0; i< TICKSLOTS; i++)
             fprintf(stderr, "%9u ", gpioStats.diffTick[i]);
 
          fprintf(stderr, "\n");
+
+         fprintf(stderr,
+            "#####################################################\n");
       }
    }
 
@@ -6958,6 +7302,8 @@ int gpioGetPWMrange(unsigned gpio)
 
 int gpioGetPWMrealRange(unsigned gpio)
 {
+   unsigned pwm;
+
    DBG(DBG_USER, "gpio=%d", gpio);
 
    CHECK_INITED;
@@ -6968,6 +7314,9 @@ int gpioGetPWMrealRange(unsigned gpio)
    switch (gpioInfo[gpio].is)
    {
       case GPIO_HW_PWM:
+         pwm = (PWMDef[gpio] >> 4) & 3;
+         return hw_pwm_real_range[pwm];
+
       case GPIO_HW_CLK:
          return PI_HW_PWM_RANGE;
 
@@ -7552,7 +7901,7 @@ int gpioWaveTxStart(unsigned wave_mode)
       for (i=0; i<cb; i++) waveCbOPrint(i);
    }
 
-   initDMAgo((uint32_t *)dmaOut, (uint32_t)dmaOPhys[0]);
+   initDMAgo((uint32_t *)dmaOut, (uint32_t)dmaOBus[0]);
 
    return cb;
 
@@ -7584,7 +7933,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
 
    if (wave_mode == PI_WAVE_MODE_ONE_SHOT) p->next = 0;
-   else p->next = waveCbPOadr(waveInfo[wave_id].botCB+1) | DMA_BUS_ADR;
+   else p->next = waveCbPOadr(waveInfo[wave_id].botCB+1);
 
    dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
 
@@ -8698,6 +9047,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    uint32_t cfreq[CLK_SRCS]={CLK_OSC_FREQ, CLK_PLLD_FREQ};
    unsigned clock, mode, mash;
    int password = 0;
+   double f;
    clkInf_t clkInf={0,0,0};
 
    DBG(DBG_USER, "gpio=%d frequency=%d", gpio, frequency);
@@ -8733,9 +9083,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    {
       if (chooseBestClock(&clkInf, frequency, CLK_SRCS, cfreq))
       {
-         /* record the clock frequency */
-
-         hw_clk_freq[clock] = frequency;
+         if (clkInf.frac == 0) mash = 0;
 
          initHWClk(cctl[clock], cdiv[clock],
             csrc[clkInf.clock], clkInf.div, clkInf.frac, mash);
@@ -8743,6 +9091,14 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
          gpioSetMode(gpio, mode);
 
          gpioInfo[gpio].is = GPIO_HW_CLK;
+
+         f = (double) cfreq[clkInf.clock] /
+           ((double)clkInf.div + ((double)clkInf.frac / 4096.0));
+
+         hw_clk_freq[clock] = (f + 0.5);
+
+         DBG(DBG_USER, "cf=%d div=%d frac=%d mash=%d",
+            cfreq[clkInf.clock], clkInf.div, clkInf.frac, mash);
       }
       else
       {
@@ -8767,11 +9123,9 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
 int gpioHardwarePWM(
    unsigned gpio, unsigned frequency, unsigned dutycycle)
 {
-   int csrc[CLK_SRCS] = {CLK_CTL_SRC_OSC, CLK_CTL_SRC_PLLD};
-   uint32_t cfreq[CLK_SRCS]={CLK_OSC_FREQ, CLK_PLLD_FREQ};
    uint32_t old_PWM_CTL;
-   unsigned pwm, mode,mash;
-   clkInf_t clkInf={0,0,0};
+   unsigned pwm, mode;
+   uint32_t real_range, real_dutycycle;
 
    DBG(DBG_USER, "gpio=%d  frequency=%d dutycycle=%d",
       gpio, frequency, dutycycle);
@@ -8799,73 +9153,63 @@ int gpioHardwarePWM(
    pwm = (PWMDef[gpio] >> 4) & 3;
    mode  = PWMDef[gpio] & 7;
 
-   frequency *= PI_HW_PWM_RANGE;
-
-   mash = frequency < PI_MASH_MAX_FREQ ? 1 : 0;
-
    if (frequency)
    {
-      if (chooseBestClock(&clkInf, frequency, CLK_SRCS, cfreq))
+      real_range = ((double)CLK_PLLD_FREQ / (2.0 * frequency)) + 0.5;
+      real_dutycycle = ((uint64_t)dutycycle * real_range) / PI_HW_PWM_RANGE;
+
+      /* record the set PWM frequency and dutycycle */
+
+      hw_pwm_freq[pwm] =
+         ((double)CLK_PLLD_FREQ / ( 2.0 * real_range)) + 0.5;
+
+      hw_pwm_duty[pwm]  = dutycycle;
+
+      hw_pwm_real_range[pwm] = real_range;
+
+      /* Abort any waveform transmission in progress */
+
+      if (gpioWaveTxBusy()) gpioWaveTxStop();
+
+      waveClockInited = 0;
+
+      /* preserve channel enable only and mark space mode */
+
+      old_PWM_CTL = pwmReg[PWM_CTL] &
+         (PWM_CTL_PWEN1 | PWM_CTL_MSEN1 | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
+
+      pwmReg[PWM_CTL] = 0;
+
+      myGpioDelay(10);
+
+      initHWClk(CLK_PWMCTL, CLK_PWMDIV, CLK_CTL_SRC_PLLD, 2, 0, 0);
+
+      if (pwm == 0)
       {
-         /* record the PWM frequency and dutycycle */
-
-         /* currently both channels must use the same update rate */
-
-         hw_pwm_freq[0] = frequency / PI_HW_PWM_RANGE;
-         hw_pwm_freq[1] = frequency / PI_HW_PWM_RANGE;
-
-         hw_pwm_duty[pwm] = dutycycle;
-
-         /* Abort any waveform transmission in progress */
-
-         if (gpioWaveTxBusy()) gpioWaveTxStop();
-
-         waveClockInited = 0;
-
-         /* preserve channel enable only and mark space mode */
-
-         old_PWM_CTL = pwmReg[PWM_CTL] &
-            (PWM_CTL_PWEN1 | PWM_CTL_MSEN1 | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
-
-         pwmReg[PWM_CTL] = 0;
-
+         pwmReg[PWM_RNG1] = real_range;
+         myGpioDelay(10);
+         pwmReg[PWM_DAT1] = real_dutycycle;
          myGpioDelay(10);
 
-         initHWClk(CLK_PWMCTL, CLK_PWMDIV,
-            csrc[clkInf.clock], clkInf.div, clkInf.frac, mash);
-
-         if (pwm == 0)
-         {
-            pwmReg[PWM_RNG1] = PI_HW_PWM_RANGE;
-            myGpioDelay(10);
-            pwmReg[PWM_DAT1] = dutycycle;
-            myGpioDelay(10);
-
-            pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN1 | PWM_CTL_MSEN1);
-         }
-         else
-         {
-            pwmReg[PWM_RNG2] = PI_HW_PWM_RANGE;
-            myGpioDelay(10);
-            pwmReg[PWM_DAT2] = dutycycle;
-            myGpioDelay(10);
-
-            pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
-         }
-
-         if (gpioInfo[gpio].is != GPIO_HW_PWM)
-         {
-            switchFunctionOff(gpio);
-
-            gpioSetMode(gpio, mode);
-
-            gpioInfo[gpio].is = GPIO_HW_PWM;
-         }
+         pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN1 | PWM_CTL_MSEN1);
       }
       else
       {
-         SOFT_ERROR(PI_BAD_HPWM_FREQ,
-            "bad hardware PWM frequency (%d)", frequency/PI_HW_PWM_RANGE);
+         pwmReg[PWM_RNG2] = real_range;
+         myGpioDelay(10);
+         pwmReg[PWM_DAT2] = real_dutycycle;
+         myGpioDelay(10);
+
+         pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
+      }
+
+      if (gpioInfo[gpio].is != GPIO_HW_PWM)
+      {
+         switchFunctionOff(gpio);
+
+         gpioSetMode(gpio, mode);
+
+         gpioInfo[gpio].is = GPIO_HW_PWM;
       }
    }
    else
@@ -9031,17 +9375,17 @@ unsigned gpioHardwareRevision(void)
                {
                   piModel = 1;
                   chars = 4;
-                  PI_PERI_BASE  = 0x20000000;
-                  DMA_BUS_ADR   = 0x40000000;
-                  DMA_BUS_CACHE = 0x40000000;
+                  pi_peri_phys = 0x20000000;
+                  pi_dram_bus  = 0x40000000;
+                  pi_mem_flag  = 0x0c;
                }
                else if (strstr (buf, "ARMv7") != NULL)
                {
                   piModel = 2;
                   chars = 6;
-                  PI_PERI_BASE  = 0x3F000000;
-                  DMA_BUS_ADR   = 0xC0000000;
-                  DMA_BUS_CACHE = 0x00000000;
+                  pi_peri_phys = 0x3F000000;
+                  pi_dram_bus  = 0xC0000000;
+                  pi_mem_flag  = 0x04;
                }
             }
          }
@@ -9188,6 +9532,24 @@ int gpioCfgSocketPort(unsigned port)
       SOFT_ERROR(PI_BAD_SOCKET_PORT, "bad port (%d)", port);
 
    gpioCfg.socketPort = port;
+
+   return 0;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+int gpioCfgMemAlloc(unsigned memAllocMode)
+{
+   DBG(DBG_USER, "memAllocMode=%d", memAllocMode);
+
+   CHECK_NOT_INITED;
+
+   if (memAllocMode > PI_MEM_ALLOC_MAILBOX)
+      SOFT_ERROR(
+         PI_BAD_MALLOC_MODE, "bad mem alloc mode (%d)", memAllocMode);
+
+   gpioCfg.memAllocMode = memAllocMode;
 
    return 0;
 }

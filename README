@@ -1,3 +1,9 @@
+NOTE
+
+The initial part of the make, the compilation of pigpio.c,
+takes 100 seconds on early model Pis.  Be patient.  The overall
+install takes just over 3 minutes.
+
 INSTALL
 
 Extract the archive to a directory.

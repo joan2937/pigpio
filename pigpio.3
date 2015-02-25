@@ -154,7 +154,7 @@ All the functions which return an int return < 0 on error.
 .br
 
 .br
-If the library isn't initialised all but the \fBgpioCfg*\fP, \fBgpioVersion\fP,
+If the library is not initialised all but the \fBgpioCfg*\fP, \fBgpioVersion\fP,
 and \fBgpioHardwareRevision\fP functions will return PI_NOT_INITIALISED.
 
 .br
@@ -230,7 +230,7 @@ Call before program exit.
 .br
 
 .br
-This function resets the DMA and PWM peripherals, releases memory, and
+This function resets the used DMA channels, releases memory, and
 terminates any running threads.
 
 .br
@@ -531,10 +531,19 @@ PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 .br
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see \fBgpioGetPWMrange\fP).  If a hardware clock is
-active on the gpio the reported dutycycle will be 500 (out of 1000).
+for the gpio (see \fBgpioGetPWMrange\fP).
+
+.br
+
+.br
+If a hardware clock is active on the gpio the reported dutycycle
+will be 500000 (500k) out of 1000000 (1M).
+
+.br
+
+.br
 If hardware PWM is active on the gpio the reported dutycycle
-will be out of a 1000.
+will be out of a 1000000 (1M).
 
 .br
 
@@ -628,7 +637,7 @@ user_gpio: 0-31
 
 .br
 If a hardware clock or hardware PWM is active on the gpio
-the reported range will be 1000.
+the reported range will be 1000000 (1M).
 
 .br
 
@@ -660,8 +669,14 @@ user_gpio: 0-31
 .br
 
 .br
-If a hardware clock or hardware PWM is active on the gpio
-the reported real range will be 1000.
+If a hardware clock is active on the gpio the reported real
+range will be 1000000 (1M).
+
+.br
+
+.br
+If hardware PWM is active on the gpio the reported real range
+will be approximately 250M divided by the set PWM frequency.
 
 .br
 
@@ -807,8 +822,17 @@ user_gpio: 0-31
 
 .br
 For normal PWM the frequency will be that defined for the gpio by
-\fBgpioSetPWMfrequency\fP.  If a hardware clock is active on the gpio
-the reported frequency will be that set by \fBgpioHardwareClock\fP.
+\fBgpioSetPWMfrequency\fP.
+
+.br
+
+.br
+If a hardware clock is active on the gpio the reported frequency
+will be that set by \fBgpioHardwareClock\fP.
+
+.br
+
+.br
 If hardware PWM is active on the gpio the reported frequency
 will be that set by \fBgpioHardwarePWM\fP.
 
@@ -1985,7 +2009,9 @@ data bits \fBbbBits\fP specified in the \fBgpioSerialReadOpen\fP command.
 
 .br
 For \fBbbBits\fP 1-8 there will be one byte per character.
+.br
 For \fBbbBits\fP 9-16 there will be two bytes per character.
+.br
 For \fBbbBits\fP 17-32 there will be four bytes per character.
 
 .IP "\fBint gpioSerialReadClose(unsigned user_gpio)\fP"
@@ -2500,7 +2526,7 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on the B+ and may be
+An auxiliary SPI device is available on the A+/B+/Pi2 and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -2509,7 +2535,7 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
- spiChan: 0-1 (0-2 for B+ auxiliary device)
+ spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
 .br
  spiBaud: 32K-125M (values above 30M are unlikely to work)
 .br
@@ -2549,6 +2575,11 @@ mm defines the SPI mode.
 .br
 
 .br
+Warning: modes 1 and 3 do not appear to work on the auxiliary device.
+
+.br
+
+.br
 
 .EX
 Mode POL PHA
@@ -2578,7 +2609,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the B+.
+auxiliary device is only present on the A+/B+/Pi2.
 
 .br
 
@@ -3641,6 +3672,7 @@ gpioWrite_Bits_32_53_Set((1<<(32-32)) | (1<<(40-32)) | (1<<(53-32)));
 .IP "\fBint gpioHardwareClock(unsigned gpio, unsigned clkfreq)\fP"
 .IP "" 4
 Starts a hardware clock on a gpio at the specified frequency.
+Frequencies above 30MHz are unlikely to work.
 
 .br
 
@@ -3649,7 +3681,7 @@ Starts a hardware clock on a gpio at the specified frequency.
 .EX
    gpio: see description
 .br
-clkfreq: 0 (off) or 4689-250M
+clkfreq: 0 (off) or 4689-250000000 (250M)
 .br
 
 .EE
@@ -3678,11 +3710,11 @@ The gpio must be one of the following.
 .EX
 4   clock 0  All models
 .br
-5   clock 1  A+/B+ and compute module only (reserved for system use)
+5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
 .br
-6   clock 2  A+/B+ and compute module only
+6   clock 2  A+/B+/Pi2 and compute module only
 .br
-20  clock 0  A+/B+ and compute module only
+20  clock 0  A+/B+/Pi2 and compute module only
 .br
 21  clock 1  All models but Rev.2 B (reserved for system use)
 .br
@@ -3711,6 +3743,7 @@ gpio number.
 .IP "\fBint gpioHardwarePWM(unsigned gpio, unsigned PWMfreq, unsigned PWMduty)\fP"
 .IP "" 4
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+Frequencies above 30MHz are unlikely to work.
 
 .br
 
@@ -3732,9 +3765,9 @@ main clock defaults to PCM but may be overridden by a call to
 .EX
    gpio: see description
 .br
-PWMfreq: 0 (off) or 5-250K
+PWMfreq: 0 (off) or 1-125000000 (125M)
 .br
-PWMduty: 0 (off) to 1000 (fully on).
+PWMduty: 0 (off) to 1000000 (1M)(fully on)
 .br
 
 .EE
@@ -3748,10 +3781,9 @@ PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ, or PI_HPWM_ILLEGAL.
 .br
 
 .br
-Both PWM channels share the same clock and the same update frequency.
-The latest frequency setting will be used by both PWM channels. The
-same PWM channel is available on multiple gpios.  The latest
-dutycycle setting will be used by all gpios which share a PWM channel.
+The same PWM channel is available on multiple gpios.  The latest
+frequency and dutycycle setting will be used by all gpios which
+share a PWM channel.
 
 .br
 
@@ -3763,13 +3795,13 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+ and compute module only
+12  PWM channel 0  A+/B+/Pi2 and compute module only
 .br
-13  PWM channel 1  A+/B+ and compute module only
+13  PWM channel 1  A+/B+/Pi2 and compute module only
 .br
 18  PWM channel 0  All models
 .br
-19  PWM channel 1  A+/B+ and compute module only
+19  PWM channel 1  A+/B+/Pi2 and compute module only
 .br
 
 .br
@@ -3998,36 +4030,19 @@ number the function returns 0.
 .br
 
 .br
-The hardware revision is the last 4 characters on the Revision line of
+The hardware revision is the last few characters on the Revision line of
 /proc/cpuinfo.
 
 .br
 
 .br
 The revision number can be used to determine the assignment of gpios
-to pins.
+to pins (see \fBgpio\fP).
 
 .br
 
 .br
 There are at least three types of board.
-
-.br
-
-.br
-Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13.
-
-.br
-
-.br
-Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13, and
-gpios 28-31 on P5.
-
-.br
-
-.br
-Type 3 has a 40 pin connector rather than the 26 pin connector of
-the earlier boards.  Gpios 0 to 27 are brought out to the connector.
 
 .br
 
@@ -4042,7 +4057,7 @@ Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
 .br
 
 .br
-Type 3 boards have hardware revision number 16.
+Type 3 boards have hardware revision numbers of 16 or greater.
 
 .br
 
@@ -4121,7 +4136,7 @@ sample   4       8  12  18   31   55  107  ---
 
 .IP "\fBint gpioCfgClock(unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource)\fP"
 .IP "" 4
-Configures pigpio to use a particualar sample rate timed by a specified
+Configures pigpio to use a particular sample rate timed by a specified
 peripheral.
 
 .br
@@ -4309,7 +4324,50 @@ The default setting (0) is that both interfaces are enabled.
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
 
-.IP "\fBint gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned count)\fP"
+.IP "\fBint gpioCfgMemAlloc(unsigned memAllocMode)\fP"
+.IP "" 4
+Selects the method of DMA memory allocation.
+
+.br
+
+.br
+
+.EX
+memAllocMode: 0-2
+.br
+
+.EE
+
+.br
+
+.br
+There are two methods of DMA memory allocation.  The original method
+uses the /proc/self/pagemap file to allocate bus memory.  The new
+method uses the mailbox property interface to allocate bus memory.
+
+.br
+
+.br
+Auto will use the mailbox method unless a larger than default buffer
+size is requested with \fBgpioCfgBufferSize\fP.
+
+.IP "\fBint gpioCfgInternals(unsigned cfgWhat, int cfgVal)\fP"
+.IP "" 4
+Used to tune internal settings.
+
+.br
+
+.br
+
+.EX
+cfgWhat: see source code
+.br
+ cfgVal: see source code
+.br
+
+.EE
+
+.IP "\fBint gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned argc)\fP"
 .IP "" 4
 This function is available for user customisation.
 
@@ -4323,13 +4381,13 @@ It returns a single integer value.
 .br
 
 .EX
- arg1: >=0
+arg1: >=0
 .br
- arg2: >=0
+arg2: >=0
 .br
- argx: extra (byte) arguments
+argx: extra (byte) arguments
 .br
-count: number of extra arguments
+argc: number of extra arguments
 .br
 
 .EE
@@ -4339,7 +4397,7 @@ count: number of extra arguments
 .br
 Returns >= 0 if OK, less than 0 indicates a user defined error.
 
-.IP "\fBint gpioCustom2(unsigned arg1, char *argx, unsigned count, char *retBuf, unsigned retMax)\fP"
+.IP "\fBint gpioCustom2(unsigned arg1, char *argx, unsigned argc, char *retBuf, unsigned retMax)\fP"
 .IP "" 4
 This function is available for user customisation.
 
@@ -4359,7 +4417,7 @@ The returned value is an integer indicating the number of returned bytes.
 .br
   argx: extra (byte) arguments
 .br
- count: number of extra arguments
+  argc: number of extra arguments
 .br
 retBuf: buffer for returned bytes
 .br
@@ -4377,27 +4435,6 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 
 .br
 The number of returned bytes must be retMax or less.
-
-.IP "\fBint gpioCfgInternals(unsigned cfgWhat, int cfgVal)\fP"
-.IP "" 4
-Used to tune internal settings.
-
-.br
-
-.br
-
-.EX
-cfgWhat: see source code
-.br
- cfgVal: see source code
-.br
-
-.EE
-
-.br
-
-.br
-Not intended for general use.
 
 .IP "\fBint rawWaveAddSPI(rawSPI_t *spi, unsigned offset, unsigned spiSS, char *buf, unsigned spiTxBits, unsigned spiBitFirst, unsigned spiBitLast, unsigned spiBits)\fP"
 .IP "" 4
@@ -4719,6 +4756,53 @@ Not intended for general use.
 
 .br
 A pointer to a void object passed to a thread started by gpioStartThread.
+
+.br
+
+.br
+
+.IP "\fBarg1\fP" 0
+
+.br
+
+.br
+An unsigned argument passed to a user customised function.  Its
+meaning is defined by the customiser.
+
+.br
+
+.br
+
+.IP "\fBarg2\fP" 0
+
+.br
+
+.br
+An unsigned argument passed to a user customised function.  Its
+meaning is defined by the customiser.
+
+.br
+
+.br
+
+.IP "\fBargc\fP" 0
+
+.br
+
+.br
+The count of bytes passed to a user customised function.
+
+.br
+
+.br
+
+.IP "\fB*argx\fP" 0
+
+.br
+
+.br
+A pointer to an array of bytes passed to a user customised function.
+Its meaning and content is defined by the customiser.
 
 .br
 
@@ -5087,6 +5171,61 @@ A Broadcom numbered gpio, in the range 0-53.
 .br
 
 .br
+There  are 54 General Purpose Input Outputs (gpios) named gpio0 through
+gpio53.
+
+.br
+
+.br
+They are split into two  banks.   Bank  1  consists  of  gpio0  through
+gpio31.  Bank 2 consists of gpio32 through gpio53.
+
+.br
+
+.br
+All the gpios which are safe for the user to read and write are in
+bank 1.  Not all gpios in bank 1 are safe though.  Type 1 boards
+have 17  safe gpios.  Type 2 boards have 21.  Type 3 boards have 26.
+
+.br
+
+.br
+See \fBgpioHardwareRevision\fP.
+
+.br
+
+.br
+The user gpios are marked with an X in the following table.
+
+.br
+
+.br
+
+.EX
+          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+.br
+Type 1    X  X  -  -  X  -  -  X  X  X  X  X  -  -  X  X
+.br
+Type 2    -  -  X  X  X  -  -  X  X  X  X  X  -  -  X  X
+.br
+Type 3          X  X  X  X  X  X  X  X  X  X  X  X  X  X
+.br
+
+.br
+         16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+.br
+Type 1    -  X  X  -  -  X  X  X  X  X  -  -  -  -  -  -
+.br
+Type 2    -  X  X  -  -  -  X  X  X  X  -  X  X  X  X  X
+.br
+Type 3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
+.br
+
+.EE
+
+.br
+
+.br
 
 .IP "\fBgpioAlertFunc_t\fP" 0
 
@@ -5139,6 +5278,8 @@ One of
 \fBgpioCfgInternals\fP
 .br
 \fBgpioCfgSocketPort\fP
+.br
+\fBgpioCfgMemAlloc\fP
 
 .br
 
@@ -5451,6 +5592,31 @@ A 32-bit word value.
 
 .br
 
+.IP "\fBmemAllocMode\fP: 0-2" 0
+
+.br
+
+.br
+The DMA memory allocation mode.
+
+.br
+
+.br
+
+.EX
+PI_MEM_ALLOC_AUTO    0
+.br
+PI_MEM_ALLOC_PAGEMAP 1
+.br
+PI_MEM_ALLOC_MAILBOX 2
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fB*micros\fP" 0
 
 .br
@@ -5704,7 +5870,7 @@ PI_MAX_SERVO_PULSEWIDTH 2500
 
 .br
 
-.IP "\fBPWMduty\fP: 0-1000" 0
+.IP "\fBPWMduty\fP: 0-1000000 (1M)" 0
 The hardware PWM dutycycle.
 
 .br
@@ -5712,7 +5878,7 @@ The hardware PWM dutycycle.
 .br
 
 .EX
-#define PI_HW_PWM_RANGE 5000
+#define PI_HW_PWM_RANGE 1000000
 .br
 
 .EE
@@ -5729,9 +5895,9 @@ The hardware PWM frequency.
 .br
 
 .EX
-#define PI_HW_PWM_MIN_FREQ 5
+#define PI_HW_PWM_MIN_FREQ 1
 .br
-#define PI_HW_PWM_MAX_FREQ 50000
+#define PI_HW_PWM_MAX_FREQ 125000000
 .br
 
 .EE
@@ -5859,6 +6025,28 @@ typedef struct
 .br
 
 .EE
+
+.br
+
+.br
+
+.IP "\fB*retBuf\fP" 0
+
+.br
+
+.br
+A buffer to hold a number of bytes returned to a used customised function,
+
+.br
+
+.br
+
+.IP "\fBretMax\fP" 0
+
+.br
+
+.br
+The maximum number of bytes a user customised function should return.
 
 .br
 
@@ -6218,6 +6406,11 @@ If gpio#n may be written then bit (1<<n) is set.
 
 .br
 0-31, a Broadcom numbered gpio.
+
+.br
+
+.br
+See \fBgpio\fP.
 
 .br
 
@@ -6682,7 +6875,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
 .br
-#define PI_NO_AUX_SPI       -91 // need a B+ for auxiliary SPI
+#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2 for auxiliary SPI
 .br
 #define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
 .br
@@ -6692,11 +6885,11 @@ A 16-bit word value.
 .br
 #define PI_NOT_HPWM_GPIO    -95 // gpio has no hardware PWM
 .br
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 5-50K
+#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 1-125M
 .br
-#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-5000
+#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
 .br
-#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-25M
+#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-250M
 .br
 #define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
 .br
@@ -6707,6 +6900,8 @@ A 16-bit word value.
 #define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
 .br
 #define PI_MSG_TOOBIG      -103 // socket/pipe message too big
+.br
+#define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
 .br
 
 .br
@@ -6758,6 +6953,10 @@ A 16-bit word value.
 #define PI_DEFAULT_UPDATE_MASK_R3        0x0080400FFFFFFCLL
 .br
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
+.br
+#define PI_DEFAULT_MEM_ALLOC_MODE        PI_MEM_ALLOC_AUTO
+.br
+
 .br
 
 .EE

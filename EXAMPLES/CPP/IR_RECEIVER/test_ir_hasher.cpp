@@ -12,7 +12,7 @@ An IR receiver output pin connected to a Pi gpio.
 
 TO BUILD
 
-g++ -o ir_hash_cpp test_ir_hasher.cpp ir_hasher.cpp -lpigpio -lrt
+g++ -o ir_hash_cpp test_ir_hasher.cpp ir_hasher.cpp -lpigpio -lrt -lpthread
 
 TO RUN
 

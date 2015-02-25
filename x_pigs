@@ -1,7 +1,5 @@
 #!/bin/bash
 
-VERSION=29
-
 GPIO=4
 
 #
@@ -20,6 +18,11 @@ GPIO=4
 # Repeated failures on the same test or many failures in a group
 # of tests indicate a problem.
 #
+
+echo "Testing pigs I/F"
+
+s=$(pigs pigpv)
+echo "pigpio version $s"
 
 s=$(pigs bc1 0)
 if [[ $s = "" ]]; then echo "BC1 ok"; else echo "BC1 fail ($s)"; fi
@@ -90,9 +93,6 @@ if [[ $s = 10 ]]; then echo "PFS-a ok"; else echo "PFS-a fail ($s)"; fi
 
 s=$(pigs pfs $GPIO 800)
 if [[ $s = 800 ]]; then echo "PFS-b ok"; else echo "PFS-b fail ($s)"; fi
-
-s=$(pigs pigpv)
-if [[ $s = $VERSION ]]; then echo "PIGPV ok"; else echo "PIGPV fail ($s)"; fi
 
 s=$(pigs prs $GPIO 255)
 if [[ $s = 250 ]]; then echo "PRG-a ok"; else echo "PRG-a fail ($s)"; fi

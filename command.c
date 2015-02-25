@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 26+
+This version is for pigpio version 30+
 */
 
 #include <stdio.h>
@@ -345,7 +345,7 @@ WVTXR wid        Transmit wave repeatedly\n\
 bits  = a mask where (1<<g) is set for each gpio g of interest\n\
 bv    = byte value (0-255)\n\
 bvs   = one or more byte values (0-255)\n\
-cf    = hardware clock frequency (4689-25M)\n\
+cf    = hardware clock frequency (4689-250M)\n\
 db    = data bits (1-32)\n\
 g     = any gpio (0-53)\n\
 h     = handle (>=0)\n\
@@ -359,8 +359,8 @@ num   = number of bytes to read\n\
 o     = offset (>=0)\n\
 p     = pud (ODU)\n\
 pars  = 0 to 10 parameters for script\n\
-pdc   = hardware PWM dutycycle (0-5000)\n\
-pf    = hardware PWM frequency (5-50K)\n\
+pdc   = hardware PWM dutycycle (0-1M)\n\
+pf    = hardware PWM frequency (1-125M)\n\
 pl    = pulse length (1-100)\n\
 r     = register\n\
 sid   = script id (>=0)\n\
@@ -486,14 +486,14 @@ static errInfo_t errInfo[]=
    {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
    {PI_NOT_HCLK_GPIO    , "gpio has no hardware clock"},
    {PI_NOT_HPWM_GPIO    , "gpio has no hardware PWM"},
-   {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 5-50K"},
-   {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-5000"},
-   {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-25M"},
+   {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 1-125M"},
+   {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-1M"},
+   {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-250M"},
    {PI_BAD_HCLK_PASS    , "need password to use hardware clock 1"},
    {PI_HPWM_ILLEGAL     , "illegal, PWM in use for main clock"},
    {PI_BAD_DATABITS     , "serial data bits not 1-32"},
-   {PI_BAD_STOPBITS     , "serial (half) stop bits not 2-8"},
-
+   {PI_MSG_TOOBIG       , "socket/pipe message too big"},
+   {PI_BAD_MALLOC_MODE  , "bad memory allocation mode"},
 
 };
 

@@ -257,7 +257,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.15"
+VERSION = "1.16"
 
 exceptions = True
 
@@ -517,6 +517,8 @@ PI_BAD_HCLK_PASS    =-99
 PI_HPWM_ILLEGAL     =-100
 PI_BAD_DATABITS     =-101
 PI_BAD_STOPBITS     =-102
+PI_MSG_TOOBIG       =-103
+PI_BAD_MALLOC_MODE  =-104
 
 # pigpio error text
 
@@ -609,18 +611,20 @@ _errors=[
    [PI_UNKNOWN_COMMAND   , "unknown command"],
    [PI_SPI_XFER_FAILED   , "SPI xfer/read/write failed"],
    [_PI_BAD_POINTER      , "bad (NULL) pointer"],
-   [PI_NO_AUX_SPI        , "need a B+ for auxiliary SPI"],
+   [PI_NO_AUX_SPI        , "need a A+/B+/Pi2 for auxiliary SPI"],
    [PI_NOT_PWM_GPIO      , "gpio is not in use for PWM"],
    [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
    [PI_NOT_HCLK_GPIO     , "gpio has no hardware clock"],
    [PI_NOT_HPWM_GPIO     , "gpio has no hardware PWM"],
-   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 5-50K"],
-   [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-5000"],
-   [PI_BAD_HCLK_FREQ     , "hardware clock frequency not 4689-25M"],
+   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 1-125M"],
+   [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-1M"],
+   [PI_BAD_HCLK_FREQ     , "hardware clock frequency not 4689-250M"],
    [PI_BAD_HCLK_PASS     , "need password to use hardware clock 1"],
    [PI_HPWM_ILLEGAL      , "illegal, PWM in use for main clock"],
    [PI_BAD_DATABITS      , "serial data bits not 1-32"],
    [PI_BAD_STOPBITS      , "serial (half) stop bits not 2-8"],
+   [PI_MSG_TOOBIG        , "socket/pipe message too big"],
+   [PI_BAD_MALLOC_MODE   , "bad memory allocation mode"],
 
 ]
 
@@ -1059,10 +1063,13 @@ class pi():
 
 
       For normal PWM the dutycycle will be out of the defined range
-      for the gpio (see [*get_PWM_range*]).  If a hardware clock is
-      active on the gpio the reported dutycycle will be 500
-      (out of 1000).  If hardware PWM is active on the gpio the
-      reported dutycycle will be out of a 1000.
+      for the gpio (see [*get_PWM_range*]).
+
+      If a hardware clock is active on the gpio the reported
+      dutycycle will be 500000 (500k) out of 1000000 (1M).
+
+      If hardware PWM is active on the gpio the reported dutycycle
+      will be out of a 1000000 (1M).
 
       ...
       pi.set_PWM_dutycycle(4, 25)
@@ -1098,7 +1105,7 @@ class pi():
       user_gpio:= 0-31.
 
       If a hardware clock or hardware PWM is active on the gpio
-      the reported range will be 1000.
+      the reported range will be 1000000 (1M).
 
       ...
       pi.set_PWM_range(9, 500)
@@ -1115,8 +1122,11 @@ class pi():
 
       user_gpio:= 0-31.
 
-      If a hardware clock or hardware PWM is active on the gpio
-      the reported real range will be 1000.
+      If a hardware clock is active on the gpio the reported
+      real range will be 1000000 (1M).
+
+      If hardware PWM is active on the gpio the reported real range
+      will be approximately 250M divided by the set PWM frequency.
 
       ...
       pi.set_PWM_frequency(4, 800)
@@ -1157,8 +1167,11 @@ class pi():
       Returns the frequency (in Hz) used for the gpio.
 
       For normal PWM the frequency will be that defined for the gpio
-      by [*set_PWM_frequency*].  If a hardware clock is active on the
-      gpio the reported frequency will be that set by [*hardware_clock*].
+      by [*set_PWM_frequency*].
+
+      If a hardware clock is active on the gpio the reported frequency
+      will be that set by [*hardware_clock*].
+
       If hardware PWM is active on the gpio the reported frequency
       will be that set by [*hardware_PWM*].
 
@@ -1441,9 +1454,10 @@ class pi():
    def hardware_clock(self, gpio, clkfreq):
       """
       Starts a hardware clock on a gpio at the specified frequency.
+      Frequencies above 30MHz are unlikely to work.
 
          gpio:= see description
-      clkfreq:= 0 (off) or 4689-250M
+      clkfreq:= 0 (off) or 4689-250000000 (250M)
 
 
       Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -1456,9 +1470,10 @@ class pi():
 
       . .
       4   clock 0  All models
-      5   clock 1  A+/B+ and compute module only (reserved for system use)
-      6   clock 2  A+/B+ and compute module only
-      20  clock 0  A+/B+ and compute module only
+      5   clock 1  A+/B+/Pi2 and compute module only
+                   (reserved for system use)
+      6   clock 2  A+/B+/Pi2 and compute module only
+      20  clock 0  A+/B+/Pi2 and compute module only
       21  clock 1  All models but Rev.2 B (reserved for system use)
 
       32  clock 0  Compute module only
@@ -1482,8 +1497,8 @@ class pi():
 
    def hardware_PWM(self, gpio, PWMfreq, PWMduty):
       """
-      Starts hardware PWM on a gpio at the specified
-      frequency and dutycycle.
+      Starts hardware PWM on a gpio at the specified frequency
+      and dutycycle. Frequencies above 30MHz are unlikely to work.
 
       NOTE: Any waveform started by [*wave_send_once*],
       [*wave_send_repeat*], [*wave_tx_start*], or
@@ -1494,25 +1509,23 @@ class pi():
       pigpio daemon is started (option -t).
 
          gpio:= see descripton
-      PWMfreq:= 0 (off) or 5-50K
-      PWMduty:= 0 (off) to 5000 (fully on).
+      PWMfreq:= 0 (off) or 1-125000000 (125M).
+      PWMduty:= 0 (off) to 1000000 (1M)(fully on).
 
       Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
       PI_NOT_HPWM_GPIO, PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ.
 
-      Both PWM channels share the same clock and the same update
-      frequency.  The latest frequency setting will be used by
-      both PWM channels. The same PWM channel is available on
-      multiple gpios.  The latest dutycycle setting will be used
+      The same PWM channel is available on multiple gpios.
+      The latest frequency and dutycycle setting will be used
       by all gpios which share a PWM channel.
 
       The gpio must be one of the following.
 
       . .
-      12  PWM channel 0  A+/B+ and compute module only
-      13  PWM channel 1  A+/B+ and compute module only
+      12  PWM channel 0  A+/B+/Pi2 and compute module only
+      13  PWM channel 1  A+/B+/Pi2 and compute module only
       18  PWM channel 0  All models
-      19  PWM channel 1  A+/B+ and compute module only
+      19  PWM channel 1  A+/B+/Pi2 and compute module only
 
       40  PWM channel 0  Compute module only
       41  PWM channel 1  Compute module only
@@ -1522,9 +1535,9 @@ class pi():
       . .
 
       ...
-      pi.hardware_PWM(18, 800, 1250) # 800Hz 25% dutycycle
+      pi.hardware_PWM(18, 800, 250000) # 800Hz 25% dutycycle
 
-      pi.hardware_PWM(18, 2000, 3750) # 2000Hz 75% dutycycle
+      pi.hardware_PWM(18, 2000, 750000) # 2000Hz 75% dutycycle
       ...
       """
       # pigpio message format
@@ -1559,23 +1572,19 @@ class pi():
       """
       Returns the Pi's hardware revision number.
 
-      The hardware revision is the last 4 characters on the Revision
-      line of /proc/cpuinfo.
+      The hardware revision is the last few characters on the
+      Revision line of /proc/cpuinfo.
 
       The revision number can be used to determine the assignment
-      of gpios to pins.
+      of gpios to pins (see [*gpio*]).
 
       There are at least three types of board.
 
-      Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13
-      (revision numbers 2 and 3).
+      Type 1 boards have hardware revision numbers of 2 and 3.
 
-      Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13,
-      and gpios 28-31 on P5 (revision numbers of 4, 5, 6, and 15).
+      Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
 
-      Type 3 has a 40 pin connector rather than the 26 pin connector
-      of the earlier boards.  Gpios 0 to 27 are brought out to the
-      connector (revision number 16).
+      Type 3 boards have hardware revision numbers of 16 or greater.
 
       If the hardware revision can not be found or is not a valid
       hexadecimal number the function returns 0.
@@ -2424,12 +2433,12 @@ class pi():
       modify the default behaviour of 4-wire operation, mode 0,
       active low chip select.
 
-      An auxiliary SPI device is available on the B+ and may be
+      An auxiliary SPI device is available on the A+/B+/Pi2 and may be
       selected by setting the A bit in the flags.  The auxiliary
       device has 3 chip selects and a selectable word size in bits.
 
 
-      spi_channel:= 0-1 (0-2 for B+ auxiliary device).
+      spi_channel:= 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
          spi_baud:= 32K-125M (values above 30M are unlikely to work).
         spi_flags:= see below.
 
@@ -2447,6 +2456,9 @@ class pi():
 
       mm defines the SPI mode.
 
+      WARNING: modes 1 and 3 do not appear to work on
+      the auxiliary device.
+
       . .
       Mode POL PHA
        0    0   0
@@ -2461,7 +2473,7 @@ class pi():
       and 1 otherwise.
 
       A is 0 for the standard SPI device, 1 for the auxiliary SPI.
-      The auxiliary device is only present on the B+.
+      The auxiliary device is only present on the A+/B+/Pi2.
 
       W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
       Standard SPI device only.
@@ -2930,8 +2942,8 @@ class pi():
       data bits [*bb_bits*] specified in the [*bb_serial_read_open*]
       command.
 
-      For [*bb_bits*] 1-8 there will be one byte per character.
-      For [*bb_bits*] 9-16 there will be two bytes per character.
+      For [*bb_bits*] 1-8 there will be one byte per character. 
+      For [*bb_bits*] 9-16 there will be two bytes per character. 
       For [*bb_bits*] 17-32 there will be four bytes per character.
 
       ...
@@ -3183,6 +3195,18 @@ class pi():
 
 def xref():
    """
+   arg1:
+   An unsigned argument passed to a user customised function.  Its
+   meaning is defined by the customiser.
+
+   arg2:
+   An unsigned argument passed to a user customised function.  Its
+   meaning is defined by the customiser.
+
+   argx:
+   An array of bytes passed to a user customised function.
+   Its meaning and content is defined by the customiser.
+
    bb_baud: 100 - 250000
    The baud rate used for the transmission of bit bang serial data.
 
@@ -3242,34 +3266,35 @@ def xref():
    RISING_EDGE = 0
 
    errnum: <0
-   PI_BAD_DATABITS = -101
-   PI_BAD_DUTYCYCLE = -8
-   PI_BAD_DUTYRANGE = -21
-   PI_BAD_FLAGS = -77
-   PI_BAD_GPIO = -3
-   PI_BAD_HANDLE = -25
-   PI_BAD_HCLK_FREQ = -98
-   PI_BAD_HCLK_PASS = -99
-   PI_BAD_HPWM_DUTY = -97
-   PI_BAD_HPWM_FREQ = -96
-   PI_BAD_I2C_ADDR = -75
-   PI_BAD_I2C_BUS = -74
-   PI_BAD_LEVEL = -5
-   PI_BAD_MICS_DELAY = -64
-   PI_BAD_MILS_DELAY = -65
-   PI_BAD_MODE = -4
-   PI_BAD_PARAM = -81
-   PI_BAD_PARAM_NUM = -52
-   PI_BAD_PUD = -6
-   PI_BAD_PULSELEN = -46
-   PI_BAD_PULSEWIDTH = -7
-   PI_BAD_SCRIPT = -47
-   PI_BAD_SCRIPT_CMD = -55
-   PI_BAD_SCRIPT_ID = -48
-   PI_BAD_SERIAL_COUNT = -51
-   PI_BAD_SER_DEVICE = -79
-   PI_BAD_SER_OFFSET = -49
-   PI_BAD_SER_SPEED = -80
+   . .
+   PI_BAD_DATABITS = -101 
+   PI_BAD_DUTYCYCLE = -8 
+   PI_BAD_DUTYRANGE = -21 
+   PI_BAD_FLAGS = -77 
+   PI_BAD_GPIO = -3 
+   PI_BAD_HANDLE = -25 
+   PI_BAD_HCLK_FREQ = -98 
+   PI_BAD_HCLK_PASS = -99 
+   PI_BAD_HPWM_DUTY = -97 
+   PI_BAD_HPWM_FREQ = -96 
+   PI_BAD_I2C_ADDR = -75 
+   PI_BAD_I2C_BUS = -74 
+   PI_BAD_LEVEL = -5 
+   PI_BAD_MICS_DELAY = -64 
+   PI_BAD_MILS_DELAY = -65 
+   PI_BAD_MODE = -4 
+   PI_BAD_PARAM = -81 
+   PI_BAD_PARAM_NUM = -52 
+   PI_BAD_PUD = -6 
+   PI_BAD_PULSELEN = -46 
+   PI_BAD_PULSEWIDTH = -7 
+   PI_BAD_SCRIPT = -47 
+   PI_BAD_SCRIPT_CMD = -55 
+   PI_BAD_SCRIPT_ID = -48 
+   PI_BAD_SERIAL_COUNT = -51 
+   PI_BAD_SER_DEVICE = -79 
+   PI_BAD_SER_OFFSET = -49 
+   PI_BAD_SER_SPEED = -80 
    PI_BAD_SPI_CHANNEL = -76
    PI_BAD_SPI_COUNT = -84
    PI_BAD_SPI_SPEED = -78
@@ -3323,6 +3348,7 @@ def xref():
    PI_TOO_MANY_PULSES = -36
    PI_TOO_MANY_TAGS = -54
    PI_UNKNOWN_COMMAND = -88
+   . .
 
    frequency: 0-40000
    Defines the frequency to be used for PWM on a gpio.
@@ -3333,6 +3359,32 @@ def xref():
 
    gpio: 0-53
    A Broadcom numbered gpio.  All the user gpios are in the range 0-31.
+
+   There  are 54 General Purpose Input Outputs (gpios) named gpio0
+   through gpio53.
+
+   They are split into two  banks.   Bank  1  consists  of  gpio0
+   through gpio31.  Bank 2 consists of gpio32 through gpio53.
+
+   All the gpios which are safe for the user to read and write are in
+   bank 1.  Not all gpios in bank 1 are safe though.  Type 1 boards
+   have 17  safe gpios.  Type 2 boards have 21.  Type 3 boards have 26.
+
+   See [*get_hardware_revision*].
+
+   The user gpios are marked with an X in the following table.
+
+   . .
+             0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+   Type 1    X  X  -  -  X  -  -  X  X  X  X  X  -  -  X  X
+   Type 2    -  -  X  X  X  -  -  X  X  X  X  X  -  -  X  X
+   Type 3          X  X  X  X  X  X  X  X  X  X  X  X  X  X
+
+            16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+   Type 1    -  X  X  -  -  X  X  X  X  X  -  -  -  -  -  -
+   Type 2    -  X  X  -  -  -  X  X  X  X  -  X  X  X  X  X
+   Type 3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
+   . .
 
    gpio_off:
    A mask used to select gpios to be operated on.  See [*bits*].
@@ -3410,10 +3462,10 @@ def xref():
    pulsewidth:
    The servo pulsewidth in microseconds.  0 switches pulses off.
 
-   PWMduty: 0-1000
+   PWMduty: 0-1000000 (1M)
    The hardware PWM dutycycle.
 
-   PWMfreq: 5-250K
+   PWMfreq: 1-125000000 (125M)
    The hardware PWM frequency.
 
    range_: 25-40000
@@ -3424,6 +3476,10 @@ def xref():
    reg: 0-255
    An I2C device register.  The usable registers depend on the
    actual device.
+
+   retMax: >=0
+   The maximum number of bytes a user customised function
+   should return, default 8192.
 
    script:
    The text of a script to store on the pigpio daemon.
@@ -3475,6 +3531,8 @@ def xref():
 
    Not all the gpios within this range are usable, some are reserved
    for system use.
+
+   See [*gpio*].
 
    wait_timeout: 0.0 -
    The number of seconds to wait in wait_for_edge before timing out.

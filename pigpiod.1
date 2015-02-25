@@ -29,6 +29,11 @@ pigpiod accepts the following configuration options
 .br
 .SH OPTIONS
 
+.IP "\fB-a value\fP"
+DMA memory allocation mode
+0=AUTO, 1=PMAP, 2=MBOX
+default AUTO
+
 .IP "\fB-b value\fP"
 gpio sample buffer in milliseconds
 100-10000
@@ -110,18 +115,18 @@ All gpios may be read.
 .br
 
 .br
-Only the default gpios for the board revision or those specified by the -x option may be updated.
+Only the user gpios for the board type or those specified by the -x option may be updated.
 
 .br
 
 .br
 
 .EX
-Revision 1 boards 0x03E6CF93
+Type 1 boards 0x03E6CF93
 .br
-Revision 2 boards 0xFBC6CF9C
+Type 2 boards 0xFBC6CF9C
 .br
-Revision 3 boards 0x0FFFFFFC
+Type 3 boards 0x0FFFFFFC
 .br
 
 .EE
@@ -158,13 +163,13 @@ There are two special cases.
 .br
 
 .br
-The activity LED may be written (gpio 16 for Rev.1/2
-boards, gpio 47 for Rev.3 boards).
+The activity LED may be written (gpio 16 for type 1 and 2
+boards, gpio 47 for type 3 boards).
 
 .br
 
 .br
-The high USB power mode gpio may be written (gpio 38 for Rev.3 boards).
+The high USB power mode gpio may be written (gpio 38 for type 3 boards).
 
 .SH SEE ALSO
 

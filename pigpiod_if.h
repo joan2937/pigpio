@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 13
+#define PIGPIOD_IF_VERSION 14
 
 /*TEXT
 
@@ -471,10 +471,13 @@ user_gpio: 0-31.
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see [*get_PWM_range*]).  If a hardware clock is
-active on the gpio the reported dutycycle will be 500 (out of 1000).
+for the gpio (see [*get_PWM_range*]).
+
+If a hardware clock is active on the gpio the reported dutycycle
+will be 500000 (500k) out of 1000000 (1M).
+
 If hardware PWM is active on the gpio the reported dutycycle
-will be out of a 1000.
+will be out of a 1000000 (1M).
 D*/
 
 /*F*/
@@ -520,7 +523,7 @@ Returns the dutycycle range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
 
 If a hardware clock or hardware PWM is active on the gpio the
-reported range will be 1000.
+reported range will be 1000000 (1M).
 D*/
 
 /*F*/
@@ -535,8 +538,12 @@ user_gpio: 0-31.
 Returns the real range used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
 
-If a hardware clock or hardware PWM is active on the gpio the
-reported real range will be 1000.
+If a hardware clock is active on the gpio the reported
+real range will be 1000000 (1M).
+
+If hardware PWM is active on the gpio the reported real range
+will be approximately 250M divided by the set PWM frequency.
+
 D*/
 
 /*F*/
@@ -593,10 +600,13 @@ user_gpio: 0-31.
 . .
 
 For normal PWM the frequency will be that defined for the gpio by
-[*set_PWM_frequency*].  If a hardware clock is active on the gpio the
-reported frequency will be that set by [*hardware_clock*].  If hardware
-PWM is active on the gpio the reported frequency will be that set by
-[*hardware_PWM*].
+[*set_PWM_frequency*].
+
+If a hardware clock is active on the gpio the reported frequency
+will be that set by [*hardware_clock*].
+
+If hardware PWM is active on the gpio the reported frequency
+will be that set by [*hardware_PWM*].
 
 Returns the frequency (in hertz) used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
@@ -854,10 +864,11 @@ D*/
 int hardware_clock(unsigned gpio, unsigned clkfreq);
 /*D
 Starts a hardware clock on a gpio at the specified frequency.
+Frequencies above 30MHz are unlikely to work.
 
 . .
      gpio: see description
-frequency: 0 (off) or 4689-250M
+frequency: 0 (off) or 4689-250000000 (250M)
 . .
 
 Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -870,9 +881,9 @@ The gpio must be one of the following.
 
 . .
 4   clock 0  All models
-5   clock 1  A+/B+ and compute module only (reserved for system use)
-6   clock 2  A+/B+ and compute module only
-20  clock 0  A+/B+ and compute module only
+5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2 and compute module only
+20  clock 0  A+/B+/Pi2 and compute module only
 21  clock 1  All models but Rev.2 B (reserved for system use)
 
 32  clock 0  Compute module only
@@ -892,6 +903,7 @@ D*/
 int hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
 /*D
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+Frequencies above 30MHz are unlikely to work.
 
 NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*], [*wave_tx_start*], or [*wave_tx_repeat*] will be cancelled.
 
@@ -901,26 +913,25 @@ daemon is started (option -t).
 
 . .
    gpio: see descripton
-PWMfreq: 0 (off) or 5-50K
-PWMduty: 0 (off) to 5000 (fully on).
+PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMduty: 0 (off) to 1000000 (1M)(fully on)
 . .
 
 Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
 PI_NOT_HPWM_GPIO, PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ,
 or PI_HPWM_ILLEGAL.
 
-Both PWM channels share the same clock and the same update frequency.
-The latest frequency setting will be used by both PWM channels. The
-same PWM channel is available on multiple gpios.  The latest
-dutycycle setting will be used by all gpios which share a PWM channel.
+The same PWM channel is available on multiple gpios.  The latest
+frequency and dutycycle setting will be used by all gpios which
+share a PWM channel.
 
 The gpio must be one of the following.
 
 . .
-12  PWM channel 0  A+/B+ and compute module only
-13  PWM channel 1  A+/B+ and compute module only
+12  PWM channel 0  A+/B+/Pi2 and compute module only
+13  PWM channel 1  A+/B+/Pi2 and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+ and compute module only
+19  PWM channel 1  A+/B+/Pi2 and compute module only
 
 40  PWM channel 0  Compute module only
 41  PWM channel 1  Compute module only
@@ -948,30 +959,22 @@ uint32_t get_hardware_revision(void);
 /*D
 Get the Pi's hardware revision number.
 
-The hardware revision is the last 4 characters on the Revision line
+The hardware revision is the last few characters on the Revision line
 of /proc/cpuinfo.
 
 If the hardware revision can not be found or is not a valid
 hexadecimal number the function returns 0.
 
 The revision number can be used to determine the assignment of gpios
-to pins.
+to pins (see [*gpio*]).
 
-There are currently three types of board.
-
-Type 1 has gpio 0 on P1-3, gpio 1 on P1-5, and gpio 21 on P1-13.
-
-Type 2 has gpio 2 on P1-3, gpio 3 on P1-5, gpio 27 on P1-13, and
-gpios 28-31 on P5.
-
-Type 3 has a 40 pin connector rather than the 26 pin connector of
-the earlier boards. Gpios 0 to 27 are brought out to the connector.
+There are at least three types of board.
 
 Type 1 boards have hardware revision numbers of 2 and 3.
 
 Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
 
-Type 3 boards have hardware revision number 16.
+Type 3 boards have hardware revision numbers of 16 or greater.
 D*/
 
 /*F*/
@@ -1404,8 +1407,8 @@ or PI_NOT_SERIAL_GPIO.
 The bytes returned for each character depend upon the number of
 data bits [*bbBits*] specified in the [*bb_serial_read_open*] command.
 
-For [*bbBits*] 1-8 there will be one byte per character.
-For [*bbBits*] 9-16 there will be two bytes per character.
+For [*bbBits*] 1-8 there will be one byte per character. 
+For [*bbBits*] 9-16 there will be two bytes per character. 
 For [*bbBits*] 17-32 there will be four bytes per character.
 D*/
 
@@ -1727,12 +1730,12 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on the B+ and may be
+An auxiliary SPI device is available on the A+/B+/Pi2 and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
-spi_channel: 0-1 (0-2 for B+ auxiliary device).
+spi_channel: 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
    spi_baud: 32K-125M (values above 30M are unlikely to work).
   spi_flags: see below.
 . .
@@ -1749,6 +1752,8 @@ spi_flags consists of the least significant 22 bits.
 
 mm defines the SPI mode.
 
+Warning: modes 1 and 3 do not appear to work on the auxiliary device.
+
 . .
 Mode POL PHA
  0    0   0
@@ -1762,7 +1767,7 @@ px is 0 if CEx is active low (default) and 1 for active high.
 ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the B+.
+auxiliary device is only present on the A+/B+/Pi2.
 
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
 SPI device only.
@@ -1950,17 +1955,17 @@ otherwise PI_BAD_HANDLE.
 D*/
 
 /*F*/
-int custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned count);
+int custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned argc);
 /*D
 This function is available for user customisation.
 
 It returns a single integer value.
 
 . .
- arg1: >=0
- arg2: >=0
- argx: extra (byte) arguments
-count: number of extra arguments
+arg1: >=0
+arg2: >=0
+argx: extra (byte) arguments
+argc: number of extra arguments
 . .
 
 Returns >= 0 if OK, less than 0 indicates a user defined error.
@@ -1968,7 +1973,7 @@ D*/
 
 
 /*F*/
-int custom_2(unsigned arg1, char *argx, unsigned count,
+int custom_2(unsigned arg1, char *argx, unsigned argc,
              char *retBuf, unsigned retMax);
 /*D
 This function is available for user customisation.
@@ -1979,7 +1984,7 @@ rather than just an integer.
 The return value is an integer indicating the number of returned bytes.
 . .
   arg1: >=0
-  argx: extra (byte) arguments
+  argc: extra (byte) arguments
  count: number of extra arguments
 retBuf: buffer for returned data
 retMax: maximum number of bytes to return
@@ -2068,6 +2073,22 @@ the pigpio daemon.  It may be NULL in which case localhost
 is used unless overridden by the PIGPIO_ADDR environment
 variable.
 
+arg1::
+An unsigned argument passed to a user customised function.  Its
+meaning is defined by the customiser.
+
+arg2::
+An unsigned argument passed to a user customised function.  Its
+meaning is defined by the customiser.
+
+argc::
+The count of bytes passed to a user customised function.
+
+*argx::
+A pointer to an array of bytes passed to a user customised function.
+Its meaning and content is defined by the customiser.
+
+
 bbBaud::
 The baud rate used for the transmission and reception of bit banged
 serial data.
@@ -2137,7 +2158,7 @@ typedef void (*CBFuncEx_t)
 char::
 A single character, an 8 bit quantity able to store 0-255.
 
-clkfreq::4689-250M
+clkfreq::4689-250000000 (250M)
 The hardware clock frequency.
 
 count::
@@ -2179,6 +2200,32 @@ by its dutycycle.
 
 gpio::
 A Broadcom numbered gpio, in the range 0-53.
+
+There  are 54 General Purpose Input Outputs (gpios) named gpio0 through
+gpio53.
+
+They are split into two  banks.   Bank  1  consists  of  gpio0  through
+gpio31.  Bank 2 consists of gpio32 through gpio53.
+
+All the gpios which are safe for the user to read and write are in
+bank 1.  Not all gpios in bank 1 are safe though.  Type 1 boards
+have 17  safe gpios.  Type 2 boards have 21.  Type 3 boards have 26.
+
+See [*get_hardware_revision*].
+
+The user gpios are marked with an X in the following table.
+
+. .
+          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+Type 1    X  X  -  -  X  -  -  X  X  X  X  X  -  -  X  X
+Type 2    -  -  X  X  X  -  -  X  X  X  X  X  -  -  X  X
+Type 3          X  X  X  X  X  X  X  X  X  X  X  X  X  X
+
+         16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+Type 1    -  X  X  -  -  X  X  X  X  X  -  -  -  -  -  -
+Type 2    -  X  X  -  -  -  X  X  X  X  -  X  X  X  X  X
+Type 3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
+. .
 
 gpioPulse_t::
 . .
@@ -2305,19 +2352,19 @@ PI_MIN_SERVO_PULSEWIDTH 500
 PI_MAX_SERVO_PULSEWIDTH 2500
 . .
 
-PWMduty::0-1000
+PWMduty::0-1000000 (1M)
 The hardware PWM dutycycle.
 
 . .
-#define PI_HW_PWM_RANGE 1000
+#define PI_HW_PWM_RANGE 1000000
 . .
 
-PWMfreq::5-250K
+PWMfreq::1-125000000 (125M)
 The hardware PWM frequency.
 
 . .
-#define PI_HW_PWM_MIN_FREQ 5
-#define PI_HW_PWM_MAX_FREQ 250000
+#define PI_HW_PWM_MIN_FREQ 1
+#define PI_HW_PWM_MAX_FREQ 125000000
 . .
 
 range::25-40000
@@ -2326,6 +2373,13 @@ The permissible dutycycle values are 0-range.
 PI_MIN_DUTYCYCLE_RANGE 25
 PI_MAX_DUTYCYCLE_RANGE 40000
 . .
+
+*retBuf::
+A buffer to hold a number of bytes returned to a used customised function,
+
+retMax::
+The maximum number of bytes a user customised function should return.
+
 
 *rxBuf::
 A pointer to a buffer to receive data.
@@ -2389,6 +2443,8 @@ A whole number >= 0.
 
 user_gpio::
 0-31, a Broadcom numbered gpio.
+
+See [*gpio*].
 
 *userdata::
 A pointer to arbitrary user data.  This may be used to identify the instance.
