@@ -25,7 +25,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 30 */
+/* pigpio version 31 */
+
+/* include ------------------------------------------------------- */
 
 #include <stdio.h>
 #include <string.h>
@@ -178,7 +180,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 6 C3  System Timer Compare 3
 */
 
-/* --------------------------------------------------------------- */
+/* define -------------------------------------------------------- */
 
 #define THOUSAND 1000
 #define MILLION  1000000
@@ -283,13 +285,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
    }                                                               \
    while (0)
 
-static volatile uint32_t piModel = 1;
-
 #define PI_PERI_BUS 0x7E000000
-
-static volatile uint32_t pi_peri_phys = 0x20000000;
-static volatile uint32_t pi_dram_bus  = 0x40000000;
-static volatile uint32_t pi_mem_flag  = 0x00000004;
 
 #define AUX_BASE   (pi_peri_phys + 0x00215000)
 #define CLK_BASE   (pi_peri_phys + 0x00101000)
@@ -720,6 +716,7 @@ static volatile uint32_t pi_mem_flag  = 0x00000004;
 #define SRX_BUF_SIZE 8192
 
 #define PI_I2C_SLAVE 0x0703
+#define PI_I2C_RDWR  0x0707
 #define PI_I2C_SMBUS 0x0720
 
 #define PI_I2C_SMBUS_READ  1
@@ -758,7 +755,31 @@ static volatile uint32_t pi_mem_flag  = 0x00000004;
 #define MB_UNLOCK_MEMORY_TAG   0x3000E
 #define MB_RELEASE_MEMORY_TAG  0x3000F
 
-/* --------------------------------------------------------------- */
+#define PI_SCRIPT_FREE     0
+#define PI_SCRIPT_RESERVED 1
+#define PI_SCRIPT_IN_USE   2
+#define PI_SCRIPT_DYING    3
+
+#define PI_SCRIPT_HALT   0
+#define PI_SCRIPT_RUN    1
+#define PI_SCRIPT_DELETE 2
+
+#define PI_SCRIPT_STACK_SIZE 256
+
+#define PI_SPI_FLAGS_CHANNEL(x)    ((x&7)<<29)
+
+#define PI_SPI_FLAGS_GET_CHANNEL(x) (((x)>>29)&7)
+#define PI_SPI_FLAGS_GET_BITLEN(x)  (((x)>>16)&63)
+#define PI_SPI_FLAGS_GET_RX_LSB(x)  (((x)>>15)&1)
+#define PI_SPI_FLAGS_GET_TX_LSB(x)  (((x)>>14)&1)
+#define PI_SPI_FLAGS_GET_3WREN(x)   (((x)>>10)&15)
+#define PI_SPI_FLAGS_GET_3WIRE(x)   (((x)>>9)&1)
+#define PI_SPI_FLAGS_GET_AUX_SPI(x) (((x)>>8)&1)
+#define PI_SPI_FLAGS_GET_RESVD(x)   (((x)>>5)&7)
+#define PI_SPI_FLAGS_GET_CSPOLS(x)  (((x)>>2)&7)
+#define PI_SPI_FLAGS_GET_MODE(x)     ((x)&3)
+
+/* typedef ------------------------------------------------------- */
 
 typedef void (*callbk_t) ();
 
@@ -830,17 +851,6 @@ typedef struct
    pthread_t       pthId;
 } gpioTimer_t;
 
-#define PI_SCRIPT_FREE     0
-#define PI_SCRIPT_RESERVED 1
-#define PI_SCRIPT_IN_USE   2
-#define PI_SCRIPT_DYING    3
-
-#define PI_SCRIPT_HALT   0
-#define PI_SCRIPT_RUN    1
-#define PI_SCRIPT_DELETE 2
-
-#define PI_SCRIPT_STACK_SIZE 256
-
 typedef struct
 {
    unsigned id;
@@ -891,19 +901,6 @@ typedef struct
    unsigned speed;
    uint32_t flags;
 } spiInfo_t;
-
-#define PI_SPI_FLAGS_CHANNEL(x)    ((x&7)<<29)
-
-#define PI_SPI_FLAGS_GET_CHANNEL(x) (((x)>>29)&7)
-#define PI_SPI_FLAGS_GET_BITLEN(x)  (((x)>>16)&63)
-#define PI_SPI_FLAGS_GET_RX_LSB(x)  (((x)>>15)&1)
-#define PI_SPI_FLAGS_GET_TX_LSB(x)  (((x)>>14)&1)
-#define PI_SPI_FLAGS_GET_3WREN(x)   (((x)>>10)&15)
-#define PI_SPI_FLAGS_GET_3WIRE(x)   (((x)>>9)&1)
-#define PI_SPI_FLAGS_GET_AUX_SPI(x) (((x)>>8)&1)
-#define PI_SPI_FLAGS_GET_RESVD(x)   (((x)>>5)&7)
-#define PI_SPI_FLAGS_GET_CSPOLS(x)  (((x)>>2)&7)
-#define PI_SPI_FLAGS_GET_MODE(x)     ((x)&3)
 
 typedef struct
 {
@@ -985,6 +982,12 @@ struct my_smbus_ioctl_data
 
 typedef struct
 {
+   pi_i2c_msg_t *msgs; /* pointers to pi_i2c_msgs */
+   uint32_t     nmsgs; /* number of pi_i2c_msgs */
+} my_i2c_rdwr_ioctl_data_t;
+
+typedef struct
+{
    unsigned div;
    unsigned frac;
    unsigned clock;
@@ -998,34 +1001,27 @@ typedef struct
    unsigned  size;          /* in bytes */
 } DMAMem_t;
 
-/* --------------------------------------------------------------- */
+/* global -------------------------------------------------------- */
 
 /* initialise once then preserve */
 
-static volatile gpioCfg_t gpioCfg =
-{
-   PI_DEFAULT_BUFFER_MILLIS,
-   PI_DEFAULT_CLK_MICROS,
-   PI_DEFAULT_CLK_PERIPHERAL,
-   PI_DEFAULT_DMA_PRIMARY_CHANNEL,
-   PI_DEFAULT_DMA_SECONDARY_CHANNEL,
-   PI_DEFAULT_SOCKET_PORT,
-   PI_DEFAULT_IF_FLAGS,
-   0,
-   0,
-   PI_DEFAULT_MEM_ALLOC_MODE,
-};
+static volatile uint32_t piModel      = 1;
+static volatile uint32_t pi_peri_phys = 0x20000000;
+static volatile uint32_t pi_dram_bus  = 0x40000000;
+static volatile uint32_t pi_mem_flag  = 0x0C;
 
-static volatile gpioStats_t gpioStats;
-
-static int gpioMaskSet = 0;
+static int libInitialised = 0;
 
 /* initialise every gpioInitialise */
 
 static struct timespec libStarted;
 static int waveClockInited = 0;
 
-/* initialse if not libInitialised */
+static volatile gpioStats_t gpioStats;
+
+static int gpioMaskSet = 0;
+
+/* initialise if not libInitialised */
 
 static uint64_t gpioMask;
 
@@ -1058,8 +1054,7 @@ static volatile uint32_t notifyBits  = 0;
 static volatile uint32_t scriptBits  = 0;
 
 static volatile int DMAstarted = 0;
-
-static int      libInitialised = 0;
+static volatile int terminating = 0;
 
 static int pthAlertRunning  = 0;
 static int pthFifoRunning   = 0;
@@ -1085,19 +1080,7 @@ static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 
 static int pwmFreq[PWM_FREQS];
 
-/* no initialisation required */
-
-static unsigned bufferBlocks; /* number of blocks in buffer */
-static unsigned bufferCycles; /* number of cycles */
-
-static pthread_attr_t pthAttr;
-
-static pthread_t pthAlert;
-static pthread_t pthFifo;
-static pthread_t pthSocket;
-
-static gpioSample_t gpioSample[DATUMS];
-static gpioReport_t gpioReport[DATUMS];
+/* reset after gpioTerminated */
 
 /* resources which must be released on gpioTerminate */
 
@@ -1133,7 +1116,70 @@ static volatile uint32_t * systReg = MAP_FAILED;
 static volatile uint32_t * dmaIn   = MAP_FAILED;
 static volatile uint32_t * dmaOut  = MAP_FAILED;
 
-/* constant data */
+static uint32_t hw_clk_freq[3];
+static uint32_t hw_pwm_freq[2];
+static uint32_t hw_pwm_duty[2];
+static uint32_t hw_pwm_real_range[2];
+
+static volatile gpioCfg_t gpioCfg =
+{
+   PI_DEFAULT_BUFFER_MILLIS,
+   PI_DEFAULT_CLK_MICROS,
+   PI_DEFAULT_CLK_PERIPHERAL,
+   PI_DEFAULT_DMA_PRIMARY_CHANNEL,
+   PI_DEFAULT_DMA_SECONDARY_CHANNEL,
+   PI_DEFAULT_SOCKET_PORT,
+   PI_DEFAULT_IF_FLAGS,
+   DBG_MIN_LEVEL,
+   0,
+   PI_DEFAULT_MEM_ALLOC_MODE,
+};
+
+/* no initialisation required */
+
+static unsigned bufferBlocks; /* number of blocks in buffer */
+static unsigned bufferCycles; /* number of cycles */
+
+static pthread_t pthAlert;
+static pthread_t pthFifo;
+static pthread_t pthSocket;
+
+static gpioSample_t gpioSample[DATUMS];
+static gpioReport_t gpioReport[DATUMS];
+
+static uint32_t spi_dummy;
+
+static unsigned old_mode_ce0;
+static unsigned old_mode_ce1;
+static unsigned old_mode_sclk;
+static unsigned old_mode_miso;
+static unsigned old_mode_mosi;
+
+static uint32_t old_spi_cs;
+static uint32_t old_spi_clk;
+
+static unsigned old_mode_ace0;
+static unsigned old_mode_ace1;
+static unsigned old_mode_ace2;
+static unsigned old_mode_asclk;
+static unsigned old_mode_amiso;
+static unsigned old_mode_amosi;
+
+static uint32_t old_spi_cntl0;
+static uint32_t old_spi_cntl1;
+
+/* const --------------------------------------------------------- */
+
+static const uint8_t clkDef[PI_MAX_GPIO + 1] =
+{
+ /*             0     1     2     3     4     5     6     7     8     9 */
+   /* 0 */   0x00, 0x00, 0x00, 0x00, 0x84, 0x94, 0xA4, 0x00, 0x00, 0x00,
+   /* 1 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 2 */   0x82, 0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 3 */   0x00, 0x00, 0x84, 0x00, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 4 */   0x00, 0x00, 0x94, 0xA4, 0x94, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 5 */   0x00, 0x00, 0x00, 0x00,
+};
 
 /*
  7 6 5 4 3 2 1 0
@@ -1156,17 +1202,15 @@ CC: 00 CLK0, 01 CLK1, 10 CLK2
  gpio44 GPCLK1 ALT0 Compute module only (reserved for system use)
 */
 
-uint32_t hw_clk_freq[3];
-
-uint8_t clkDef[PI_MAX_GPIO + 1] =
+static const uint8_t PWMDef[PI_MAX_GPIO + 1] =
 {
- /*             0     1     2     3     4     5     6     7     8     9 */
-   /* 0 */   0x00, 0x00, 0x00, 0x00, 0x84, 0x94, 0xA4, 0x00, 0x00, 0x00,
-   /* 1 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 2 */   0x82, 0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 3 */   0x00, 0x00, 0x84, 0x00, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 4 */   0x00, 0x00, 0x94, 0xA4, 0x94, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 5 */   0x00, 0x00, 0x00, 0x00,
+   /*          0     1     2     3     4     5     6     7     8     9 */
+   /* 0 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 1 */   0x00, 0x00, 0x84, 0x94, 0x00, 0x00, 0x00, 0x00, 0x82, 0x92,
+   /* 2 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 3 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+   /* 4 */   0x84, 0x94, 0x00, 0x00, 0x00, 0x94, 0x00, 0x00, 0x00, 0x00,
+   /* 5 */   0x00, 0x00, 0x85, 0x95,
 };
 
 /*
@@ -1187,21 +1231,6 @@ uint8_t clkDef[PI_MAX_GPIO + 1] =
  gpio52 pwm0 ALT1
  gpio53 pwm1 ALT1
 */
-
-uint32_t hw_pwm_freq[2];
-uint32_t hw_pwm_duty[2];
-uint32_t hw_pwm_real_range[2];
-
-uint8_t PWMDef[PI_MAX_GPIO + 1] =
-{
-   /*          0     1     2     3     4     5     6     7     8     9 */
-   /* 0 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 1 */   0x00, 0x00, 0x84, 0x94, 0x00, 0x00, 0x00, 0x00, 0x82, 0x92,
-   /* 2 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 3 */   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   /* 4 */   0x84, 0x94, 0x00, 0x00, 0x00, 0x94, 0x00, 0x00, 0x00, 0x00,
-   /* 5 */   0x00, 0x00, 0x85, 0x95,
-};
 
 static const clkCfg_t clkCfg[]=
 {
@@ -1227,18 +1256,18 @@ static const uint16_t pwmRealRange[PWM_FREQS]=
    { 25,   50,  100,  125,  200,  250,  400,   500,   625,
     800, 1000, 1250, 2000, 2500, 4000, 5000, 10000, 20000};
  
-/* ======================================================================= */
-
-/* Internal prototypes.
-*/
+/* prototype ----------------------------------------------------- */
 
 static void intNotifyBits(void);
+
 static void intScriptBits(void);
+
 static int  gpioNotifyOpenInBand(int fd);
+
 static void initHWClk
    (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH);
-static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
 
+static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
 
 /* ======================================================================= */
 
@@ -1444,7 +1473,7 @@ static void flushMemory(void)
 
 static void waitForDMAstarted(void)
 {
-   while (!DMAstarted)
+   while ((!DMAstarted) && (!terminating))
    {
       if (piModel == 1) myGpioDelay(1000);
       else flushMemory();
@@ -1531,7 +1560,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
 
       case PI_CMD_CF2:
-         /* a couple of extra precautions for untruested code */
+         /* a couple of extra precautions for untrusted code */
          if (p[2] > bufSize) p[2] = bufSize;
          res = gpioCustom2(p[1], buf, p[3], buf, p[2]);
          if (res > p[2]) res = p[2];
@@ -2110,7 +2139,7 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 */
 
-int mbCreate(void)
+static int mbCreate(void)
 {
    /* <0 error */
 
@@ -2119,14 +2148,14 @@ int mbCreate(void)
    return mknod(MB_DEV, S_IFCHR|0600, makedev(MB_DEV_MAJOR, 0));
 }
 
-int mbOpen(void)
+static int mbOpen(void)
 {
    /* <0 error */
 
    return open(MB_DEV, 0);
 }
 
-void mbClose(int fd)
+static void mbClose(int fd)
 {
    close(fd);
 }
@@ -2136,7 +2165,7 @@ static int mbProperty(int fd, void *buf)
    return ioctl(fd, MB_IOCTL, buf);
 }
 
-unsigned mbAllocateMemory(
+static unsigned mbAllocateMemory(
    int fd, unsigned size, unsigned align, unsigned flags)
 {
    int i=1;
@@ -2157,7 +2186,7 @@ unsigned mbAllocateMemory(
    return p[5];
 }
 
-unsigned mbLockMemory(int fd, unsigned handle)
+static unsigned mbLockMemory(int fd, unsigned handle)
 {
    int i=1;
    unsigned p[32];
@@ -2175,7 +2204,7 @@ unsigned mbLockMemory(int fd, unsigned handle)
    return p[5];
 }
 
-unsigned mbUnlockMemory(int fd, unsigned handle)
+static unsigned mbUnlockMemory(int fd, unsigned handle)
 {
    int i=1;
    unsigned p[32];
@@ -2193,7 +2222,7 @@ unsigned mbUnlockMemory(int fd, unsigned handle)
    return p[5];
 }
 
-unsigned mbReleaseMemory(int fd, unsigned handle)
+static unsigned mbReleaseMemory(int fd, unsigned handle)
 {
    int i=1;
    unsigned p[32];
@@ -2211,7 +2240,7 @@ unsigned mbReleaseMemory(int fd, unsigned handle)
    return p[5];
 }
 
-void *mbMapMem(unsigned base, unsigned size)
+static void *mbMapMem(unsigned base, unsigned size)
 {
    void *mem = MAP_FAILED;
 
@@ -2220,13 +2249,13 @@ void *mbMapMem(unsigned base, unsigned size)
    return mem;
 }
 
-int mbUnmapMem(void *addr, unsigned size)
+static int mbUnmapMem(void *addr, unsigned size)
 {
    /* 0 okay, -1 fail */
    return munmap(addr, size);
 }
 
-void mbDMAFree(DMAMem_t *DMAMemP)
+static void mbDMAFree(DMAMem_t *DMAMemP)
 {
    if (DMAMemP->handle)
    {
@@ -2237,7 +2266,7 @@ void mbDMAFree(DMAMem_t *DMAMemP)
    }
 }
 
-int mbDMAAlloc(DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
+static int mbDMAAlloc(DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
 {
    DMAMemP->size = size;
 
@@ -3388,30 +3417,50 @@ int i2cClose(unsigned handle)
    return 0;
 }
 
+int i2cTransaction(unsigned handle, pi_i2c_msg_t *parts, unsigned numParts)
+{
+   int retval, fd;
+   my_i2c_rdwr_ioctl_data_t rdwr;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (parts == NULL)
+      SOFT_ERROR(PI_BAD_POINTER, "null parts");
+
+   if (numParts > PI_I2C_RDRW_IOCTL_MAX_MSGS)
+      SOFT_ERROR(PI_TOO_MANY_PARTS, "too many parts (%d)", numParts);
+
+   fd = open(PI_I2C_COMBINED, O_RDWR);
+
+   if (fd >= 0)
+   {
+      write(fd, "1", 1);
+      close(fd);
+   }
+
+   rdwr.msgs = parts;
+   rdwr.nmsgs = numParts;
+
+   retval = ioctl(i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
+
+   DBG(0, "i2cTransaction retval=%d", retval);
+
+   if (retval >= 0) return retval;
+   else             return PI_BAD_I2C_PART;
+}
+
+
 /* ======================================================================= */
 
 /*SPI */
-
-static uint32_t spi_dummy; /* only used to prevent warning */
-
-static unsigned old_mode_ce0;
-static unsigned old_mode_ce1;
-static unsigned old_mode_sclk;
-static unsigned old_mode_miso;
-static unsigned old_mode_mosi;
-
-static uint32_t old_spi_cs;
-static uint32_t old_spi_clk;
-
-static unsigned old_mode_ace0;
-static unsigned old_mode_ace1;
-static unsigned old_mode_ace2;
-static unsigned old_mode_asclk;
-static unsigned old_mode_amiso;
-static unsigned old_mode_amosi;
-
-static uint32_t old_spi_cntl0;
-static uint32_t old_spi_cntl1;
 
 static uint32_t _spiTXBits(char *buf, int pos, int bitlen, int msbf)
 {
@@ -3767,7 +3816,7 @@ static void spiInit(uint32_t flags)
    }
 }
 
-void spiTerm(uint32_t flags)
+static void spiTerm(uint32_t flags)
 {
    int resvd;
 
@@ -6341,8 +6390,9 @@ static void initClearGlobals(void)
    notifyBits  = 0;
    scriptBits  = 0;
 
-   libInitialised   = 0;
-   DMAstarted       = 0;
+   libInitialised = 0;
+   DMAstarted     = 0;
+   terminating    = 0;
 
    pthAlertRunning  = 0;
    pthFifoRunning   = 0;
@@ -6598,19 +6648,22 @@ static void initReleaseResources(void)
 
 int initInitialise(void)
 {
-   int i;
+   int rev, i;
    struct sockaddr_in server;
    char * portStr;
    unsigned port;
    struct sched_param param;
+   pthread_attr_t pthAttr;
+
+   DBG(DBG_STARTUP, "");
+
+   if (libInitialised) return PIGPIO_VERSION;
 
    waveClockInited = 0;
 
    clock_gettime(CLOCK_REALTIME, &libStarted);
 
-   DBG(DBG_STARTUP, "");
-
-   if (libInitialised) return PIGPIO_VERSION;
+   rev = gpioHardwareRevision();
 
    initClearGlobals();
 
@@ -6623,13 +6676,11 @@ int initInitialise(void)
 
    if (!gpioMaskSet)
    {
-      i = gpioHardwareRevision();
-
-      if      (i ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
-      else if (i == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-      else if (i <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
-      else if (i <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
-      else              gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
+      if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
+      else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+      else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
+      else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
+      else                gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
 
       gpioMaskSet = 1;
    }
@@ -6937,18 +6988,20 @@ void gpioTerminate(void)
 
    DBG(DBG_USER, "");
 
-   gpioMaskSet = 0;
+   terminating = 1;
 
    if (libInitialised)
    {
+      libInitialised = 0;
+
+      gpioMaskSet = 0;
+
       /* reset DMA */
 
       DMAstarted = 0;
 
       dmaIn[DMA_CS] = DMA_CHANNEL_RESET;
       dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-
-      libInitialised = 0;
 
       if (gpioCfg.showStats)
       {
@@ -8573,6 +8626,8 @@ static int intGpioSetTimerFunc(unsigned id,
                                int user,
                                void *userdata)
 {
+   pthread_attr_t pthAttr;
+
    DBG(DBG_INTERNAL, "id=%d millis=%d function=%08X user=%d userdata=%08X",
       id, millis, (uint32_t)f, user, (uint32_t)userdata);
 
@@ -8587,6 +8642,14 @@ static int intGpioSetTimerFunc(unsigned id,
 
       if (!gpioTimer[id].running)
       {
+         if (pthread_attr_init(&pthAttr))
+            SOFT_ERROR(PI_TIMER_FAILED,
+               "pthread_attr_init failed (%m)");
+
+         if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
+            SOFT_ERROR(PI_TIMER_FAILED,
+               "pthread_attr_setstacksize failed (%m)");
+
          if (pthread_create(
             &gpioTimer[id].pthId, &pthAttr, pthTimerTick, &gpioTimer[id]))
                SOFT_ERROR(PI_TIMER_FAILED,
@@ -9377,7 +9440,7 @@ unsigned gpioHardwareRevision(void)
                   chars = 4;
                   pi_peri_phys = 0x20000000;
                   pi_dram_bus  = 0x40000000;
-                  pi_mem_flag  = 0x0c;
+                  pi_mem_flag  = 0x0C;
                }
                else if (strstr (buf, "ARMv7") != NULL)
                {

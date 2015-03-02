@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 30
+#define PIGPIO_VERSION 31
 
 /*TEXT
 
@@ -319,6 +319,8 @@ OVERVIEW*/
 
 #define PI_LOCKFILE "/var/run/pigpio.pid"
 
+#define PI_I2C_COMBINED "/sys/module/i2c_bcm2708/parameters/combined"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -398,6 +400,29 @@ uint32_t stride;
 uint32_t next;
 uint32_t pad[2];
 } rawCbs_t;
+
+/* max pi_i2c_msg_t per transaction */
+
+#define  PI_I2C_RDRW_IOCTL_MAX_MSGS 42
+
+/* flags for pi_i2c_msg_t */
+
+#define PI_I2C_M_WR           0x0000 /* write data */
+#define PI_I2C_M_RD           0x0001 /* read data */
+#define PI_I2C_M_TEN          0x0010 /* ten bit chip address */
+#define PI_I2C_M_RECV_LEN     0x0400 /* length will be first received byte */
+#define PI_I2C_M_NO_RD_ACK    0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_IGNORE_NAK   0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_NOSTART      0x4000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+
+typedef struct
+{
+   uint16_t addr;  /* slave address       */
+   uint16_t flags;
+   uint16_t len;   /* msg length          */
+   uint8_t  *buf;  /* pointer to msg data */
+} pi_i2c_msg_t;
 
 typedef void (*gpioAlertFunc_t)    (int      gpio,
                                     int      level,
@@ -1699,7 +1724,6 @@ user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 D*/
 
-
 /*F*/
 int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 /*D
@@ -1715,6 +1739,22 @@ No flags are currently defined.  This parameter should be set to zero.
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
+
+For the smbus commands the low level transactions are shown at the end
+of the function description.  The following abbreviations are used.
+
+. .
+S     (1 bit) : Start bit
+P     (1 bit) : Stop bit
+Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+A, NA (1 bit) : Accept and not accept bit. 
+Addr  (7 bits): I2C 7 bit address.
+Comm  (8 bits): Command byte, a data byte which often selects a register.
+Data  (8 bits): A data byte.
+Count (8 bits): A data byte containing the length of a block operation.
+
+[..]: Data sent by the device.
+. .
 D*/
 
 
@@ -1762,6 +1802,10 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 D*/
 
+int i2cTransaction(unsigned handle, pi_i2c_msg_t *parts, unsigned numParts);
+/*
+This performs a combined I2C transction made up of count parts.
+*/
 
 /*F*/
 int i2cWriteQuick(unsigned handle, unsigned bit);
@@ -1778,6 +1822,9 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 Quick command. smbus 2.0 5.5.1
+. .
+S Addr Rd/Wr [A] P
+. .
 D*/
 
 
@@ -1795,6 +1842,9 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 Send byte. smbus 2.0 5.5.2
+. .
+S Addr Wr [A] Data [A] P
+. .
 D*/
 
 
@@ -1811,6 +1861,9 @@ Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 or PI_I2C_READ_FAILED.
 
 Receive byte. smbus 2.0 5.5.3
+. .
+S Addr Rd [A] [Data] NA P
+. .
 D*/
 
 
@@ -1830,6 +1883,9 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 Write byte. smbus 2.0 5.5.4
+. .
+S Addr Wr [A] Comm [A] Data [A] P
+. .
 D*/
 
 
@@ -1849,6 +1905,9 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 Write word. smbus 2.0 5.5.4
+. .
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+. .
 D*/
 
 
@@ -1867,6 +1926,9 @@ Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Read byte. smbus 2.0 5.5.5
+. .
+S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+. .
 D*/
 
 
@@ -1885,6 +1947,9 @@ Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Read word. smbus 2.0 5.5.5
+. .
+S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
 D*/
 
 
@@ -1904,6 +1969,10 @@ Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Process call. smbus 2.0 5.5.6
+. .
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
 D*/
 
 
@@ -1925,6 +1994,9 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 Block write. smbus 2.0 5.5.7
+. .
+S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+. .
 D*/
 
 
@@ -1946,6 +2018,10 @@ Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Block read. smbus 2.0 5.5.7
+. .
+S Addr Wr [A] Comm [A]
+   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+. .
 D*/
 
 
@@ -1972,6 +2048,10 @@ sent and a minimum of 1 byte may be received.  The total number of
 bytes sent/received must be 32 or less.
 
 Block write-block read. smbus 2.0 5.5.8
+. .
+S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+   S Addr Rd [A] [Count] A [Data] ... A P
+. .
 D*/
 
 
@@ -1991,6 +2071,11 @@ i2cReg: 0-255, the register to read
 
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+. .
+S Addr Wr [A] Comm [A]
+   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+. .
 D*/
 
 
@@ -2010,6 +2095,10 @@ i2cReg: 0-255, the register to write
 
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
+
+. .
+S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+. .
 D*/
 
 
@@ -3742,38 +3831,47 @@ numBits::
 The number of bits stored in a buffer.
 
 numBytes::
-
 The number of bytes used to store characters in a string.  Depending
 on the number of bits per character there may be 1, 2, or 4 bytes
 per character.
 
 numPar:: 0-10
-
 The number of parameters passed to a script.
 
-numPulses::
+numParts::
+The number of parts in a combined I2C transaction.
 
+numPulses::
 The number of pulses to be added to a waveform.
 
 offset::
-
 The associated data starts this number of microseconds from the start of
 tghe waveform.
 
 *param::
-
 An array of script parameters.
 
-port:: 1024-32000
+*parts::
+An array of the part transactions which make up a combined I2C transaction.
 
+pi_i2c_msg_t::
+. .
+typedef struct
+{
+   uint16_t addr;  // slave address
+   uint16_t flags;
+   uint16_t len;   // msg length
+   uint8_t  *buf;  // pointer to msg data
+} pi_i2c_msg_t;
+. .
+
+port:: 1024-32000
 The port used to bind to the pigpio socket.  Defaults to 8888.
 
 pos::
-
 The position of an item.
 
 primaryChannel:: 0-14
-
 The DMA channel used to time the sampling of gpios and to time servo and
 PWM pulses.
 
@@ -4323,6 +4421,9 @@ after this command is issued.
 #define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
 #define PI_MSG_TOOBIG      -103 // socket/pipe message too big
 #define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
+#define PI_TOO_MANY_PARTS  -105 // too many I2C transaction parts
+#define PI_BAD_I2C_PART    -106 // a combined I2C transaction failed
+
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

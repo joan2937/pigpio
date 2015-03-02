@@ -118,6 +118,8 @@ Pi_Hasher_t *Pi_Hasher(int gpio, Pi_Hasher_CB_t callback, int timeout)
 
    gpioSetMode(gpio, PI_INPUT);
    gpioSetAlertFuncEx(gpio, _cb, hasher);
+
+   return hasher;
 }
 
 void Pi_Hasher_cancel(Pi_Hasher_t *hasher)
@@ -127,6 +129,8 @@ void Pi_Hasher_cancel(Pi_Hasher_t *hasher)
       gpioSetAlertFunc(hasher->gpio, 0);
 
       free(hasher);
+
+      hasher = NULL;
    }
 }
 

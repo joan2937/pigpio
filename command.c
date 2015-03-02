@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 30+
+This version is for pigpio version 31+
 */
 
 #include <stdio.h>
@@ -494,6 +494,8 @@ static errInfo_t errInfo[]=
    {PI_BAD_DATABITS     , "serial data bits not 1-32"},
    {PI_MSG_TOOBIG       , "socket/pipe message too big"},
    {PI_BAD_MALLOC_MODE  , "bad memory allocation mode"},
+   {PI_TOO_MANY_PARTS   , "too many I2C transaction parts"},
+   {PI_BAD_I2C_PART     , "a combined I2C transaction failed"},
 
 };
 

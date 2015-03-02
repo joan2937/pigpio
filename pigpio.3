@@ -2062,6 +2062,42 @@ No flags are currently defined.  This parameter should be set to zero.
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
 
+.br
+
+.br
+For the smbus commands the low level transactions are shown at the end
+of the function description.  The following abbreviations are used.
+
+.br
+
+.br
+
+.EX
+S     (1 bit) : Start bit
+.br
+P     (1 bit) : Stop bit
+.br
+Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+.br
+A, NA (1 bit) : Accept and not accept bit.
+.br
+.br
+.br
+Addr  (7 bits): I2C 7 bit address.
+.br
+Comm  (8 bits): Command byte, a data byte which often selects a register.
+.br
+Data  (8 bits): A data byte.
+.br
+Count (8 bits): A data byte containing the length of a block operation.
+.br
+
+.br
+[..]: Data sent by the device.
+.br
+
+.EE
+
 .IP "\fBint i2cClose(unsigned handle)\fP"
 .IP "" 4
 This closes the I2C device associated with the handle.
@@ -2157,6 +2193,12 @@ PI_I2C_WRITE_FAILED.
 .br
 Quick command. smbus 2.0 5.5.1
 
+.EX
+S Addr Rd/Wr [A] P
+.br
+
+.EE
+
 .IP "\fBint i2cWriteByte(unsigned handle, unsigned bVal)\fP"
 .IP "" 4
 This sends a single byte to the device associated with handle.
@@ -2184,6 +2226,12 @@ PI_I2C_WRITE_FAILED.
 .br
 Send byte. smbus 2.0 5.5.2
 
+.EX
+S Addr Wr [A] Data [A] P
+.br
+
+.EE
+
 .IP "\fBint i2cReadByte(unsigned handle)\fP"
 .IP "" 4
 This reads a single byte from the device associated with handle.
@@ -2208,6 +2256,12 @@ or PI_I2C_READ_FAILED.
 
 .br
 Receive byte. smbus 2.0 5.5.3
+
+.EX
+S Addr Rd [A] [Data] NA P
+.br
+
+.EE
 
 .IP "\fBint i2cWriteByteData(unsigned handle, unsigned i2cReg, unsigned bVal)\fP"
 .IP "" 4
@@ -2239,6 +2293,12 @@ PI_I2C_WRITE_FAILED.
 .br
 Write byte. smbus 2.0 5.5.4
 
+.EX
+S Addr Wr [A] Comm [A] Data [A] P
+.br
+
+.EE
+
 .IP "\fBint i2cWriteWordData(unsigned handle, unsigned i2cReg, unsigned wVal)\fP"
 .IP "" 4
 This writes a single 16 bit word to the specified register of the device
@@ -2269,6 +2329,12 @@ PI_I2C_WRITE_FAILED.
 .br
 Write word. smbus 2.0 5.5.4
 
+.EX
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+.br
+
+.EE
+
 .IP "\fBint i2cReadByteData(unsigned handle, unsigned i2cReg)\fP"
 .IP "" 4
 This reads a single byte from the specified register of the device
@@ -2297,6 +2363,12 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 Read byte. smbus 2.0 5.5.5
 
+.EX
+S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+.br
+
+.EE
+
 .IP "\fBint i2cReadWordData(unsigned handle, unsigned i2cReg)\fP"
 .IP "" 4
 This reads a single 16 bit word from the specified register of the device
@@ -2324,6 +2396,12 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 .br
 Read word. smbus 2.0 5.5.5
+
+.EX
+S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+.br
+
+.EE
 
 .IP "\fBint i2cProcessCall(unsigned handle, unsigned i2cReg, unsigned wVal)\fP"
 .IP "" 4
@@ -2354,6 +2432,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 .br
 Process call. smbus 2.0 5.5.6
+
+.EX
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+.br
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
+.br
+
+.EE
 
 .IP "\fBint i2cWriteBlockData(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2386,6 +2472,12 @@ PI_I2C_WRITE_FAILED.
 
 .br
 Block write. smbus 2.0 5.5.7
+
+.EX
+S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint i2cReadBlockData(unsigned handle, unsigned i2cReg, char *buf)\fP"
 .IP "" 4
@@ -2421,6 +2513,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 .br
 Block read. smbus 2.0 5.5.7
+
+.EX
+S Addr Wr [A] Comm [A]
+.br
+   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+.br
+
+.EE
 
 .IP "\fBint i2cBlockProcessCall(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2462,6 +2562,14 @@ bytes sent/received must be 32 or less.
 .br
 Block write-block read. smbus 2.0 5.5.8
 
+.EX
+S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+.br
+   S Addr Rd [A] [Count] A [Data] ... A P
+.br
+
+.EE
+
 .IP "\fBint i2cReadI2CBlockData(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
 .IP "" 4
 This reads count bytes from the specified register of the device
@@ -2489,6 +2597,18 @@ i2cReg: 0-255, the register to read
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
+.br
+
+.br
+
+.EX
+S Addr Wr [A] Comm [A]
+.br
+   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+.br
+
+.EE
+
 .IP "\fBint i2cWriteI2CBlockData(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes 1 to 32 bytes to the specified register of the device
@@ -2515,6 +2635,16 @@ i2cReg: 0-255, the register to write
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
+
+.br
+
+.br
+
+.EX
+S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)\fP"
 .IP "" 4
@@ -5697,10 +5827,6 @@ The number of bits stored in a buffer.
 .br
 
 .IP "\fBnumBytes\fP" 0
-
-.br
-
-.br
 The number of bytes used to store characters in a string.  Depending
 on the number of bits per character there may be 1, 2, or 4 bytes
 per character.
@@ -5710,21 +5836,20 @@ per character.
 .br
 
 .IP "\fBnumPar\fP: 0-10" 0
-
-.br
-
-.br
 The number of parameters passed to a script.
 
 .br
 
 .br
 
+.IP "\fBnumParts\fP" 0
+The number of parts in a combined I2C transaction.
+
+.br
+
+.br
+
 .IP "\fBnumPulses\fP" 0
-
-.br
-
-.br
 The number of pulses to be added to a waveform.
 
 .br
@@ -5732,10 +5857,6 @@ The number of pulses to be added to a waveform.
 .br
 
 .IP "\fBoffset\fP" 0
-
-.br
-
-.br
 The associated data starts this number of microseconds from the start of
 tghe waveform.
 
@@ -5744,21 +5865,44 @@ tghe waveform.
 .br
 
 .IP "\fB*param\fP" 0
-
-.br
-
-.br
 An array of script parameters.
 
 .br
 
 .br
 
+.IP "\fB*parts\fP" 0
+An array of the part transactions which make up a combined I2C transaction.
+
+.br
+
+.br
+
+.IP "\fBpi_i2c_msg_t\fP" 0
+
+.EX
+typedef struct
+.br
+{
+.br
+   uint16_t addr;  // slave address
+.br
+   uint16_t flags;
+.br
+   uint16_t len;   // msg length
+.br
+   uint8_t  *buf;  // pointer to msg data
+.br
+} pi_i2c_msg_t;
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fBport\fP: 1024-32000" 0
-
-.br
-
-.br
 The port used to bind to the pigpio socket.  Defaults to 8888.
 
 .br
@@ -5766,10 +5910,6 @@ The port used to bind to the pigpio socket.  Defaults to 8888.
 .br
 
 .IP "\fBpos\fP" 0
-
-.br
-
-.br
 The position of an item.
 
 .br
@@ -5777,10 +5917,6 @@ The position of an item.
 .br
 
 .IP "\fBprimaryChannel\fP: 0-14" 0
-
-.br
-
-.br
 The DMA channel used to time the sampling of gpios and to time servo and
 PWM pulses.
 
@@ -6902,6 +7038,12 @@ A 16-bit word value.
 #define PI_MSG_TOOBIG      -103 // socket/pipe message too big
 .br
 #define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
+.br
+#define PI_TOO_MANY_PARTS  -105 // too many I2C transaction parts
+.br
+#define PI_BAD_I2C_PART    -106 // a combined I2C transaction failed
+.br
+
 .br
 
 .br
