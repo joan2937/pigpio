@@ -4,7 +4,7 @@ AR      = ar
 RANLIB  = ranlib
 SIZE    = size
 
-CFLAGS	= -O3 -Wall
+CFLAGS	+= -O3 -Wall
 
 LIB1     = libpigpio.a
 OBJ1     = pigpio.o command.o
@@ -40,7 +40,7 @@ pig2vcd:	pig2vcd.o
 clean:
 	rm -f *.o *.i *.s *~ $(ALL)
 
-install:	$(LIB) 
+install:	$(LIB)
 	sudo install -m 0755 -d              /opt/pigpio/cgi
 	sudo install -m 0755 -d              /usr/local/include
 	sudo install -m 0644 pigpio.h        /usr/local/include
@@ -89,4 +89,3 @@ pigpiod_if.o: pigpiod_if.c pigpio.h command.h pigpiod_if.h
 pigs.o: pigs.c pigpio.h command.h
 x_pigpio.o: x_pigpio.c pigpio.h
 x_pigpiod_if.o: x_pigpiod_if.c pigpiod_if.h pigpio.h
-

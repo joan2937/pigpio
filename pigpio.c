@@ -46,7 +46,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <limits.h>
-#include <pthread.h> 
+#include <pthread.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -117,7 +117,7 @@ For more information, please refer to <http://unlicense.org/>
 5 TXFR_LEN     DMA Channel 0 CB Word 3 (Transfer Length)
 6 STRIDE       DMA Channel 0 CB Word 4 (2D Stride)
 7 NEXTCPI_ONBK DMA Channel 0 CB Word 5 (Next CB Address)
-8 DEBUG        DMA Channel 0 Debug 
+8 DEBUG        DMA Channel 0 Debug
 */
 
 /*
@@ -127,24 +127,24 @@ bit 2 READ_ERROR
 
    Slave Read Response Error RW 0x0
 
-   Set if the read operation returned an error value on 
-   the read response bus. It can be cleared by writing 
+   Set if the read operation returned an error value on
+   the read response bus. It can be cleared by writing
    a 1.
 
 bit 1 FIFO_ERROR
 
    Fifo Error RW 0x0
 
-   Set if the optional read Fifo records an error 
+   Set if the optional read Fifo records an error
    condition. It can be cleared by writing a 1.
 
 bit 0 READ_LAST_NOT_SET_ERROR
 
    Read Last Not Set Error RW 0x0
 
-   If the AXI read last signal was not set when 
-   expected, then this error bit will be set. It can be 
-   cleared by writing a 1. 
+   If the AXI read last signal was not set when
+   expected, then this error bit will be set. It can be
+   cleared by writing a 1.
 */
 
 /*
@@ -190,77 +190,65 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define BIT  (1<<(gpio&0x1F))
 
-#define CHECK_INITED                                               \
-   do                                                              \
-   {                                                               \
-      if (!libInitialised)                                         \
-      {                                                            \
-         fprintf(stderr,                                           \
-            "%s %s: pigpio uninitialised, call gpioInitialise()\n",\
-            myTimeStamp(), __FUNCTION__);                          \
-         return PI_NOT_INITIALISED;                                \
-      }                                                            \
-   }                                                               \
-   while (0)
+#ifndef EMBEDDED_IN_VM
+#define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
+#else
+#define DBG(level, format, arg...)
+#endif
 
-#define CHECK_INITED_RET_NULL_PTR                                  \
-   do                                                              \
-   {                                                               \
-      if (!libInitialised)                                         \
-      {                                                            \
-         fprintf(stderr,                                           \
-            "%s %s: pigpio uninitialised, call gpioInitialise()\n",\
-            myTimeStamp(), __FUNCTION__);                          \
-         return (NULL);                                            \
-      }                                                            \
-   }                                                               \
-   while (0)
-
-#define CHECK_INITED_RET_NIL                                       \
-   do                                                              \
-   {                                                               \
-      if (!libInitialised)                                         \
-      {                                                            \
-         fprintf(stderr,                                           \
-            "%s %s: pigpio uninitialised, call gpioInitialise()\n",\
-            myTimeStamp(), __FUNCTION__);                          \
-      }                                                            \
-   }                                                               \
-   while (0)
-
-#define CHECK_NOT_INITED                                           \
-   do                                                              \
-   {                                                               \
-      if (libInitialised)                                          \
-      {                                                            \
-         fprintf(stderr,                                           \
-            "%s %s: pigpio initialised, call gpioTerminate()\n",   \
-            myTimeStamp(), __FUNCTION__);                          \
-         return PI_INITIALISED;                                    \
-      }                                                            \
-   }                                                               \
-   while (0)
-
-#define DBG(level, format, arg...)                                 \
-   do                                                              \
+#define DO_DBG(level, format, arg...)                              \
    {                                                               \
       if (gpioCfg.dbgLevel >= level)                               \
          fprintf(stderr, "%s %s: " format "\n" ,                   \
             myTimeStamp(), __FUNCTION__ , ## arg);                 \
+   }
+
+#define CHECK_INITED                                               \
+   {                                                               \
+      if (!libInitialised)                                         \
+      {                                                            \
+         DBG(DBG_ALWAYS,                                           \
+           "pigpio uninitialised, call gpioInitialise()");         \
+         return PI_NOT_INITIALISED;                                \
+      }                                                            \
    }                                                               \
-   while (0)
+
+#define CHECK_INITED_RET_NULL_PTR                                  \
+   {                                                               \
+      if (!libInitialised)                                         \
+      {                                                            \
+         DBG(DBG_ALWAYS,                                           \
+           "pigpio uninitialised, call gpioInitialise()");         \
+         return (NULL);                                            \
+      }                                                            \
+   }                                                               \
+
+#define CHECK_INITED_RET_NIL                                       \
+   {                                                               \
+      if (!libInitialised)                                         \
+      {                                                            \
+         DBG(DBG_ALWAYS,                                           \
+           "pigpio uninitialised, call gpioInitialise()");         \
+      }                                                            \
+   }                                                               \
+
+#define CHECK_NOT_INITED                                           \
+   {                                                               \
+      if (libInitialised)                                          \
+      {                                                            \
+         DBG(DBG_ALWAYS,                                           \
+            "pigpio initialised, call gpioTerminate()");           \
+         return PI_INITIALISED;                                    \
+      }                                                            \
+   }                                                               \
 
 #define SOFT_ERROR(x, format, arg...)                              \
-   do                                                              \
    {                                                               \
-      fprintf(stderr, "%s %s: " format "\n",                       \
-         myTimeStamp(), __FUNCTION__ , ## arg);                    \
+      DBG(DBG_ALWAYS, format, ## arg);                             \
       return x;                                                    \
    }                                                               \
-   while (0)
 
 #define TIMER_ADD(a, b, result)                                    \
-   do                                                              \
    {                                                               \
       (result)->tv_sec =  (a)->tv_sec  + (b)->tv_sec;              \
       (result)->tv_nsec = (a)->tv_nsec + (b)->tv_nsec;             \
@@ -270,10 +258,8 @@ bit 0 READ_LAST_NOT_SET_ERROR
         (result)->tv_nsec -= BILLION;                              \
       }                                                            \
    }                                                               \
-   while (0)
 
 #define TIMER_SUB(a, b, result)                                    \
-   do                                                              \
    {                                                               \
       (result)->tv_sec =  (a)->tv_sec  - (b)->tv_sec;              \
       (result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec;             \
@@ -283,7 +269,6 @@ bit 0 READ_LAST_NOT_SET_ERROR
          (result)->tv_nsec += BILLION;                             \
       }                                                            \
    }                                                               \
-   while (0)
 
 #define PI_PERI_BUS 0x7E000000
 
@@ -1251,11 +1236,11 @@ static const clkCfg_t clkCfg[]=
 static const uint16_t pwmCycles[PWM_FREQS]=
    {  1,    2,    4,    5,    8,   10,   16,    20,    25,
      32,   40,   50,   80,  100,  160,  200,   400,   800};
- 
+
 static const uint16_t pwmRealRange[PWM_FREQS]=
    { 25,   50,  100,  125,  200,  250,  400,   500,   625,
     800, 1000, 1250, 2000, 2500, 4000, 5000, 10000, 20000};
- 
+
 /* prototype ----------------------------------------------------- */
 
 static void intNotifyBits(void);
@@ -1501,7 +1486,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
          if ((mask | p[1]) != mask)
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioWrite_Bits_0_31_Clear: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
@@ -1515,7 +1500,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
          if ((mask | p[1]) != mask)
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioWrite_Bits_32_53_Clear: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
@@ -1533,7 +1518,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
          if ((mask | p[1]) != mask)
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioWrite_Bits_0_31_Set: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
@@ -1547,7 +1532,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
          if ((mask | p[1]) != mask)
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioWrite_Bits_32_53_Set: bad bits %08X (permissions %08X)",
                p[1], mask);
             res = PI_SOME_PERMITTED;
@@ -1702,7 +1687,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          if (myPermit(p[1])) res = gpioSetPWMfrequency(p[1], p[2]);
          else
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioSetPWMfrequency: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
@@ -1734,7 +1719,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          if (myPermit(p[1])) res = gpioSetPWMrange(p[1], p[2]);
          else
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioSetPWMrange: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
@@ -1744,7 +1729,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          if (myPermit(p[1])) res = gpioSetPullUpDown(p[1], p[2]);
          else
          {
-            DBG(DBG_USER, 
+            DBG(DBG_USER,
                "gpioSetPullUpDown: gpio %d, no permission to update", p[1]);
             res = PI_NOT_PERMITTED;
          }
@@ -2728,7 +2713,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
    out   = wf[1-wfcur];
 
    tNow = 0;
-  
+
    if (!numIn1) tNext1 = -1; else tNext1 = 0;
    if (!numIn2) tNext2 = -1; else tNext2 = 0;
 
@@ -3228,7 +3213,7 @@ int i2cReadI2CBlockData(
    if (my_smbus_access(
       i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data))
       return PI_I2C_READ_FAILED;
-   else 
+   else
    {
       if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
       {
@@ -3497,9 +3482,9 @@ static void spiACS(int channel, int on)
 
    switch (channel)
    {
-       case  0: gpio = PI_ASPI_CE0; break; 
-       case  1: gpio = PI_ASPI_CE1; break; 
-       default: gpio = PI_ASPI_CE2; break; 
+       case  0: gpio = PI_ASPI_CE0; break;
+       case  1: gpio = PI_ASPI_CE1; break;
+       default: gpio = PI_ASPI_CE2; break;
    }
    myGpioWrite(gpio, on);
 }
@@ -4474,7 +4459,7 @@ static uint32_t dmaCbAdr(int pos)
 /* ----------------------------------------------------------------------- */
 
 static void dmaGpioOnCb(int b, int pos)
-{   
+{
    rawCbs_t * p;
 
    p = dmaCB2adr(b);
@@ -4489,7 +4474,7 @@ static void dmaGpioOnCb(int b, int pos)
 /* ----------------------------------------------------------------------- */
 
 static void dmaTickCb(int b, int pos)
-{   
+{
    rawCbs_t * p;
 
    p = dmaCB2adr(b);
@@ -4779,7 +4764,7 @@ static void * pthAlertThread(void *x)
 
             numSamples++;
          }
-         
+
          tick += gpioCfg.clockMicros;
 
          if (++pulse >= PULSE_PER_CYCLE)
@@ -4791,7 +4776,7 @@ static void * pthAlertThread(void *x)
                cycle = 0;
                oldSlot = 0;
             }
-            
+
             expected = tick;
 
             tick = myGetTick(cycle);
@@ -5114,7 +5099,7 @@ static void * pthAlertThread(void *x)
 
       if (numSamples > gpioStats.maxSamples)
          gpioStats.maxSamples = numSamples;
-      
+
       gpioStats.numSamples += numSamples;
    }
 
@@ -5714,7 +5699,7 @@ static void * pthSocketThread(void *x)
    int fdC, c, *sock;
    struct sockaddr_in client;
    pthread_attr_t attr;
- 
+
    if (pthread_attr_init(&attr))
       SOFT_ERROR((void*)PI_INIT_FAILED,
          "pthread_attr_init failed (%m)");
@@ -5731,7 +5716,7 @@ static void * pthSocketThread(void *x)
       failure to bind as fatal. */
 
    listen(fdSock, 100);
-   
+
    c = sizeof(struct sockaddr_in);
 
    /* don't start until DMA started */
@@ -5746,13 +5731,13 @@ static void * pthSocketThread(void *x)
       sock = malloc(sizeof(int));
 
       *sock = fdC;
-      
+
       if (pthread_create
          (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
          SOFT_ERROR((void*)PI_INIT_FAILED,
             "socket pthread_create failed (%m)");
    }
-   
+
    if (fdC < 0)
       SOFT_ERROR((void*)PI_INIT_FAILED, "accept failed (%m)");
 
@@ -5770,15 +5755,15 @@ static int initGrabLockFile(void)
    /* try to grab the lock file */
 
    fd = open(PI_LOCKFILE, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0644);
-   
+
    if (fd != -1)
    {
       lockResult = flock(fd, LOCK_EX|LOCK_NB);
-   
+
       if(lockResult == 0)
       {
          sprintf(pidStr, "%d\n", (int)getpid());
-   
+
          write(fd, pidStr, strlen(pidStr));
       }
       else
@@ -5809,13 +5794,13 @@ static int initCheckPermitted(void)
 
    if ((fdMem = open("/dev/mem", O_RDWR | O_SYNC) ) < 0)
    {
-      fprintf(stderr,
+      DBG(DBG_STARTUP,
          "\n" \
          "+---------------------------------------------------------+\n" \
          "|Sorry, you don't have permission to run this program.    |\n" \
          "|Try running as root, e.g. precede the command with sudo. |\n" \
          "+---------------------------------------------------------+\n\n");
-      exit(-1);
+      return -1;
    }
    return 0;
 }
@@ -6168,7 +6153,7 @@ static int initAllocDMAMem(void)
    DBG(DBG_STARTUP,
       "gpioReg=%08X pwmReg=%08X pcmReg=%08X clkReg=%08X auxReg=%08X",
       (uint32_t)gpioReg, (uint32_t)pwmReg,
-      (uint32_t)pcmReg,  (uint32_t)clkReg, (uint32_t)auxReg); 
+      (uint32_t)pcmReg,  (uint32_t)clkReg, (uint32_t)auxReg);
 
    for (i=0; i<DMAI_PAGES; i++)
       DBG(DBG_STARTUP, "dmaIBus[%d]=%08X", i, (uint32_t)dmaIBus[i]);
@@ -6205,7 +6190,7 @@ static void initPWM(unsigned bits)
    myGpioDelay(10);
 
    dmaIVirt[0]->periphData = 1;
-   
+
    /* enable PWM DMA, raise panic and dreq thresholds to 15 */
 
    pwmReg[PWM_DMAC] = PWM_DMAC_ENAB      |
@@ -6247,7 +6232,7 @@ static void initPCM(unsigned bits)
    pcmReg[PCM_GRAY]   = 0;
 
    myGpioDelay(1000);
-  
+
    pcmReg[PCM_MODE] = PCM_MODE_FLEN(bits-1); /* # bits in frame */
 
    /* enable channel 1 with # bits width */
@@ -6685,7 +6670,9 @@ int initInitialise(void)
       gpioMaskSet = 1;
    }
 
+#ifndef EMBEDDED_IN_VM
    sigSetHandler();
+#endif
 
    if (initPeripherals() < 0) return PI_INIT_FAILED;
 
@@ -6734,7 +6721,7 @@ int initInitialise(void)
 
       if (fdSock == -1)
          SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
-   
+
       portStr = getenv(PI_ENVPORT);
 
       if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
@@ -6742,7 +6729,7 @@ int initInitialise(void)
       server.sin_family = AF_INET;
       server.sin_addr.s_addr = INADDR_ANY;
       server.sin_port = htons(port);
-   
+
       if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
          SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
 
@@ -7003,6 +6990,7 @@ void gpioTerminate(void)
       dmaIn[DMA_CS] = DMA_CHANNEL_RESET;
       dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
 
+#ifndef EMBEDDED_IN_VM
       if (gpioCfg.showStats)
       {
          fprintf(stderr,
@@ -7033,6 +7021,7 @@ void gpioTerminate(void)
          fprintf(stderr,
             "#####################################################\n");
       }
+#endif
    }
 
    initReleaseResources();
@@ -7166,7 +7155,7 @@ int gpioSetPullUpDown(unsigned gpio, unsigned pud)
    *(gpioReg + GPPUDCLK0 + BANK) = BIT;
 
    myGpioDelay(20);
-  
+
    *(gpioReg + GPPUD) = 0;
 
    *(gpioReg + GPPUDCLK0 + BANK) = 0;
@@ -7239,7 +7228,7 @@ int gpioPWM(unsigned gpio, unsigned val)
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if (val > gpioInfo[gpio].range) 
+   if (val > gpioInfo[gpio].range)
       SOFT_ERROR(PI_BAD_DUTYCYCLE, "gpio %d, bad dutycycle (%d)", gpio, val);
 
    if (gpioInfo[gpio].is != GPIO_PWM)
@@ -7656,7 +7645,7 @@ int gpioWaveAddSerial
    for (i=0; i<numBytes; i++)
    {
       p++;
-   
+
       /* start bit */
 
       wf[2][p].gpioOn = 0;
@@ -7927,7 +7916,7 @@ int gpioWaveTxStart(unsigned wave_mode)
       SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
 
    if (wfc[wfcur] == 0) return 0;
-   
+
    if (!waveClockInited)
    {
       stopHardwarePWM();
@@ -9626,9 +9615,9 @@ int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
 
    DBG(DBG_USER, "cfgWhat=%u, cfgVal=%d", cfgWhat, cfgVal);
 
-   /* 
+   /*
    133084774
-   207081315 
+   207081315
    293640712
    394342930
    472769257
@@ -9674,4 +9663,3 @@ int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
 /* include any user customisations */
 
 #include "custom.cext"
-
