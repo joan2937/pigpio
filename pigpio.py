@@ -197,20 +197,20 @@ i2c_close                 Closes an I2C device
 i2c_read_device           Reads the raw I2C device
 i2c_write_device          Writes the raw I2C device
 
-i2c_write_quick           smbus write quick
-i2c_write_byte            smbus write byte
-i2c_read_byte             smbus read byte
-i2c_write_byte_data       smbus write byte data
-i2c_write_word_data       smbus write word data
-i2c_read_byte_data        smbus read byte data
-i2c_read_word_data        smbus read word data
-i2c_process_call          smbus process call
-i2c_write_block_data      smbus write block data
-i2c_read_block_data       smbus read block data
-i2c_block_process_call    smbus block process call
+i2c_write_quick           SMBus write quick
+i2c_write_byte            SMBus write byte
+i2c_read_byte             SMBus read byte
+i2c_write_byte_data       SMBus write byte data
+i2c_write_word_data       SMBus write word data
+i2c_read_byte_data        SMBus read byte data
+i2c_read_word_data        SMBus read word data
+i2c_process_call          SMBus process call
+i2c_write_block_data      SMBus write block data
+i2c_read_block_data       SMBus read block data
+i2c_block_process_call    SMBus block process call
 
-i2c_read_i2c_block_data   smbus read I2C block data
-i2c_write_i2c_block_data  smbus write I2C block data
+i2c_read_i2c_block_data   SMBus read I2C block data
+i2c_write_i2c_block_data  SMBus write I2C block data
 
 SPI
 
@@ -257,7 +257,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.16"
+VERSION = "1.17"
 
 exceptions = True
 
@@ -303,6 +303,12 @@ PI_SCRIPT_HALTED =1
 PI_SCRIPT_RUNNING=2
 PI_SCRIPT_WAITING=3
 PI_SCRIPT_FAILED =4
+
+# notification flags
+
+NTFY_FLAGS_ALIVE = (1 << 6)
+NTFY_FLAGS_WDOG  = (1 << 5)
+NTFY_FLAGS_GPIO  = 31
 
 # pigpio command numbers
 
@@ -519,6 +525,10 @@ PI_BAD_DATABITS     =-101
 PI_BAD_STOPBITS     =-102
 PI_MSG_TOOBIG       =-103
 PI_BAD_MALLOC_MODE  =-104
+_PI_TOO_MANY_PARTS  =-105
+_PI_BAD_I2C_PART    =-106
+PI_BAD_SMBUS_CMD    =-107
+PI_NOT_I2C_GPIO     =-108
 
 # pigpio error text
 
@@ -560,7 +570,7 @@ _errors=[
    [PI_BAD_WAVE_BAUD     , "baud rate not 50-250000(RX)/1000000(TX)"],
    [PI_TOO_MANY_PULSES   , "waveform has too many pulses"],
    [PI_TOO_MANY_CHARS    , "waveform has too many chars"],
-   [PI_NOT_SERIAL_GPIO   , "no serial read in progress on gpio"],
+   [PI_NOT_SERIAL_GPIO   , "no bit bang serial read in progress on gpio"],
    [PI_NOT_PERMITTED     , "no permission to update gpio"],
    [PI_SOME_PERMITTED    , "no permission to update one or more gpios"],
    [PI_BAD_WVSC_COMMND   , "bad WVSC subcommand"],
@@ -625,6 +635,10 @@ _errors=[
    [PI_BAD_STOPBITS      , "serial (half) stop bits not 2-8"],
    [PI_MSG_TOOBIG        , "socket/pipe message too big"],
    [PI_BAD_MALLOC_MODE   , "bad memory allocation mode"],
+   [_PI_TOO_MANY_PARTS    , "too many I2C transaction parts"],
+   [_PI_BAD_I2C_PART      , "a combined I2C transaction failed"],
+   [PI_BAD_SMBUS_CMD     , "SMBus command not supported"],
+   [PI_NOT_I2C_GPIO      , "no bit bang I2C in progress on gpio"],
 
 ]
 
@@ -867,10 +881,11 @@ class _callback_thread(threading.Thread):
                      if (cb.edge ^ newLevel):
                          cb.func(cb.gpio, newLevel, tick)
             else:
-               gpio = flags & 31
-               for cb in self.callbacks:
-                  if cb.gpio == gpio:
-                     cb.func(cb.gpio, TIMEOUT, tick)
+               if flags & NTFY_FLAGS_WDOG:
+                  gpio = flags & NTFY_FLAGS_GPIO
+                  for cb in self.callbacks:
+                     if cb.gpio == gpio:
+                        cb.func(cb.gpio, TIMEOUT, tick)
 
       self.sl.s.close()
 
@@ -1993,7 +2008,7 @@ class pi():
 
       Normally you would only use the [*i2c_**] functions if
       you are or will be connecting to the Pi over a network.  If
-      you will always run on the local Pi use the standard smbus
+      you will always run on the local Pi use the standard SMBus
       module instead.
 
       ...
@@ -2080,7 +2095,7 @@ class pi():
       """
       Sends a single bit to the device associated with handle.
 
-      smbus 2.0 5.5.1 - Quick command.
+      SMBus 2.0 5.5.1 - Quick command.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          bit:= 0 or 1, the value to write.
@@ -2096,7 +2111,7 @@ class pi():
       """
       Sends a single byte to the device associated with handle.
 
-      smbus 2.0 5.5.2 - Send byte.
+      SMBus 2.0 5.5.2 - Send byte.
 
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
       byte_val:= 0-255, the value to write.
@@ -2113,7 +2128,7 @@ class pi():
       """
       Reads a single byte from the device associated with handle.
 
-      smbus 2.0 5.5.3 - Receive byte.
+      SMBus 2.0 5.5.3 - Receive byte.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
 
@@ -2128,7 +2143,7 @@ class pi():
       Writes a single byte to the specified register of the device
       associated with handle.
 
-      smbus 2.0 5.5.4 - Write byte.
+      SMBus 2.0 5.5.4 - Write byte.
 
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
@@ -2156,7 +2171,7 @@ class pi():
       Writes a single 16 bit word to the specified register of the
       device associated with handle.
 
-      smbus 2.0 5.5.4 - Write word.
+      SMBus 2.0 5.5.4 - Write word.
 
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
@@ -2184,7 +2199,7 @@ class pi():
       Reads a single byte from the specified register of the device
       associated with handle.
 
-      smbus 2.0 5.5.5 - Read byte.
+      SMBus 2.0 5.5.5 - Read byte.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
@@ -2204,7 +2219,7 @@ class pi():
       Reads a single 16 bit word from the specified register of the
       device associated with handle.
 
-      smbus 2.0 5.5.5 - Read word.
+      SMBus 2.0 5.5.5 - Read word.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
@@ -2224,7 +2239,7 @@ class pi():
       Writes 16 bits of data to the specified register of the device
       associated with handle and reads 16 bits of data in return.
 
-      smbus 2.0 5.5.6 - Process call.
+      SMBus 2.0 5.5.6 - Process call.
 
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
@@ -2249,7 +2264,7 @@ class pi():
       Writes up to 32 bytes to the specified register of the device
       associated with handle.
 
-      smbus 2.0 5.5.7 - Block write.
+      SMBus 2.0 5.5.7 - Block write.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
@@ -2281,7 +2296,7 @@ class pi():
       Reads a block of up to 32 bytes from the specified register of
       the device associated with handle.
 
-      smbus 2.0 5.5.7 - Block read.
+      SMBus 2.0 5.5.7 - Block read.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
@@ -2316,13 +2331,13 @@ class pi():
       associated with handle and reads a device specified number
       of bytes of data in return.
 
-      smbus 2.0 5.5.8 - Block write-block read.
+      SMBus 2.0 5.5.8 - Block write-block read.
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
 
-      The smbus 2.0 documentation states that a minimum of 1 byte may
+      The SMBus 2.0 documentation states that a minimum of 1 byte may
       be sent and a minimum of 1 byte may be received.  The total
       number of bytes sent/received must be 32 or less.
 

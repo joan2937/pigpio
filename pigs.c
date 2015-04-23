@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 26+
+This version is for pigpio version 32+
 */
 
 #include <stdio.h>
@@ -141,7 +141,7 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          printf(cmdUsage);
          break;
 
-      case 6: /* CF2 I2CPK I2CRD I2CRI I2CRK SERR SLR SPIX SPIR */
+      case 6: /* BI2CX CF2 I2CPK I2CRD I2CRI I2CRK SERR SLR SPIX SPIR */
          printf("%d", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
          if (r > 0)
@@ -178,6 +178,7 @@ void get_extensions(int sock, int command, int res)
 {
    switch (command)
    {
+      case PI_CMD_BI2CX:
       case PI_CMD_CF2:
       case PI_CMD_I2CPK:
       case PI_CMD_I2CRD:

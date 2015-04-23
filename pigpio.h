@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 31
+#define PIGPIO_VERSION 3202
 
 /*TEXT
 
@@ -225,20 +225,20 @@ i2cClose                   Closes an I2C device
 i2cReadDevice              Reads the raw I2C device
 i2cWriteDevice             Writes the raw I2C device
 
-i2cWriteQuick              smbus write quick
-i2cWriteByte               smbus write byte
-i2cReadByte                smbus read byte
-i2cWriteByteData           smbus write byte data
-i2cWriteWordData           smbus write word data
-i2cReadByteData            smbus read byte data
-i2cReadWordData            smbus read word data
-i2cProcessCall             smbus process call
-i2cWriteBlockData          smbus write block data
-i2cReadBlockData           smbus read block data
-i2cBlockProcessCall        smbus block process call
+i2cWriteQuick              SMBus write quick
+i2cWriteByte               SMBus write byte
+i2cReadByte                SMBus read byte
+i2cWriteByteData           SMBus write byte data
+i2cWriteWordData           SMBus write word data
+i2cReadByteData            SMBus read byte data
+i2cReadWordData            SMBus read word data
+i2cProcessCall             SMBus process call
+i2cWriteBlockData          SMBus write block data
+i2cReadBlockData           SMBus read block data
+i2cBlockProcessCall        SMBus block process call
 
-i2cWriteI2CBlockData       smbus write I2C block data
-i2cReadI2CBlockData        smbus read I2C block data
+i2cWriteI2CBlockData       SMBus write I2C block data
+i2cReadI2CBlockData        SMBus read I2C block data
 
 SPI
 
@@ -327,36 +327,36 @@ extern "C" {
 
 typedef struct
 {
-uint16_t func;
-uint16_t size;
+   uint16_t func;
+   uint16_t size;
 } gpioHeader_t;
 
 typedef struct
 {
-size_t size;
-void *ptr;
-uint32_t data;
+   size_t size;
+   void *ptr;
+   uint32_t data;
 } gpioExtent_t;
 
 typedef struct
 {
-uint32_t tick;
-uint32_t level;
+   uint32_t tick;
+   uint32_t level;
 } gpioSample_t;
 
 typedef struct
 {
-uint16_t seqno;
-uint16_t flags;
-uint32_t tick;
-uint32_t level;
+   uint16_t seqno;
+   uint16_t flags;
+   uint32_t tick;
+   uint32_t level;
 } gpioReport_t;
 
 typedef struct
 {
-uint32_t gpioOn;
-uint32_t gpioOff;
-uint32_t usDelay;
+   uint32_t gpioOn;
+   uint32_t gpioOff;
+   uint32_t usDelay;
 } gpioPulse_t;
 
 #define WAVE_FLAG_READ  1
@@ -365,10 +365,10 @@ uint32_t usDelay;
 
 typedef struct
 {
-uint32_t gpioOn;
-uint32_t gpioOff;
-uint32_t usDelay;
-uint32_t flags;
+   uint32_t gpioOn;
+   uint32_t gpioOff;
+   uint32_t usDelay;
+   uint32_t flags;
 } rawWave_t;
 
 typedef struct
@@ -381,40 +381,25 @@ typedef struct
 
 typedef struct
 {
-int clk;     /* gpio for clock           */
-int mosi;    /* gpio for MOSI            */
-int miso;    /* gpio for MISO            */
-int ss_pol;  /* slave select off state   */
-int ss_us;   /* delay after slave select */
-int clk_pol; /* clock off state          */
-int clk_pha; /* clock phase              */
-int clk_us;  /* clock micros             */
+   int clk;     /* gpio for clock           */
+   int mosi;    /* gpio for MOSI            */
+   int miso;    /* gpio for MISO            */
+   int ss_pol;  /* slave select off state   */
+   int ss_us;   /* delay after slave select */
+   int clk_pol; /* clock off state          */
+   int clk_pha; /* clock phase              */
+   int clk_us;  /* clock micros             */
 } rawSPI_t;
 
 typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
-uint32_t info;
-uint32_t src;
-uint32_t dst;
-uint32_t length;
-uint32_t stride;
-uint32_t next;
-uint32_t pad[2];
+   uint32_t info;
+   uint32_t src;
+   uint32_t dst;
+   uint32_t length;
+   uint32_t stride;
+   uint32_t next;
+   uint32_t pad[2];
 } rawCbs_t;
-
-/* max pi_i2c_msg_t per transaction */
-
-#define  PI_I2C_RDRW_IOCTL_MAX_MSGS 42
-
-/* flags for pi_i2c_msg_t */
-
-#define PI_I2C_M_WR           0x0000 /* write data */
-#define PI_I2C_M_RD           0x0001 /* read data */
-#define PI_I2C_M_TEN          0x0010 /* ten bit chip address */
-#define PI_I2C_M_RECV_LEN     0x0400 /* length will be first received byte */
-#define PI_I2C_M_NO_RD_ACK    0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_IGNORE_NAK   0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_NOSTART      0x4000 /* if I2C_FUNC_PROTOCOL_MANGLING */
 
 typedef struct
 {
@@ -521,6 +506,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_NOTIFY_SLOTS  32
 
+#define PI_NTFY_FLAGS_ALIVE    (1 <<6)
 #define PI_NTFY_FLAGS_WDOG     (1 <<5)
 #define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
 
@@ -563,6 +549,43 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_MAX_I2C_DEVICE_COUNT (1<<16)
 #define PI_MAX_SPI_DEVICE_COUNT (1<<16)
+
+/* max pi_i2c_msg_t per transaction */
+
+#define  PI_I2C_RDRW_IOCTL_MAX_MSGS 42
+
+/* flags for pi_i2c_msg_t */
+
+#define PI_I2C_M_WR           0x0000 /* write data */
+#define PI_I2C_M_RD           0x0001 /* read data */
+#define PI_I2C_M_TEN          0x0010 /* ten bit chip address */
+#define PI_I2C_M_RECV_LEN     0x0400 /* length will be first received byte */
+#define PI_I2C_M_NO_RD_ACK    0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_IGNORE_NAK   0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_NOSTART      0x4000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+
+/* bit bang I2C commands */
+
+#define PI_I2C_END     0
+#define PI_I2C_START   1
+#define PI_I2C_STOP    2
+#define PI_I2C_READ    3
+#define PI_I2C_WRITE   4
+#define PI_I2C_READ16  5
+#define PI_I2C_WRITE16 6
+
+/* combined transaction I2C flag commands */
+
+#define PI_I2C_F_CLEAR        40 /* clear flags */
+#define PI_I2C_F_TEN          41 /* ten bit chip address */
+#define PI_I2C_F_RECV_LEN     42 /* length will be first received byte */
+#define PI_I2C_F_NO_RD_ACK    43 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_F_IGNORE_NAK   44 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_F_REV_DIR_ADDR 45 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_F_NOSTART      46 /* if I2C_FUNC_PROTOCOL_MANGLING */
+
+/* SPI */
 
 #define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
 #define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
@@ -1740,7 +1763,7 @@ No flags are currently defined.  This parameter should be set to zero.
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
 
-For the smbus commands the low level transactions are shown at the end
+For the SMBus commands the low level transactions are shown at the end
 of the function description.  The following abbreviations are used.
 
 . .
@@ -1821,7 +1844,7 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Quick command. smbus 2.0 5.5.1
+Quick command. SMBus 2.0 5.5.1
 . .
 S Addr Rd/Wr [A] P
 . .
@@ -1841,7 +1864,7 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Send byte. smbus 2.0 5.5.2
+Send byte. SMBus 2.0 5.5.2
 . .
 S Addr Wr [A] Data [A] P
 . .
@@ -1860,7 +1883,7 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 or PI_I2C_READ_FAILED.
 
-Receive byte. smbus 2.0 5.5.3
+Receive byte. SMBus 2.0 5.5.3
 . .
 S Addr Rd [A] [Data] NA P
 . .
@@ -1882,7 +1905,7 @@ i2cReg: 0-255, the register to write
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Write byte. smbus 2.0 5.5.4
+Write byte. SMBus 2.0 5.5.4
 . .
 S Addr Wr [A] Comm [A] Data [A] P
 . .
@@ -1904,7 +1927,7 @@ i2cReg: 0-255, the register to write
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Write word. smbus 2.0 5.5.4
+Write word. SMBus 2.0 5.5.4
 . .
 S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
 . .
@@ -1925,7 +1948,7 @@ i2cReg: 0-255, the register to read
 Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Read byte. smbus 2.0 5.5.5
+Read byte. SMBus 2.0 5.5.5
 . .
 S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
 . .
@@ -1946,7 +1969,7 @@ i2cReg: 0-255, the register to read
 Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Read word. smbus 2.0 5.5.5
+Read word. SMBus 2.0 5.5.5
 . .
 S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
 . .
@@ -1968,7 +1991,7 @@ i2cReg: 0-255, the register to write/read
 Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Process call. smbus 2.0 5.5.6
+Process call. SMBus 2.0 5.5.6
 . .
 S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
    S Addr Rd [A] [DataLow] A [DataHigh] NA P
@@ -1993,7 +2016,7 @@ i2cReg: 0-255, the register to write
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Block write. smbus 2.0 5.5.7
+Block write. SMBus 2.0 5.5.7
 . .
 S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
 . .
@@ -2017,7 +2040,7 @@ The amount of returned data is set by the device.
 Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Block read. smbus 2.0 5.5.7
+Block read. SMBus 2.0 5.5.7
 . .
 S Addr Wr [A] Comm [A]
    S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
@@ -2043,11 +2066,11 @@ i2cReg: 0-255, the register to write/read
 Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-The smbus 2.0 documentation states that a minimum of 1 byte may be
+The SMBus 2.0 documentation states that a minimum of 1 byte may be
 sent and a minimum of 1 byte may be received.  The total number of
 bytes sent/received must be 32 or less.
 
-Block write-block read. smbus 2.0 5.5.8
+Block write-block read. SMBus 2.0 5.5.8
 . .
 S Addr Wr [A] Comm [A] Count [A] Data [A] ...
    S Addr Rd [A] [Count] A [Data] ... A P
@@ -2100,6 +2123,14 @@ PI_I2C_WRITE_FAILED.
 S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
 . .
 D*/
+
+int bbI2COpen(unsigned SDA, unsigned SCL, unsigned bbBaud);
+
+int bbI2CClose(unsigned SDA);
+
+int bbI2CXfer(
+   unsigned SDA,
+   char *inBuf, unsigned inLen, char *outBuf, unsigned outLen);
 
 
 /*F*/
@@ -4252,6 +4283,12 @@ PARAMS*/
 #define PI_CMD_CF1   87
 #define PI_CMD_CF2   88
 
+#define PI_CMD_BI2CC 89
+#define PI_CMD_BI2CO 90
+#define PI_CMD_BI2CX 91
+
+#define PI_CMD_I2CX  92
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -4354,7 +4391,7 @@ after this command is issued.
 #define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
 #define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses
 #define PI_TOO_MANY_CHARS   -37 // waveform has too many chars
-#define PI_NOT_SERIAL_GPIO  -38 // no serial read in progress on gpio
+#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read in progress on gpio
 #define PI_BAD_SERIAL_STRUC -39 // bad (null) serial structure parameter
 #define PI_BAD_SERIAL_BUF   -40 // bad (null) serial buf parameter
 #define PI_NOT_PERMITTED    -41 // gpio operation not permitted
@@ -4423,7 +4460,11 @@ after this command is issued.
 #define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
 #define PI_TOO_MANY_PARTS  -105 // too many I2C transaction parts
 #define PI_BAD_I2C_PART    -106 // a combined I2C transaction failed
-
+#define PI_BAD_SMBUS_CMD   -107 // SMBus command not supported by driver
+#define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on gpio
+#define PI_BAD_BB_WLEN     -109 // bad BB write length
+#define PI_BAD_BB_RLEN     -110 // bad BB read length
+#define PI_BAD_BB_CMD      -111 // bad BB command
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
@@ -4448,7 +4489,7 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_R0        0xFFFFFFFF
 #define PI_DEFAULT_UPDATE_MASK_R1        0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_R2        0xFBC7CF9C
-#define PI_DEFAULT_UPDATE_MASK_R3        0x0080400FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_R3        0x0080480FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
 #define PI_DEFAULT_MEM_ALLOC_MODE        PI_MEM_ALLOC_AUTO
 

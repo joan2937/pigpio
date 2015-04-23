@@ -52,7 +52,8 @@ install:	$(LIB)
 	sudo install -m 0755 pig2vcd         /usr/local/bin
 	sudo install -m 0755 pigpiod         /usr/local/bin
 	sudo install -m 0755 pigs            /usr/local/bin
-	sudo python setup.py install
+	sudo python2 setup.py install
+	sudo python3 setup.py install
 	sudo install -m 0755 -d              /usr/local/man/man1
 	sudo install -m 0644 *.1             /usr/local/man/man1
 	sudo install -m 0755 -d              /usr/local/man/man3
@@ -66,6 +67,12 @@ uninstall:
 	sudo rm -f /usr/local/bin/pig2vcd
 	sudo rm -f /usr/local/bin/pigpiod
 	sudo rm -f /usr/local/bin/pigs
+	echo removing python2 files
+	sudo python2 setup.py install --record /tmp/pigpio >/dev/null
+	sudo xargs rm -f < /tmp/pigpio >/dev/null
+	echo removing python3 files
+	sudo python3 setup.py install --record /tmp/pigpio >/dev/null
+	sudo xargs rm -f < /tmp/pigpio >/dev/null
 	sudo rm -f /usr/local/man/man1/pig*.1
 	sudo rm -f /usr/local/man/man3/pig*.3
 

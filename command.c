@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 31+
+This version is for pigpio version 32+
 */
 
 #include <stdio.h>
@@ -44,6 +44,10 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_BC1,   "BC1",   111, 1}, // gpioWrite_Bits_0_31_Clear
    {PI_CMD_BC2,   "BC2",   111, 1}, // gpioWrite_Bits_32_53_Clear
+
+   {PI_CMD_BI2CC, "BI2CC", 112, 0}, // bbI2CClose
+   {PI_CMD_BI2CO, "BI2CO", 131, 0}, // bbI2COpen
+   {PI_CMD_BI2CX, "BI2CX", 193, 6}, // bbI2CXfer
 
    {PI_CMD_BR1,   "BR1",   101, 3}, // gpioRead_Bits_0_31
    {PI_CMD_BR2,   "BR2",   101, 3}, // gpioRead_Bits_32_53
@@ -85,6 +89,8 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_I2CWQ, "I2CWQ", 121, 0}, // i2cWriteQuick
    {PI_CMD_I2CWS, "I2CWS", 121, 0}, // i2cWriteByte
    {PI_CMD_I2CWW, "I2CWW", 131, 0}, // i2cWriteWordData
+
+   {PI_CMD_I2CX,  "I2CX",  131, 0}, // i2cXfer
 
    {PI_CMD_MICS,  "MICS",  112, 0}, // gpioDelay
    {PI_CMD_MILS,  "MILS",  112, 0}, // gpioDelay
@@ -243,23 +249,23 @@ HWVER            Get hardware version\n\
 I2CC h           Close I2C handle\n\
 I2CO ib id if    Open I2C bus and device with flags\n\
 \n\
-I2CPC h r wv     smb Process Call: exchange register with word\n\
-I2CPK h r bvs    smb Block Process Call: exchange data bytes with register\n\
+I2CPC h r wv     SMBus Process Call: exchange register with word\n\
+I2CPK h r bvs    SMBus Block Process Call: exchange data bytes with register\n\
 \n\
-I2CRB h r        smb Read Byte Data: read byte from register\n\
+I2CRB h r        SMBus Read Byte Data: read byte from register\n\
 I2CRD h num      i2c Read bytes\n\
-I2CRI h r num    smb Read I2C Block Data: read bytes from register\n\
-I2CRK h r        smb Read Block Data: read data from register\n\
-I2CRS h          smb Read Byte: read byte\n\
-I2CRW h r        smb Read Word Data: read word from register\n\
+I2CRI h r num    SMBus Read I2C Block Data: read bytes from register\n\
+I2CRK h r        SMBus Read Block Data: read data from register\n\
+I2CRS h          SMBus Read Byte: read byte\n\
+I2CRW h r        SMBus Read Word Data: read word from register\n\
 \n\
-I2CWB h r bv     smb Write Byte Data: write byte to register\n\
+I2CWB h r bv     SMBus Write Byte Data: write byte to register\n\
 I2CWD h bvs      i2c Write data\n\
-I2CWI h r bvs    smb Write I2C Block Data\n\
-I2CWK h r bvs    smb Write Block Data: write data to register\n\
-I2CWQ h bit      smb Write Quick: write bit\n\
-I2CWS h bv       smb Write Byte: write byte\n\
-I2CWW h r wv     smb Write Word Data: write word to register\n\
+I2CWI h r bvs    SMBus Write I2C Block Data\n\
+I2CWK h r bvs    SMBus Write Block Data: write data to register\n\
+I2CWQ h bit      SMBus Write Quick: write bit\n\
+I2CWS h bv       SMBus Write Byte: write byte\n\
+I2CWW h r wv     SMBus Write Word Data: write word to register\n\
 \n\
 M/MODES g m      Set gpio mode\n\
 MG/MODEG g       Get gpio mode\n\
@@ -428,7 +434,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_WAVE_BAUD    , "baud rate not 50-250K(RX)/50-1M(TX)"},
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
-   {PI_NOT_SERIAL_GPIO  , "no serial read in progress on gpio"},
+   {PI_NOT_SERIAL_GPIO  , "no bit bang serial read in progress on gpio"},
    {PI_BAD_SERIAL_STRUC , "bad (null) serial structure parameter"},
    {PI_BAD_SERIAL_BUF   , "bad (null) serial buf parameter"}, 
    {PI_NOT_PERMITTED    , "no permission to update gpio"},
@@ -496,6 +502,8 @@ static errInfo_t errInfo[]=
    {PI_BAD_MALLOC_MODE  , "bad memory allocation mode"},
    {PI_TOO_MANY_PARTS   , "too many I2C transaction parts"},
    {PI_BAD_I2C_PART     , "a combined I2C transaction failed"},
+   {PI_BAD_SMBUS_CMD    , "SMBus command not supported by driver"},
+   {PI_NOT_I2C_GPIO     , "no bit bang I2C in progress on gpio"},
 
 };
 
@@ -616,7 +624,7 @@ int cmdParse(
 
          break;
 
-      case 112: /* GDC  GPW  I2CC
+      case 112: /* BI2CC GDC  GPW  I2CC
                    I2CRB MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
                    WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR
@@ -787,7 +795,8 @@ int cmdParse(
 
          break;
 
-      case 131: /* HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SLRO  SPIO  TRIG
+      case 131: /* BI2CO HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SLRO
+                   SPIO  TRIG
 
                    Three positive parameters.
                 */
@@ -884,7 +893,7 @@ int cmdParse(
 
          break;
 
-      case 193: /* I2CWD  SERW
+      case 193: /* BI2CX  I2CWD  SERW  SPIW  SPIX
 
                    Two or more parameters, first >=0, rest 0-255.
                 */

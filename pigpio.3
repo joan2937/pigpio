@@ -2065,7 +2065,7 @@ PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
 .br
 
 .br
-For the smbus commands the low level transactions are shown at the end
+For the SMBus commands the low level transactions are shown at the end
 of the function description.  The following abbreviations are used.
 
 .br
@@ -2191,7 +2191,7 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Quick command. smbus 2.0 5.5.1
+Quick command. SMBus 2.0 5.5.1
 
 .EX
 S Addr Rd/Wr [A] P
@@ -2224,7 +2224,7 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Send byte. smbus 2.0 5.5.2
+Send byte. SMBus 2.0 5.5.2
 
 .EX
 S Addr Wr [A] Data [A] P
@@ -2255,7 +2255,7 @@ or PI_I2C_READ_FAILED.
 .br
 
 .br
-Receive byte. smbus 2.0 5.5.3
+Receive byte. SMBus 2.0 5.5.3
 
 .EX
 S Addr Rd [A] [Data] NA P
@@ -2291,7 +2291,7 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Write byte. smbus 2.0 5.5.4
+Write byte. SMBus 2.0 5.5.4
 
 .EX
 S Addr Wr [A] Comm [A] Data [A] P
@@ -2327,7 +2327,7 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Write word. smbus 2.0 5.5.4
+Write word. SMBus 2.0 5.5.4
 
 .EX
 S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
@@ -2361,7 +2361,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Read byte. smbus 2.0 5.5.5
+Read byte. SMBus 2.0 5.5.5
 
 .EX
 S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
@@ -2395,7 +2395,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Read word. smbus 2.0 5.5.5
+Read word. SMBus 2.0 5.5.5
 
 .EX
 S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
@@ -2431,7 +2431,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Process call. smbus 2.0 5.5.6
+Process call. SMBus 2.0 5.5.6
 
 .EX
 S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
@@ -2471,7 +2471,7 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Block write. smbus 2.0 5.5.7
+Block write. SMBus 2.0 5.5.7
 
 .EX
 S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
@@ -2512,7 +2512,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Block read. smbus 2.0 5.5.7
+Block read. SMBus 2.0 5.5.7
 
 .EX
 S Addr Wr [A] Comm [A]
@@ -2553,14 +2553,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-The smbus 2.0 documentation states that a minimum of 1 byte may be
+The SMBus 2.0 documentation states that a minimum of 1 byte may be
 sent and a minimum of 1 byte may be received.  The total number of
 bytes sent/received must be 32 or less.
 
 .br
 
 .br
-Block write-block read. smbus 2.0 5.5.8
+Block write-block read. SMBus 2.0 5.5.8
 
 .EX
 S Addr Wr [A] Comm [A] Count [A] Data [A] ...
@@ -6816,6 +6816,18 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_BI2CC 89
+.br
+#define PI_CMD_BI2CO 90
+.br
+#define PI_CMD_BI2CX 91
+.br
+
+.br
+#define PI_CMD_I2CX  92
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -6905,7 +6917,7 @@ A 16-bit word value.
 .br
 #define PI_TOO_MANY_CHARS   -37 // waveform has too many chars
 .br
-#define PI_NOT_SERIAL_GPIO  -38 // no serial read in progress on gpio
+#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read in progress on gpio
 .br
 #define PI_BAD_SERIAL_STRUC -39 // bad (null) serial structure parameter
 .br
@@ -7043,7 +7055,15 @@ A 16-bit word value.
 .br
 #define PI_BAD_I2C_PART    -106 // a combined I2C transaction failed
 .br
-
+#define PI_BAD_SMBUS_CMD   -107 // SMBus command not supported by driver
+.br
+#define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on gpio
+.br
+#define PI_BAD_BB_WLEN     -109 // bad BB write length
+.br
+#define PI_BAD_BB_RLEN     -110 // bad BB read length
+.br
+#define PI_BAD_BB_CMD      -111 // bad BB command
 .br
 
 .br
@@ -7092,7 +7112,7 @@ A 16-bit word value.
 .br
 #define PI_DEFAULT_UPDATE_MASK_R2        0xFBC7CF9C
 .br
-#define PI_DEFAULT_UPDATE_MASK_R3        0x0080400FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_R3        0x0080480FFFFFFCLL
 .br
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
 .br
