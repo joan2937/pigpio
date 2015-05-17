@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 32 */
+/* pigpio version 33 */
 
 /* include ------------------------------------------------------- */
 
@@ -908,6 +908,7 @@ typedef struct
 {
    uint16_t state;
    int16_t  fd;
+   uint32_t addr;
    uint32_t flags;
    uint32_t funcs;
 } i2cInfo_t;
@@ -1000,7 +1001,7 @@ typedef struct
 {
    int      mode;
    int      gpio;
-   uint32_t baud; /* 50-250000 */
+   uint32_t baud;
    union
    {
       wfRxSerial_t s;
@@ -1483,6 +1484,31 @@ static uint32_t myGetLevel(int pos)
 
 /* ----------------------------------------------------------------------- */
 
+static int myI2CGetPar(char *inBuf, int *inPos, int inLen, int *esc)
+{
+   int bytes;
+
+   if (*esc) bytes = 2; else bytes = 1;
+
+   *esc = 0;
+
+   if (*inPos <= (inLen - bytes))
+   {
+      if (bytes == 1)
+      {
+         return inBuf[(*inPos)++];
+      }
+      else
+      {
+         (*inPos) += 2;
+         return inBuf[*inPos-2] + (inBuf[*inPos-1]<<8);
+      }
+   }
+   return -1;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static uint32_t myGetTick(int pos)
 {
    uint32_t tick;
@@ -1588,10 +1614,10 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          res = bbI2COpen(p[1], p[2], p[4]);
          break;
 
-      case PI_CMD_BI2CX:
+      case PI_CMD_BI2CZ:
          /* use half buffer for write, half buffer for read */
          if (p[3] > (bufSize/2)) p[3] = bufSize/2;
-         res = bbI2CXfer(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
+         res = bbI2CZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
          if (res > 0)
          {
             memcpy(buf, buf+(bufSize/2), res);
@@ -1738,6 +1764,16 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
       case PI_CMD_I2CWW:
          memcpy(&p[4], buf, 4);
          res = i2cWriteWordData(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_I2CZ:
+         /* use half buffer for write, half buffer for read */
+         if (p[3] > (bufSize/2)) p[3] = bufSize/2;
+         res = i2cZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
+         if (res > 0)
+         {
+            memcpy(buf, buf+(bufSize/2), res);
+         }
          break;
 
 
@@ -3470,8 +3506,8 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
    if (i2cBus >= PI_NUM_I2C_BUS)
       SOFT_ERROR(PI_BAD_I2C_BUS, "bad I2C bus (%d)", i2cBus);
 
-//   if ((i2cAddr < 0x08) || (i2cAddr > 0x77))
-//      SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (0x%X)", i2cAddr);
+   if (i2cAddr > PI_MAX_I2C_ADDR)
+      SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (%d)", i2cAddr);
 
    if (i2cFlags)
       SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", i2cFlags);
@@ -3522,6 +3558,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
    }
 
    i2cInfo[slot].fd = fd;
+   i2cInfo[slot].addr = i2cAddr;
    i2cInfo[slot].flags = i2cFlags;
    i2cInfo[slot].funcs = funcs;
 
@@ -3548,7 +3585,23 @@ int i2cClose(unsigned handle)
    return 0;
 }
 
-int i2cTransaction(unsigned handle, pi_i2c_msg_t *parts, unsigned numParts)
+void i2cSwitchCombined(int setting)
+{
+   int fd;
+
+   DBG(DBG_USER, "setting=%d", setting);
+
+   fd = open(PI_I2C_COMBINED, O_WRONLY);
+
+   if (fd >= 0)
+   {
+      if (setting) write(fd, "1\n", 2); else write(fd, "0\n", 2);
+
+      close(fd);
+   }
+}
+
+int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)
 {
    int retval;
    my_i2c_rdwr_ioctl_data_t rdwr;
@@ -3563,31 +3616,28 @@ int i2cTransaction(unsigned handle, pi_i2c_msg_t *parts, unsigned numParts)
    if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (parts == NULL)
-      SOFT_ERROR(PI_BAD_POINTER, "null parts");
+   if (segs == NULL)
+      SOFT_ERROR(PI_BAD_POINTER, "null segments");
 
-   if (numParts > PI_I2C_RDRW_IOCTL_MAX_MSGS)
-      SOFT_ERROR(PI_TOO_MANY_PARTS, "too many parts (%d)", numParts);
+   if (numSegs > PI_I2C_RDRW_IOCTL_MAX_MSGS)
+      SOFT_ERROR(PI_TOO_MANY_SEGS, "too many segments (%d)", numSegs);
 
-   rdwr.msgs = parts;
-   rdwr.nmsgs = numParts;
+   rdwr.msgs = segs;
+   rdwr.nmsgs = numSegs;
 
    retval = ioctl(i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
 
-   DBG(0, "i2cTransaction retval=%d", retval);
-
    if (retval >= 0) return retval;
-   else             return PI_BAD_I2C_PART;
+   else             return PI_BAD_I2C_SEG;
 }
 
-#ifdef ZZZZ
-
-int i2cXfer(
+int i2cZip(
    unsigned handle,
    char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
 {
-   int i, parts, inPos, outPos, status, bytes, len_bytes,flags, addr;
-   pi_i2c_msg_t part[PI_I2C_RDRW_IOCTL_MAX_MSGS];
+   int numSegs, inPos, outPos, status, bytes, flags, addr;
+   int esc, setesc;
+   pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
 
    DBG(DBG_USER, "handle=%d inBuf=%s outBuf=%08X len=%d",
       handle, myBuf2Str(inLen, (char *)inBuf), (int)outBuf, outLen);
@@ -3606,19 +3656,21 @@ int i2cXfer(
    if (!outBuf && outLen)
       SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
 
-   parts = 0;
+   numSegs = 0;
+
    inPos = 0;
    outPos = 0;
    status = 0;
+
+   addr = i2cInfo[handle].addr;
    flags = 0;
-   addr = 0;
+   esc = 0;
+   setesc = 0;
 
-   while (!status && (inPos < inLen) && (parts < PI_I2C_RDRW_IOCTL_MAX_MSGS))
+   while (!status && (inPos < inLen))
    {
-      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d",
-         status, inPos, inLen, inBuf[inPos]);
-
-      len_bytes = 1;
+      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
+         status, inPos, inLen, inBuf[inPos], addr, flags);
 
       switch (inBuf[inPos++])
       {
@@ -3626,83 +3678,114 @@ int i2cXfer(
             status = 1;
             break;
 
-         case PI_I2C_READ16:
-            len_bytes = 2;
-            /* fall through */
-
-         case PI_I2C_READ:
-            if (inPos <= (inLen - len_bytes))
+         case PI_I2C_COMBINED_ON:
+            /* Run prior transactions before setting combined flag */
+            if (numSegs)
             {
-               if (len_bytes != 1)
-               {
-                  bytes=inBuf[inPos] + (inBuf[inPos+1]<<8);
-                  inPos += 2;
-               }
-               else
-               {
-                  bytes=inBuf[inPos++];
-               }
-
-               if (bytes && ((bytes + outPos) < outLen))
-               {
-                  part[parts].addr = addr;
-                  part[parts].flags = flags;
-                  part[parts].len =
-                  part[parts].buf =
-
-                  for (i=0; i<(bytes-1); i++)
-                  {
-                     outBuf[outPos++] = I2CGetByte(w, 0);
-                  }
-                  outBuf[outPos++] = I2CGetByte(w, 1);
-               }
-               else status = PI_BAD_BB_WLEN;
+               status = i2cSegments(handle, segs, numSegs);
+               if (status >= 0) status = 0; /* continue */
+               numSegs = 0;
             }
-            else status = PI_BAD_BB_WLEN;
+            i2cSwitchCombined(1);
             break;
 
-         case PI_I2C_WRITE16:
-            len_bytes = 2;
-            /* fall through */
+         case PI_I2C_COMBINED_OFF:
+            /* Run prior transactions before clearing combined flag */
+            if (numSegs)
+            {
+               status = i2cSegments(handle, segs, numSegs);
+               if (status >= 0) status = 0; /* continue */
+               numSegs = 0;
+            }
+            i2cSwitchCombined(0);
+            break;
+
+         case PI_I2C_ADDR:
+            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (addr < 0) status = PI_BAD_I2C_CMD;
+            break;
+
+         case PI_I2C_FLAGS:
+            /* cheat to force two byte flags */
+            esc = 1;
+            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (flags < 0) status = PI_BAD_I2C_CMD;
+            break;
+
+         case PI_I2C_ESC:
+            setesc = 1;
+            break;
+
+         case PI_I2C_READ:
+
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0)
+            {
+               if ((bytes + outPos) < outLen)
+               {
+                  segs[numSegs].addr = addr;
+                  segs[numSegs].flags = (flags|1);
+                  segs[numSegs].len = bytes;
+                  segs[numSegs].buf = (uint8_t *)(outBuf + outPos);
+                  outPos += bytes;
+                  numSegs++;
+                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
+                  {
+                     status = i2cSegments(handle, segs, numSegs);
+                     if (status >= 0) status = 0; /* continue */
+                     numSegs = 0;
+                  }
+               }
+               else status = PI_BAD_I2C_RLEN;
+            }
+            else status = PI_BAD_I2C_RLEN;
+            break;
 
          case PI_I2C_WRITE:
-            if (inPos <= (inLen - len_bytes))
-            {
-               if (len_bytes != 1)
-               {
-                  bytes=inBuf[inPos] + (inBuf[inPos+1]<<8);
-                  inPos += 2;
-               }
-               else
-               {
-                  bytes=inBuf[inPos++];
-               }
 
-               if (bytes && ((bytes + inPos) < inLen))
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0)
+            {
+               if ((bytes + inPos) < inLen)
                {
-                  for (i=0; i<(bytes-1); i++)
+                  segs[numSegs].addr = addr;
+                  segs[numSegs].flags = flags;
+                  segs[numSegs].len = bytes;
+                  segs[numSegs].buf = (uint8_t *)(inBuf + inPos);
+                  inPos += bytes;
+                  numSegs++;
+                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
                   {
-                     ack = I2CPutByte(w, inBuf[inPos++]);
-                     if (ack) status = PI_I2C_WRITE_FAILED;
+                     status = i2cSegments(handle, segs, numSegs);
+                     if (status >= 0) status = 0; /* continue */
+                     numSegs = 0;
                   }
-                  ack = I2CPutByte(w, inBuf[inPos++]);
-                  //if (ack) status = PI_I2C_WRITE_FAILED;
                }
-               else status = PI_BAD_BB_RLEN;
+               else status = PI_BAD_I2C_WLEN;
             }
-            else status = PI_BAD_BB_RLEN;
+            else status = PI_BAD_I2C_WLEN;
             break;
 
          default:
-            status = PI_BAD_BB_CMD;
+            status = PI_BAD_I2C_CMD;
       }
+
+      if (setesc) esc = 1; else esc = 0;
+
+      setesc = 0;
+   }
+
+   if (status >= 0)
+   {
+      if (numSegs) status = i2cSegments(handle, segs, numSegs);
    }
 
    if (status >= 0) status = outPos;
 
    return status;
 }
-#endif
 
 /* ======================================================================= */
 
@@ -4103,12 +4186,12 @@ static void spiTerm(uint32_t flags)
    }
 }
 
-int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
+int spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags)
 {
    int i, slot;
 
-   DBG(DBG_USER, "spiChan=%d spiBaud=%d spiFlags=0x%X",
-      spiChan, spiBaud, spiFlags);
+   DBG(DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X",
+      spiChan, baud, spiFlags);
 
    CHECK_INITED;
 
@@ -4125,8 +4208,8 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
    if (spiChan >= i)
       SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
 
-   if ((spiBaud < MIN_SPI_SPEED) || (spiBaud > MAX_SPI_SPEED))
-      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad spiBaud (%d)", spiBaud);
+   if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
+      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
 
    if (spiFlags > (1<<22))
       SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
@@ -4134,7 +4217,7 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
    if (!spiAnyOpen(spiFlags)) /* initialise on first open */
    {
       spiInit(spiFlags);
-      spiGo(spiBaud, spiFlags, NULL, NULL, 0);
+      spiGo(baud, spiFlags, NULL, NULL, 0);
    }
 
    slot = -1;
@@ -4152,7 +4235,7 @@ int spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)
    if (slot < 0)
       SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
 
-   spiInfo[slot].speed = spiBaud;
+   spiInfo[slot].speed = baud;
    spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
 
    return slot;
@@ -4890,6 +4973,7 @@ static void sigHandler(int signum)
 
             default:
                DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
+               gpioTerminate();
                exit(-1);
          }
       }
@@ -4899,7 +4983,7 @@ static void sigHandler(int signum)
       /* exit */
 
       DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
-
+      gpioTerminate();
       exit(-1);
    }
 }
@@ -5050,7 +5134,7 @@ static void * pthAlertThread(void *x)
             {
                /* shouldn't happen */
 
-               gpioCfg.showStats = 1;
+               //gpioCfg.showStats = 1;
 
                gpioStats.diffTick[0]++;
             }
@@ -5059,7 +5143,7 @@ static void * pthAlertThread(void *x)
             {
                /* shouldn't happen */
 
-               gpioCfg.showStats = 1;
+               //gpioCfg.showStats = 1;
 
                gpioStats.diffTick[TICKSLOTS-1]++;
             }
@@ -5303,10 +5387,10 @@ static void * pthAlertThread(void *x)
                            {
                               /* serious error, no point continuing */
 
-                              DBG(0, "fd=%d err=%d errno=%d",
+                              DBG(DBG_ALWAYS, "fd=%d err=%d errno=%d",
                                  gpioNotify[n].fd, err, errno);
 
-                              DBG(0, "%s", strerror(errno));
+                              DBG(DBG_ALWAYS, "%s", strerror(errno));
 
                               gpioNotify[n].bits  = 0;
                               gpioNotify[n].state = PI_NOTIFY_CLOSING;
@@ -5331,10 +5415,10 @@ static void * pthAlertThread(void *x)
                         {
                            if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
                            {
-                              DBG(0, "fd=%d err=%d errno=%d",
+                              DBG(DBG_ALWAYS, "fd=%d err=%d errno=%d",
                                  gpioNotify[n].fd, err, errno);
 
-                              DBG(0, "%s", strerror(errno));
+                              DBG(DBG_ALWAYS, "%s", strerror(errno));
 
                               /* serious error, no point continuing */
                               gpioNotify[n].bits  = 0;
@@ -5897,7 +5981,7 @@ static void *pthSocketThreadHandler(void *fdC)
             if (recv(sock, buf, p[3], MSG_WAITALL) != p[3])
             {
                /* Serious error.  No point continuing. */
-               DBG(0, "recv failed for %d bytes", p[3]);
+               DBG(DBG_ALWAYS, "recv failed for %d bytes", p[3]);
 
                close(sock);
 
@@ -5907,7 +5991,7 @@ static void *pthSocketThreadHandler(void *fdC)
          else
          {
             /* Serious error.  No point continuing. */
-            DBG(0, "ext too large %d(%d)", p[3], sizeof(buf));
+            DBG(DBG_ALWAYS, "ext too large %d(%d)", p[3], sizeof(buf));
 
             close(sock);
 
@@ -5949,12 +6033,13 @@ static void *pthSocketThreadHandler(void *fdC)
       {
          /* extensions */
 
-         case PI_CMD_BI2CX:
+         case PI_CMD_BI2CZ:
          case PI_CMD_CF2:
          case PI_CMD_I2CPK:
          case PI_CMD_I2CRD:
          case PI_CMD_I2CRI:
          case PI_CMD_I2CRK:
+         case PI_CMD_I2CZ:
          case PI_CMD_PROCP:
          case PI_CMD_SERR:
          case PI_CMD_SLR:
@@ -6031,11 +6116,46 @@ static void * pthSocketThread(void *x)
 
 /* ======================================================================= */
 
+static void initCheckLockFile(void)
+{
+   int fd;
+   int count;
+   int pid;
+   int err;
+   int delete;
+   char str[20];
+
+   fd = open(PI_LOCKFILE, O_RDONLY);
+
+   if (fd != -1)
+   {
+      DBG(DBG_STARTUP, "lock file exists");
+      delete = 1;
+
+      count = read(fd, str, sizeof(str)-1);
+
+      if (count)
+      {
+         pid = atoi(str);
+         err = kill(pid, 0);
+         if (!err) delete = 0; /* process still exists */
+         DBG(DBG_STARTUP, "lock file pid=%d err=%d", pid, err);
+      }
+
+      close(fd);
+      DBG(DBG_STARTUP, "lock file delete=%d", delete);
+
+      if (delete) unlink(PI_LOCKFILE);
+   }
+}
+
 static int initGrabLockFile(void)
 {
-   int  fd;
-   int  lockResult;
+   int fd;
+   int lockResult;
    char pidStr[20];
+
+   initCheckLockFile();
 
    /* try to grab the lock file */
 
@@ -6910,6 +7030,9 @@ static void initReleaseResources(void)
       close(fdMbox);
       fdMbox = -1;
    }
+
+   gpioStats.DMARestarts = 0;
+   gpioStats.dmaInitCbsCount = 0;
 }
 
 int initInitialise(void)
@@ -7233,6 +7356,8 @@ int gpioInitialise(void)
 
    if (libInitialised) return PIGPIO_VERSION;
 
+   DBG(DBG_STARTUP, "not initialised, initialising");
+
    runState = PI_STARTING;
 
    status = initInitialise();
@@ -7261,6 +7386,8 @@ void gpioTerminate(void)
    DBG(DBG_USER, "");
 
    if (!libInitialised) return;
+
+   DBG(DBG_STARTUP, "initialised, terminating");
 
    runState = PI_ENDING;
 
@@ -7863,9 +7990,9 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
 
 int gpioWaveAddSerial
    (unsigned gpio,
-    unsigned bbBaud,
-    unsigned bbBits,
-    unsigned bbStops,
+    unsigned baud,
+    unsigned data_bits,
+    unsigned stop_bits,
     unsigned offset,
     unsigned numBytes,
     char     *bstr)
@@ -7879,7 +8006,7 @@ int gpioWaveAddSerial
 
    DBG(DBG_USER,
       "gpio=%d baud=%d bits=%d stops=%d offset=%d numBytes=%d str=[%s]",
-      gpio, bbBaud, bbBits, bbStops, offset,
+      gpio, baud, data_bits, stop_bits, offset,
       numBytes, myBuf2Str(numBytes, (char *)bstr));
 
    CHECK_INITED;
@@ -7887,16 +8014,16 @@ int gpioWaveAddSerial
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if ((bbBaud < PI_BB_MIN_BAUD) || (bbBaud > PI_BB_TX_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_WAVE_BAUD, "bad baud rate (%d)", bbBaud);
+   if ((baud < PI_WAVE_MIN_BAUD) || (baud > PI_WAVE_MAX_BAUD))
+      SOFT_ERROR(PI_BAD_WAVE_BAUD, "bad baud rate (%d)", baud);
 
-   if ((bbBits < PI_MIN_WAVE_DATABITS) || (bbBits > PI_MAX_WAVE_DATABITS))
-      SOFT_ERROR(PI_BAD_DATABITS, "bad number of databits (%d)", bbBits);
+   if ((data_bits < PI_MIN_WAVE_DATABITS) || (data_bits > PI_MAX_WAVE_DATABITS))
+      SOFT_ERROR(PI_BAD_DATABITS, "bad number of databits (%d)", data_bits);
 
-   if ((bbStops < PI_MIN_WAVE_HALFSTOPBITS) ||
-       (bbStops > PI_MAX_WAVE_HALFSTOPBITS))
+   if ((stop_bits < PI_MIN_WAVE_HALFSTOPBITS) ||
+       (stop_bits > PI_MAX_WAVE_HALFSTOPBITS))
       SOFT_ERROR(PI_BAD_STOPBITS,
-         "bad number of (half) stop bits (%d)", bbStops);
+         "bad number of (half) stop bits (%d)", stop_bits);
 
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
@@ -7907,12 +8034,12 @@ int gpioWaveAddSerial
    if (offset > PI_WAVE_MAX_MICROS)
       SOFT_ERROR(PI_BAD_SER_OFFSET, "offset too large (%d)", offset);
 
-   if (bbBits > 8) numBytes /= 2;
-   if (bbBits > 16) numBytes /= 2;
+   if (data_bits > 8) numBytes /= 2;
+   if (data_bits > 16) numBytes /= 2;
 
    if (!numBytes) return 0;
 
-   waveBitDelay(bbBaud, bbBits, bbStops, bitDelay);
+   waveBitDelay(baud, data_bits, stop_bits, bitDelay);
 
    p = 0;
 
@@ -7936,11 +8063,11 @@ int gpioWaveAddSerial
 
       lev = 0;
 
-      if      (bbBits <  9) c = bstr[i];
-      else if (bbBits < 17) c = wstr[i];
+      if      (data_bits <  9) c = bstr[i];
+      else if (data_bits < 17) c = wstr[i];
       else                  c = lstr[i];
 
-      for (b=0; b<bbBits; b++)
+      for (b=0; b<data_bits; b++)
       {
          if (c & (1<<b)) v=1; else v=0;
 
@@ -7970,14 +8097,14 @@ int gpioWaveAddSerial
 
       /* stop bit */
 
-      if (lev) wf[2][p].usDelay += bitDelay[bbBits+1];
+      if (lev) wf[2][p].usDelay += bitDelay[data_bits+1];
       else
       {
          p++;
 
          wf[2][p].gpioOn  = (1<<gpio);
          wf[2][p].gpioOff = 0;
-         wf[2][p].usDelay = bitDelay[bbBits+1];
+         wf[2][p].usDelay = bitDelay[data_bits+1];
          wf[2][p].flags   = 0;
       }
    }
@@ -8519,9 +8646,9 @@ static uint8_t I2CGetByte(wfRx_t *w, int nack)
    return byte;
 }
 
-int bbI2COpen(unsigned SDA, unsigned SCL, unsigned bbBaud)
+int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
 {
-   DBG(DBG_USER, "SDA=%d SCL=%d bbBaud=%d", SDA, SCL, bbBaud);
+   DBG(DBG_USER, "SDA=%d SCL=%d baud=%d", SDA, SCL, baud);
 
    CHECK_INITED;
 
@@ -8531,24 +8658,24 @@ int bbI2COpen(unsigned SDA, unsigned SCL, unsigned bbBaud)
    if (SCL > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad SCL (%d)", SCL);
 
-   if ((bbBaud < PI_BB_MIN_BAUD) || (bbBaud > PI_BB_RX_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_WAVE_BAUD,
-         "SDA %d, bad baud rate (%d)", SDA, bbBaud);
+   if ((baud < PI_BB_I2C_MIN_BAUD) || (baud > PI_BB_I2C_MAX_BAUD))
+      SOFT_ERROR(PI_BAD_I2C_BAUD,
+         "SDA %d, bad baud rate (%d)", SDA, baud);
 
    if (wfRx[SDA].mode != PI_WFRX_NONE)
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", SDA);
 
-   if (wfRx[SCL].mode != PI_WFRX_NONE)
+   if ((wfRx[SCL].mode != PI_WFRX_NONE)  || (SCL == SDA))
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", SCL);
 
    wfRx[SDA].gpio = SDA;
    wfRx[SDA].mode = PI_WFRX_I2C;
-   wfRx[SDA].baud = bbBaud;
+   wfRx[SDA].baud = baud;
 
    wfRx[SDA].I.started = 0;
    wfRx[SDA].I.SDA = SDA;
    wfRx[SDA].I.SCL = SCL;
-   wfRx[SDA].I.delay = 500000 / bbBaud;
+   wfRx[SDA].I.delay = 500000 / baud;
    wfRx[SDA].I.SDAMode = gpioGetMode(SDA);
    wfRx[SDA].I.SCLMode = gpioGetMode(SCL);
 
@@ -8597,14 +8724,17 @@ int bbI2CClose(unsigned SDA)
    return 0;
 }
 
-
 /*-------------------------------------------------------------------------*/
 
-int bbI2CXfer(
+int bbI2CZip(
    unsigned SDA,
-   char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
+   char *inBuf,
+   unsigned inLen,
+   char *outBuf,
+   unsigned outLen)
 {
-   int i, ack, inPos, outPos, status, bytes, len_bytes;
+   int i, ack, inPos, outPos, status, bytes;
+   int addr, flags, esc, setesc;
    wfRx_t *w;
 
    DBG(DBG_USER, "gpio=%d inBuf=%s outBuf=%08X len=%d",
@@ -8630,12 +8760,15 @@ int bbI2CXfer(
    outPos = 0;
    status = 0;
 
+   addr = 0;
+   flags = 0;
+   esc = 0;
+   setesc = 0;
+
    while (!status && (inPos < inLen))
    {
-      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d",
-         status, inPos, inLen, inBuf[inPos]);
-
-      len_bytes = 1;
+      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
+         status, inPos, inLen, inBuf[inPos], addr, flags);
 
       switch (inBuf[inPos++])
       {
@@ -8651,71 +8784,79 @@ int bbI2CXfer(
             I2CStop(w);
             break;
 
-         case PI_I2C_READ16:
-            len_bytes = 2;
-            /* fall through */
-
-         case PI_I2C_READ:
-            if (inPos <= (inLen - len_bytes))
-            {
-               if (len_bytes != 1)
-               {
-                  bytes=inBuf[inPos] + (inBuf[inPos+1]<<8);
-                  inPos += 2;
-               }
-               else
-               {
-                  bytes=inBuf[inPos++];
-               }
-
-               if (bytes && ((bytes + outPos) < outLen))
-               {
-                  for (i=0; i<(bytes-1); i++)
-                  {
-                     outBuf[outPos++] = I2CGetByte(w, 0);
-                  }
-                  outBuf[outPos++] = I2CGetByte(w, 1);
-               }
-               else status = PI_BAD_BB_WLEN;
-            }
-            else status = PI_BAD_BB_WLEN;
+         case PI_I2C_ADDR:
+            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (addr < 0) status = PI_BAD_I2C_CMD;
             break;
 
-         case PI_I2C_WRITE16:
-            len_bytes = 2;
-            /* fall through */
+         case PI_I2C_FLAGS:
+            /* cheat to force two byte flags */
+            esc = 1;
+            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (flags < 0) status = PI_BAD_I2C_CMD;
+            break;
+
+         case PI_I2C_ESC:
+            setesc = 1;
+            break;
+
+         case PI_I2C_READ:
+
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0) ack = I2CPutByte(w, (addr<<1)|1);
+
+            if (bytes > 0)
+            {
+               if (!ack)
+               {
+                  if ((bytes + outPos) < outLen)
+                  {
+                     for (i=0; i<(bytes-1); i++)
+                     {
+                        outBuf[outPos++] = I2CGetByte(w, 0);
+                     }
+                     outBuf[outPos++] = I2CGetByte(w, 1);
+                  }
+                  else status = PI_BAD_I2C_RLEN;
+               }
+               else status = PI_I2C_READ_FAILED;
+            }
+            else status = PI_BAD_I2C_CMD;
+            break;
 
          case PI_I2C_WRITE:
-            if (inPos <= (inLen - len_bytes))
-            {
-               if (len_bytes != 1)
-               {
-                  bytes=inBuf[inPos] + (inBuf[inPos+1]<<8);
-                  inPos += 2;
-               }
-               else
-               {
-                  bytes=inBuf[inPos++];
-               }
 
-               if (bytes && ((bytes + inPos) < inLen))
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0) ack = I2CPutByte(w, addr<<1);
+
+            if (bytes > 0)
+            {
+               if (!ack)
                {
-                  for (i=0; i<(bytes-1); i++)
+                  if ((bytes + inPos) < inLen)
                   {
+                     for (i=0; i<(bytes-1); i++)
+                     {
+                        ack = I2CPutByte(w, inBuf[inPos++]);
+                        if (ack) status = PI_I2C_WRITE_FAILED;
+                     }
                      ack = I2CPutByte(w, inBuf[inPos++]);
-                     if (ack) status = PI_I2C_WRITE_FAILED;
                   }
-                  ack = I2CPutByte(w, inBuf[inPos++]);
-                  //if (ack) status = PI_I2C_WRITE_FAILED;
-               }
-               else status = PI_BAD_BB_RLEN;
+                  else status = PI_BAD_I2C_RLEN;
+               } else status = PI_I2C_WRITE_FAILED;
             }
-            else status = PI_BAD_BB_RLEN;
+            else status = PI_BAD_I2C_CMD;
             break;
 
          default:
-            status = PI_BAD_BB_CMD;
+            status = PI_BAD_I2C_CMD;
       }
+
+      if (setesc) esc = 1; else esc = 0;
+
+      setesc = 0;
    }
 
    if (status >= 0) status = outPos;
@@ -8726,37 +8867,38 @@ int bbI2CXfer(
 
 /*-------------------------------------------------------------------------*/
 
-int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud, unsigned bbBits)
+int gpioSerialReadOpen(unsigned gpio, unsigned baud, unsigned data_bits)
 {
    int bitTime, timeout;
 
-   DBG(DBG_USER, "gpio=%d bbBaud=%d bbBits=%d", gpio, bbBaud, bbBits);
+   DBG(DBG_USER, "gpio=%d baud=%d data_bits=%d", gpio, baud, data_bits);
 
    CHECK_INITED;
 
    if (gpio > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if ((bbBaud < PI_BB_MIN_BAUD) || (bbBaud > PI_BB_RX_MAX_BAUD))
+   if ((baud < PI_BB_SER_MIN_BAUD) || (baud > PI_BB_SER_MAX_BAUD))
       SOFT_ERROR(PI_BAD_WAVE_BAUD,
-         "gpio %d, bad baud rate (%d)", gpio, bbBaud);
+         "gpio %d, bad baud rate (%d)", gpio, baud);
 
-   if ((bbBits < PI_MIN_WAVE_DATABITS) || (bbBits > PI_MAX_WAVE_DATABITS))
+   if ((data_bits < PI_MIN_WAVE_DATABITS) ||
+       (data_bits > PI_MAX_WAVE_DATABITS))
       SOFT_ERROR(PI_BAD_DATABITS,
-         "gpio %d, bad data bits (%d)", gpio, bbBits);
+         "gpio %d, bad data bits (%d)", gpio, data_bits);
 
    if (wfRx[gpio].mode != PI_WFRX_NONE)
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", gpio);
 
-   bitTime = (1000 * MILLION) / bbBaud; /* nanos */
+   bitTime = (1000 * MILLION) / baud; /* nanos */
 
-   timeout  = ((bbBits+2) * bitTime)/MILLION; /* millis */
+   timeout  = ((data_bits+2) * bitTime)/MILLION; /* millis */
 
    if (timeout < 1) timeout = 1;
 
    wfRx[gpio].gpio = gpio;
    wfRx[gpio].mode = PI_WFRX_SERIAL;
-   wfRx[gpio].baud = bbBaud;
+   wfRx[gpio].baud = baud;
 
    wfRx[gpio].s.buf      = malloc(SRX_BUF_SIZE);
    wfRx[gpio].s.bufSize  = SRX_BUF_SIZE;
@@ -8766,10 +8908,10 @@ int gpioSerialReadOpen(unsigned gpio, unsigned bbBaud, unsigned bbBits)
    wfRx[gpio].s.readPos  = 0;
    wfRx[gpio].s.writePos = 0;
    wfRx[gpio].s.bit      = -1;
-   wfRx[gpio].s.dataBits = bbBits;
+   wfRx[gpio].s.dataBits = data_bits;
 
-   if      (bbBits <  9) wfRx[gpio].s.bytes = 1;
-   else if (bbBits < 17) wfRx[gpio].s.bytes = 2;
+   if      (data_bits <  9) wfRx[gpio].s.bytes = 1;
+   else if (data_bits < 17) wfRx[gpio].s.bytes = 2;
    else                  wfRx[gpio].s.bytes = 4;
 
    gpioSetAlertFunc(gpio, waveRxBit);

@@ -251,6 +251,135 @@ ERROR: no permission to update one or more gpios
 
 .br
 
+.IP "\fBBI2CC sda\fP - Close bit bang I2C"
+.IP "" 4
+This command signals that bit banging I2C on \fBsda\fP (and \fBscl\fP) is no
+longer required.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bi2cc 5
+.br
+
+.EE
+
+.br
+
+.IP "\fBBI2CO sda scl b\fP - Open bit bang I2C"
+.IP "" 4
+This command signals that gpios \fBsda\fP and \fBscl\fP are to be used
+for bit banging I2C at \fBb\fP baud.
+
+.br
+Bit banging I2C allows for certain operations which are not possible
+with the standard I2C driver.
+
+.br
+o baud rates as low as 50
+.br
+o repeated starts
+.br
+o clock stretching
+.br
+o I2C on any pair of spare gpios
+
+.br
+The baud rate may be between 50 and 500000 bits per second.
+
+.br
+The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
+a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
+
+.br
+
+.IP "\fBBI2CZ sda bvs\fP - I2C bit bang multiple transactions"
+.IP "" 4
+This function executes a sequence of bit banged I2C operations.  The
+operations to be performed are specified by the contents of \fBbvs\fP
+which contains the concatenated command codes and associated data.
+
+.br
+The following command codes are supported:
+
+.br
+
+.EX
+Name      Cmd & Data     Meaning
+End       0              No more commands
+Escape    1              Next P is two bytes
+Start     2              Start condition
+Stop      3              Stop condition
+Address   4 P            Set I2C address to P
+Flags     5 lsb msb      Set I2C flags to lsb + (msb << 8)
+Read      6 P            Read P bytes of data
+Write     7 P ...        Write P bytes of data
+
+.EE
+
+.br
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+.br
+The address and flags default to 0.  The address and flags maintain
+their previous value until updated.
+
+.br
+No flags are currently defined.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+Set address 0x53
+.br
+start, write 0x32, (re)start, read 6 bytes, stop
+.br
+Set address 0x1E
+.br
+start, write 0x03, (re)start, read 6 bytes, stop
+.br
+Set address 0x68
+.br
+start, write 0x1B, (re)start, read 8 bytes, stop
+.br
+End
+.br
+
+.br
+0x04 0x53
+.br
+0x02 0x07 0x01 0x32   0x02 0x06 0x06 0x03
+.br
+
+.br
+0x04 0x1E
+.br
+0x02 0x07 0x01 0x03   0x02 0x06 0x06 0x03
+.br
+
+.br
+0x04 0x68
+.br
+0x02 0x07 0x01 0x1B   0x02 0x06 0x08 0x03
+.br
+
+.br
+0x00
+.br
+
+.EE
+
+.br
+
 .IP "\fBBR1 \fP - Read bank 1 gpios"
 .IP "" 4
 This command read gpios 0-31 (bank 1) and returns the levels as a
@@ -1136,6 +1265,72 @@ $ pigs i2cww 0 0 0xffff
 .br
 
 .EE
+
+.br
+
+.IP "\fBI2CZ h bvs\fP - Performs multiple I2C transactions"
+.IP "" 4
+This command executes a sequence of I2C operations.  The
+operations to be performed are specified by the contents of \fBbvs\fP
+which contains the concatenated command codes and associated data.
+
+.br
+The following command codes are supported:
+
+.br
+
+.EX
+Name      Cmd & Data   Meaning
+End       0            No more commands
+Escape    1            Next P is two bytes
+On        2            Switch combined flag on
+Off       3            Switch combined flag off
+Address   4 P          Set I2C address to P
+Flags     5 lsb msb    Set I2C flags to lsb + (msb << 8)
+Read      6 P          Read P bytes of data
+Write     7 P ...      Write P bytes of data
+
+.EE
+
+.br
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+.br
+The address defaults to that associated with the handle \fBh\fP.
+The flags default to 0.  The address and flags maintain their
+previous value until updated.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+Set address 0x53, write 0x32, read 6 bytes
+.br
+Set address 0x1E, write 0x03, read 6 bytes
+.br
+Set address 0x68, write 0x1B, read 8 bytes
+.br
+End
+.br
+
+.br
+0x04 0x53   0x07 0x01 0x32   0x06 0x06
+.br
+0x04 0x1E   0x07 0x01 0x03   0x06 0x06
+.br
+0x04 0x68   0x07 0x01 0x1B   0x06 0x08
+.br
+0x00
+.br
+
+.EE
+
+.br
 
 .br
 
@@ -2149,7 +2344,7 @@ $ pigs serda 0
 
 .br
 
-.IP "\fBSERO dev b sef\fP - Open serial device dev at baud with flags"
+.IP "\fBSERO dev b sef\fP - Open serial device dev at baud b with flags"
 .IP "" 4
 
 .br
@@ -2165,6 +2360,11 @@ will be returned.
 .br
 The UART is /dev/ttyAMA0.  The consoles are /dev/ttyx.  The USB
 devices are /dev/ttyUSBx.
+
+.br
+The baud rate must be one of 50, 75, 110, 134, 150,
+200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+38400, 57600, 115200, or 230400.
 
 .br
 
@@ -2382,6 +2582,9 @@ Upon success nothing is returned.  On error a negative status code
 will be returned.
 
 .br
+The baud rate may be between 50 and 250000 bits per second.
+
+.br
 The received data is held in a cyclic buffer.
 
 .br
@@ -2422,7 +2625,26 @@ will be returned.
 
 .br
 
-.IP "\fBSPIO c b spf\fP - SPI open channel at baud with flags"
+\fBExample\fP
+.br
+
+.EX
+$ pigs spic 1
+.br
+
+.br
+$ pigs spic 1
+.br
+-25
+.br
+ERROR: unknown handle
+.br
+
+.EE
+
+.br
+
+.IP "\fBSPIO c b spf\fP - SPI open channel at baud b with flags"
 .IP "" 4
 
 .br
@@ -2432,6 +2654,10 @@ This command returns a handle to a SPI device on channel \fBc\fP.
 Data will be transferred at \fBb\fP bits per second.  The flags \fBspf\fP
 may be used to modify the default behaviour of 4-wire operation,
 mode 0, active low chip select.
+
+.br
+Speeds between 32kbps and 125Mbps are allowed.  Speeds above 30Mbps
+are unlikely to work.
 
 .br
 An auxiliary SPI device is available on the A+/B+/Pi2 and may be
@@ -2522,6 +2748,12 @@ will be returned.
 $ pigs spio 0 100000 3 # Open channel 0 at 100kbps in mode 3.
 .br
 0
+.br
+
+.br
+$ pigs spio 0 32000 256 # Open channel 0 of auxiliary spi at 32kbps.
+.br
+1
 .br
 
 .EE
@@ -2809,6 +3041,9 @@ returned.  On error a negative status code will be returned.
 .br
 The serial data is formatted as one start bit, \fBdb\fP data bits, and
 \fBsb\fP/2 stop bits.
+
+.br
+The baud rate may be between 50 and 1000000 bits per second.
 
 .br
 It is legal to add serial data streams with different baud rates to
@@ -3285,8 +3520,9 @@ ERROR: non existent wave id
 
 .br
 
-.IP "\fBb\fP - baud (100-250000)" 0
-The command expects a baud rate for serial data.
+.IP "\fBb\fP - baud" 0
+The command expects the baud rate in bits per second for
+the transmission of serial data (I2C/SPI/serial link, waves).
 
 .br
 
@@ -3516,6 +3752,18 @@ The command expects an I2C register number.
 
 .IP "\fBsb\fP - serial stop (half) bits (2-8)" 0
 The command expects the number of stop (half) bits per serial character.
+
+.br
+
+.IP "\fBscl\fP - user gpio (0-31)" 0
+The command expects the number of the gpio to be used for SCL
+when bit banging I2C.
+
+.br
+
+.IP "\fBsda\fP - user gpio (0-31)" 0
+The command expects the number of the gpio to be used for SDA
+when bit banging I2C.
 
 .br
 

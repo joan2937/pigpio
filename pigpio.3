@@ -1570,7 +1570,7 @@ else
 
 .EE
 
-.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned bbBaud, unsigned bbBits, unsigned bbStop, unsigned offset, unsigned numBytes, char *str)\fP"
+.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset, unsigned numBytes, char *str)\fP"
 .IP "" 4
 This function adds a waveform representing serial data to the
 existing waveform (if any).  The serial data starts offset
@@ -1583,11 +1583,11 @@ microseconds from the start of the waveform.
 .EX
 user_gpio: 0-31
 .br
-   bbBaud: 100-1000000
+     baud: 50-1000000
 .br
-   bbBits: 1-32
+data_bits: 1-32
 .br
-   bbStop: 2-8
+stop_bits: 2-8
 .br
    offset: 0-
 .br
@@ -1614,8 +1614,8 @@ NOTES:
 .br
 
 .br
-The serial data is formatted as one start bit, bbBits data bits, and
-bbStop/2 stop bits.
+The serial data is formatted as one start bit, data_bits data bits, and
+stop_bits/2 stop bits.
 
 .br
 
@@ -1631,16 +1631,16 @@ numBytes is the number of bytes of data in str.
 .br
 
 .br
-The bytes required for each character depend upon bbBits.
+The bytes required for each character depend upon data_bits.
 
 .br
 
 .br
-For bbBits 1-8 there will be one byte per character.
+For data_bits 1-8 there will be one byte per character.
 .br
-For bbBits 9-16 there will be two bytes per character.
+For data_bits 9-16 there will be two bytes per character.
 .br
-For bbBits 17-32 there will be four bytes per character.
+For data_bits 17-32 there will be four bytes per character.
 
 .br
 
@@ -1938,7 +1938,7 @@ waveform created since \fBgpioInitialise\fP was called.
 This function returns the maximum possible size of a waveform in DMA
 control blocks.
 
-.IP "\fBint gpioSerialReadOpen(unsigned user_gpio, unsigned bbBaud, unsigned bbBits)\fP"
+.IP "\fBint gpioSerialReadOpen(unsigned user_gpio, unsigned baud, unsigned data_bits)\fP"
 .IP "" 4
 This function opens a gpio for bit bang reading of serial data.
 
@@ -1949,9 +1949,9 @@ This function opens a gpio for bit bang reading of serial data.
 .EX
 user_gpio: 0-31
 .br
-   bbBaud: 100-250000
+     baud: 50-250000
 .br
-   bbBits: 1-32
+data_bits: 1-32
 .br
 
 .EE
@@ -2003,16 +2003,16 @@ or PI_NOT_SERIAL_GPIO.
 
 .br
 The bytes returned for each character depend upon the number of
-data bits \fBbbBits\fP specified in the \fBgpioSerialReadOpen\fP command.
+data bits \fBdata_bits\fP specified in the \fBgpioSerialReadOpen\fP command.
 
 .br
 
 .br
-For \fBbbBits\fP 1-8 there will be one byte per character.
+For \fBdata_bits\fP 1-8 there will be one byte per character.
 .br
-For \fBbbBits\fP 9-16 there will be two bytes per character.
+For \fBdata_bits\fP 9-16 there will be two bytes per character.
 .br
-For \fBbbBits\fP 17-32 there will be four bytes per character.
+For \fBdata_bits\fP 17-32 there will be four bytes per character.
 
 .IP "\fBint gpioSerialReadClose(unsigned user_gpio)\fP"
 .IP "" 4
@@ -2044,7 +2044,7 @@ This returns a handle for the device at the address on the I2C bus.
 .EX
   i2cBus: 0-1
 .br
- i2cAddr: 0x08-0x77
+ i2cAddr: 0x00-0x7F
 .br
 i2cFlags: 0
 .br
@@ -2116,54 +2116,6 @@ handle: >=0, as returned by a call to \fBi2cOpen\fP
 
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
-
-.IP "\fBint i2cReadDevice(unsigned handle, char *buf, unsigned count)\fP"
-.IP "" 4
-This reads count bytes from the raw device into buf.
-
-.br
-
-.br
-
-.EX
-handle: >=0, as returned by a call to \fBi2cOpen\fP
-.br
-   buf: an array to receive the read data bytes
-.br
- count: >0, the number of bytes to read
-.br
-
-.EE
-
-.br
-
-.br
-Returns count (>0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
-PI_I2C_READ_FAILED.
-
-.IP "\fBint i2cWriteDevice(unsigned handle, char *buf, unsigned count)\fP"
-.IP "" 4
-This writes count bytes from buf to the raw device.
-
-.br
-
-.br
-
-.EX
-handle: >=0, as returned by a call to \fBi2cOpen\fP
-.br
-   buf: an array containing the data bytes to write
-.br
- count: >0, the number of bytes to write
-.br
-
-.EE
-
-.br
-
-.br
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
-PI_I2C_WRITE_FAILED.
 
 .IP "\fBint i2cWriteQuick(unsigned handle, unsigned bit)\fP"
 .IP "" 4
@@ -2646,7 +2598,430 @@ S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
 
 .EE
 
-.IP "\fBint spiOpen(unsigned spiChan, unsigned spiBaud, unsigned spiFlags)\fP"
+.IP "\fBint i2cReadDevice(unsigned handle, char *buf, unsigned count)\fP"
+.IP "" 4
+This reads count bytes from the raw device into buf.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBi2cOpen\fP
+.br
+   buf: an array to receive the read data bytes
+.br
+ count: >0, the number of bytes to read
+.br
+
+.EE
+
+.br
+
+.br
+Returns count (>0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
+PI_I2C_READ_FAILED.
+
+.IP "\fBint i2cWriteDevice(unsigned handle, char *buf, unsigned count)\fP"
+.IP "" 4
+This writes count bytes from buf to the raw device.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBi2cOpen\fP
+.br
+   buf: an array containing the data bytes to write
+.br
+ count: >0, the number of bytes to write
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
+PI_I2C_WRITE_FAILED.
+
+.IP "\fBvoid i2cSwitchCombined(int setting)\fP"
+.IP "" 4
+This sets the I2C (i2c-bcm2708) module "use combined transactions"
+parameter on or off.
+
+.br
+
+.br
+
+.EX
+setting: 0 to set the parameter off, non-zero to set it on
+.br
+
+.EE
+
+.br
+
+.br
+
+.br
+
+.br
+NOTE: when the flag is on a write followed by a read to the same
+slave address will use a repeated start (rather than a stop/start).
+
+.IP "\fBint i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)\fP"
+.IP "" 4
+This function executes multiple I2C segments in one transaction by
+calling the I2C_RDWR ioctl.
+
+.br
+
+.br
+
+.EX
+ handle: >=0, as returned by a call to \fBi2cOpen\fP
+.br
+   segs: an array of I2C segments
+.br
+numSegs: >0, the number of I2C segments
+.br
+
+.EE
+
+.br
+
+.br
+Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
+
+.IP "\fBint i2cZip(unsigned handle, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.IP "" 4
+This function executes a sequence of I2C operations.  The
+operations to be performed are specified by the contents of inBuf
+which contains the concatenated command codes and associated data.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBi2cOpen\fP
+.br
+ inBuf: pointer to the concatenated I2C commands, see below
+.br
+ inLen: size of command buffer
+.br
+outBuf: pointer to buffer to hold returned data
+.br
+outLen: size of output buffer
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_HANDLE, PI_BAD_POINTER, PI_BAD_I2C_CMD, PI_BAD_I2C_RLEN.
+PI_BAD_I2C_WLEN, or PI_BAD_I2C_SEG.
+
+.br
+
+.br
+The following command codes are supported:
+
+.br
+
+.br
+Name      Cmd & Data   Meaning
+
+.br
+End       0            No more commands
+
+.br
+Escape    1            Next P is two bytes
+
+.br
+On        2            Switch combined flag on
+
+.br
+Off       3            Switch combined flag off
+
+.br
+Address   4 P          Set I2C address to P
+
+.br
+Flags     5 lsb msb    Set I2C flags to lsb + (msb << 8)
+
+.br
+Read      6 P          Read P bytes of data
+
+.br
+Write     7 P ...      Write P bytes of data
+
+.br
+
+.br
+
+.br
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+.br
+
+.br
+The address defaults to that associated with the handle.
+The flags default to 0.  The address and flags maintain their
+previous value until updated.
+
+.br
+
+.br
+The returned I2C data is stored in consecutive locations of outBuf.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+Set address 0x53, write 0x32, read 6 bytes
+.br
+Set address 0x1E, write 0x03, read 6 bytes
+.br
+Set address 0x68, write 0x1B, read 8 bytes
+.br
+End
+.br
+
+.br
+0x04 0x53   0x07 0x01 0x32   0x06 0x06
+.br
+0x04 0x1E   0x07 0x01 0x03   0x06 0x06
+.br
+0x04 0x68   0x07 0x01 0x1B   0x06 0x08
+.br
+0x00
+.br
+
+.EE
+
+.IP "\fBint bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)\fP"
+.IP "" 4
+This function selects a pair of gpios for bit banging I2C at a
+specified baud rate.
+
+.br
+
+.br
+Bit banging I2C allows for certain operations which are not possible
+with the standard I2C driver.
+
+.br
+
+.br
+o baud rates as low as 50
+.br
+o repeated starts
+.br
+o clock stretching
+.br
+o I2C on any pair of spare gpios
+
+.br
+
+.br
+
+.EX
+ SDA: 0-31
+.br
+ SCL: 0-31
+.br
+baud: 50-500000
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_I2C_BAUD, or
+PI_GPIO_IN_USE.
+
+.br
+
+.br
+NOTE:
+
+.br
+
+.br
+The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
+a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
+
+.IP "\fBint bbI2CClose(unsigned SDA)\fP"
+.IP "" 4
+This function stops bit banging I2C on a pair of gpios previously
+opened with \fBbbI2COpen\fP.
+
+.br
+
+.br
+
+.EX
+SDA: 0-31, the SDA gpio used in a prior call to \fBbbI2COpen\fP
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
+
+.IP "\fBint bbI2CZip(unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.IP "" 4
+This function executes a sequence of bit banged I2C operations.  The
+operations to be performed are specified by the contents of inBuf
+which contains the concatenated command codes and associated data.
+
+.br
+
+.br
+
+.EX
+   SDA: 0-31 (as used in a prior call to \fBbbI2COpen\fP)
+.br
+ inBuf: pointer to the concatenated I2C commands, see below
+.br
+ inLen: size of command buffer
+.br
+outBuf: pointer to buffer to hold returned data
+.br
+outLen: size of output buffer
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_USER_GPIO, PI_NOT_I2C_GPIO, PI_BAD_POINTER,
+PI_BAD_I2C_CMD, PI_BAD_I2C_RLEN, PI_BAD_I2C_WLEN,
+PI_I2C_READ_FAILED, or PI_I2C_WRITE_FAILED.
+
+.br
+
+.br
+The following command codes are supported:
+
+.br
+
+.br
+Name      Cmd & Data     Meaning
+
+.br
+End       0              No more commands
+
+.br
+Escape    1              Next P is two bytes
+
+.br
+Start     2              Start condition
+
+.br
+Stop      3              Stop condition
+
+.br
+Address   4 P            Set I2C address to P
+
+.br
+Flags     5 lsb msb      Set I2C flags to lsb + (msb << 8)
+
+.br
+Read      6 P            Read P bytes of data
+
+.br
+Write     7 P ...        Write P bytes of data
+
+.br
+
+.br
+
+.br
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+.br
+
+.br
+The address and flags default to 0.  The address and flags maintain
+their previous value until updated.
+
+.br
+
+.br
+No flags are currently defined.
+
+.br
+
+.br
+The returned I2C data is stored in consecutive locations of outBuf.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+Set address 0x53
+.br
+start, write 0x32, (re)start, read 6 bytes, stop
+.br
+Set address 0x1E
+.br
+start, write 0x03, (re)start, read 6 bytes, stop
+.br
+Set address 0x68
+.br
+start, write 0x1B, (re)start, read 8 bytes, stop
+.br
+End
+.br
+
+.br
+0x04 0x53
+.br
+0x02 0x07 0x01 0x32   0x02 0x06 0x06 0x03
+.br
+
+.br
+0x04 0x1E
+.br
+0x02 0x07 0x01 0x03   0x02 0x06 0x06 0x03
+.br
+
+.br
+0x04 0x68
+.br
+0x02 0x07 0x01 0x1B   0x02 0x06 0x08 0x03
+.br
+
+.br
+0x00
+.br
+
+.EE
+
+.IP "\fBint spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags)\fP"
 .IP "" 4
 This function returns a handle for the SPI device on the channel.
 Data will be transferred at baud bits per second.  The flags may
@@ -2667,7 +3042,7 @@ device has 3 chip selects and a selectable word size in bits.
 .EX
  spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
 .br
- spiBaud: 32K-125M (values above 30M are unlikely to work)
+    baud: 32K-125M (values above 30M are unlikely to work)
 .br
 spiFlags: see below
 .br
@@ -2876,7 +3251,7 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint serOpen(char *sertty, unsigned serBaud, unsigned serFlags)\fP"
+.IP "\fBint serOpen(char *sertty, unsigned baud, unsigned serFlags)\fP"
 .IP "" 4
 This function opens a serial device at a specified baud rate
 with specified flags.
@@ -2888,7 +3263,7 @@ with specified flags.
 .EX
   sertty: the serial device to open, /dev/tty*
 .br
- serBaud: the baud rate to use
+    baud: the baud rate in bits per second, see below
 .br
 serFlags: 0
 .br
@@ -2900,6 +3275,13 @@ serFlags: 0
 .br
 Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, or
 PI_SER_OPEN_FAILED.
+
+.br
+
+.br
+The baud rate must be one of 50, 75, 110, 134, 150,
+200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+38400, 57600, 115200, or 230400.
 
 .br
 
@@ -4916,10 +5298,6 @@ meaning is defined by the customiser.
 .br
 
 .IP "\fBargc\fP" 0
-
-.br
-
-.br
 The count of bytes passed to a user customised function.
 
 .br
@@ -4927,10 +5305,6 @@ The count of bytes passed to a user customised function.
 .br
 
 .IP "\fB*argx\fP" 0
-
-.br
-
-.br
 A pointer to an array of bytes passed to a user customised function.
 Its meaning and content is defined by the customiser.
 
@@ -4938,85 +5312,15 @@ Its meaning and content is defined by the customiser.
 
 .br
 
-.IP "\fBbbBaud\fP" 0
-
-.br
-
-.br
-The baud rate used for the transmission and reception of bit banged
-serial data.
-
-.br
-
-.br
-
-.EX
-PI_BB_MIN_BAUD 50
-.br
-PI_BB_RX_MAX_BAUD 250000
-.br
-PI_BB_TX_MAX_BAUD 1000000
-.br
-
-.EE
-
-.br
-
-.br
-
-.IP "\fBbbBits\fP: 1-32" 0
-
-.br
-
-.br
-The number of data bits to be used when adding serial data to a
-waveform.
-
-.br
-
-.br
-
-.EX
-#define PI_MIN_WAVE_DATABITS 1
-.br
-#define PI_MAX_WAVE_DATABITS 32
-.br
-
-.EE
-
-.br
-
-.br
-
-.IP "\fBbbStop\fP: 2-8" 0
-
-.br
-
-.br
-The number of (half) stop bits to be used when adding serial data
-to a waveform.
-
-.br
-
-.br
-
-.EX
-#define PI_MIN_WAVE_HALFSTOPBITS 2
-.br
-#define PI_MAX_WAVE_HALFSTOPBITS 8
-.br
-
-.EE
+.IP "\fBbaud\fP" 0
+The speed of serial communication (I2C, SPI, serial link, waves) in
+bits per second.
 
 .br
 
 .br
 
 .IP "\fBbit\fP" 0
-
-.br
-
-.br
 A value of 0 or 1.
 
 .br
@@ -5024,10 +5328,6 @@ A value of 0 or 1.
 .br
 
 .IP "\fBbitPos\fP" 0
-
-.br
-
-.br
 A bit position within a byte or word.  The least significant bit is
 position 0.
 
@@ -5036,10 +5336,6 @@ position 0.
 .br
 
 .IP "\fBbits\fP" 0
-
-.br
-
-.br
 A value used to select gpios.  If bit n of bits is set then gpio n is
 selected.
 
@@ -5219,6 +5515,30 @@ The hardware clock frequency.
 .br
 The number of bytes to be transferred in an I2C, SPI, or Serial
 command.
+
+.br
+
+.br
+
+.IP "\fBdata_bits\fP: 1-32" 0
+
+.br
+
+.br
+The number of data bits to be used when adding serial data to a
+waveform.
+
+.br
+
+.br
+
+.EX
+#define PI_MIN_WAVE_DATABITS 1
+.br
+#define PI_MAX_WAVE_DATABITS 32
+.br
+
+.EE
 
 .br
 
@@ -5587,12 +5907,8 @@ A number referencing an object opened by one of
 
 .br
 
-.IP "\fBi2cAddr\fP: 0x08-0x77" 0
-
-.br
-
-.br
-The address of a device on the I2C bus (0x08 - 0x77)
+.IP "\fBi2cAddr\fP" 0
+The address of a device on the I2C bus.
 
 .br
 
@@ -5645,11 +5961,21 @@ PI_DISABLE_SOCK_IF 2
 
 .br
 
+.IP "\fB*inBuf\fP" 0
+A buffer used to pass data to a function.
+
+.br
+
+.br
+
+.IP "\fBinLen\fP" 0
+The number of bytes of data in a buffer.
+
+.br
+
+.br
+
 .IP "\fBint\fP" 0
-
-.br
-
-.br
 A whole number, negative or positive.
 
 .br
@@ -5657,10 +5983,6 @@ A whole number, negative or positive.
 .br
 
 .IP "\fBlevel\fP" 0
-
-.br
-
-.br
 The level of a gpio.  Low or High.
 
 .br
@@ -5842,15 +6164,15 @@ The number of parameters passed to a script.
 
 .br
 
-.IP "\fBnumParts\fP" 0
-The number of parts in a combined I2C transaction.
-
-.br
-
-.br
-
 .IP "\fBnumPulses\fP" 0
 The number of pulses to be added to a waveform.
+
+.br
+
+.br
+
+.IP "\fBnumSegs\fP" 0
+The number of segments in a combined I2C transaction.
 
 .br
 
@@ -5864,15 +6186,22 @@ tghe waveform.
 
 .br
 
+.IP "\fB*outBuf\fP" 0
+A buffer used to return data from a function.
+
+.br
+
+.br
+
+.IP "\fBoutLen\fP" 0
+The size in bytes of an output buffer.
+
+.br
+
+.br
+
 .IP "\fB*param\fP" 0
 An array of script parameters.
-
-.br
-
-.br
-
-.IP "\fB*parts\fP" 0
-An array of the part transactions which make up a combined I2C transaction.
 
 .br
 
@@ -6199,6 +6528,17 @@ A pointer to a buffer to receive data.
 
 .br
 
+.IP "\fBSCL\fP" 0
+
+.br
+
+.br
+The user gpio to use for the clock when bit banging I2C.
+
+.br
+
+.br
+
 .IP "\fB*script\fP" 0
 
 .br
@@ -6216,6 +6556,17 @@ A pointer to the text of a script.
 
 .br
 An id of a stored script as returned by \fBgpioStoreScript\fP.
+
+.br
+
+.br
+
+.IP "\fBSDA\fP" 0
+
+.br
+
+.br
+The user gpio to use for data when bit banging I2C.
 
 .br
 
@@ -6255,28 +6606,18 @@ The number of seconds.
 
 .br
 
-.IP "\fBserBaud\fP" 0
+.IP "\fB*segs\fP" 0
 
 .br
 
 .br
-The baud rate to use on the serial link.
-
-.br
-
-.br
-It must be one of 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400,
-4800, 9600, 19200, 38400, 57600, 115200, 230400.
+An array of segments which make up a combined I2C transaction.
 
 .br
 
 .br
 
 .IP "\fBserFlags\fP" 0
-
-.br
-
-.br
 Flags which modify a serial open command.  None are currently defined.
 
 .br
@@ -6284,11 +6625,14 @@ Flags which modify a serial open command.  None are currently defined.
 .br
 
 .IP "\fB*sertty\fP" 0
-
-.br
-
-.br
 The name of a serial tty device, e.g. /dev/ttyAMA0, /dev/ttyUSB0, /dev/tty1.
+
+.br
+
+.br
+
+.IP "\fBsetting\fP" 0
+A value used to set a flag, 0 for false, non-zero for true.
 
 .br
 
@@ -6320,32 +6664,13 @@ A standard type used to indicate the size of an object in bytes.
 .br
 
 .IP "\fB*spi\fP" 0
-
-.br
-
-.br
 A pointer to a \fBrawSPI_t\fP structure.
 
 .br
 
 .br
 
-.IP "\fBspiBaud\fP" 0
-
-.br
-
-.br
-The speed in bits per second to use for the SPI device.
-
-.br
-
-.br
-
 .IP "\fBspiBitFirst\fP" 0
-
-.br
-
-.br
 Gpio reads are made from spiBitFirst to spiBitLast.
 
 .br
@@ -6364,10 +6689,6 @@ Gpio reads are made from spiBitFirst to spiBitLast.
 .br
 
 .IP "\fBspiBits\fP" 0
-
-.br
-
-.br
 The number of bits to transfer in a raw SPI transaction.
 
 .br
@@ -6375,10 +6696,6 @@ The number of bits to transfer in a raw SPI transaction.
 .br
 
 .IP "\fBspiChan\fP" 0
-
-.br
-
-.br
 A SPI channel, 0-2.
 
 .br
@@ -6386,10 +6703,6 @@ A SPI channel, 0-2.
 .br
 
 .IP "\fBspiFlags\fP" 0
-
-.br
-
-.br
 See \fBspiOpen\fP.
 
 .br
@@ -6397,10 +6710,6 @@ See \fBspiOpen\fP.
 .br
 
 .IP "\fBspiSS\fP" 0
-
-.br
-
-.br
 The SPI slave select gpio in a raw SPI transaction.
 
 .br
@@ -6408,21 +6717,33 @@ The SPI slave select gpio in a raw SPI transaction.
 .br
 
 .IP "\fBspiTxBits\fP" 0
-
-.br
-
-.br
 The number of bits to transfer dring a raw SPI transaction
 
 .br
 
 .br
 
+.IP "\fBstop_bits\fP: 2-8" 0
+The number of (half) stop bits to be used when adding serial data
+to a waveform.
+
+.br
+
+.br
+
+.EX
+#define PI_MIN_WAVE_HALFSTOPBITS 2
+.br
+#define PI_MAX_WAVE_HALFSTOPBITS 8
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fB*str\fP" 0
-
-.br
-
-.br
 An array of characters.
 
 .br
@@ -6430,10 +6751,6 @@ An array of characters.
 .br
 
 .IP "\fBtimeout\fP" 0
-
-.br
-
-.br
 A gpio watchdog timeout in milliseconds.
 
 .EX
@@ -6820,11 +7137,11 @@ A 16-bit word value.
 .br
 #define PI_CMD_BI2CO 90
 .br
-#define PI_CMD_BI2CX 91
+#define PI_CMD_BI2CZ 91
 .br
 
 .br
-#define PI_CMD_I2CX  92
+#define PI_CMD_I2CZ  92
 .br
 
 .br
@@ -7051,19 +7368,21 @@ A 16-bit word value.
 .br
 #define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
 .br
-#define PI_TOO_MANY_PARTS  -105 // too many I2C transaction parts
+#define PI_TOO_MANY_SEGS   -105 // too many I2C transaction segments
 .br
-#define PI_BAD_I2C_PART    -106 // a combined I2C transaction failed
+#define PI_BAD_I2C_SEG     -106 // an I2C transaction segment failed
 .br
 #define PI_BAD_SMBUS_CMD   -107 // SMBus command not supported by driver
 .br
 #define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on gpio
 .br
-#define PI_BAD_BB_WLEN     -109 // bad BB write length
+#define PI_BAD_I2C_WLEN    -109 // bad I2C write length
 .br
-#define PI_BAD_BB_RLEN     -110 // bad BB read length
+#define PI_BAD_I2C_RLEN    -110 // bad I2C read length
 .br
-#define PI_BAD_BB_CMD      -111 // bad BB command
+#define PI_BAD_I2C_CMD     -111 // bad I2C command
+.br
+#define PI_BAD_I2C_BAUD    -112 // bad I2C baud rate, not 50-500k
 .br
 
 .br

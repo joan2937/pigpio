@@ -194,9 +194,6 @@ I2C
 i2c_open                  Opens an I2C device
 i2c_close                 Closes an I2C device
 
-i2c_read_device           Reads the raw I2C device
-i2c_write_device          Writes the raw I2C device
-
 i2c_write_quick           SMBus write quick
 i2c_write_byte            SMBus write byte
 i2c_read_byte             SMBus read byte
@@ -211,6 +208,15 @@ i2c_block_process_call    SMBus block process call
 
 i2c_read_i2c_block_data   SMBus read I2C block data
 i2c_write_i2c_block_data  SMBus write I2C block data
+
+i2c_read_device           Reads the raw I2C device
+i2c_write_device          Writes the raw I2C device
+
+i2c_zip                   Performs multiple I2C transactions
+
+bb_i2c_open               Opens gpios for bit banging I2C
+bb_i2c_close              Closes gpios for bit banging I2C
+bb_i2c_zip                Performs multiple bit banged I2C transactions
 
 SPI
 
@@ -257,7 +263,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.17"
+VERSION = "1.18"
 
 exceptions = True
 
@@ -416,7 +422,13 @@ _PI_CMD_HP   =86
 _PI_CMD_CF1  =87
 _PI_CMD_CF2  =88
 
-_PI_CMD_NOIB= 99
+_PI_CMD_NOIB =99
+
+_PI_CMD_BI2CC=89
+_PI_CMD_BI2CO=90
+_PI_CMD_BI2CZ=91
+
+_PI_CMD_I2CZ =92
 
 # pigpio error numbers
 
@@ -525,10 +537,14 @@ PI_BAD_DATABITS     =-101
 PI_BAD_STOPBITS     =-102
 PI_MSG_TOOBIG       =-103
 PI_BAD_MALLOC_MODE  =-104
-_PI_TOO_MANY_PARTS  =-105
-_PI_BAD_I2C_PART    =-106
+_PI_TOO_MANY_SEGS   =-105
+_PI_BAD_I2C_SEG     =-106
 PI_BAD_SMBUS_CMD    =-107
 PI_NOT_I2C_GPIO     =-108
+PI_BAD_I2C_WLEN     =-109
+PI_BAD_I2C_RLEN     =-110
+PI_BAD_I2C_CMD      =-111
+PI_BAD_I2C_BAUD     =-112
 
 # pigpio error text
 
@@ -635,10 +651,14 @@ _errors=[
    [PI_BAD_STOPBITS      , "serial (half) stop bits not 2-8"],
    [PI_MSG_TOOBIG        , "socket/pipe message too big"],
    [PI_BAD_MALLOC_MODE   , "bad memory allocation mode"],
-   [_PI_TOO_MANY_PARTS    , "too many I2C transaction parts"],
-   [_PI_BAD_I2C_PART      , "a combined I2C transaction failed"],
+   [_PI_TOO_MANY_SEGS    , "too many I2C transaction segments"],
+   [_PI_BAD_I2C_SEG      , "an I2C transaction segment failed"],
    [PI_BAD_SMBUS_CMD     , "SMBus command not supported"],
    [PI_NOT_I2C_GPIO      , "no bit bang I2C in progress on gpio"],
+   [PI_BAD_I2C_WLEN      , "bad I2C write length"],
+   [PI_BAD_I2C_RLEN      , "bad I2C read length"],
+   [PI_BAD_I2C_CMD       , "bad I2C command"],
+   [PI_BAD_I2C_BAUD      , "bad I2C baud rate, not 50-500k"],
 
 ]
 
@@ -1725,7 +1745,7 @@ class pi():
          return 0
 
    def wave_add_serial(
-      self, user_gpio, bb_baud, data, offset=0, bb_bits=8, bb_stop=2):
+      self, user_gpio, baud, data, offset=0, bb_bits=8, bb_stop=2):
       """
       Adds a waveform representing serial data to the existing
       waveform (if any).  The serial data starts [*offset*]
@@ -1733,7 +1753,7 @@ class pi():
 
       user_gpio:= gpio to transmit data.  You must set the gpio mode
                   to output.
-        bb_baud:= baud rate to use.
+           baud:= 50-1000000 bits per second.
            data:= the bytes to write.
          offset:= number of microseconds from the start of the
                   waveform, default 0.
@@ -1767,7 +1787,7 @@ class pi():
       # pigpio message format
 
       # I p1 gpio
-      # I p2 bb_baud
+      # I p2 baud
       # I p3 len+12
       ## extension ##
       # I bb_bits
@@ -1777,7 +1797,7 @@ class pi():
       if len(data):
          extents = [struct.pack("III", bb_bits, bb_stop, offset), data]
          return _u2i(_pigpio_command_ext(
-            self.sl, _PI_CMD_WVAS, user_gpio, bb_baud, len(data)+12, extents))
+            self.sl, _PI_CMD_WVAS, user_gpio, baud, len(data)+12, extents))
       else:
          return 0
 
@@ -2003,7 +2023,7 @@ class pi():
       Returns a handle (>=0) for the device at the I2C bus address.
 
           i2c_bus:= 0-1.
-      i2c_address:= 0x08-0x77.
+      i2c_address:= 0x00-0x7F.
         i2c_flags:= 0, no flags are currently defined.
 
       Normally you would only use the [*i2c_**] functions if
@@ -2035,61 +2055,6 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_I2CC, handle, 0))
-
-   def i2c_read_device(self, handle, count):
-      """
-      Returns count bytes read from the raw device associated
-      with handle.
-
-      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
-       count:= >0, the number of bytes to read.
-
-      The returned value is a tuple of the number of bytes read and a
-      bytearray containing the bytes.  If there was an error the
-      number of bytes read will be less than zero (and will contain
-      the error code).
-
-      ...
-      (count, data) = pi.i2c_read_device(h, 12)
-      ...
-      """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
-      return bytes, data
-
-   def i2c_write_device(self, handle, data):
-      """
-      Writes the data bytes to the raw device associated with handle.
-
-      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
-        data:= the bytes to write.
-
-      ...
-      pi.i2c_write_device(h, b"\\x12\\x34\\xA8")
-
-      pi.i2c_write_device(h, b"help")
-
-      pi.i2c_write_device(h, 'help')
-
-      pi.i2c_write_device(h, [23, 56, 231])
-      ...
-      """
-      # I p1 handle
-      # I p2 0
-      # I p3 len
-      ## extension ##
-      # s len data bytes
-      if len(data):
-         return _u2i(_pigpio_command_ext(
-            self.sl, _PI_CMD_I2CWD, handle, 0, len(data), [data]))
-      else:
-         return 0
 
    def i2c_write_quick(self, handle, bit):
       """
@@ -2441,7 +2406,269 @@ class pi():
       self.sl.l.release()
       return bytes, data
 
-   def spi_open(self, spi_channel, spi_baud, spi_flags=0):
+   def i2c_read_device(self, handle, count):
+      """
+      Returns count bytes read from the raw device associated
+      with handle.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
+       count:= >0, the number of bytes to read.
+
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code).
+
+      ...
+      (count, data) = pi.i2c_read_device(h, 12)
+      ...
+      """
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(
+         _pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count, False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+   def i2c_write_device(self, handle, data):
+      """
+      Writes the data bytes to the raw device associated with handle.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
+        data:= the bytes to write.
+
+      ...
+      pi.i2c_write_device(h, b"\\x12\\x34\\xA8")
+
+      pi.i2c_write_device(h, b"help")
+
+      pi.i2c_write_device(h, 'help')
+
+      pi.i2c_write_device(h, [23, 56, 231])
+      ...
+      """
+      # I p1 handle
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+      if len(data):
+         return _u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_I2CWD, handle, 0, len(data), [data]))
+      else:
+         return 0
+
+
+   def i2c_zip(self, handle, data):
+      """
+      This function executes a sequence of I2C operations.  The
+      operations to be performed are specified by the contents of data
+      which contains the concatenated command codes and associated data.
+
+      handle:= >=0 (as returned by a prior call to [*i2c_open*]).
+        data:= the concatenated I2C commands, see below
+
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code).
+
+      ...
+      (count, data) = pi.i2c_zip(h, [4, 0x53, 7, 1, 0x32, 6, 6, 0])
+      ...
+
+      The following command codes are supported:
+
+      Name    @ Cmd & Data @ Meaning
+      End     @ 0          @ No more commands
+      Escape  @ 1          @ Next P is two bytes
+      On      @ 2          @ Switch combined flag on
+      Off     @ 3          @ Switch combined flag off
+      Address @ 4 P        @ Set I2C address to P
+      Flags   @ 5 lsb msb  @ Set I2C flags to lsb + (msb << 8)
+      Read    @ 6 P        @ Read P bytes of data
+      Write   @ 7 P ...    @ Write P bytes of data
+
+      The address, read, and write commands take a parameter P.
+      Normally P is one byte (0-255).  If the command is preceded by
+      the Escape command then P is two bytes (0-65535, least significant
+      byte first).
+
+      The address defaults to that associated with the handle.
+      The flags default to 0.  The address and flags maintain their
+      previous value until updated.
+
+      Any read I2C data is concatenated in the returned bytearray.
+
+      ...
+      Set address 0x53, write 0x32, read 6 bytes
+      Set address 0x1E, write 0x03, read 6 bytes
+      Set address 0x68, write 0x1B, read 8 bytes
+      End
+
+      0x04 0x53   0x07 0x01 0x32   0x06 0x06
+      0x04 0x1E   0x07 0x01 0x03   0x06 0x06
+      0x04 0x68   0x07 0x01 0x1B   0x06 0x08
+      0x00
+      ...
+      """
+      # I p1 handle
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+
+   def bb_i2c_open(self, SDA, SCL, baud=100000):
+      """
+      This function selects a pair of gpios for bit banging I2C at a
+      specified baud rate.
+
+      Bit banging I2C allows for certain operations which are not possible
+      with the standard I2C driver.
+
+      o baud rates as low as 50 
+      o repeated starts 
+      o clock stretching 
+      o I2C on any pair of spare gpios
+
+       SDA:= 0-31
+       SCL:= 0-31
+      baud:= 50-500000
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_I2C_BAUD, or
+      PI_GPIO_IN_USE.
+
+      NOTE:
+
+      The gpios used for SDA and SCL must have pull-ups to 3V3 connected.
+      As a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
+
+      ...
+      h = pi.bb_i2c_open(4, 5, 50000) # bit bang on gpio 4/5 at 50kbps
+      ...
+      """
+      # I p1 SDA
+      # I p2 SCL
+      # I p3 4
+      ## extension ##
+      # I baud
+      extents = [struct.pack("I", baud)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BI2CO, SDA, SCL, 4, extents))
+
+
+   def bb_i2c_close(self, SDA):
+      """
+      This function stops bit banging I2C on a pair of gpios
+      previously opened with [*bb_i2c_open*].
+
+      SDA:= 0-31, the SDA gpio used in a prior call to [*bb_i2c_open*]
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
+
+      ...
+      pi.bb_i2c_close(SDA)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BI2CC, SDA, 0))
+
+
+   def bb_i2c_zip(self, SDA, data):
+      """
+      This function executes a sequence of bit banged I2C operations.
+      The operations to be performed are specified by the contents
+      of data which contains the concatenated command codes and
+      associated data.
+
+       SDA:= 0-31 (as used in a prior call to [*bb_i2c_open*])
+      data:= the concatenated I2C commands, see below
+
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code).
+
+      ...
+      (count, data) = pi.bb_i2c_zip(
+                         h, [4, 0x53, 2, 7, 1, 0x32, 2, 6, 6, 3, 0])
+      ...
+
+      The following command codes are supported:
+
+      Name    @ Cmd & Data   @ Meaning
+      End     @ 0            @ No more commands
+      Escape  @ 1            @ Next P is two bytes
+      Start   @ 2            @ Start condition
+      Stop    @ 3            @ Stop condition
+      Address @ 4 P          @ Set I2C address to P
+      Flags   @ 5 lsb msb    @ Set I2C flags to lsb + (msb << 8)
+      Read    @ 6 P          @ Read P bytes of data
+      Write   @ 7 P ...      @ Write P bytes of data
+
+      The address, read, and write commands take a parameter P.
+      Normally P is one byte (0-255).  If the command is preceded by
+      the Escape command then P is two bytes (0-65535, least significant
+      byte first).
+
+      The address and flags default to 0.  The address and flags maintain
+      their previous value until updated.
+
+      No flags are currently defined.
+
+      Any read I2C data is concatenated in the returned bytearray.
+
+      ...
+      Set address 0x53
+      start, write 0x32, (re)start, read 6 bytes, stop
+      Set address 0x1E
+      start, write 0x03, (re)start, read 6 bytes, stop
+      Set address 0x68
+      start, write 0x1B, (re)start, read 8 bytes, stop
+      End
+
+      0x04 0x53
+      0x02 0x07 0x01 0x32   0x02 0x06 0x06 0x03
+
+      0x04 0x1E
+      0x02 0x07 0x01 0x03   0x02 0x06 0x06 0x03
+
+      0x04 0x68
+      0x02 0x07 0x01 0x1B   0x02 0x06 0x08 0x03
+
+      0x00
+      ...
+      """
+      # I p1 SDA
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BI2CZ, SDA, 0, len(data), [data], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+   def spi_open(self, spi_channel, baud, spi_flags=0):
       """
       Returns a handle for the SPI device on channel.  Data will be
       transferred at baud bits per second.  The flags may be used to
@@ -2454,7 +2681,7 @@ class pi():
 
 
       spi_channel:= 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
-         spi_baud:= 32K-125M (values above 30M are unlikely to work).
+             baud:= 32K-125M (values above 30M are unlikely to work).
         spi_flags:= see below.
 
       Normally you would only use the [*spi_**] functions if
@@ -2511,19 +2738,19 @@ class pi():
       The other bits in flags should be set to zero.
 
       ...
-      # open SPI device on channel 1 in mode 3 at 20000 bits per second
+      # open SPI device on channel 1 in mode 3 at 50000 bits per second
 
-      h = pi.spi_open(1, 20000, 3)
+      h = pi.spi_open(1, 50000, 3)
       ...
       """
       # I p1 spi_channel
-      # I p2 spi_baud
+      # I p2 baud
       # I p3 4
       ## extension ##
       # I spi_flags
       extents = [struct.pack("I", spi_flags)]
       return _u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_SPIO, spi_channel, spi_baud, 4, extents))
+         self.sl, _PI_CMD_SPIO, spi_channel, baud, 4, extents))
 
    def spi_close(self, handle):
       """
@@ -2631,13 +2858,13 @@ class pi():
       self.sl.l.release()
       return bytes, data
 
-   def serial_open(self, tty, ser_baud, ser_flags=0):
+   def serial_open(self, tty, baud, ser_flags=0):
       """
       Returns a handle for the serial tty device opened
-      at ser_baud bits per second.
+      at baud bits per second.
 
             tty:= the serial device to open.
-       ser_baud:= baud rate
+           baud:= baud rate in bits per second, see below.
       ser_flags:= 0, no flags are currently defined.
 
       Normally you would only use the [*serial_**] functions if
@@ -2645,19 +2872,23 @@ class pi():
       you will always run on the local Pi use the standard serial
       module instead.
 
+      The baud rate must be one of 50, 75, 110, 134, 150,
+      200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+      38400, 57600, 115200, or 230400.
+
       ...
       h1 = pi.serial_open("/dev/ttyAMA0", 300)
 
       h2 = pi.serial_open("/dev/ttyUSB1", 19200, 0)
       ...
       """
-      # I p1 ser_baud
+      # I p1 baud
       # I p2 ser_flags
       # I p3 len
       ## extension ##
       # s len data bytes
       return _u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_SERO, ser_baud, ser_flags, len(tty), [tty]))
+         self.sl, _PI_CMD_SERO, baud, ser_flags, len(tty), [tty]))
 
    def serial_close(self, handle):
       """
@@ -2912,12 +3143,12 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_PROCD, script_id, 0))
 
-   def bb_serial_read_open(self, user_gpio, bb_baud, bb_bits=8):
+   def bb_serial_read_open(self, user_gpio, baud, bb_bits=8):
       """
       Opens a gpio for bit bang reading of serial data.
 
       user_gpio:= 0-31, the gpio to use.
-        bb_baud:= 300-250000, the baud rate.
+           baud:= 50-250000, the baud rate.
         bb_bits:= 1-32, the number of bits per word, default 8.
 
       The serial data is held in a cyclic buffer and is read using
@@ -2934,13 +3165,13 @@ class pi():
       # pigpio message format
 
       # I p1 user_gpio
-      # I p2 bb_baud
+      # I p2 baud
       # I p3 4
       ## extension ##
       # I bb_bits
       extents = [struct.pack("I", bb_bits)]
       return _u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_SLRO, user_gpio, bb_baud, 4, extents))
+         self.sl, _PI_CMD_SLRO, user_gpio, baud, 4, extents))
 
    def bb_serial_read(self, user_gpio):
       """
@@ -3222,16 +3453,15 @@ def xref():
    An array of bytes passed to a user customised function.
    Its meaning and content is defined by the customiser.
 
-   bb_baud: 100 - 250000
-   The baud rate used for the transmission of bit bang serial data.
+   baud:
+   The speed of serial communication (I2C, SPI, serial link, waves)
+   in bits per second.
 
    bb_bits: 1-32
-
    The number of data bits to be used when adding serial data to a
    waveform.
 
    bb_stop: 2-8
-
    The number of (half) stop bits to be used when adding serial data
    to a waveform.
 
@@ -3424,7 +3654,7 @@ def xref():
    One of the i2c_ functions.
 
    i2c_address:
-   The address of a device on the I2C bus (0x08 - 0x77)
+   The address of a device on the I2C bus.
 
    i2c_bus: 0-1
    An I2C bus number.
@@ -3496,18 +3726,17 @@ def xref():
    The maximum number of bytes a user customised function
    should return, default 8192.
 
+   SCL:
+   The user gpio to use for the clock when bit banging I2C.
+
    script:
    The text of a script to store on the pigpio daemon.
 
    script_id: 0-
    A number referencing a script created by [*store_script*].
 
-   ser_baud:
-   The transmission rate in bits per second.
-
-   The allowable values are 50, 75, 110, 134, 150, 200, 300,
-   600, 1200, 1800, 2400, 4800, 9600, 19200, 38400,
-   57600, 115200, or 230400.
+   SDA:
+   The user gpio to use for data when bit banging I2C.
 
    ser_flags: 32 bit
    No serial flags are currently defined.
@@ -3517,9 +3746,6 @@ def xref():
 
    spi_*:
    One of the spi_ functions.
-
-   spi_baud: 32K-125M
-   The transmission rate in bits per second.
 
    spi_channel: 0-2
    A SPI channel.
