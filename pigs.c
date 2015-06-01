@@ -33,6 +33,7 @@ This version is for pigpio version 33+
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -50,7 +51,12 @@ the commands available from pigpio.
 char command_buf[8192];
 char response_buf[8192];
 
+int printFlags = 0;
+
 #define SOCKET_OPEN_FAILED -1
+
+#define PRINT_HEX 1
+#define PRINT_ASCII 2
 
 void fatal(char *fmt, ...)
 {
@@ -64,6 +70,30 @@ void fatal(char *fmt, ...)
    fprintf(stderr, "%s\n", buf);
 
    fflush(stderr);
+}
+
+static int initOpts(int argc, char *argv[])
+{
+   int opt, args;
+
+   args = 1;
+
+   while ((opt = getopt(argc, argv, "ax")) != -1)
+   {
+      switch (opt)
+      {
+         case 'a':
+            printFlags |= PRINT_ASCII;
+            args++;
+            break;
+
+         case 'x':
+            printFlags |= PRINT_HEX;
+            args++;
+            break;
+        }
+    }
+   return args;
 }
 
 static int openSocket(void)
@@ -108,7 +138,7 @@ static int openSocket(void)
 
 void print_result(int sock, int rv, cmdCmd_t cmd)
 {
-   int i, r;
+   int i, r, ch;
    uint32_t *p;
 
    r = cmd.res;
@@ -146,9 +176,20 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
          if (r > 0)
          {
+            if (printFlags == PRINT_ASCII) printf(" ");
+
             for (i=0; i<r; i++)
             {
-               printf(" %hhu", response_buf[i]);
+               ch = response_buf[i];
+
+               if (printFlags & PRINT_HEX) printf(" %hhx", ch);
+
+               else if (printFlags & PRINT_ASCII)
+               {
+                  if ((ch > 31) && (ch < 127)) printf("%c", ch);
+                  else printf("\\x%02hhx", ch);
+               }
+               else printf(" %hhu", response_buf[i]);
             }
          }
          printf("\n");
@@ -203,7 +244,7 @@ void get_extensions(int sock, int command, int res)
 int main(int argc , char *argv[])
 {
    int sock, command;
-   int idx, i, pp, l, len;
+   int args, idx, i, pp, l, len;
    cmdCmd_t cmd;
    uint32_t p[CMD_P_ARR];
    cmdCtlParse_t ctl;
@@ -212,11 +253,13 @@ int main(int argc , char *argv[])
 
    sock = openSocket();
 
+   args = initOpts(argc, argv);
+
    command_buf[0] = 0;
    l = 0;
    pp = 0;
 
-   for (i=1; i<argc; i++)
+   for (i=args; i<argc; i++)
    {
       l += (strlen(argv[i]) + 1);
       if (l < sizeof(command_buf))

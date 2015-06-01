@@ -384,8 +384,8 @@ To the lascivious pleasing of a lute.
 
    oc = t5_count
    while pi.wave_tx_busy():
-      time.sleep(0.1)
-   time.sleep(0.1)
+      time.sleep(0.2)
+   time.sleep(0.2)
    c = t5_count - oc
    CHECK(5, 10, c, 1702, 0, "wave tx busy, callback")
 
@@ -455,8 +455,8 @@ To the lascivious pleasing of a lute.
 
    oc = t5_count
    while pi.wave_tx_busy():
-      time.sleep(0.1)
-   time.sleep(0.1)
+      time.sleep(0.2)
+   time.sleep(0.2)
    c = t5_count - oc
    CHECK(5, 32, c, 1702, 0, "wave tx busy, callback")
 

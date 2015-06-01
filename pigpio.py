@@ -263,7 +263,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.18"
+VERSION = "1.19"
 
 exceptions = True
 

@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 33
+#define PIGPIO_VERSION 34
 
 /*TEXT
 
@@ -1956,7 +1956,7 @@ D*/
 int i2cProcessCall(unsigned handle, unsigned i2cReg, unsigned wVal);
 /*D
 This writes 16 bits of data to the specified register of the device
-associated with handle and and reads 16 bits of data in return.
+associated with handle and reads 16 bits of data in return.
 
 . .
 handle: >=0, as returned by a call to [*i2cOpen*]
@@ -3742,7 +3742,7 @@ samples per second.
 
 cfgMillis:: 100-10000
 
-The size of the sample buffer in milliseconds.  Gnerally this should be
+The size of the sample buffer in milliseconds.  Generally this should be
 left at the default of 120ms.  If you expect intense bursts of signals it
 might be necessary to increase the buffer size.
 
@@ -4063,7 +4063,7 @@ The number of segments in a combined I2C transaction.
 
 offset::
 The associated data starts this number of microseconds from the start of
-tghe waveform.
+the waveform.
 
 *outBuf::
 A buffer used to return data from a function.
