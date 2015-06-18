@@ -200,6 +200,9 @@ gpioWaveCreate             Creates a waveform from added data
 gpioWaveDelete             Deletes one or more waveforms
 
 gpioWaveTxSend             Transmits a waveform
+
+gpioWaveChain              Transmits a chain of waveforms
+
 gpioWaveTxBusy             Checks to see if the waveform has ended
 gpioWaveTxStop             Aborts the current waveform
 
@@ -371,7 +374,6 @@ typedef struct
 
 #define WAVE_FLAG_READ  1
 #define WAVE_FLAG_TICK  2
-#define WAVE_FLAG_COUNT 4
 
 typedef struct
 {
@@ -547,7 +549,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
 
-#define PI_MAX_WAVES 512
+#define PI_MAX_WAVES       250
+//#define PI_MAX_WAVE_CYCLES 537824
+#define PI_MAX_WAVE_CYCLES 16777216
+#define PI_WAVE_COUNTERS   5
 
 /* wave tx mode */
 
@@ -1607,6 +1612,71 @@ wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
 
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+D*/
+
+
+/*F*/
+int gpioWaveChain(char *buf, unsigned bufSize);
+/*D
+This function transmits a chain of waveforms.
+
+NOTE: Any hardware PWM started by [*gpioHardwarePWM*] will be cancelled.
+
+The waves to be transmitted are specified by the contents of buf
+which contains an ordered list of wave_ids and optional command
+codes and related data.
+
+. .
+    buf: pointer to the wave_ids and optional command codes
+bufSize: the number of bytes in buf
+. .
+
+Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
+PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+
+Each wave is transmitted in the order specified.  A wave may only
+occur once per chain.  Waves may be transmitted multiple times by
+using the repeat command.  The repeat command specifies a wave id
+and a count.  The wave id must occur earlier in the chain.  All the
+waves between wave id and the repeat command are transmitted count
+times.
+
+Repeat commands may not be nested.  The minimum repeat count is 2.
+A maximum of 5 repeat commands is supported per chain.
+
+The following command codes are supported:
+
+Name    @ Cmd & Data       @ Meaning
+Repeat  @ 255 wid C0 C1 C2 @ Repeat from wid count times
+count = C0 + C1*256 + C2*65536
+
+...
+The following examples assume that waves with ids 0 to 12 exist.
+
+// 0 255 0 57 0 0 (repeat 0 57 times)
+status = gpioWaveChain((char []){0, 255, 0, 57, 0, 0}, 6);
+
+// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+status = gpioWaveChain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+
+// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+status = gpioWaveChain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+
+// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+status = gpioWaveChain(
+   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+
+// The following repeats 5 65793 times, transmits 6,
+// repeats 7+8 514 times, transmits 12,
+// repeats 9+11+10 197121 times.
+// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+char chain[] = {
+   5,             255, 5, 1, 1, 1,
+   6, 7, 8,       255, 7, 2, 2, 0,
+   12, 9, 11, 10, 255, 9, 1, 2, 3};
+
+status = gpioWaveChain(chain, sizeof(chain));
+...
 D*/
 
 
@@ -3065,8 +3135,8 @@ int gpioHardwarePWM(unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
-NOTE: Any waveform started by [*gpioWaveTxSend*] or [*gpioWaveTxStart*]
-will be cancelled.
+NOTE: Any waveform started by [*gpioWaveTxSend*], [*gpioWaveTxStart*],
+or [*gpioWaveChain*] will be cancelled.
 
 This function is only valid if the pigpio main clock is PCM.  The
 main clock defaults to PCM but may be overridden by a call to
@@ -4480,6 +4550,8 @@ PARAMS*/
 
 #define PI_CMD_I2CZ  92
 
+#define PI_CMD_WVCHA 93
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -4657,6 +4729,11 @@ after this command is issued.
 #define PI_BAD_I2C_RLEN    -110 // bad I2C read length
 #define PI_BAD_I2C_CMD     -111 // bad I2C command
 #define PI_BAD_I2C_BAUD    -112 // bad I2C baud rate, not 50-500k
+#define PI_BAD_REPEAT_CNT  -113 // bad repeat count, not 2-max
+#define PI_BAD_REPEAT_WID  -114 // bad repeat wave id
+#define PI_TOO_MANY_COUNTS -115 // too many chain counters
+#define PI_BAD_CHAIN_CMD   -116 // malformed chain command string
+#define PI_REUSED_WID      -117 // wave already used in chain
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

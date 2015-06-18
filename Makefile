@@ -9,14 +9,12 @@ STRIPLIB = strip --strip-unneeded
 CFLAGS	+= -O3 -Wall
 
 LIB1     = libpigpio.so
-LIB1_ST  = libpigpio.a
 OBJ1     = pigpio.o command.o
 
 LIB2     = libpigpiod_if.so
-LIB2_ST  = libpigpiod_if.a
 OBJ2     = pigpiod_if.o command.o
 
-LIB      = $(LIB1) $(LIB1_ST) $(LIB2) $(LIB2_ST)
+LIB      = $(LIB1) $(LIB2)
 
 ALL     = $(LIB) x_pigpio x_pigpiod_if pig2vcd pigpiod pigs
 
@@ -59,9 +57,7 @@ install:	$(ALL)
 	sudo install -m 0644 pigpio.h         /usr/local/include
 	sudo install -m 0644 pigpiod_if.h     /usr/local/include
 	sudo install -m 0755 -d               /usr/local/lib
-	sudo install -m 0644 libpigpio.a      /usr/local/lib
 	sudo install -m 0755 libpigpio.so     /usr/local/lib
-	sudo install -m 0644 libpigpiod_if.a  /usr/local/lib
 	sudo install -m 0755 libpigpiod_if.so /usr/local/lib
 	sudo install -m 0755 -d               /usr/local/bin
 	sudo install -m 0755 -s pig2vcd       /usr/local/bin
@@ -78,8 +74,6 @@ install:	$(ALL)
 uninstall:
 	sudo rm -f /usr/local/include/pigpio.h
 	sudo rm -f /usr/local/include/pigpiod_if.h
-	sudo rm -f /usr/local/lib/libpigpio.a
-	sudo rm -f /usr/local/lib/libpigpiod_if.a
 	sudo rm -f /usr/local/lib/libpigpio.so
 	sudo rm -f /usr/local/lib/libpigpiod_if.so
 	sudo rm -f /usr/local/bin/pig2vcd
@@ -100,22 +94,10 @@ $(LIB1):	$(OBJ1)
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
-$(LIB1_ST):	$(OBJ1)
-	$(AR) rcs $(LIB1_ST) $(OBJ1)
-	$(RANLIB) $(LIB1_ST)
-	$(STRIPLIB) $(LIB1_ST)
-	$(SIZE)   $(LIB1_ST)
-
 $(LIB2):	$(OBJ2)
 	$(SHLIB) -o $(LIB2) $(OBJ2)
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
-
-$(LIB2_ST):	$(OBJ2)
-	$(AR) rcs $(LIB2_ST) $(OBJ2)
-	$(RANLIB) $(LIB2_ST)
-	$(STRIPLIB) $(LIB2_ST)
-	$(SIZE)   $(LIB2_ST)
 
 # generated using gcc -MM *.c
 

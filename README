@@ -17,15 +17,15 @@ make install
 
 This will install
 
-o the library (libpigpio.a) in /usr/local/lib
-o the library (libpigpiod_if.a) in /usr/local/lib
+o the library (libpigpio.so) in /usr/local/lib
+o the library (libpigpiod_if.so) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
 o the daemon (pigpiod) in /usr/local/bin
 o the socket interface (pigs) in /usr/local/bin
 o the utility pig2vcd in /usr/local/bin
 o man pages in /usr/local/man/man1 and man3
-o the Python module pigpio.py
+o the Python module pigpio.py for Python 2 and 3
 
 TEST (optional)
 
@@ -98,7 +98,8 @@ echo "help" >/dev/pigpio
 
 PYTHON MODULE
 
-The Python pigpio module is installed to the default python location.
+The Python pigpio module is installed to the default Python location
+for Python 2 and Python 3.
 
 You can install it for additional Python versions by
 
@@ -131,7 +132,7 @@ make -f MakeRemote install
 
 This will install
 
-o the library (libpigpiod_if.a) in /usr/local/lib
+o the library (libpigpiod_if.so) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
 o the socket interface (pigs) in /usr/local/bin

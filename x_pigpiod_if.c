@@ -359,7 +359,7 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 3, e, 9, 0, "wave tx repeat");
 
    oc = t5_count;
-   time_sleep(5);
+   time_sleep(5.05);
    c = t5_count - oc;
    CHECK(5, 4, c, 50, 1, "callback");
 

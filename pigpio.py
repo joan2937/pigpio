@@ -176,6 +176,9 @@ wave_delete               Deletes one or more waveforms
 
 wave_send_once            Transmits a waveform once
 wave_send_repeat          Transmits a waveform repeatedly
+
+wave_chain                Transmits a chain of waveforms
+
 wave_tx_busy              Checks to see if a waveform has ended
 wave_tx_stop              Aborts the current waveform
 
@@ -430,6 +433,8 @@ _PI_CMD_BI2CZ=91
 
 _PI_CMD_I2CZ =92
 
+_PI_CMD_WVCHA=93
+
 # pigpio error numbers
 
 _PI_INIT_FAILED     =-1
@@ -545,6 +550,11 @@ PI_BAD_I2C_WLEN     =-109
 PI_BAD_I2C_RLEN     =-110
 PI_BAD_I2C_CMD      =-111
 PI_BAD_I2C_BAUD     =-112
+PI_BAD_REPEAT_CNT   =-113
+PI_BAD_REPEAT_WID   =-114
+PI_TOO_MANY_COUNTS  =-115
+PI_BAD_CHAIN_CMD    =-116
+PI_REUSED_WID       =-117
 
 # pigpio error text
 
@@ -659,6 +669,11 @@ _errors=[
    [PI_BAD_I2C_RLEN      , "bad I2C read length"],
    [PI_BAD_I2C_CMD       , "bad I2C command"],
    [PI_BAD_I2C_BAUD      , "bad I2C baud rate, not 50-500k"],
+   [PI_BAD_REPEAT_CNT    , "bad repeat count, not 2-max"],
+   [PI_BAD_REPEAT_WID    , "bad repeat wave id"],
+   [PI_TOO_MANY_COUNTS   , "too many chain counters"],
+   [PI_BAD_CHAIN_CMD     , "malformed chain command string"],
+   [PI_REUSED_WID        , "wave already used in chain"],
 
 ]
 
@@ -1536,8 +1551,8 @@ class pi():
       and dutycycle. Frequencies above 30MHz are unlikely to work.
 
       NOTE: Any waveform started by [*wave_send_once*],
-      [*wave_send_repeat*], [*wave_tx_start*], or
-      [*wave_tx_repeat*] will be cancelled.
+      [*wave_send_repeat*], [*wave_tx_start*], [*wave_tx_repeat*],
+      or [*wave_chain*] will be cancelled.
 
       This function is only valid if the pigpio main clock is PCM.
       The main clock defaults to PCM but may be overridden when the
@@ -1955,6 +1970,74 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVHLT, 0, 0))
+
+   def wave_chain(self, data):
+      """
+      This function transmits a chain of waveforms.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
+
+      The waves to be transmitted are specified by the contents of
+      data which contains an ordered list of wave_ids and optional
+      command codes and related data.
+
+      data:= contains the wave_ids and optional command codes
+
+      Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
+      PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+
+      Each wave is transmitted in the order specified.  A wave may
+      only occur once per chain.  Waves may be transmitted multiple
+      times by using the repeat command.  The repeat command
+      specifies a wave id and a count.  The wave id must occur
+      earlier in the chain.  All the waves between wave id and the
+      repeat command are transmitted count times.
+
+      Repeat commands may not be nested.  The minimum repeat
+      count is 2. A maximum of 5 repeat commands is supported
+      per chain.
+
+      The following command codes are supported:
+
+      Name    @ Cmd & Data       @ Meaning
+      Repeat  @ 255 wid C0 C1 C2 @ Repeat from wid count times
+      count = C0 + C1*256 + C2*65536
+
+      ...
+      The following examples assume that waves with ids 0 to 12 exist.
+
+      # 0 255 0 57 0 0 (repeat 0 57 times)
+      pi.wave_chain([0, 255, 0, 57, 0, 0])
+
+      # 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+      pi.wave_chain([0, 1, 255, 0, 0, 2, 0])
+
+      # 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+      pi.wave_chain([0, 1, 255, 1, 0, 0, 1])
+
+      # 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+      pi.wave_chain([0, 1, 2, 3, 255, 2, 13, 0, 0])
+
+      # The following repeats 5 65793 times, transmits 6,
+      # repeats 7+8 514 times, transmits 12,
+      # repeats 9+11+10 197121 times.
+      # 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+      pi.wave_chain([
+         5,             255, 5, 1, 1, 1,
+         6, 7, 8,       255, 7, 2, 2, 0,
+         12, 9, 11, 10, 255, 9, 1, 2, 3])
+      ...
+      """
+      # I p1 0
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_WVCHA, 0, 0, len(data), [data]))
+
 
    def wave_get_micros(self):
       """
@@ -3512,87 +3595,95 @@ def xref():
 
    errnum: <0
    . .
-   PI_BAD_DATABITS = -101 
-   PI_BAD_DUTYCYCLE = -8 
-   PI_BAD_DUTYRANGE = -21 
-   PI_BAD_FLAGS = -77 
-   PI_BAD_GPIO = -3 
-   PI_BAD_HANDLE = -25 
-   PI_BAD_HCLK_FREQ = -98 
-   PI_BAD_HCLK_PASS = -99 
-   PI_BAD_HPWM_DUTY = -97 
-   PI_BAD_HPWM_FREQ = -96 
-   PI_BAD_I2C_ADDR = -75 
-   PI_BAD_I2C_BUS = -74 
-   PI_BAD_LEVEL = -5 
-   PI_BAD_MICS_DELAY = -64 
-   PI_BAD_MILS_DELAY = -65 
-   PI_BAD_MODE = -4 
-   PI_BAD_PARAM = -81 
-   PI_BAD_PARAM_NUM = -52 
-   PI_BAD_PUD = -6 
-   PI_BAD_PULSELEN = -46 
-   PI_BAD_PULSEWIDTH = -7 
-   PI_BAD_SCRIPT = -47 
-   PI_BAD_SCRIPT_CMD = -55 
-   PI_BAD_SCRIPT_ID = -48 
-   PI_BAD_SERIAL_COUNT = -51 
-   PI_BAD_SER_DEVICE = -79 
-   PI_BAD_SER_OFFSET = -49 
-   PI_BAD_SER_SPEED = -80 
-   PI_BAD_SPI_CHANNEL = -76
-   PI_BAD_SPI_COUNT = -84
-   PI_BAD_SPI_SPEED = -78
-   PI_BAD_STOPBITS = -102
-   PI_BAD_TAG = -63
-   PI_BAD_USER_GPIO = -2
-   PI_BAD_VAR_NUM = -56
-   PI_BAD_WAVE_BAUD = -35
-   PI_BAD_WAVE_ID = -66
-   PI_BAD_WDOG_TIMEOUT = -15
-   PI_BAD_WVSC_COMMND = -43
-   PI_BAD_WVSM_COMMND = -44
-   PI_BAD_WVSP_COMMND = -45
-   PI_DUP_TAG = -53
-   PI_EMPTY_WAVEFORM = -69
-   PI_GPIO_IN_USE = -50
-   PI_HPWM_ILLEGAL = -100
-   PI_I2C_OPEN_FAILED = -71
-   PI_I2C_READ_FAILED = -83
-   PI_I2C_WRITE_FAILED = -82
-   PI_NOT_HALTED = -62
-   PI_NOT_HCLK_GPIO = -94
-   PI_NOT_HPWM_GPIO = -95
-   PI_NOT_PERMITTED = -41
-   PI_NOT_PWM_GPIO = -92
-   PI_NOT_SERIAL_GPIO = -38
-   PI_NOT_SERVO_GPIO = -93
-   PI_NO_AUX_SPI = -91
-   PI_NO_HANDLE = -24
-   PI_NO_MEMORY = -58
-   PI_NO_SCRIPT_ROOM = -57
-   PI_NO_WAVEFORM_ID = -70
-   PI_SCRIPT_FAILED = 4
-   PI_SCRIPT_HALTED = 1
-   PI_SCRIPT_INITING = 0
-   PI_SCRIPT_RUNNING = 2
-   PI_SCRIPT_WAITING = 3
-   PI_SER_OPEN_FAILED = -72
-   PI_SER_READ_FAILED = -86
-   PI_SER_READ_NO_DATA = -87
-   PI_SER_WRITE_FAILED = -85
-   PI_SOCK_READ_FAILED = -59
-   PI_SOCK_WRIT_FAILED = -60
-   PI_SOME_PERMITTED = -42
-   PI_SPI_OPEN_FAILED = -73
-   PI_SPI_XFER_FAILED = -89
-   PI_TOO_MANY_CBS = -67
-   PI_TOO_MANY_CHARS = -37
-   PI_TOO_MANY_OOL = -68
-   PI_TOO_MANY_PARAM = -61
-   PI_TOO_MANY_PULSES = -36
-   PI_TOO_MANY_TAGS = -54
-   PI_UNKNOWN_COMMAND = -88
+   PI_BAD_USER_GPIO    =-2
+   PI_BAD_GPIO         =-3
+   PI_BAD_MODE         =-4
+   PI_BAD_LEVEL        =-5
+   PI_BAD_PUD          =-6
+   PI_BAD_PULSEWIDTH   =-7
+   PI_BAD_DUTYCYCLE    =-8
+   PI_BAD_WDOG_TIMEOUT =-15
+   PI_BAD_DUTYRANGE    =-21
+   PI_NO_HANDLE        =-24
+   PI_BAD_HANDLE       =-25
+   PI_BAD_WAVE_BAUD    =-35
+   PI_TOO_MANY_PULSES  =-36
+   PI_TOO_MANY_CHARS   =-37
+   PI_NOT_SERIAL_GPIO  =-38
+   PI_NOT_PERMITTED    =-41
+   PI_SOME_PERMITTED   =-42
+   PI_BAD_WVSC_COMMND  =-43
+   PI_BAD_WVSM_COMMND  =-44
+   PI_BAD_WVSP_COMMND  =-45
+   PI_BAD_PULSELEN     =-46
+   PI_BAD_SCRIPT       =-47
+   PI_BAD_SCRIPT_ID    =-48
+   PI_BAD_SER_OFFSET   =-49
+   PI_GPIO_IN_USE      =-50
+   PI_BAD_SERIAL_COUNT =-51
+   PI_BAD_PARAM_NUM    =-52
+   PI_DUP_TAG          =-53
+   PI_TOO_MANY_TAGS    =-54
+   PI_BAD_SCRIPT_CMD   =-55
+   PI_BAD_VAR_NUM      =-56
+   PI_NO_SCRIPT_ROOM   =-57
+   PI_NO_MEMORY        =-58
+   PI_SOCK_READ_FAILED =-59
+   PI_SOCK_WRIT_FAILED =-60
+   PI_TOO_MANY_PARAM   =-61
+   PI_NOT_HALTED       =-62
+   PI_BAD_TAG          =-63
+   PI_BAD_MICS_DELAY   =-64
+   PI_BAD_MILS_DELAY   =-65
+   PI_BAD_WAVE_ID      =-66
+   PI_TOO_MANY_CBS     =-67
+   PI_TOO_MANY_OOL     =-68
+   PI_EMPTY_WAVEFORM   =-69
+   PI_NO_WAVEFORM_ID   =-70
+   PI_I2C_OPEN_FAILED  =-71
+   PI_SER_OPEN_FAILED  =-72
+   PI_SPI_OPEN_FAILED  =-73
+   PI_BAD_I2C_BUS      =-74
+   PI_BAD_I2C_ADDR     =-75
+   PI_BAD_SPI_CHANNEL  =-76
+   PI_BAD_FLAGS        =-77
+   PI_BAD_SPI_SPEED    =-78
+   PI_BAD_SER_DEVICE   =-79
+   PI_BAD_SER_SPEED    =-80
+   PI_BAD_PARAM        =-81
+   PI_I2C_WRITE_FAILED =-82
+   PI_I2C_READ_FAILED  =-83
+   PI_BAD_SPI_COUNT    =-84
+   PI_SER_WRITE_FAILED =-85
+   PI_SER_READ_FAILED  =-86
+   PI_SER_READ_NO_DATA =-87
+   PI_UNKNOWN_COMMAND  =-88
+   PI_SPI_XFER_FAILED  =-89
+   PI_NO_AUX_SPI       =-91
+   PI_NOT_PWM_GPIO     =-92
+   PI_NOT_SERVO_GPIO   =-93
+   PI_NOT_HCLK_GPIO    =-94
+   PI_NOT_HPWM_GPIO    =-95
+   PI_BAD_HPWM_FREQ    =-96
+   PI_BAD_HPWM_DUTY    =-97
+   PI_BAD_HCLK_FREQ    =-98
+   PI_BAD_HCLK_PASS    =-99
+   PI_HPWM_ILLEGAL     =-100
+   PI_BAD_DATABITS     =-101
+   PI_BAD_STOPBITS     =-102
+   PI_MSG_TOOBIG       =-103
+   PI_BAD_MALLOC_MODE  =-104
+   PI_BAD_SMBUS_CMD    =-107
+   PI_NOT_I2C_GPIO     =-108
+   PI_BAD_I2C_WLEN     =-109
+   PI_BAD_I2C_RLEN     =-110
+   PI_BAD_I2C_CMD      =-111
+   PI_BAD_I2C_BAUD     =-112
+   PI_BAD_REPEAT_CNT   =-113
+   PI_BAD_REPEAT_WID   =-114
+   PI_TOO_MANY_COUNTS  =-115
+   PI_BAD_CHAIN_CMD    =-116
+   PI_REUSED_WID       =-117
    . .
 
    frequency: 0-40000

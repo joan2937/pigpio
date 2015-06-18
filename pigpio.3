@@ -1871,6 +1871,132 @@ wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 
+.IP "\fBint gpioWaveChain(char *buf, unsigned bufSize)\fP"
+.IP "" 4
+This function transmits a chain of waveforms.
+
+.br
+
+.br
+NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
+
+.br
+
+.br
+The waves to be transmitted are specified by the contents of buf
+which contains an ordered list of wave_ids and optional command
+codes and related data.
+
+.br
+
+.br
+
+.EX
+    buf: pointer to the wave_ids and optional command codes
+.br
+bufSize: the number of bytes in buf
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
+PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+
+.br
+
+.br
+Each wave is transmitted in the order specified.  A wave may only
+occur once per chain.  Waves may be transmitted multiple times by
+using the repeat command.  The repeat command specifies a wave id
+and a count.  The wave id must occur earlier in the chain.  All the
+waves between wave id and the repeat command are transmitted count
+times.
+
+.br
+
+.br
+Repeat commands may not be nested.  The minimum repeat count is 2.
+A maximum of 5 repeat commands is supported per chain.
+
+.br
+
+.br
+The following command codes are supported:
+
+.br
+
+.br
+Name      Cmd & Data         Meaning
+
+.br
+Repeat    255 wid C0 C1 C2   Repeat from wid count times
+
+.br
+count = C0 + C1*256 + C2*65536
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+The following examples assume that waves with ids 0 to 12 exist.
+.br
+
+.br
+// 0 255 0 57 0 0 (repeat 0 57 times)
+.br
+status = gpioWaveChain((char []){0, 255, 0, 57, 0, 0}, 6);
+.br
+
+.br
+// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+.br
+status = gpioWaveChain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+.br
+
+.br
+// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+.br
+status = gpioWaveChain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+.br
+
+.br
+// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+.br
+status = gpioWaveChain(
+.br
+   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+.br
+
+.br
+// The following repeats 5 65793 times, transmits 6,
+.br
+// repeats 7+8 514 times, transmits 12,
+.br
+// repeats 9+11+10 197121 times.
+.br
+// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+.br
+char chain[] = {
+.br
+   5,             255, 5, 1, 1, 1,
+.br
+   6, 7, 8,       255, 7, 2, 2, 0,
+.br
+   12, 9, 11, 10, 255, 9, 1, 2, 3};
+.br
+
+.br
+status = gpioWaveChain(chain, sizeof(chain));
+.br
+
+.EE
+
 .IP "\fBint gpioWaveTxBusy(void)\fP"
 .IP "" 4
 This function checks to see if a waveform is currently being
@@ -2358,7 +2484,7 @@ S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
 .IP "\fBint i2cProcessCall(unsigned handle, unsigned i2cReg, unsigned wVal)\fP"
 .IP "" 4
 This writes 16 bits of data to the specified register of the device
-associated with handle and and reads 16 bits of data in return.
+associated with handle and reads 16 bits of data in return.
 
 .br
 
@@ -4260,8 +4386,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .br
-NOTE: Any waveform started by \fBgpioWaveTxSend\fP or \fBgpioWaveTxStart\fP
-will be cancelled.
+NOTE: Any waveform started by \fBgpioWaveTxSend\fP, \fBgpioWaveTxStart\fP,
+or \fBgpioWaveChain\fP will be cancelled.
 
 .br
 
@@ -5414,7 +5540,7 @@ samples per second.
 .br
 
 .br
-The size of the sample buffer in milliseconds.  Gnerally this should be
+The size of the sample buffer in milliseconds.  Generally this should be
 left at the default of 120ms.  If you expect intense bursts of signals it
 might be necessary to increase the buffer size.
 
@@ -6180,7 +6306,7 @@ The number of segments in a combined I2C transaction.
 
 .IP "\fBoffset\fP" 0
 The associated data starts this number of microseconds from the start of
-tghe waveform.
+the waveform.
 
 .br
 
@@ -7145,6 +7271,10 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_WVCHA 93
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -7383,6 +7513,16 @@ A 16-bit word value.
 #define PI_BAD_I2C_CMD     -111 // bad I2C command
 .br
 #define PI_BAD_I2C_BAUD    -112 // bad I2C baud rate, not 50-500k
+.br
+#define PI_BAD_REPEAT_CNT  -113 // bad repeat count, not 2-max
+.br
+#define PI_BAD_REPEAT_WID  -114 // bad repeat wave id
+.br
+#define PI_TOO_MANY_COUNTS -115 // too many chain counters
+.br
+#define PI_BAD_CHAIN_CMD   -116 // malformed chain command string
+.br
+#define PI_REUSED_WID      -117 // wave already used in chain
 .br
 
 .br

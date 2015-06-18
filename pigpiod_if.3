@@ -1221,7 +1221,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .br
-NOTE: Any waveform started by \fBwave_send_once\fP, \fBwave_send_repeat\fP, \fBwave_tx_start\fP, or \fBwave_tx_repeat\fP will be cancelled.
+NOTE: Any waveform started by \fBwave_send_once\fP, \fBwave_send_repeat\fP, \fBwave_tx_start\fP, \fBwave_tx_repeat\fP, or \fBwave_chain\fP
+will be cancelled.
 
 .br
 
@@ -1701,6 +1702,132 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+
+.IP "\fBint wave_chain(char *buf, unsigned bufSize)\fP"
+.IP "" 4
+This function transmits a chain of waveforms.
+
+.br
+
+.br
+NOTE: Any hardware PWM started by \fBhardware_PWM\fP will be cancelled.
+
+.br
+
+.br
+The waves to be transmitted are specified by the contents of buf
+which contains an ordered list of wave_ids and optional command
+codes and related data.
+
+.br
+
+.br
+
+.EX
+    buf: pointer to the wave_ids and optional command codes
+.br
+bufSize: the number of bytes in buf
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
+PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+
+.br
+
+.br
+Each wave is transmitted in the order specified.  A wave may only
+occur once per chain.  Waves may be transmitted multiple times by
+using the repeat command.  The repeat command specifies a wave id
+and a count.  The wave id must occur earlier in the chain.  All the
+waves between wave id and the repeat command are transmitted count
+times.
+
+.br
+
+.br
+Repeat commands may not be nested.  The minimum repeat count is 2.
+A maximum of 5 repeat commands is supported per chain.
+
+.br
+
+.br
+The following command codes are supported:
+
+.br
+
+.br
+Name      Cmd & Data         Meaning
+
+.br
+Repeat    255 wid C0 C1 C2   Repeat from wid count times
+
+.br
+count = C0 + C1*256 + C2*65536
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+The following examples assume that waves with ids 0 to 12 exist.
+.br
+
+.br
+// 0 255 0 57 0 0 (repeat 0 57 times)
+.br
+status = wave_chain((char []){0, 255, 0, 57, 0, 0}, 6);
+.br
+
+.br
+// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+.br
+status = wave_chain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+.br
+
+.br
+// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+.br
+status = wave_chain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+.br
+
+.br
+// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+.br
+status = wave_chain(
+.br
+   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+.br
+
+.br
+// The following repeats 5 65793 times, transmits 6,
+.br
+// repeats 7+8 514 times, transmits 12,
+.br
+// repeats 9+11+10 197121 times.
+.br
+// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+.br
+char chain[] = {
+.br
+   5,             255, 5, 1, 1, 1,
+.br
+   6, 7, 8,       255, 7, 2, 2, 0,
+.br
+   12, 9, 11, 10, 255, 9, 1, 2, 3};
+.br
+
+.br
+status = wave_chain(chain, sizeof(chain));
+.br
+
+.EE
 
 .IP "\fBint wave_tx_busy(void)\fP"
 .IP "" 4

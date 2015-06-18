@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 15
+#define PIGPIOD_IF_VERSION 16
 
 /*TEXT
 
@@ -186,6 +186,9 @@ wave_delete                Deletes one or more waveforms
 
 wave_send_once             Transmits a waveform once
 wave_send_repeat           Transmits a waveform repeatedly
+
+wave_chain                 Transmits a chain of waveforms
+
 wave_tx_busy               Checks to see if the waveform has ended
 wave_tx_stop               Aborts the current waveform
 
@@ -911,7 +914,8 @@ int hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
-NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*], [*wave_tx_start*], or [*wave_tx_repeat*] will be cancelled.
+NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*], [*wave_tx_start*], [*wave_tx_repeat*], or [*wave_chain*]
+will be cancelled.
 
 This function is only valid if the pigpio main clock is PCM.  The
 main clock defaults to PCM but may be overridden when the pigpio
@@ -1193,6 +1197,70 @@ wave_id: >=0, as returned by [*wave_create*].
 
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+D*/
+
+/*F*/
+int wave_chain(char *buf, unsigned bufSize);
+/*D
+This function transmits a chain of waveforms.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
+
+The waves to be transmitted are specified by the contents of buf
+which contains an ordered list of wave_ids and optional command
+codes and related data.
+
+. .
+    buf: pointer to the wave_ids and optional command codes
+bufSize: the number of bytes in buf
+. .
+
+Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
+PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+
+Each wave is transmitted in the order specified.  A wave may only
+occur once per chain.  Waves may be transmitted multiple times by
+using the repeat command.  The repeat command specifies a wave id
+and a count.  The wave id must occur earlier in the chain.  All the
+waves between wave id and the repeat command are transmitted count
+times.
+
+Repeat commands may not be nested.  The minimum repeat count is 2.
+A maximum of 5 repeat commands is supported per chain.
+
+The following command codes are supported:
+
+Name    @ Cmd & Data       @ Meaning
+Repeat  @ 255 wid C0 C1 C2 @ Repeat from wid count times
+count = C0 + C1*256 + C2*65536
+
+...
+The following examples assume that waves with ids 0 to 12 exist.
+
+// 0 255 0 57 0 0 (repeat 0 57 times)
+status = wave_chain((char []){0, 255, 0, 57, 0, 0}, 6);
+
+// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+status = wave_chain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+
+// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+status = wave_chain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+
+// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+status = wave_chain(
+   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+
+// The following repeats 5 65793 times, transmits 6,
+// repeats 7+8 514 times, transmits 12,
+// repeats 9+11+10 197121 times.
+// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+char chain[] = {
+   5,             255, 5, 1, 1, 1,
+   6, 7, 8,       255, 7, 2, 2, 0,
+   12, 9, 11, 10, 255, 9, 1, 2, 3};
+
+status = wave_chain(chain, sizeof(chain));
+...
 D*/
 
 

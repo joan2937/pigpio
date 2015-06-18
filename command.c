@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 33+
+This version is for pigpio version 34+
 */
 
 #include <stdio.h>
@@ -166,6 +166,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_WVAG,  "WVAG",  192, 2}, // gpioWaveAddGeneric
    {PI_CMD_WVAS,  "WVAS",  196, 2}, // gpioWaveAddSerial
    {PI_CMD_WVBSY, "WVBSY", 101, 2}, // gpioWaveTxBusy
+   {PI_CMD_WVCHA, "WVCHA", 197, 0}, // gpioWaveChain
    {PI_CMD_WVCLR, "WVCLR", 101, 0}, // gpioWaveClear
    {PI_CMD_WVCRE, "WVCRE", 101, 2}, // gpioWaveCreate
    {PI_CMD_WVDEL, "WVDEL", 112, 0}, // gpioWaveDelete
@@ -318,6 +319,7 @@ WDOG g millis    Set millisecond watchdog on gpio\n\
 WVAG triplets    Wave add generic pulses\n\
 WVAS g baud bitlen stopbits offset ... | Wave add serial data\n\
 WVBSY            Check if wave busy\n\
+WVCHA            Transmit a chain of waves\n\
 WVCLR            Wave clear\n\
 WVCRE            Create wave from added pulses\n\
 WVDEL wid        Delete waves w and higher\n\
@@ -456,6 +458,12 @@ static errInfo_t errInfo[]=
    {PI_BAD_I2C_RLEN     , "bad I2C read length"},
    {PI_BAD_I2C_CMD      , "bad I2C command"},
    {PI_BAD_I2C_BAUD     , "bad I2C baud rate, not 50-500k"},
+   {PI_BAD_REPEAT_CNT   , "bad repeat count, not 2-max"},
+   {PI_BAD_REPEAT_WID   , "bad repeat wave id"},
+   {PI_TOO_MANY_COUNTS  , "too many chain counters"},
+   {PI_BAD_CHAIN_CMD    , "malformed chain command string"},
+   {PI_REUSED_WID       , "wave already used in chain"},
+
 };
 
 static char * fmtMdeStr="RW540123";
@@ -844,7 +852,7 @@ int cmdParse(
 
          break;
 
-      case 193: /* BI2CZ  I2CWD  I2CZ SERW  SPIW  SPIX
+      case 193: /* BI2CZ  I2CWD  I2CZ  SERW  SPIW  SPIX
 
                    Two or more parameters, first >=0, rest 0-255.
                 */
@@ -1004,6 +1012,32 @@ int cmdParse(
          }
 
          break;
+
+      case 197: /* WVCHA
+
+                   One or more parameters, all 0-255.
+                */
+         pars = 0;
+         p8 = ext;
+
+         while (pars < CMD_MAX_PARAM)
+         {
+            ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+            if ((to1 == CMD_NUMERIC) &&
+                ((int)tp1>=0) && ((int)tp1<=255))
+            {
+               pars++;
+               *p8++ = tp1;
+            }
+            else break;
+         }
+
+         p[3] = pars;
+
+         if (pars) valid = 1;
+
+         break;
+
 
    }
 

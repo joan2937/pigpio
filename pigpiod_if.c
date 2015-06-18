@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 15 */
+/* PIGPIOD_IF_VERSION 16 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -742,6 +742,25 @@ int wave_send_once(unsigned wave_id)
 
 int wave_send_repeat(unsigned wave_id)
    {return pigpio_command(gPigCommand, PI_CMD_WVTXR, 0, 0, 1);}
+
+int wave_chain(char *buf, unsigned bufSize)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=0
+   p2=0
+   p3=bufSize
+   ## extension ##
+   char buf[bufSize]
+   */
+
+   ext[0].size = bufSize;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (gPigCommand, PI_CMD_WVCHA, 0, 0, bufSize, 1, ext, 1);
+}
 
 int wave_tx_busy(void)
    {return pigpio_command(gPigCommand, PI_CMD_WVBSY, 0, 0, 1);}

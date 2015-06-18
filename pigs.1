@@ -674,8 +674,8 @@ frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
 are unlikely to work.
 
 .br
-NOTE: Any waveform started by \fBWVGO\fP, \fBWVGOR\fP, \fBWVTX\fP or
-\fBWVTXR\fP will be cancelled.
+NOTE: Any waveform started by \fBWVGO\fP, \fBWVGOR\fP, \fBWVTX\fP,
+\fBWVTXR\fP, or \fBWVCHA\fP will be cancelled.
 
 .br
 This function is only valid if the pigpio main clock is PCM.  The
@@ -3104,6 +3104,99 @@ $ pigs wvbsy
 
 .br
 
+.IP "\fBWVCHA bvs\fP - Transmits a chain of waveforms"
+.IP "" 4
+
+.br
+This command transmits a chain of waveforms.
+
+.br
+NOTE: Any hardware PWM started by \fBHP\fP will
+be cancelled.
+
+.br
+The waves to be transmitted are specified by the contents of
+\fBbvs\fP which contains an ordered list of wave_ids and optional
+command codes and related data.
+
+.br
+Upon success 0 is returned.  On error a negative status code
+will be returned.
+
+.br
+Each wave is transmitted in the order specified.  A wave may
+only occur once per chain.  Waves may be transmitted multiple
+times by using the repeat command.  The repeat command
+specifies a wave id and a count.  The wave id must occur
+earlier in the chain.  All the waves between wave id and the
+repeat command are transmitted count times.
+
+.br
+Repeat commands may not be nested.  The minimum repeat
+count is 2. A maximum of 5 repeat commands is supported
+per chain.
+
+.br
+The following command codes are supported:
+
+.br
+
+.EX
+Name     Cmd & Data         Meaning
+Repeat   255 wid C0 C1 C2   Repeat from wid count times
+
+.EE
+count = C0 + C1*256 + C2*65536
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+The following examples assume that waves with ids 0 to 12 exist.
+.br
+
+.br
+# 0 255 0 57 0 0 (repeat 0 57 times)
+.br
+$ pigs wvcha 0 255 0 57 0 0
+.br
+
+.br
+# 0 1 255 0 0 2 0 (repeat 0+1 512 times)
+.br
+$ pigs wvcha 0 1 255 0 0 2 0
+.br
+
+.br
+# 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+.br
+$ pigs wvcha 0 1 255 1 0 0 1
+.br
+
+.br
+# 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+.br
+$ pigs wvcha 0 1 2 3 255 2 13 0 0
+.br
+
+.br
+# The following repeats 5 65793 times, transmits 6,
+.br
+# repeats 7+8 514 times, transmits 12,
+.br
+# repeats 9+11+10 197121 times.
+.br
+# 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+.br
+$ pigs wvcha 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+.br
+
+.EE
+
+.br
+
 .IP "\fBWVCLR \fP - Clear all waveforms"
 .IP "" 4
 
@@ -3444,7 +3537,7 @@ $ pigs wvsp 2
 
 .br
 
-.IP "\fBWVTX wid\fP - Transmit waveform once"
+.IP "\fBWVTX wid\fP - Transmits waveform once"
 .IP "" 4
 
 .br
@@ -3480,7 +3573,7 @@ ERROR: non existent wave id
 
 .br
 
-.IP "\fBWVTXR wid\fP - Transmit waveform repeatedly"
+.IP "\fBWVTXR wid\fP - Transmits waveform repeatedly"
 .IP "" 4
 
 .br
@@ -4109,6 +4202,8 @@ specified y is assumed to be a variable.
 The WAIT command parameter is a bit-mask with 1 set for gpios of interest.
 
 .br
+The SYS script receives two unsigned parameters: the accumulator A and
+the current gpio levels.
 
 .SH SEE ALSO
 
