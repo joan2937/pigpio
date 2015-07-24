@@ -1683,8 +1683,9 @@ gpioWaveAddSerial(4, 9600, 8, 2, 1000000, MSG_LEN, data);
 .IP "\fBint gpioWaveCreate(void)\fP"
 .IP "" 4
 This function creates a waveform from the data provided by the prior
-calls to the \fBgpioWaveAdd*\fP functions.  Upon success a positive wave id
-is returned.
+calls to the \fBgpioWaveAdd*\fP functions.  Upon success a wave id
+greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
+PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
 
 .br
 
@@ -1788,8 +1789,7 @@ PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 
 .IP "\fBint gpioWaveDelete(unsigned wave_id)\fP"
 .IP "" 4
-This function deletes all created waveforms with ids greater than or
-equal to wave_id.
+This function deletes the waveform with id wave_id.
 
 .br
 
@@ -1810,38 +1810,6 @@ Wave ids are allocated in order, 0, 1, 2, etc.
 
 .br
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
-
-.IP "\fBint gpioWaveTxStart(unsigned wave_mode)\fP"
-.IP "" 4
-This function creates and then transmits a waveform.  The mode
-determines whether the waveform is sent once or cycles endlessly.
-
-.br
-
-.br
-NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
-
-.br
-
-.br
-
-.EX
-wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
-.br
-
-.EE
-
-.br
-
-.br
-This function is deprecated and should no longer be used.  Use
-\fBgpioWaveCreate\fP and \fBgpioWaveTxSend\fP instead.
-
-.br
-
-.br
-Returns the number of DMA control blocks in the waveform if OK,
-otherwise PI_BAD_WAVE_MODE.
 
 .IP "\fBint gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)\fP"
 .IP "" 4
@@ -1884,7 +1852,7 @@ NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
 
 .br
 The waves to be transmitted are specified by the contents of buf
-which contains an ordered list of wave_ids and optional command
+which contains an ordered list of \fBwave_id\fPs and optional command
 codes and related data.
 
 .br
@@ -1902,24 +1870,26 @@ bufSize: the number of bytes in buf
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
-PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+Returns 0 if OK, otherwise PI_CHAIN_NESTING, PI_CHAIN_LOOP_CNT, PI_BAD_CHAIN_LOOP, PI_BAD_CHAIN_CMD, PI_CHAIN_COUNTER,
+PI_BAD_CHAIN_DELAY, PI_CHAIN_TOO_BIG, or PI_BAD_WAVE_ID.
 
 .br
 
 .br
-Each wave is transmitted in the order specified.  A wave may only
-occur once per chain.  Waves may be transmitted multiple times by
-using the repeat command.  The repeat command specifies a wave id
-and a count.  The wave id must occur earlier in the chain.  All the
-waves between wave id and the repeat command are transmitted count
-times.
+Each wave is transmitted in the order specified.  A wave may
+occur multiple times per chain.
 
 .br
 
 .br
-Repeat commands may not be nested.  The minimum repeat count is 2.
-A maximum of 5 repeat commands is supported per chain.
+A blocks of waves may be transmitted multiple times by using
+the loop commands. The block is bracketed by loop start and
+end commands.  Loops may be nested.
+
+.br
+
+.br
+Delays between waves may be added with the delay command.
 
 .br
 
@@ -1929,13 +1899,24 @@ The following command codes are supported:
 .br
 
 .br
-Name      Cmd & Data         Meaning
+Name          Cmd & Data   Meaning
 
 .br
-Repeat    255 wid C0 C1 C2   Repeat from wid count times
+Loop Start    255 0        Identify start of a wave block
 
 .br
-count = C0 + C1*256 + C2*65536
+Loop Repeat   255 1 x y    loop x + y*256 times
+
+.br
+Delay         255 2 x y    delay x + y*256 microseconds
+
+.br
+
+.br
+
+.br
+The code is currently dimensioned to support a chain with roughly
+600 entries and 20 loop counters.
 
 .br
 
@@ -1944,55 +1925,109 @@ count = C0 + C1*256 + C2*65536
 .br
 
 .EX
-The following examples assume that waves with ids 0 to 12 exist.
+#include <stdio.h>
+.br
+#include <pigpio.h>
 .br
 
 .br
-// 0 255 0 57 0 0 (repeat 0 57 times)
+#define WAVES 5
 .br
-status = gpioWaveChain((char []){0, 255, 0, 57, 0, 0}, 6);
-.br
-
-.br
-// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
-.br
-status = gpioWaveChain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+#define GPIO 4
 .br
 
 .br
-// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
+int main(int argc, char *argv[])
 .br
-status = gpioWaveChain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+{
 .br
-
-.br
-// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
-.br
-status = gpioWaveChain(
-.br
-   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+   int i, wid[WAVES];
 .br
 
 .br
-// The following repeats 5 65793 times, transmits 6,
-.br
-// repeats 7+8 514 times, transmits 12,
-.br
-// repeats 9+11+10 197121 times.
-.br
-// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
-.br
-char chain[] = {
-.br
-   5,             255, 5, 1, 1, 1,
-.br
-   6, 7, 8,       255, 7, 2, 2, 0,
-.br
-   12, 9, 11, 10, 255, 9, 1, 2, 3};
+   if (gpioInitialise()<0) return -1;
 .br
 
 .br
-status = gpioWaveChain(chain, sizeof(chain));
+   gpioSetMode(GPIO, PI_OUTPUT);
+.br
+
+.br
+   printf("start piscope, press return\n"); getchar();
+.br
+
+.br
+   for (i=0; i<WAVES; i++)
+.br
+   {
+.br
+      gpioWaveAddGeneric(2, (gpioPulse_t[])
+.br
+         {{1<<GPIO, 0,        20},
+.br
+          {0, 1<<GPIO, (i+1)*200}});
+.br
+
+.br
+      wid[i] = gpioWaveCreate();
+.br
+   }
+.br
+
+.br
+   gpioWaveChain((char []) {
+.br
+      wid[4], wid[3], wid[2],       // transmit waves 4+3+2
+.br
+      255, 0,                       // loop start
+.br
+         wid[0], wid[0], wid[0],    // transmit waves 0+0+0
+.br
+         255, 0,                    // loop start
+.br
+            wid[0], wid[1],         // transmit waves 0+1
+.br
+            255, 2, 0x88, 0x13,     // delay 5000us
+.br
+         255, 1, 30, 0,             // loop end (repeat 30 times)
+.br
+         255, 0,                    // loop start
+.br
+            wid[2], wid[3], wid[0], // transmit waves 2+3+0
+.br
+            wid[3], wid[1], wid[2], // transmit waves 3+1+2
+.br
+         255, 1, 10, 0,             // loop end (repeat 10 times)
+.br
+      255, 1, 5, 0,                 // loop end (repeat 5 times)
+.br
+      wid[4], wid[4], wid[4],       // transmit waves 4+4+4
+.br
+      255, 2, 0x20, 0x4E,           // delay 20000us
+.br
+      wid[0], wid[0], wid[0],       // transmit waves 0+0+0
+.br
+
+.br
+      }, 46);
+.br
+
+.br
+   while (gpioWaveTxBusy()) time_sleep(0.1);
+.br
+
+.br
+   for (i=0; i<WAVES; i++) gpioWaveDelete(wid[i]);
+.br
+
+.br
+   printf("stop piscope, press return\n"); getchar();
+.br
+
+.br
+   gpioTerminate();
+.br
+}
 .br
 
 .EE
@@ -4386,8 +4421,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .br
-NOTE: Any waveform started by \fBgpioWaveTxSend\fP, \fBgpioWaveTxStart\fP,
-or \fBgpioWaveChain\fP will be cancelled.
+NOTE: Any waveform started by \fBgpioWaveTxSend\fP, or
+\fBgpioWaveChain\fP will be cancelled.
 
 .br
 
@@ -7022,7 +7057,7 @@ Denoting no parameter is required
 .br
 
 .br
-A number representing a waveform created by \fBgpioWaveCreate\fP.
+A number identifying a waveform created by \fBgpioWaveCreate\fP.
 
 .br
 
@@ -7514,15 +7549,21 @@ A 16-bit word value.
 .br
 #define PI_BAD_I2C_BAUD    -112 // bad I2C baud rate, not 50-500k
 .br
-#define PI_BAD_REPEAT_CNT  -113 // bad repeat count, not 2-max
+#define PI_CHAIN_LOOP_CNT  -113 // bad chain loop count
 .br
-#define PI_BAD_REPEAT_WID  -114 // bad repeat wave id
+#define PI_BAD_CHAIN_LOOP  -114 // empty chain loop
 .br
-#define PI_TOO_MANY_COUNTS -115 // too many chain counters
+#define PI_CHAIN_COUNTER   -115 // too many chain counters
 .br
-#define PI_BAD_CHAIN_CMD   -116 // malformed chain command string
+#define PI_BAD_CHAIN_CMD   -116 // bad chain command
 .br
-#define PI_REUSED_WID      -117 // wave already used in chain
+#define PI_BAD_CHAIN_DELAY -117 // bad chain delay micros
+.br
+#define PI_CHAIN_NESTING   -118 // chain counters nested too deeply
+.br
+#define PI_CHAIN_TOO_BIG   -119 // chain is too long
+.br
+#define PI_DEPRECATED      -120 // deprecated function removed
 .br
 
 .br

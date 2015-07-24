@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 34 */
+/* pigpio version 35 */
 
 /* include ------------------------------------------------------- */
 
@@ -626,7 +626,10 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define NORMAL_DMA (DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
 
-#define TIMED_DMA(x)  (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
+#define TIMED_DMA(x) (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
+
+#define PCM_TIMER (((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS)
+#define PWM_TIMER (((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS)
 
 #define DBG_MIN_LEVEL 0
 #define DBG_ALWAYS    0
@@ -668,6 +671,28 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define CBS_PER_OPAGE 118
 #define OOL_PER_OPAGE  79
+
+/*
+Wave Count Block
+
+Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
+   0  CB [13]  13*8  104 CBs for counter 0
+ 104  CB [13]  13*8  104 CBs for counter 1
+ 208  CB [60]  60*8  480 CBs reserved to construct wave
+ 688 OOL [60]  60*1   60 OOL reserved to construct wave
+ 748 OOL[136] 136*1  136 OOL for counter 0
+ 884 OOL[136] 136*1  136 OOL for counter 1
+1020 pad  [4]   4*1    4 spare
+*/
+
+#define WCB_CNT_PER_PAGE 2
+#define WCB_COUNTERS (WCB_CNT_PER_PAGE * PI_WAVE_COUNT_PAGES)
+#define WCB_CNT_CBS 13
+#define WCB_CNT_OOL 68
+#define WCB_COUNTER_OOL (WCB_CNT_PER_PAGE * WCB_CNT_OOL)
+#define WCB_COUNTER_CBS (WCB_CNT_PER_PAGE * WCB_CNT_CBS)
+#define WCB_CHAIN_CBS   60
+#define WCB_CHAIN_OOL   60
 
 #define CBS_PER_CYCLE ((PULSE_PER_CYCLE*3)+2)
 
@@ -1086,9 +1111,8 @@ static rawWaveInfo_t waveInfo[PI_MAX_WAVES];
 
 static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
-static int waveOutBotCB  = PI_WAVE_COUNTERS*CBS_PER_OPAGE;
-static int waveOutTopCB  = NUM_WAVE_CBS;
-static int waveOutBotOOL = PI_WAVE_COUNTERS*OOL_PER_OPAGE;
+static int waveOutBotCB  = PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE;
+static int waveOutBotOOL = PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE;
 static int waveOutTopOOL = NUM_WAVE_OOL;
 static int waveOutCount = 0;
 
@@ -1311,6 +1335,9 @@ static void initHWClk
    (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH);
 
 static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
+
+int gpioWaveTxStart(unsigned wave_mode); /* deprecated */
+
 
 /* ======================================================================= */
 
@@ -2463,19 +2490,6 @@ static uint32_t waveOOLPOadr(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-static void waveCbOPrint(int pos)
-{
-   rawCbs_t * p;
-
-   p = rawWaveCBAdr(pos);
-
-   fprintf(stderr, "i=%x s=%x d=%x len=%x s=%x nxt=%x\n",
-      p->info, p->src, p->dst, p->length, p->stride, p->next);
-}
-
-
-/* ----------------------------------------------------------------------- */
-
 static void waveBitDelay
    (unsigned baud, unsigned bits, unsigned stops, unsigned *bitDelay)
 {
@@ -2501,20 +2515,42 @@ static void waveBitDelay
 
 /* ----------------------------------------------------------------------- */
 
-static int errCBsOOL(int cb, int botOOL, int topOOL)
+static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 {
-   if (cb >= waveOutTopCB) return PI_TOO_MANY_CBS;
+   int numCB=0, numBOOL=0, numTOOL=0;
 
-   if (botOOL >= topOOL) return PI_TOO_MANY_OOL;
+   unsigned i;
 
-   return 0;
+   unsigned numWaves;
+
+   rawWave_t *waves;
+
+   numWaves = wfc[wfcur];
+   waves    = wf [wfcur];
+
+   /* delay cb at start of DMA */
+
+   numCB++;
+
+   for (i=0; i<numWaves; i++)
+   {
+      if (waves[i].gpioOn)                 {numCB++; numBOOL++;}
+      if (waves[i].gpioOff)                {numCB++; numBOOL++;}
+      if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
+      if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
+      if (waves[i].usDelay)                {numCB++;           }
+   }
+
+   *numCBs   = numCB;
+   *numBOOLs = numBOOL;
+   *numTOOLs = numTOOL;
 }
 
 /* ----------------------------------------------------------------------- */
 
-static int wave2Cbs(unsigned wave_mode)
+static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
 {
-   int botCB=waveOutBotCB, botOOL=waveOutBotOOL, topOOL=waveOutTopOOL;
+   int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
 
    int status;
 
@@ -2531,8 +2567,6 @@ static int wave2Cbs(unsigned wave_mode)
 
    half = PI_WF_MICROS/2;
 
-   if ((status = errCBsOOL(botCB+1, botOOL, topOOL))) return status;
-
    /* add delay cb at start of DMA */
 
    p = rawWaveCBAdr(botCB++);
@@ -2541,17 +2575,13 @@ static int wave2Cbs(unsigned wave_mode)
 
    if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
    {
-      p->info   = NORMAL_DMA |
-                  DMA_DEST_DREQ |
-                  DMA_PERIPHERAL_MAPPING(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+      p->info = NORMAL_DMA | TIMED_DMA(2);
+      p->dst  = PCM_TIMER;
    }
    else
    {
-      p->info   = NORMAL_DMA |
-                  DMA_DEST_DREQ |
-                  DMA_PERIPHERAL_MAPPING(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+      p->info = NORMAL_DMA | TIMED_DMA(5);
+      p->dst  = PWM_TIMER;
    }
 
    p->src    = (uint32_t) (&dmaOBus[0]->periphData);
@@ -2564,8 +2594,6 @@ static int wave2Cbs(unsigned wave_mode)
    {
       if (waves[i].gpioOn)
       {
-         if ((status = errCBsOOL(botCB+1, botOOL+1, topOOL))) return status;
-
          waveSetOOL(botOOL, waves[i].gpioOn);
 
          p = rawWaveCBAdr(botCB++);
@@ -2579,8 +2607,6 @@ static int wave2Cbs(unsigned wave_mode)
 
       if (waves[i].gpioOff)
       {
-         if ((status = errCBsOOL(botCB+1, botOOL+1, topOOL))) return status;
-
          waveSetOOL(botOOL, waves[i].gpioOff);
 
          p = rawWaveCBAdr(botCB++);
@@ -2594,8 +2620,6 @@ static int wave2Cbs(unsigned wave_mode)
 
       if (waves[i].flags & WAVE_FLAG_READ)
       {
-         if ((status = errCBsOOL(botCB+1, botOOL, topOOL-1))) return status;
-
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
@@ -2607,8 +2631,6 @@ static int wave2Cbs(unsigned wave_mode)
 
       if (waves[i].flags & WAVE_FLAG_TICK)
       {
-         if ((status = errCBsOOL(botCB+1, botOOL, topOOL-1))) return status;
-
          p = rawWaveCBAdr(botCB++);
 
          p->info   = NORMAL_DMA;
@@ -2620,27 +2642,19 @@ static int wave2Cbs(unsigned wave_mode)
 
       if (waves[i].usDelay)
       {
-         if ((status = errCBsOOL(botCB+1, botOOL, topOOL))) return status;
-
          p = rawWaveCBAdr(botCB++);
 
          /* use the secondary clock */
 
          if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
          {
-            p->info   = NORMAL_DMA |
-                        DMA_DEST_DREQ |
-                        DMA_PERIPHERAL_MAPPING(2);
-
-            p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+            p->info = NORMAL_DMA | TIMED_DMA(2);
+            p->dst  = PCM_TIMER;
          }
          else
          {
-            p->info   = NORMAL_DMA |
-                        DMA_DEST_DREQ |
-                        DMA_PERIPHERAL_MAPPING(5);
-
-            p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+            p->info = NORMAL_DMA | TIMED_DMA(5);
+            p->dst  = PWM_TIMER;
          }
 
          p->src    = (uint32_t) (&dmaOBus[0]->periphData);
@@ -2656,112 +2670,14 @@ static int wave2Cbs(unsigned wave_mode)
       else p->next = waveCbPOadr(repeatCB);
    }
 
-   status = botCB - waveOutBotCB;
+   status = botCB - *CB;
 
-   waveOutBotCB  = botCB;
-   waveOutBotOOL = botOOL;
-   waveOutTopOOL = topOOL;
+   *CB   = botCB;
+   *BOOL = botOOL;
+   *TOOL = topOOL;
 
    return status;
 }
-
-/* ----------------------------------------------------------------------- */
-
-static uint32_t waveGetIn(int page, int slot)
-{
-   return (dmaOVirt[page]->OOL[slot]);
-}
-
-static void waveSetIn(int page, int slot, uint32_t value)
-{
-   dmaOVirt[page]->OOL[slot] = value;
-}
-
-static uint32_t myWaveOOLPOadr(int page, int slot)
-{
-   return (uint32_t) &dmaOBus[page]->OOL[slot];
-}
-
-static void waveCount(
-   unsigned counter,
-   unsigned blklen,
-   unsigned blocks,
-   unsigned count,
-   uint32_t repeat,
-   uint32_t next)
-{
-   rawCbs_t *p=NULL;
-
-   int b, baseCB, dig;
-   uint32_t nxt;
-
-   int botCB;
-
-   botCB  = counter * CBS_PER_OPAGE;
-
-   baseCB = botCB;
-
-   /* set up all the OOLs */
-   for (b=0; b < (blocks*(blklen+1)); b++) waveSetIn(counter, b, repeat);
-
-   for (b=0; b<blocks; b++)
-      waveSetIn(counter, ((b*(blklen+1))+blklen), waveCbPOadr(baseCB+((b*3)+3)));
-
-   for (b=0; b<blocks; b++)
-   {
-      /* copy BOTTOM to NEXT */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info = NORMAL_DMA;
-
-      p->src = myWaveOOLPOadr(counter, b*(blklen+1));
-      p->dst = (waveCbPOadr(botCB+1) + 20);
-
-      p->length = 4;
-      p->next   = waveCbPOadr(botCB);
-
-      /* copy BOTTOM to TOP */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info   = NORMAL_DMA;
-
-      p->src = myWaveOOLPOadr(counter, b*(blklen+1));
-      p->dst = myWaveOOLPOadr(counter, (b*(blklen+1))+blklen);
-
-      p->length = 4;
-      p->next   = waveCbPOadr(botCB);
-
-      /* shift all down one */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info   = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
-
-      p->src = myWaveOOLPOadr(counter, ((b*(blklen+1))+1));
-      p->dst = myWaveOOLPOadr(counter, ((b*(blklen+1))+0));
-
-      p->length = blklen*4;
-      p->next   = repeat;
-   }
-
-   b = 0;
-
-   while (count && (b<blocks))
-   {
-      dig = count % blklen;
-      count /= blklen;
-
-      if (count) nxt = waveGetIn(counter, (b*(blklen+1))+blklen);
-      else       nxt = next;
-
-      waveSetIn(counter, b*(blklen+1)+dig, nxt);
-
-      b++;
-   }
-}
-
 
 /* ----------------------------------------------------------------------- */
 
@@ -4894,13 +4810,13 @@ static void dmaDelayCb(int b)
 
    if (gpioCfg.clockPeriph == PI_CLOCK_PCM)
    {
-      p->info   = NORMAL_DMA | TIMED_DMA(2);
-      p->dst    = ((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+      p->info = NORMAL_DMA | TIMED_DMA(2);
+      p->dst  = PCM_TIMER;
    }
    else
    {
-      p->info   = NORMAL_DMA | TIMED_DMA(5);
-      p->dst    = ((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS;
+      p->info = NORMAL_DMA | TIMED_DMA(5);
+      p->dst  = PWM_TIMER;
    }
 
    p->src    = dmaPwmDataAdr(b%DMAI_PAGES);
@@ -7463,9 +7379,6 @@ void gpioTerminate(void)
 
 static void switchFunctionOff(unsigned gpio)
 {
-   unsigned clock, pwm;
-   int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
-
    switch (gpioInfo[gpio].is)
    {
       case GPIO_SERVO:
@@ -7481,17 +7394,12 @@ static void switchFunctionOff(unsigned gpio)
          break;
 
       case GPIO_HW_CLK:
-         /* switch hardware clock off */
-         clock = (clkDef[gpio] >> 4) & 3;
-         clkReg[cctl[clock]] = CLK_PASSWD | CLK_CTL_KILL;
+         /* No longer disable clock hardware, doing that was a bug. */
          gpioInfo[gpio].width = 0;
          break;
 
       case GPIO_HW_PWM:
-         /* switch hardware PWM off */
-         pwm = (PWMDef[gpio] >> 4) & 3;
-         if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
-         else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
+         /* No longer disable PWM hardware, doing that was a bug. */
          gpioInfo[gpio].width = 0;
          break;
    }
@@ -7499,14 +7407,18 @@ static void switchFunctionOff(unsigned gpio)
 
 static void stopHardwarePWM(void)
 {
-   int i;
+   unsigned i, pwm;
 
    for (i=0; i<= PI_MAX_GPIO; i++)
    {
       if (gpioInfo[i].is == GPIO_HW_PWM)
       {
-         switchFunctionOff(i);
+         pwm = (PWMDef[i] >> 4) & 3;
 
+         if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
+         else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
+
+         gpioInfo[i].width = 0;
          gpioInfo[i].is = GPIO_UNDEFINED;
       }
    }
@@ -7953,9 +7865,8 @@ int gpioWaveClear(void)
    wfStats.pulses = 0;
    wfStats.cbs    = 0;
 
-   waveOutBotCB  = PI_WAVE_COUNTERS*CBS_PER_OPAGE;
-   waveOutTopCB  = NUM_WAVE_CBS;
-   waveOutBotOOL = PI_WAVE_COUNTERS*OOL_PER_OPAGE;
+   waveOutBotCB  = PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE;
+   waveOutBotOOL = PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE;
    waveOutTopOOL = NUM_WAVE_OOL;
 
    waveOutCount = 0;
@@ -8041,7 +7952,8 @@ int gpioWaveAddSerial
    if ((baud < PI_WAVE_MIN_BAUD) || (baud > PI_WAVE_MAX_BAUD))
       SOFT_ERROR(PI_BAD_WAVE_BAUD, "bad baud rate (%d)", baud);
 
-   if ((data_bits < PI_MIN_WAVE_DATABITS) || (data_bits > PI_MAX_WAVE_DATABITS))
+   if ((data_bits < PI_MIN_WAVE_DATABITS) ||
+       (data_bits > PI_MAX_WAVE_DATABITS))
       SOFT_ERROR(PI_BAD_DATABITS, "bad number of databits (%d)", data_bits);
 
    if ((stop_bits < PI_MIN_WAVE_HALFSTOPBITS) ||
@@ -8286,7 +8198,9 @@ int rawWaveAddSPI(
 
 int gpioWaveCreate(void)
 {
-   int cb;
+   int i, wid;
+   int numCB, numBOOL, numTOOL;
+   int CB, BOOL, TOOL;
 
    DBG(DBG_USER, "");
 
@@ -8294,22 +8208,86 @@ int gpioWaveCreate(void)
 
    if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
 
-   if (waveOutCount < PI_MAX_WAVES)
+   /* What resources are needed? */
+
+   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
+
+   wid = -1;
+
+   /* Is there an exact fit with a deleted wave. */
+
+   for (i=0; i<waveOutCount; i++)
    {
-      waveInfo[waveOutCount].botCB  = waveOutBotCB;
-      waveInfo[waveOutCount].botOOL = waveOutBotOOL;
-      waveInfo[waveOutCount].topOOL = waveOutTopOOL;
-
-      if ((cb = wave2Cbs(PI_WAVE_MODE_ONE_SHOT)) < 0) return cb;
-
-      waveInfo[waveOutCount].topCB  = waveOutBotCB-1;
-
-      gpioWaveAddNew();
-
-      return waveOutCount++;
+      if (waveInfo[i].deleted             &&
+         (waveInfo[i].numCB   == numCB)   &&
+         (waveInfo[i].numBOOL == numBOOL) &&
+         (waveInfo[i].numTOOL == numTOOL))
+      {
+         /* Reuse the deleted waves resources. */
+         wid = i;
+         break;
+      }
    }
 
-   return PI_NO_WAVEFORM_ID;
+   if (wid == -1)
+   {
+      /* Are there enough spare resources? */
+
+      if ((numCB+waveOutBotCB) >= NUM_WAVE_CBS)
+         return PI_TOO_MANY_CBS;
+
+      if ((numBOOL+waveOutBotOOL) >= (waveOutTopOOL-numTOOL))
+         return PI_TOO_MANY_OOL;
+
+      if (wid >= PI_MAX_WAVES)
+         return PI_NO_WAVEFORM_ID;
+
+      wid = waveOutCount++;
+
+      waveInfo[wid].botCB  = waveOutBotCB;
+      waveInfo[wid].topCB  = waveOutBotCB + numCB -1;
+      waveInfo[wid].botOOL = waveOutBotOOL;
+      waveInfo[wid].topOOL = waveOutTopOOL;
+      waveInfo[wid].numCB = numCB;
+      waveInfo[wid].numBOOL = numBOOL;
+      waveInfo[wid].numTOOL = numTOOL;
+
+      waveOutBotCB += numCB;
+      waveOutBotOOL += numBOOL;
+      waveOutTopOOL -= numTOOL;
+   }
+
+   /* Must be room if got this far. */
+
+   CB   = waveInfo[wid].botCB;
+   BOOL = waveInfo[wid].botOOL;
+   TOOL = waveInfo[wid].topOOL;
+
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL);
+
+   /* Sanity check. */
+
+   if ( (numCB   != (CB-waveInfo[wid].botCB))    ||
+        (numBOOL != (BOOL-waveInfo[wid].botOOL)) ||
+        (numTOOL != (waveInfo[wid].topOOL-TOOL)) )
+   {
+      DBG(0, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
+         numCB,   CB-waveInfo[wid].botCB,
+         numBOOL, BOOL-waveInfo[wid].botOOL,
+         numTOOL, waveInfo[wid].topOOL-TOOL);
+   }
+
+   waveInfo[wid].deleted = 0;
+
+   /* Consume waves. */
+
+   wfc[0] = 0;
+   wfc[1] = 0;
+   wfc[2] = 0;
+
+   wfcur = 0;
+
+   return wid;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -8320,14 +8298,23 @@ int gpioWaveDelete(unsigned wave_id)
 
    CHECK_INITED;
 
-   if (wave_id >= waveOutCount)
+   if ((wave_id >= waveOutCount) || waveInfo[wave_id].deleted)
       SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
 
-   waveOutBotCB  = waveInfo[wave_id].botCB;
-   waveOutBotOOL = waveInfo[wave_id].botOOL;
-   waveOutTopOOL = waveInfo[wave_id].topOOL;
+   waveInfo[wave_id].deleted = 1;
 
-   waveOutCount = wave_id;
+   if (wave_id == (waveOutCount-1))
+   {
+      /* top wave deleted, garbage collect any other deleted waves */
+
+      while ((wave_id > 0) && (waveInfo[wave_id-1].deleted)) --wave_id;
+
+      waveOutBotCB  = waveInfo[wave_id].botCB;
+      waveOutBotOOL = waveInfo[wave_id].botOOL;
+      waveOutTopOOL = waveInfo[wave_id].topOOL;
+
+      waveOutCount = wave_id;
+   }
 
    return 0;
 }
@@ -8336,53 +8323,11 @@ int gpioWaveDelete(unsigned wave_id)
 
 int gpioWaveTxStart(unsigned wave_mode)
 {
-   /* This function is deprecated and will be removed. */
-
-   int firstCB=PI_WAVE_COUNTERS*CBS_PER_OPAGE;
-   int numCBs, i;
-
-   DBG(DBG_USER, "wave_mode=%d", wave_mode);
+   /* This function is deprecated and has been removed. */
 
    CHECK_INITED;
 
-   if (wave_mode > PI_WAVE_MODE_REPEAT)
-      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
-
-   if (wfc[wfcur] == 0) return 0;
-
-   if (!waveClockInited)
-   {
-      stopHardwarePWM();
-      initClock(0); /* initialise secondary clock */
-      waveClockInited = 1;
-   }
-
-   dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-
-   dmaOut[DMA_CONBLK_AD] = 0;
-
-   waveOutBotCB  = firstCB;
-   waveOutTopCB  = NUM_WAVE_CBS;
-   waveOutBotOOL = PI_WAVE_COUNTERS*OOL_PER_OPAGE;
-   waveOutTopOOL = NUM_WAVE_OOL;
-
-   waveOutCount = 0;
-
-   numCBs = wave2Cbs(wave_mode);
-
-   if (numCBs > 0)
-   {
-      if (gpioCfg.dbgLevel >= DBG_SLOW_TICK)
-      {
-         fprintf(stderr, "*** OUTPUT DMA CONTROL BLOCKS ***\n");
-         for (i=0; i<numCBs; i++) waveCbOPrint(firstCB+i);
-      }
-
-      initDMAgo((uint32_t *)dmaOut, waveCbPOadr(firstCB));
-   }
-
-   return numCBs;
-
+   SOFT_ERROR(PI_DEPRECATED, "deprected function removed");
 }
 
 /* ----------------------------------------------------------------------- */
@@ -8395,7 +8340,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
 
    CHECK_INITED;
 
-   if (wave_id >= waveOutCount)
+   if ((wave_id >= waveOutCount) || waveInfo[wave_id].deleted)
       SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
 
    if (wave_mode > PI_WAVE_MODE_REPEAT)
@@ -8425,16 +8370,201 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
    return (waveInfo[wave_id].topCB - waveInfo[wave_id].botCB) + 1;
 }
 
+
 /* ----------------------------------------------------------------------- */
+
+static int chainGetCB(int n)
+{
+   int block, index;
+
+   if (n < (WCB_CHAIN_CBS * PI_WAVE_COUNT_PAGES))
+   {
+      block = n / WCB_CHAIN_CBS;
+      index = n % WCB_CHAIN_CBS;
+      return (block*CBS_PER_OPAGE) + WCB_COUNTER_CBS + index;
+   }
+   return -1;
+}
+
+static void chainSetVal(int n, uint32_t val)
+{
+   int block, index;
+   uint32_t *p;
+
+   if (n < (WCB_CHAIN_OOL * PI_WAVE_COUNT_PAGES))
+   {
+      block = n / WCB_CHAIN_OOL;
+      index = n % WCB_CHAIN_OOL;
+      p = (uint32_t *) dmaOVirt[block] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
+      p[index] = val;
+   }
+}
+
+static uint32_t chainGetValPadr(int n)
+{
+   int block, index;
+   uint32_t *p;
+
+   if (n < (WCB_CHAIN_OOL * PI_WAVE_COUNT_PAGES))
+   {
+      block = n / WCB_CHAIN_OOL;
+      index = n % WCB_CHAIN_OOL;
+      p = (uint32_t *) dmaOBus[block] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
+      return (uint32_t) (p + index);
+   }
+   return 0;
+}
+
+static uint32_t chainGetCntVal(int counter, int slot)
+{
+   uint32_t *p;
+   int page, offset;
+   page = counter / 2;
+   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
+   p = (uint32_t *) dmaOVirt[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
+   return p[WCB_CHAIN_OOL+ offset + slot];
+}
+
+static void chainSetCntVal(int counter, int slot, uint32_t value)
+{
+   uint32_t *p;
+   int page, offset;
+   page = counter / 2;
+   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
+   p = (uint32_t *) dmaOVirt[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
+   p[WCB_CHAIN_OOL + offset + slot] = value;
+}
+
+static uint32_t chainGetCntValPadr(int counter, int slot)
+{
+   uint32_t *p;
+   int page, offset;
+   page = counter / 2;
+   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
+   p = (uint32_t *) dmaOBus[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
+   return (uint32_t)(p + WCB_CHAIN_OOL + offset + slot);
+}
+
+static int chainGetCntCB(int counter)
+{
+   int page, offset;
+   page = counter / 2;
+   offset = (counter % 2 ? WCB_CNT_CBS : 0);
+   return ((page * CBS_PER_OPAGE) + offset);
+}
+
+static void chainMakeCounter(
+   unsigned counter,
+   unsigned blklen,
+   unsigned blocks,
+   unsigned count,
+   uint32_t repeat,
+   uint32_t next)
+{
+   rawCbs_t *p=NULL;
+
+   int b, baseCB, dig;
+   uint32_t nxt;
+
+   int botCB;
+
+   botCB  = chainGetCntCB(counter);
+
+   baseCB = botCB;
+
+   /* set up all the OOLs */
+   for (b=0; b < (blocks*(blklen+1)); b++) chainSetCntVal(counter, b, repeat);
+
+   for (b=0; b<blocks; b++)
+      chainSetCntVal(counter,
+         ((b*(blklen+1))+blklen),
+         waveCbPOadr(baseCB+((b*3)+3)));
+
+   for (b=0; b<blocks; b++)
+   {
+      /* copy BOTTOM to NEXT */
+
+      p = rawWaveCBAdr(botCB++);
+
+      p->info = NORMAL_DMA;
+
+      p->src = chainGetCntValPadr(counter, b*(blklen+1));
+      p->dst = (waveCbPOadr(botCB+1) + 20);
+
+      p->length = 4;
+      p->next   = waveCbPOadr(botCB);
+
+      /* copy BOTTOM to TOP */
+
+      p = rawWaveCBAdr(botCB++);
+
+      p->info   = NORMAL_DMA;
+
+      p->src = chainGetCntValPadr(counter, b*(blklen+1));
+      p->dst = chainGetCntValPadr(counter, (b*(blklen+1))+blklen);
+
+      p->length = 4;
+      p->next   = waveCbPOadr(botCB);
+
+      /* shift all down one */
+
+      p = rawWaveCBAdr(botCB++);
+
+      p->info   = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
+
+      p->src = chainGetCntValPadr(counter, ((b*(blklen+1))+1));
+      p->dst = chainGetCntValPadr(counter, ((b*(blklen+1))+0));
+
+      p->length = blklen*4;
+      p->next   = repeat;
+   }
+
+   /* reset the counter */
+
+   p = rawWaveCBAdr(botCB);
+
+   p->info = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
+
+   p->src = chainGetCntValPadr(counter, blocks*(blklen+1));
+   p->dst = chainGetCntValPadr(counter, 0);
+
+   p->length = blocks*(blklen+1)*4;
+   p->next   = next;
+
+   b = 0;
+
+   while (count && (b<blocks))
+   {
+      dig = count % blklen;
+      count /= blklen;
+
+      if (count) nxt = chainGetCntVal(counter, (b*(blklen+1))+blklen);
+      else       nxt = waveCbPOadr(botCB);
+
+      chainSetCntVal(counter, b*(blklen+1)+dig, nxt);
+
+      b++;
+   }
+
+   /* copy all the OOLs */
+   for (b=0; b < (blocks*(blklen+1)); b++)
+      chainSetCntVal(
+         counter, b+(blocks*(blklen+1)), chainGetCntVal(counter, b));
+}
+
 
 int gpioWaveChain(char *buf, unsigned bufSize)
 {
-   unsigned blklen=8, blocks=8;
-   int i, wid, rwid, nwid, firstCB, lastCB, counters, cycles;
+   unsigned blklen=16, blocks=4;
+   int cb, chaincb;
+   rawCbs_t *p;
+   int i, wid, cmd, loop, counters;
+   unsigned cycles;
    uint32_t repeat, next;
-   char used[256];
+   int stk_pos[10], stk_lev=0;
 
-   rawCbs_t *p=NULL;
+   cb = 0;
+   loop = -1;
 
    DBG(DBG_USER, "bufSize=%d [%s]", bufSize, myBuf2Str(bufSize, buf));
 
@@ -8451,12 +8581,29 @@ int gpioWaveChain(char *buf, unsigned bufSize)
 
    dmaOut[DMA_CONBLK_AD] = 0;
 
-   for (i=0; i<256; i++) used[i] = 255;
+   /* add delay cb at start of DMA */
+
+   p = rawWaveCBAdr(chainGetCB(cb++));
+
+   /* use the secondary clock */
+
+   if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+   {
+      p->info = NORMAL_DMA | TIMED_DMA(2);
+      p->dst  = PCM_TIMER;
+   }
+   else
+   {
+      p->info = NORMAL_DMA | TIMED_DMA(5);
+      p->dst  = PWM_TIMER;
+   }
+
+   p->src    = (uint32_t) (&dmaOBus[0]->periphData);
+   p->length = 4 * 20 / PI_WF_MICROS; /* 20 micros delay */
+   p->next   = waveCbPOadr(chainGetCB(cb));
 
    counters = 0;
    wid = -1;
-   lastCB = -1;
-   firstCB = -1;
 
    i = 0;
 
@@ -8464,92 +8611,183 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    {
       wid = (unsigned)buf[i];
 
-      if (wid == 255) /* repeat wave command */
+      if (wid == 255) /* wave command */
       {
-         if (counters < PI_WAVE_COUNTERS)
+         if ((i+2) > bufSize)
+            SOFT_ERROR(PI_BAD_CHAIN_CMD,
+               "incomplete chain command (at %d)", i);
+
+         cmd = buf[i+1];
+
+         if (cmd == 0) /* loop begin */
          {
-            if ((i+4) < bufSize)
-            {
-               rwid = buf[i+1];
-               if ((i+5) < bufSize)
-               {
-                  nwid = buf[i+5];
-                  if (nwid < waveOutCount)
-                     next = waveCbPOadr(1+waveInfo[nwid].botCB);
-                  else next = 0; /* error, will be picked up later */
-               }
-               else next = 0;
-               if (used[rwid] == counters)
-               {
-                  repeat = waveCbPOadr(1+waveInfo[rwid].botCB);
+            if (stk_lev >= (sizeof(stk_pos)/sizeof(int)))
+               SOFT_ERROR(PI_CHAIN_NESTING,
+                  "chain counters nested too deep (at %d)", i);
 
-                  cycles = (unsigned)buf[i+2] +
-                           ((unsigned)buf[i+3]<<8) +
-                           ((unsigned)buf[i+4]<<16);
-
-                  i+=4;
-
-                  if ((cycles > 1) && (cycles < PI_MAX_WAVE_CYCLES))
-                  {
-                     --cycles;
-
-                     waveCount(counters, blklen, blocks, cycles, repeat, next);
-
-                     p = rawWaveCBAdr(lastCB);
-
-                     lastCB = -1;
-
-                     p->next = waveCbPOadr(counters * CBS_PER_OPAGE);
-
-                     counters++;
-                  }
-                  else SOFT_ERROR(PI_BAD_REPEAT_CNT,
-                          "bad chain repeat count (%d)", cycles);
-               }
-               else SOFT_ERROR(PI_BAD_REPEAT_WID,
-                       "bad chain repeat wave (%d)", rwid);
-            }
-            else SOFT_ERROR(PI_BAD_CHAIN_CMD,
-                    "bad chain command (at char %d)", i);
+            stk_pos[stk_lev++] = cb;
+            i += 2;
          }
-         else SOFT_ERROR(PI_TOO_MANY_COUNTS,
-                 "too many chain counters (at char %d)", i);
+         else if (cmd == 1) /* loop end */
+         {
+            if (counters >= WCB_COUNTERS)
+               SOFT_ERROR(PI_CHAIN_COUNTER,
+                  "too many chain counters (at %d)", i);
+
+            if ((i+4) > bufSize)
+               SOFT_ERROR(PI_BAD_CHAIN_CMD,
+                  "incomplete chain command (at %d)", i);
+
+            loop = 0;
+            if (--stk_lev >= 0) loop = stk_pos[stk_lev];
+
+            if ((loop < 1) || (loop == cb))
+               SOFT_ERROR(PI_BAD_CHAIN_LOOP,
+                  "empty chain loop (at %d)", i);
+
+            cycles = ((unsigned)buf[i+3] <<  8) + (unsigned)buf[i+2];
+
+            i += 4;
+
+            if (cycles > PI_MAX_WAVE_CYCLES)
+               SOFT_ERROR(PI_CHAIN_LOOP_CNT,
+                  "bad chain loop count (%d)", cycles);
+
+            if (cycles == 0)
+            {
+               /* Skip the complete loop block.  Change
+                  the next pointing to the start of the
+                  loop block to the current cb.
+               */
+               p = rawWaveCBAdr(chainGetCB(loop));
+               p->next = waveCbPOadr(chainGetCB(cb));
+            }
+            else if (cycles == 1)
+            {
+               /* Nothing to do, no need for a counter. */
+            }
+            else
+            {
+               chaincb = chainGetCB(cb++);
+               if (chaincb < 0)
+                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+               p = rawWaveCBAdr(chaincb);
+
+               repeat = waveCbPOadr(chainGetCB(loop));
+
+                /* Need to check next cb as well. */
+
+               chaincb = chainGetCB(cb);
+
+               if (chaincb < 0)
+                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+               next = waveCbPOadr(chainGetCB(cb));
+
+               /* dummy src and dest */
+               p->info = NORMAL_DMA;
+               p->src = (uint32_t) (&dmaOBus[0]->periphData);
+               p->dst = (uint32_t) (&dmaOBus[0]->periphData);
+               p->length = 4;
+               p->next = waveCbPOadr(chainGetCntCB(counters));
+
+               chainMakeCounter(counters, blklen, blocks,
+                            cycles-1, repeat, next);
+
+               counters++;
+            }
+            loop = -1;
+         }
+         else if (cmd == 2) /* delay us */
+         {
+            if ((i+4) > bufSize)
+               SOFT_ERROR(PI_BAD_CHAIN_CMD,
+                  "incomplete chain command (at %d)", i);
+
+            cycles = ((unsigned)buf[i+3] <<  8) + (unsigned)buf[i+2];
+
+            i += 4;
+
+            if (cycles > PI_MAX_WAVE_DELAY)
+               SOFT_ERROR(PI_BAD_CHAIN_DELAY,
+                  "bad chain delay micros (%d)", cycles);
+
+            if (cycles)
+            {
+               chaincb = chainGetCB(cb++);
+
+               if (chaincb < 0)
+                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+               p = rawWaveCBAdr(chaincb);
+
+               /* use the secondary clock */
+
+               if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+               {
+                  p->info = NORMAL_DMA | TIMED_DMA(2);
+                  p->dst  = PCM_TIMER;
+               }
+               else
+               {
+                  p->info = NORMAL_DMA | TIMED_DMA(5);
+                  p->dst  = PWM_TIMER;
+               }
+
+               p->src    = (uint32_t) (&dmaOBus[0]->periphData);
+               p->length = 4 * cycles / PI_WF_MICROS;
+               p->next   = waveCbPOadr(chainGetCB(cb));
+            }
+         }
+         else
+            SOFT_ERROR(PI_BAD_CHAIN_CMD,
+               "unknown chain command (255 %d)", cmd);
       }
-      else if (wid >= waveOutCount)
+      else if ((wid >= waveOutCount) || waveInfo[wid].deleted)
          SOFT_ERROR(PI_BAD_WAVE_ID, "undefined wave (%d)", wid);
       else
       {
-         if (used[wid] == 255)
-         {
-            used[wid] = counters;
+         chaincb = chainGetCB(cb++);
 
-            if (firstCB < 0) firstCB = waveInfo[wid].botCB;
+         if (chaincb < 0)
+            SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
 
-            if (lastCB >= 0)
-            {
-               p = rawWaveCBAdr(lastCB);
+         p = rawWaveCBAdr(chaincb);
 
-               p->next = waveCbPOadr(1+waveInfo[wid].botCB);
-            }
-            lastCB = waveInfo[wid].topCB;
-         }
-         else SOFT_ERROR(PI_REUSED_WID,
-                 "wave already used in chain (%d)", wid);
+         chaincb = chainGetCB(cb);
+
+         if (chaincb < 0)
+            SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+         chainSetVal(cb-1, waveCbPOadr(chaincb));
+
+         /* patch next of wid topCB to next cb */
+
+         p->info   = NORMAL_DMA;
+         p->src    = chainGetValPadr(cb-1); /* this next */
+         p->dst    = waveCbPOadr(waveInfo[wid].topCB) + 20; /* wid next */
+         p->length = 4;
+         p->next   = waveCbPOadr(waveInfo[wid].botCB+1);
+
+         i += 1;
       }
-      i++;
    }
 
-   if (firstCB >= 0)
-   {
-      if (lastCB >= 0)
-      {
-         p = rawWaveCBAdr(lastCB);
+   chaincb = chainGetCB(cb++);
 
-         p->next = 0;
-      }
+   if (chaincb < 0)
+      SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
 
-      initDMAgo((uint32_t *)dmaOut, waveCbPOadr(firstCB));
-   }
+   p = rawWaveCBAdr(chaincb);
+
+   p->info   = NORMAL_DMA;
+   p->src    = (uint32_t) (&dmaOBus[0]->periphData);
+   p->dst    = (uint32_t) (&dmaOBus[0]->periphData);
+   p->length = 4;
+   p->next = 0;
+
+   initDMAgo((uint32_t *)dmaOut, waveCbPOadr(chainGetCB(0)));
 
    return 0;
 }

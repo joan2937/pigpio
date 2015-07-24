@@ -674,8 +674,8 @@ frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
 are unlikely to work.
 
 .br
-NOTE: Any waveform started by \fBWVGO\fP, \fBWVGOR\fP, \fBWVTX\fP,
-\fBWVTXR\fP, or \fBWVCHA\fP will be cancelled.
+NOTE: Any waveform started by \fBWVTX\fP, \fBWVTXR\fP, or \fBWVCHA\fP
+will be cancelled.
 
 .br
 This function is only valid if the pigpio main clock is PCM.  The
@@ -3125,16 +3125,15 @@ will be returned.
 
 .br
 Each wave is transmitted in the order specified.  A wave may
-only occur once per chain.  Waves may be transmitted multiple
-times by using the repeat command.  The repeat command
-specifies a wave id and a count.  The wave id must occur
-earlier in the chain.  All the waves between wave id and the
-repeat command are transmitted count times.
+occur multiple times per chain.
 
 .br
-Repeat commands may not be nested.  The minimum repeat
-count is 2. A maximum of 5 repeat commands is supported
-per chain.
+A blocks of waves may be transmitted multiple times by using
+the loop commands. The block is bracketed by loop start and
+end commands.  Loops may be nested.
+
+.br
+Delays between waves may be added with the delay command.
 
 .br
 The following command codes are supported:
@@ -3142,11 +3141,16 @@ The following command codes are supported:
 .br
 
 .EX
-Name     Cmd & Data         Meaning
-Repeat   255 wid C0 C1 C2   Repeat from wid count times
+Name          Cmd & Data   Meaning
+Loop Start    255 0        Identify start of a wave block
+Loop Repeat   255 1 x y    loop x + y*256 times
+Delay         255 2 x y    delay x + y*256 microseconds
 
 .EE
-count = C0 + C1*256 + C2*65536
+
+.br
+The code is currently dimensioned to support a chain with roughly
+600 entries and 20 loop counters.
 
 .br
 
@@ -3154,43 +3158,103 @@ count = C0 + C1*256 + C2*65536
 .br
 
 .EX
-The following examples assume that waves with ids 0 to 12 exist.
+#!/bin/bash
 .br
 
 .br
-# 0 255 0 57 0 0 (repeat 0 57 times)
+GPIO=4
 .br
-$ pigs wvcha 0 255 0 57 0 0
-.br
-
-.br
-# 0 1 255 0 0 2 0 (repeat 0+1 512 times)
-.br
-$ pigs wvcha 0 1 255 0 0 2 0
+WAVES=5
 .br
 
 .br
-# 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
-.br
-$ pigs wvcha 0 1 255 1 0 0 1
+pigs m $GPIO w
 .br
 
 .br
-# 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
+for ((i=0; i<$WAVES; i++))
 .br
-$ pigs wvcha 0 1 2 3 255 2 13 0 0
+do
+.br
+   pigs wvag $((1<<GPIO)) 0 20 0 $((1<<GPIO)) $(((i+1)*200))
+.br
+   w[i]=$(pigs wvcre)
+.br
+done
 .br
 
 .br
-# The following repeats 5 65793 times, transmits 6,
+# transmit waves 4+3+2
 .br
-# repeats 7+8 514 times, transmits 12,
+# loop start
 .br
-# repeats 9+11+10 197121 times.
+#    transmit waves 0+0+0
 .br
-# 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+#    loop start
 .br
-$ pigs wvcha 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
+#       transmit waves 0+1
+.br
+#       delay 5000us
+.br
+#    loop end (repeat 30 times)
+.br
+#    loop start
+.br
+#       transmit waves 2+3+0
+.br
+#       transmit waves 3+1+2
+.br
+#    loop end (repeat 10 times)
+.br
+# loop end (repeat 5 times)
+.br
+# transmit waves 4+4+4
+.br
+# delay 20000us
+.br
+# transmit waves 0+0+0
+.br
+
+.br
+pigs wvcha \\ 
+.br
+   ${w[4]} ${w[3]} ${w[2]} \\ 
+.br
+   255 0 \\ 
+.br
+      ${w[0]} ${w[0]} ${w[0]} \\ 
+.br
+      255 0 \\ 
+.br
+         ${w[0]} ${w[1]} \\ 
+.br
+         255 2 0x88 0x13 \\ 
+.br
+      255 1 30 0 \\ 
+.br
+      255 0 \\ 
+.br
+         ${w[2]} ${w[3]} ${w[0]} \\ 
+.br
+         ${w[3]} ${w[1]} ${w[2]} \\ 
+.br
+      255 1 10 0 \\ 
+.br
+   255 1 5 0 \\ 
+.br
+   ${w[4]} ${w[4]} ${w[4]} \\ 
+.br
+   255 2 0x20 0x4E \\ 
+.br
+   ${w[0]} ${w[0]} ${w[0]}
+.br
+
+.br
+while [[ $(pigs wvbsy) -eq 1 ]]; do sleep 0.1; done
+.br
+
+.br
+for ((i=0; i<$WAVES; i++)); do echo ${w[i]}; pigs wvdel ${w[i]}; done
 .br
 
 .EE
@@ -3309,7 +3373,7 @@ ERROR: attempt to create an empty waveform
 .IP "" 4
 
 .br
-This command deletes all waveforms with ids greater than or equal to \fBwid\fP.
+This command deletes the waveform with id \fBwid\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -3333,36 +3397,6 @@ ERROR: non existent wave id
 .br
 
 .EE
-
-.br
-
-.IP "\fBWVGO \fP - Transmit waveform once (DEPRECATED)"
-.IP "" 4
-
-.br
-This command transmits the current waveform.  The waveform is sent once.
-
-.br
-NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
-
-.br
-Upon success the number of DMA control blocks in the waveform is returned.
-On error a negative status code will be returned.
-
-.br
-
-.IP "\fBWVGOR \fP - Transmit waveform repeatedly (DEPRECATED)"
-.IP "" 4
-
-.br
-This command transmits the current waveform.  The waveform is sent repeatedly.
-
-.br
-NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
-
-.br
-Upon success the number of DMA control blocks in the waveform is returned.
-On error a negative status code will be returned.
 
 .br
 
@@ -4059,7 +4093,7 @@ Again, ignore the details for now.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\\ 
 .br
  do sleep 0.2; done)
 .br
@@ -4099,7 +4133,7 @@ jp 999 jumps to tag 999 if the result is positive.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\\ 
 .br
  do sleep 0.2; done)
 .br

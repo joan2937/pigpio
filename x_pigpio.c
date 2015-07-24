@@ -363,7 +363,7 @@ To the lascivious pleasing of a lute.\n\
       {0, 1<<GPIO, 100000},
    };
 
-   int e, oc, c;
+   int e, oc, c, wid;
 
    char text[2048];
 
@@ -379,7 +379,8 @@ To the lascivious pleasing of a lute.\n\
    e = gpioWaveAddGeneric(4, wf);
    CHECK(5, 2, e, 4, 0, "pulse, wave add generic");
 
-   e = gpioWaveTxStart(PI_WAVE_MODE_REPEAT);
+   wid = gpioWaveCreate();
+   e = gpioWaveTxSend(wid, PI_WAVE_MODE_REPEAT);
    CHECK(5, 3, e, 9, 0, "wave tx repeat");
 
    oc = t5_count;
@@ -399,7 +400,8 @@ To the lascivious pleasing of a lute.\n\
    e = gpioWaveAddSerial(GPIO, BAUD, 8, 2, 5000000, strlen(TEXT), TEXT);
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial");
 
-   e = gpioWaveTxStart(PI_WAVE_MODE_ONE_SHOT);
+   wid = gpioWaveCreate();
+   e = gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
    CHECK(5, 8, e, 6811, 0, "wave tx start");
 
    CHECK(5, 9, 0, 0, 0, "NOT APPLICABLE");

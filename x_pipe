@@ -270,7 +270,10 @@ if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 echo "m $GPIO w" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
-echo "wvgo" >/dev/pigpio
+echo "wvcre" >/dev/pigpio
+read -t 1 w </dev/pigout
+if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($w)"; fi
+echo "wvtx $w" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
 sleep 0.2
@@ -339,9 +342,12 @@ if [[ $s = 215 ]]; then echo "WVAS ok"; else echo "WVAS fail ($s)"; fi
 echo "wvag 16 0 5000000 0 16 5000000" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 216 ]]; then echo "WVAG ok"; else echo "WVAG fail ($s)"; fi
-echo "wvgo" >/dev/pigpio
+echo "wvcre" >/dev/pigpio
+read -t 1 w </dev/pigout
+if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
+echo "wvtx $w" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 433 ]]; then echo "WVGO ok"; else echo "WVGO fail ($s)"; fi
+if [[ $s = 433 ]]; then echo "WVTX ok"; else echo "WVTX fail ($s)"; fi
 echo "wvbsy" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
@@ -355,9 +361,9 @@ if [[ $s = 0 ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
 echo "wvbsy" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
-echo "wvgor" >/dev/pigpio
+echo "wvtxr $w" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 433 ]]; then echo "WVGOR ok"; else echo "WVGOR fail ($s)"; fi
+if [[ $s = 433 ]]; then echo "WVTXR ok"; else echo "WVTXR fail ($s)"; fi
 echo "wvbsy" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi

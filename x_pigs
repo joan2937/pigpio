@@ -195,7 +195,9 @@ s=$(pigs wvas $GPIO 1200 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73
 if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 s=$(pigs m $GPIO w)
 if [[ $s = "" ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
-s=$(pigs wvgo)
+w=$(pigs wvcre)
+if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
+s=$(pigs wvtx $w)
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
 sleep 0.2
 s=$(pigs slr $GPIO 100)
@@ -246,8 +248,10 @@ s=$(pigs wvas $GPIO 300 8 2 0 0x74 0x68 0x69 0x73 0x20 0x69 0x73 0x20 0x74 0x68 
 if [[ $s = 309 ]]; then echo "WVAS ok"; else echo "WVAS fail ($s)"; fi
 s=$(pigs wvag 16 0 5000000 0 16 5000000)
 if [[ $s = 310 ]]; then echo "WVAG ok"; else echo "WVAG fail ($s)"; fi
-s=$(pigs wvgo)
-if [[ $s = 621 ]]; then echo "WVGO ok"; else echo "WVGO fail ($s)"; fi
+w=$(pigs wvcre)
+if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
+s=$(pigs wvtx $w)
+if [[ $s = 621 ]]; then echo "WVTX ok"; else echo "WVTX fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
 sleep 1
@@ -257,8 +261,8 @@ s=$(pigs wvhlt)
 if [[ $s = "" ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
-s=$(pigs wvgor)
-if [[ $s = 621 ]]; then echo "WVGOR ok"; else echo "WVGOR fail ($s)"; fi
+s=$(pigs wvtxr $w)
+if [[ $s = 621 ]]; then echo "WVTXR ok"; else echo "WVTXR fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
 s=$(pigs wvhlt)

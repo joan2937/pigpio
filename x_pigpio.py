@@ -356,8 +356,9 @@ To the lascivious pleasing of a lute.
    e = pi.wave_add_generic(wf)
    CHECK(5, 2, e, 4, 0, "pulse, wave add generic")
 
-   e = pi.wave_tx_repeat()
-   CHECK(5, 3, e, 9, 0, "wave tx repeat")
+   wid = pi.wave_create()
+   e = pi.wave_send_repeat(wid)
+   CHECK(5, 3, e, 9, 0, "wave send repeat")
 
    oc = t5_count
    time.sleep(5)
@@ -374,8 +375,9 @@ To the lascivious pleasing of a lute.
    e = pi.wave_add_serial(GPIO, BAUD, TEXT, 5000000)
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial")
 
-   e = pi.wave_tx_start()
-   CHECK(5, 8, e, 6811, 0, "wave tx start")
+   wid = pi.wave_create()
+   e = pi.wave_send_once(wid)
+   CHECK(5, 8, e, 6811, 0, "wave send once")
 
    oc = t5_count
    time.sleep(3)

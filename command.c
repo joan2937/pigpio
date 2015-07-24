@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 34+
+This version is for pigpio version 35+
 */
 
 #include <stdio.h>
@@ -458,11 +458,14 @@ static errInfo_t errInfo[]=
    {PI_BAD_I2C_RLEN     , "bad I2C read length"},
    {PI_BAD_I2C_CMD      , "bad I2C command"},
    {PI_BAD_I2C_BAUD     , "bad I2C baud rate, not 50-500k"},
-   {PI_BAD_REPEAT_CNT   , "bad repeat count, not 2-max"},
-   {PI_BAD_REPEAT_WID   , "bad repeat wave id"},
-   {PI_TOO_MANY_COUNTS  , "too many chain counters"},
-   {PI_BAD_CHAIN_CMD    , "malformed chain command string"},
-   {PI_REUSED_WID       , "wave already used in chain"},
+   {PI_CHAIN_LOOP_CNT   , "bad chain loop count"},
+   {PI_BAD_CHAIN_LOOP   , "empty chain loop"},
+   {PI_CHAIN_COUNTER    , "too many chain counters"},
+   {PI_BAD_CHAIN_CMD    , "bad chain command"},
+   {PI_BAD_CHAIN_DELAY  , "bad chain delay micros"},
+   {PI_CHAIN_NESTING    , "chain counters nested too deeply"},
+   {PI_CHAIN_TOO_BIG    , "chain is too long"},
+   {PI_DEPRECATED       , "deprecated function removed"},
 
 };
 
@@ -535,6 +538,7 @@ int cmdParse(
    char c;
    uint32_t tp1, tp2, tp3;
    int8_t to1, to2, to3;
+   int eaten;
 
    /* Check that ext is big enough for the largest message. */
    if (ext_len < (4 * CMD_MAX_PARAM)) return CMD_EXT_TOO_SMALL;
@@ -865,12 +869,16 @@ int cmdParse(
 
             while (pars < CMD_MAX_PARAM)
             {
-               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
-               if ((to1 == CMD_NUMERIC) &&
-                   ((int)tp1>=0) && ((int)tp1<=255))
+               eaten = getNum(buf+ctl->eaten, &tp1, &to1);
+               if (to1 == CMD_NUMERIC)
                {
-                  pars++;
-                  *p8++ = tp1;
+                  if (((int)tp1>=0) && ((int)tp1<=255))
+                  {
+                     pars++;
+                     *p8++ = tp1;
+                     ctl->eaten += eaten;
+                  }
+                  else break; /* invalid number, end of command */
                }
                else break;
             }
@@ -899,13 +907,16 @@ int cmdParse(
 
             while (pars < 32)
             {
-               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
-               if ((to1 == CMD_NUMERIC) &&
-                  ((int)tp1>=0) &&
-                  ((int)tp1<=255))
+               eaten = getNum(buf+ctl->eaten, &tp1, &to1);
+               if (to1 == CMD_NUMERIC)
                {
-                  pars++;
-                  *p8++ = tp1;
+                  if (((int)tp1>=0) && ((int)tp1<=255))
+                  {
+                     pars++;
+                     *p8++ = tp1;
+                     ctl->eaten += eaten;
+                  }
+                  else break; /* invalid number, end of command */
                }
                else break;
             }
@@ -940,15 +951,16 @@ int cmdParse(
 
                      while (pars < CMD_MAX_PARAM)
                      {
-                        ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+                        eaten = getNum(buf+ctl->eaten, &tp1, &to1);
                         if (to1 == CMD_NUMERIC)
                         {
                            if (((int)tp1>=0) && ((int)tp1<=255))
                            {
                               pars++;
                               *p8++ = tp1;
+                              ctl->eaten += eaten;
                            }
-                           else valid = 0;
+                           else break;
                         }
                         else break;
                      }
@@ -996,12 +1008,16 @@ int cmdParse(
             p8 = ext + 12;
             while (pars < CMD_MAX_PARAM)
             {
-               ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
-               if ((to1 == CMD_NUMERIC) &&
-                   ((int)tp1>=0) && ((int)tp1<=255))
+               eaten = getNum(buf+ctl->eaten, &tp1, &to1);
+               if (to1 == CMD_NUMERIC)
                {
-                  *p8++ = tp1;
-                  pars++;
+                  if (((int)tp1>=0) && ((int)tp1<=255))
+                  {
+                     *p8++ = tp1;
+                     pars++;
+                     ctl->eaten += eaten;
+                  }
+                  else break; /* invalid number, end of command */
                }
                else break;
             }
@@ -1022,12 +1038,16 @@ int cmdParse(
 
          while (pars < CMD_MAX_PARAM)
          {
-            ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
-            if ((to1 == CMD_NUMERIC) &&
-                ((int)tp1>=0) && ((int)tp1<=255))
+            eaten = getNum(buf+ctl->eaten, &tp1, &to1);
+            if (to1 == CMD_NUMERIC)
             {
-               pars++;
-               *p8++ = tp1;
+               if (((int)tp1>=0) && ((int)tp1<=255))
+               {
+                  pars++;
+                  *p8++ = tp1;
+                  ctl->eaten += eaten;
+               }
+               else break; /* invalid number, end of command */
             }
             else break;
          }

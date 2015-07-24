@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 16
+#define PIGPIOD_IF_VERSION 17
 
 /*TEXT
 
@@ -203,9 +203,6 @@ wave_get_max_pulses        Absolute maximum allowed pulses
 wave_get_cbs               Length in cbs of the current waveform
 wave_get_high_cbs          Length of longest waveform so far
 wave_get_max_cbs           Absolute maximum allowed cbs
-
-wave_tx_start              Creates/transmits a waveform (DEPRECATED)
-wave_tx_repeat             Creates/transmits a waveform repeatedly (DEPRECATED)
 
 I2C
 
@@ -914,8 +911,8 @@ int hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
-NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*], [*wave_tx_start*], [*wave_tx_repeat*], or [*wave_chain*]
-will be cancelled.
+NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*],
+or [*wave_chain*] will be cancelled.
 
 This function is only valid if the pigpio main clock is PCM.  The
 main clock defaults to PCM but may be overridden when the pigpio
@@ -1081,8 +1078,9 @@ D*/
 int wave_create(void);
 /*D
 This function creates a waveform from the data provided by the prior
-calls to the [*wave_add_**] functions.  Upon success a positive wave id
-is returned.
+calls to the [*wave_add_**] functions.  Upon success a wave id
+greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
+PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
 
 The data provided by the [*wave_add_**] functions is consumed by this
 function.
@@ -1134,8 +1132,7 @@ D*/
 /*F*/
 int wave_delete(unsigned wave_id);
 /*D
-This function deletes all created waveforms with ids greater than or
-equal to wave_id.
+This function deletes the waveform with id wave_id.
 
 . .
 wave_id: >=0, as returned by [*wave_create*].
@@ -1144,26 +1141,6 @@ wave_id: >=0, as returned by [*wave_create*].
 Wave ids are allocated in order, 0, 1, 2, etc.
 
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
-D*/
-
-/*F*/
-int wave_tx_start(void);
-/*D
-This function is deprecated and should no longer be used.
-
-Use [*wave_create*]/[*wave_send_**] instead.
-
-NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
-D*/
-
-/*F*/
-int wave_tx_repeat(void);
-/*D
-This function is deprecated and should no longer be used.
-
-Use [*wave_create*]/[*wave_send_**] instead.
-
-NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 D*/
 
 /*F*/
@@ -1207,7 +1184,7 @@ This function transmits a chain of waveforms.
 NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 The waves to be transmitted are specified by the contents of buf
-which contains an ordered list of wave_ids and optional command
+which contains an ordered list of [*wave_id*]s and optional command
 codes and related data.
 
 . .
@@ -1215,51 +1192,77 @@ codes and related data.
 bufSize: the number of bytes in buf
 . .
 
-Returns 0 if OK, otherwise PI_BAD_REPEAT_CNT, PI_BAD_REPEAT_WID,
-PI_BAD_CHAIN_CMD, PI_TOO_MANY_COUNTS, or PI_BAD_WAVE_ID.
+Returns 0 if OK, otherwise PI_CHAIN_NESTING, PI_CHAIN_LOOP_CNT, PI_BAD_CHAIN_LOOP, PI_BAD_CHAIN_CMD, PI_CHAIN_COUNTER,
+PI_BAD_CHAIN_DELAY, PI_CHAIN_TOO_BIG, or PI_BAD_WAVE_ID.
 
-Each wave is transmitted in the order specified.  A wave may only
-occur once per chain.  Waves may be transmitted multiple times by
-using the repeat command.  The repeat command specifies a wave id
-and a count.  The wave id must occur earlier in the chain.  All the
-waves between wave id and the repeat command are transmitted count
-times.
+Each wave is transmitted in the order specified.  A wave may
+occur multiple times per chain.
 
-Repeat commands may not be nested.  The minimum repeat count is 2.
-A maximum of 5 repeat commands is supported per chain.
+A blocks of waves may be transmitted multiple times by using
+the loop commands. The block is bracketed by loop start and
+end commands.  Loops may be nested.
+
+Delays between waves may be added with the delay command.
 
 The following command codes are supported:
 
-Name    @ Cmd & Data       @ Meaning
-Repeat  @ 255 wid C0 C1 C2 @ Repeat from wid count times
-count = C0 + C1*256 + C2*65536
+Name        @ Cmd & Data @ Meaning
+Loop Start  @ 255 0      @ Identify start of a wave block
+Loop Repeat @ 255 1 x y  @ loop x + y*256 times
+Delay       @ 255 2 x y  @ delay x + y*256 microseconds
+
+The code is currently dimensioned to support a chain with roughly
+600 entries and 20 loop counters.
 
 ...
-The following examples assume that waves with ids 0 to 12 exist.
+#include <stdio.h>
+#include <pigpiod_if.h>
 
-// 0 255 0 57 0 0 (repeat 0 57 times)
-status = wave_chain((char []){0, 255, 0, 57, 0, 0}, 6);
+#define WAVES 5
+#define GPIO 4
 
-// 0 1 255 0 0 2 0 (repeat 0+1 512 times)
-status = wave_chain((char []){0, 1, 255, 0, 0, 2, 0}, 7);
+int main(int argc, char *argv[])
+{
+   int i, wid[WAVES];
 
-// 0 1 255 1 0 0 1 (transmit 0, repeat 1 65536 times)
-status = wave_chain((char []){0, 1, 255, 1, 0, 0, 1}, 7);
+   if (pigpio_start(0, 0)<0) return -1;
 
-// 0 1 2 3 255 2 13 0 0 (transmit 0+1, repeat 2+3 13 times)
-status = wave_chain(
-   (char []){0, 1, 2, 3, 255, 2, 13, 0, 0}, 9);
+   set_mode(GPIO, PI_OUTPUT);
 
-// The following repeats 5 65793 times, transmits 6,
-// repeats 7+8 514 times, transmits 12,
-// repeats 9+11+10 197121 times.
-// 5 255 5 1 1 1 6 7 8 255 7 2 2 0 12 9 11 10 255 9 1 2 3
-char chain[] = {
-   5,             255, 5, 1, 1, 1,
-   6, 7, 8,       255, 7, 2, 2, 0,
-   12, 9, 11, 10, 255, 9, 1, 2, 3};
+   for (i=0; i<WAVES; i++)
+   {
+      wave_add_generic(2, (gpioPulse_t[])
+         {{1<<GPIO, 0,        20},
+          {0, 1<<GPIO, (i+1)*200}});
 
-status = wave_chain(chain, sizeof(chain));
+      wid[i] = wave_create();
+   }
+
+   wave_chain((char []) {
+      wid[4], wid[3], wid[2],       // transmit waves 4+3+2
+      255, 0,                       // loop start
+         wid[0], wid[0], wid[0],    // transmit waves 0+0+0
+         255, 0,                    // loop start
+            wid[0], wid[1],         // transmit waves 0+1
+            255, 2, 0x88, 0x13,     // delay 5000us
+         255, 1, 30, 0,             // loop end (repeat 30 times)
+         255, 0,                    // loop start
+            wid[2], wid[3], wid[0], // transmit waves 2+3+0
+            wid[3], wid[1], wid[2], // transmit waves 3+1+2
+         255, 1, 10, 0,             // loop end (repeat 10 times)
+      255, 1, 5, 0,                 // loop end (repeat 5 times)
+      wid[4], wid[4], wid[4],       // transmit waves 4+4+4
+      255, 2, 0x20, 0x4E,           // delay 20000us
+      wid[0], wid[0], wid[0],       // transmit waves 0+0+0
+
+      }, 46);
+
+   while (wave_tx_busy()) time_sleep(0.1);
+
+   for (i=0; i<WAVES; i++) wave_delete(wid[i]);
+
+   pigpio_stop();
+}
 ...
 D*/
 
