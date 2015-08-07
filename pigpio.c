@@ -786,7 +786,8 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define MB_IOCTL _IOWR(MB_DEV_MAJOR, 0, char *)
 
-#define MB_DEV "/dev/pigpio-mb"
+#define MB_DEV1 "/dev/vcio"
+#define MB_DEV2 "/dev/pigpio-mb"
 
 #define BUS_TO_PHYS(x) ((x)&~0xC0000000)
 
@@ -2284,20 +2285,29 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 */
 
-static int mbCreate(void)
+static int mbCreate(char *dev)
 {
    /* <0 error */
 
-   unlink(MB_DEV);
+   unlink(dev);
 
-   return mknod(MB_DEV, S_IFCHR|0600, makedev(MB_DEV_MAJOR, 0));
+   return mknod(dev, S_IFCHR|0600, makedev(MB_DEV_MAJOR, 0));
 }
 
 static int mbOpen(void)
 {
    /* <0 error */
 
-   return open(MB_DEV, 0);
+   int fd;
+
+   fd = open(MB_DEV1, 0);
+
+   if (fd < 0)
+   {
+      mbCreate(MB_DEV2);
+      fd = open(MB_DEV2, 0);
+   }
+   return fd;
 }
 
 static void mbClose(int fd)
@@ -6470,9 +6480,6 @@ static int initAllocDMAMem(void)
 
       if (dmaMboxBlk == MAP_FAILED)
          SOFT_ERROR(PI_INIT_FAILED, "mmap mbox block failed (%m)");
-
-      if (mbCreate() < 0)
-         SOFT_ERROR(PI_INIT_FAILED, "mbox create failed(%m)");
 
       fdMbox = mbOpen();
 
