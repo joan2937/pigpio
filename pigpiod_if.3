@@ -2187,6 +2187,26 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 
+.IP "\fBint bb_serial_invert(unsigned user_gpio, unsigned invert)\fP"
+.IP "" 4
+This function inverts the serial logic for bit bang reading of serial data.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
+   invert: 0-1, 1 invert , 0 normal.
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
+
 .IP "\fBint i2c_open(unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags)\fP"
 .IP "" 4
 This returns a handle for the device at address i2c_addr on bus i2c_bus.

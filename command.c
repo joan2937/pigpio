@@ -146,6 +146,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
    {PI_CMD_SLRC,  "SLRC",  112, 0}, // gpioSerialReadClose
    {PI_CMD_SLRO,  "SLRO",  131, 0}, // gpioSerialReadOpen
+   {PI_CMD_SLRI,  "SLRI",  121, 0}, // gpioSerialReadInvert
 
    {PI_CMD_SPIC,  "SPIC",  112, 0}, // spiClose
    {PI_CMD_SPIO,  "SPIO",  131, 2}, // spiOpen
@@ -305,6 +306,7 @@ SERWB h byte        Write byte to serial handle\n\
 SLR g v          Read bit bang serial data from gpio\n\
 SLRC g           Close gpio for bit bang serial data\n\
 SLRO g baud bitlen | Open gpio for bit bang serial data\n\
+SLRI g invert    Invert serial logic (1 invert, 0 normal)\n\
 SPIC h           SPI close handle\n\
 SPIO channel baud flags | SPI open channel at baud with flags\n\
 SPIR h v         SPI read bytes from handle\n\
@@ -466,6 +468,8 @@ static errInfo_t errInfo[]=
    {PI_CHAIN_NESTING    , "chain counters nested too deeply"},
    {PI_CHAIN_TOO_BIG    , "chain is too long"},
    {PI_DEPRECATED       , "deprecated function removed"},
+   {PI_NOT_IN_SER_MODE  , "gpio not opened for bit-bang serial"},
+   {PI_BAD_SER_INVERT   , "bit-bang serial invert not 0 or 1"},
 
 };
 
@@ -662,7 +666,7 @@ int cmdParse(
          break;
 
       case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
-                   PWM  S  SERVO  SLR  W  WDOG  WRITE
+                   PWM  S  SERVO  SLR  SLRI  W  WDOG  WRITE
 
                    Two positive parameters.
                 */

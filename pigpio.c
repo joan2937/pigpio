@@ -1011,6 +1011,7 @@ typedef struct
    int      bytes; /* 1, 2, 4 */
    int      level;
    int      dataBits; /* 1-32 */
+   int      invert; /* 0, 1 */
 } wfRxSerial_t;
 
 typedef struct
@@ -1943,6 +1944,7 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
             memcpy(&p[4], buf, 4);
             res = gpioSerialReadOpen(p[1], p[2], p[4]); break;
 
+      case PI_CMD_SLRI: res = gpioSerialReadInvert(p[1], p[2]); break;
 
 
       case PI_CMD_SPIC: res = spiClose(p[1]); break;
@@ -2695,6 +2697,8 @@ static void waveRxSerial(wfRx_t *w, int level, uint32_t tick)
 {
    int diffTicks, lastLevel;
    int newWritePos;
+
+   level = level ^ w->s.invert;
 
    if (w->s.bit >= 0)
    {
@@ -9311,12 +9315,37 @@ int gpioSerialReadOpen(unsigned gpio, unsigned baud, unsigned data_bits)
    wfRx[gpio].s.writePos = 0;
    wfRx[gpio].s.bit      = -1;
    wfRx[gpio].s.dataBits = data_bits;
+   wfRx[gpio].s.invert   = PI_BB_SER_NORMAL;
 
    if      (data_bits <  9) wfRx[gpio].s.bytes = 1;
    else if (data_bits < 17) wfRx[gpio].s.bytes = 2;
    else                  wfRx[gpio].s.bytes = 4;
 
    gpioSetAlertFunc(gpio, waveRxBit);
+
+   return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+
+int gpioSerialReadInvert(unsigned gpio, unsigned invert)
+{
+   DBG(DBG_USER, "gpio=%d invert=%d", gpio, invert);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (wfRx[gpio].mode != PI_WFRX_SERIAL)
+      SOFT_ERROR(PI_NOT_IN_SER_MODE, "gpio %d is not in serial mode", gpio);
+
+   if ((invert < PI_BB_SER_NORMAL) ||
+       (invert > PI_BB_SER_INVERT))
+      SOFT_ERROR(PI_BAD_SER_INVERT,
+         "gpio %d, invert (%d)", gpio, invert);
+
+   wfRx[gpio].s.invert = invert;
 
    return 0;
 }

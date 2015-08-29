@@ -941,6 +941,9 @@ int bb_serial_read(unsigned user_gpio, void *buf, size_t bufSize)
 int bb_serial_read_close(unsigned user_gpio)
    {return pigpio_command(gPigCommand, PI_CMD_SLRC, user_gpio, 0, 1);}
 
+int bb_serial_invert(unsigned user_gpio, unsigned invert)
+   {return pigpio_command(gPigCommand, PI_CMD_SLRI, user_gpio, invert, 1);}
+
 int i2c_open(unsigned i2c_bus, unsigned i2c_addr, uint32_t i2c_flags)
 {
    gpioExtent_t ext[1];

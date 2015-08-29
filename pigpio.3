@@ -2175,6 +2175,26 @@ For \fBdata_bits\fP 9-16 there will be two bytes per character.
 .br
 For \fBdata_bits\fP 17-32 there will be four bytes per character.
 
+.IP "\fBint gpioSerialReadInvert(unsigned user_gpio, unsigned invert)\fP"
+.IP "" 4
+This function inverts the serial logic for bit bang reading of serial data.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31, previously opened with \fBgpioSerialReadOpen\fP.
+   invert: 0-1, 1 invert , 0 normal.
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
+
 .IP "\fBint gpioSerialReadClose(unsigned user_gpio)\fP"
 .IP "" 4
 This function closes a gpio for bit bang reading of serial data.
@@ -7310,6 +7330,10 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_SLRI  94
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -7564,6 +7588,10 @@ A 16-bit word value.
 #define PI_CHAIN_TOO_BIG   -119 // chain is too long
 .br
 #define PI_DEPRECATED      -120 // deprecated function removed
+.br
+#define PI_NOT_IN_SER_MODE -121 // gpio not opened for bit-bang serial
+.br
+#define PI_BAD_SER_INVERT  -122 // bit-bang serial invert not 0 or 1
 .br
 
 .br
