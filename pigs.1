@@ -2612,6 +2612,36 @@ ERROR: gpio already in use
 
 .br
 
+.IP "\fBSLRI u i\fP - Invert serial logic for bit bang serial data"
+.IP "" 4
+
+.br
+This command inverts the serial logic when reading bit bang serial data.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+The invert parameter is 1 for inverted signal, 0 for normal.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs slri 17 1
+.br
+
+.br
+$ pigs slri 17 0
+.br
+
+.EE
+
+.br
+
 .IP "\fBSPIC h\fP - SPI close handle"
 .IP "" 4
 

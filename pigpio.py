@@ -151,6 +151,7 @@ notify_close              Close a notification
 bb_serial_read_open       Open a gpio for bit bang serial reads
 bb_serial_read            Read bit bang serial data from  a gpio
 bb_serial_read_close      Close a gpio for bit bang serial reads
+bb_serial_invert          Invert serial logic (1 invert, 0 normal)
 
 hardware_clock            Start hardware clock on supported gpios
 hardware_PWM              Start hardware PWM on supported gpios
@@ -432,6 +433,8 @@ _PI_CMD_I2CZ =92
 
 _PI_CMD_WVCHA=93
 
+_PI_CMD_SLRI= 94
+
 # pigpio error numbers
 
 _PI_INIT_FAILED     =-1
@@ -555,6 +558,8 @@ PI_BAD_CHAIN_DELAY  =-117
 PI_CHAIN_NESTING    =-118
 PI_CHAIN_TOO_BIG    =-119
 PI_DEPRECATED       =-120
+PI_NOT_IN_SER_MODE  =-121
+PI_BAD_SER_INVERT   =-122
 
 # pigpio error text
 
@@ -677,6 +682,8 @@ _errors=[
    [PI_CHAIN_NESTING     , "chain counters nested too deeply"],
    [PI_CHAIN_TOO_BIG     , "chain is too long"],
    [PI_DEPRECATED        , "deprecated function removed"],
+   [PI_NOT_IN_SER_MODE   , "gpio not opened for bit-bang serial"],
+   [PI_BAD_SER_INVERT    , "bit-bang serial invert not 0 or 1"],
 
 ]
 
@@ -3324,6 +3331,19 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRC, user_gpio, 0))
 
+   def bb_serial_invert(self, user_gpio, invert):
+      """
+      Invert serial logic.
+
+      user_gpio:= 0-31 (opened in a prior call to [*bb_serial_read_open*])
+      invert:= 0-1 (1 invert, 0 normal)
+
+      ...
+      status = pi.bb_serial_invert(17, 1)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRI, user_gpio, invert, 0))
+
    def custom_1(self, arg1=0, arg2=0, argx=[]):
       """
       Calls a pigpio function customised by the user.
@@ -3718,6 +3738,8 @@ def xref():
    PI_CHAIN_NESTING = -118
    PI_CHAIN_TOO_BIG = -119
    PI_DEPRECATED = -120
+   PI_NOT_IN_SER_MODE  =-121
+   PI_BAD_SER_INVERT   =-122
    . .
 
    frequency: 0-40000

@@ -174,6 +174,7 @@ gpioNotifyPause            Pause notifications
 gpioNotifyClose            Close a notification
 
 gpioSerialReadOpen         Opens a gpio for bit bang serial reads
+gpioSerialReadInvert       Configures normal/inverted for serial reads
 gpioSerialRead             Reads bit bang serial data from a gpio
 gpioSerialReadClose        Closes a gpio for bit bang serial reads
 
@@ -548,6 +549,9 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_BB_SER_MIN_BAUD     50
 #define PI_BB_SER_MAX_BAUD 250000
+
+#define PI_BB_SER_NORMAL 0
+#define PI_BB_SER_INVERT 1
 
 #define PI_WAVE_MIN_BAUD      50
 #define PI_WAVE_MAX_BAUD 1000000
@@ -1819,6 +1823,26 @@ The serial data is returned in a cyclic buffer and is read using
 
 It is the caller's responsibility to read data from the cyclic buffer
 in a timely fashion.
+D*/
+
+/*F*/
+int gpioSerialReadInvert(unsigned user_gpio, unsigned invert);
+/*D
+This function configures the level logci for bit bang serial reads.
+
+Pass PI_BB_SER_INVERT to invert the serial logic.  Pass PI_BB_SER_NORMAL for
+normal logic.  Default is PI_BB_SER_NORMAL.
+
+. .
+user_gpio: 0-31
+invert: 0-1
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
+PI_NOT_IN_SER_MODE, or PI_BAD_SER_INVERT.
+
+The gpio must be opened for bit bang reading of serial data using
+[*gpioSerialReadOpen*] prior to calling this function.
 D*/
 
 
@@ -4581,6 +4605,8 @@ PARAMS*/
 
 #define PI_CMD_WVCHA 93
 
+#define PI_CMD_SLRI  94
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -4766,6 +4792,8 @@ after this command is issued.
 #define PI_CHAIN_NESTING   -118 // chain counters nested too deeply
 #define PI_CHAIN_TOO_BIG   -119 // chain is too long
 #define PI_DEPRECATED      -120 // deprecated function removed
+#define PI_NOT_IN_SER_MODE -121 // gpio not opened for bit-bang serial
+#define PI_BAD_SER_INVERT  -122 // bit-bang serial invert not 0 or 1
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

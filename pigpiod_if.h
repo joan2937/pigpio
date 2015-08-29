@@ -161,6 +161,7 @@ notify_close               Close a notification
 bb_serial_read_open        Opens a gpio for bit bang serial reads
 bb_serial_read             Reads bit bang serial data from a gpio
 bb_serial_read_close       Closes a gpio for bit bang serial reads
+bb_serial_invert           Invert serial logic (1 invert, 0 normal)
 
 hardware_clock             Start hardware clock on supported gpios
 hardware_PWM               Start hardware PWM on supported gpios
@@ -1499,6 +1500,19 @@ user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+D*/
+
+/*F*/
+int bb_serial_invert(unsigned user_gpio, unsigned invert);
+/*D
+This function inverts serial logic for big bang serial reads.
+
+. .
+user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
+   invert: 0-1, 1 invert, 0 normal.
+. .
+
+Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
 D*/
 
 /*F*/
