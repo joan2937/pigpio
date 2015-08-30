@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 35 */
+/* pigpio version 37 */
 
 /* include ------------------------------------------------------- */
 
@@ -9338,12 +9338,12 @@ int gpioSerialReadInvert(unsigned gpio, unsigned invert)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
    if (wfRx[gpio].mode != PI_WFRX_SERIAL)
-      SOFT_ERROR(PI_NOT_IN_SER_MODE, "gpio %d is not in serial mode", gpio);
+      SOFT_ERROR(PI_NOT_SERIAL_GPIO, "no serial read on gpio (%d)", gpio);
 
    if ((invert < PI_BB_SER_NORMAL) ||
        (invert > PI_BB_SER_INVERT))
       SOFT_ERROR(PI_BAD_SER_INVERT,
-         "gpio %d, invert (%d)", gpio, invert);
+         "bad invert level for gpio %d (%d)", gpio, invert);
 
    wfRx[gpio].s.invert = invert;
 

@@ -49,7 +49,7 @@ s=$(pigs bs2 0)
 if [[ $s = "" ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 s=$(pigs h)
-if [[ ${#s} = 4263 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
+if [[ ${#s} = 4321 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
 
 s=$(pigs hwver)
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi

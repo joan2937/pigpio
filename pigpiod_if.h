@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 17
+#define PIGPIOD_IF_VERSION 18
 
 /*TEXT
 
@@ -1512,7 +1512,7 @@ user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
    invert: 0-1, 1 invert, 0 normal.
 . .
 
-Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
+Returns 0 if OK, otherwise PI_NOT_SERIAL_GPIO or PI_BAD_SER_INVERT.
 D*/
 
 /*F*/
@@ -1530,6 +1530,22 @@ No flags are currently defined.  This parameter should be set to zero.
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
+
+For the SMBus commands the low level transactions are shown at the end
+of the function description.  The following abbreviations are used.
+
+. .
+S     (1 bit) : Start bit
+P     (1 bit) : Stop bit
+Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+A, NA (1 bit) : Accept and not accept bit. 
+Addr  (7 bits): I2C 7 bit address.
+Comm  (8 bits): Command byte, a data byte which often selects a register.
+Data  (8 bits): A data byte.
+Count (8 bits): A data byte containing the length of a block operation.
+
+[..]: Data sent by the device.
+. .
 D*/
 
 /*F*/
@@ -1558,7 +1574,10 @@ handle: >=0, as returned by a call to [*i2c_open*].
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Quick command. smbus 2.0 5.5.1
+Quick command. SMBus 2.0 5.5.1
+. .
+S Addr Rd/Wr [A] P
+. .
 D*/
 
 /*F*/
@@ -1574,7 +1593,10 @@ handle: >=0, as returned by a call to [*i2c_open*].
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Send byte. smbus 2.0 5.5.2
+Send byte. SMBus 2.0 5.5.2
+. .
+S Addr Wr [A] Data [A] P
+. .
 D*/
 
 /*F*/
@@ -1589,7 +1611,10 @@ handle: >=0, as returned by a call to [*i2c_open*].
 Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 or PI_I2C_READ_FAILED.
 
-Receive byte. smbus 2.0 5.5.3
+Receive byte. SMBus 2.0 5.5.3
+. .
+S Addr Rd [A] [Data] NA P
+. .
 D*/
 
 /*F*/
@@ -1607,7 +1632,10 @@ i2c_reg: 0-255, the register to write.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Write byte. smbus 2.0 5.5.4
+Write byte. SMBus 2.0 5.5.4
+. .
+S Addr Wr [A] Comm [A] Data [A] P
+. .
 D*/
 
 /*F*/
@@ -1625,7 +1653,10 @@ i2c_reg: 0-255, the register to write.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Write word. smbus 2.0 5.5.4
+Write word. SMBus 2.0 5.5.4
+. .
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+. .
 D*/
 
 /*F*/
@@ -1642,7 +1673,10 @@ i2c_reg: 0-255, the register to read.
 Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Read byte. smbus 2.0 5.5.5
+Read byte. SMBus 2.0 5.5.5
+. .
+S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+. .
 D*/
 
 /*F*/
@@ -1659,7 +1693,10 @@ i2c_reg: 0-255, the register to read.
 Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Read word. smbus 2.0 5.5.5
+Read word. SMBus 2.0 5.5.5
+. .
+S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
 D*/
 
 /*F*/
@@ -1677,7 +1714,11 @@ i2c_reg: 0-255, the register to write/read.
 Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Process call. smbus 2.0 5.5.6
+Process call. SMBus 2.0 5.5.6
+. .
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
 D*/
 
 /*F*/
@@ -1697,7 +1738,10 @@ i2c_reg: 0-255, the register to write.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-Block write. smbus 2.0 5.5.7
+Block write. SMBus 2.0 5.5.7
+. .
+S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+. .
 D*/
 
 /*F*/
@@ -1717,7 +1761,11 @@ The amount of returned data is set by the device.
 Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
-Block read. smbus 2.0 5.5.7
+Block read. SMBus 2.0 5.5.7
+. .
+S Addr Wr [A] Comm [A]
+   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+. .
 D*/
 
 /*F*/
@@ -1743,7 +1791,11 @@ The smbus 2.0 documentation states that a minimum of 1 byte may be
 sent and a minimum of 1 byte may be received.  The total number of
 bytes sent/received must be 32 or less.
 
-Block write-block read. smbus 2.0 5.5.8
+Block write-block read. SMBus 2.0 5.5.8
+. .
+S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+   S Addr Rd [A] [Count] A [Data] ... A P
+. .
 D*/
 
 /*F*/
@@ -1762,6 +1814,11 @@ i2c_reg: 0-255, the register to read.
 
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+. .
+S Addr Wr [A] Comm [A]
+   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+. .
 D*/
 
 
@@ -1781,6 +1838,10 @@ i2c_reg: 0-255, the register to write.
 
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
+
+. .
+S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+. .
 D*/
 
 /*F*/
@@ -2517,6 +2578,9 @@ The number of bytes of data in a buffer.
 
 int::
 A whole number, negative or positive.
+
+invert::
+A flag used to set normal or inverted bit bang serial data level logic.
 
 level::
 The level of a gpio.  Low or High.

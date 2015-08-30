@@ -1295,24 +1295,30 @@ typedef struct
 .br
 
 .br
-seqno starts at 0 each time the handle is opened and then increments
+seqno: starts at 0 each time the handle is opened and then increments
 by one for each report.
 
 .br
 
 .br
-flags, if bit 5 is set then bits 0-4 of the flags indicate a gpio
-which has had a watchdog timeout.
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags
+indicate a gpio which has had a watchdog timeout; if bit 6 is set
+(PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the
+pipe/socket and is sent once a minute in the absence of other
+notification activity.
 
 .br
 
 .br
-tick is the number of microseconds since system boot.
+tick: the number of microseconds since system boot.  It wraps around
+after 1h12m.
 
 .br
 
 .br
-level indicates the level of each gpio.
+level: indicates the level of each gpio.  If bit 1<<x is set then
+gpio x is high.
 
 .br
 
@@ -2135,6 +2141,40 @@ The serial data is returned in a cyclic buffer and is read using
 It is the caller's responsibility to read data from the cyclic buffer
 in a timely fashion.
 
+.IP "\fBint gpioSerialReadInvert(unsigned user_gpio, unsigned invert)\fP"
+.IP "" 4
+This function configures the level logic for bit bang serial reads.
+
+.br
+
+.br
+Pass PI_BB_SER_INVERT to invert the serial logic.  Pass PI_BB_SER_NORMAL for
+normal logic.  Default is PI_BB_SER_NORMAL.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+invert: 0-1
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
+PI_NOT_SERIAL_GPIO, or PI_BAD_SER_INVERT.
+
+.br
+
+.br
+The gpio must be opened for bit bang reading of serial data using
+\fBgpioSerialReadOpen\fP prior to calling this function.
+
 .IP "\fBint gpioSerialRead(unsigned user_gpio, void *buf, size_t bufSize)\fP"
 .IP "" 4
 This function copies up to bufSize bytes of data read from the
@@ -2174,26 +2214,6 @@ For \fBdata_bits\fP 1-8 there will be one byte per character.
 For \fBdata_bits\fP 9-16 there will be two bytes per character.
 .br
 For \fBdata_bits\fP 17-32 there will be four bytes per character.
-
-.IP "\fBint gpioSerialReadInvert(unsigned user_gpio, unsigned invert)\fP"
-.IP "" 4
-This function inverts the serial logic for bit bang reading of serial data.
-
-.br
-
-.br
-
-.EX
-user_gpio: 0-31, previously opened with \fBgpioSerialReadOpen\fP.
-   invert: 0-1, 1 invert , 0 normal.
-.br
-
-.EE
-
-.br
-
-.br
-Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
 
 .IP "\fBint gpioSerialReadClose(unsigned user_gpio)\fP"
 .IP "" 4
@@ -6163,6 +6183,13 @@ A whole number, negative or positive.
 
 .br
 
+.IP "\fBinvert\fP" 0
+A flag used to set normal or inverted bit bang serial data level logic.
+
+.br
+
+.br
+
 .IP "\fBlevel\fP" 0
 The level of a gpio.  Low or High.
 
@@ -7589,9 +7616,7 @@ A 16-bit word value.
 .br
 #define PI_DEPRECATED      -120 // deprecated function removed
 .br
-#define PI_NOT_IN_SER_MODE -121 // gpio not opened for bit-bang serial
-.br
-#define PI_BAD_SER_INVERT  -122 // bit-bang serial invert not 0 or 1
+#define PI_BAD_SER_INVERT  -121 // bit bang serial invert not 0 or 1
 .br
 
 .br

@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 35+
+This version is for pigpio version 37+
 */
 
 #include <stdio.h>
@@ -468,8 +468,7 @@ static errInfo_t errInfo[]=
    {PI_CHAIN_NESTING    , "chain counters nested too deeply"},
    {PI_CHAIN_TOO_BIG    , "chain is too long"},
    {PI_DEPRECATED       , "deprecated function removed"},
-   {PI_NOT_IN_SER_MODE  , "gpio not opened for bit-bang serial"},
-   {PI_BAD_SER_INVERT   , "bit-bang serial invert not 0 or 1"},
+   {PI_BAD_SER_INVERT   , "bit bang serial invert not 0 or 1"},
 
 };
 
