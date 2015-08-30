@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 36
+#define PIGPIO_VERSION 37
 
 /*TEXT
 
@@ -1317,15 +1317,21 @@ typedef struct
 } gpioReport_t;
 . .
 
-seqno starts at 0 each time the handle is opened and then increments
+seqno: starts at 0 each time the handle is opened and then increments
 by one for each report.
 
-flags, if bit 5 is set then bits 0-4 of the flags indicate a gpio
-which has had a watchdog timeout.
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags
+indicate a gpio which has had a watchdog timeout; if bit 6 is set
+(PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the
+pipe/socket and is sent once a minute in the absence of other
+notification activity.
 
-tick is the number of microseconds since system boot.
+tick: the number of microseconds since system boot.  It wraps around
+after 1h12m.
 
-level indicates the level of each gpio.
+level: indicates the level of each gpio.  If bit 1<<x is set then
+gpio x is high.
 
 ...
 // Start notifications for gpios 1, 4, 6, 7, 10.
@@ -1828,7 +1834,7 @@ D*/
 /*F*/
 int gpioSerialReadInvert(unsigned user_gpio, unsigned invert);
 /*D
-This function configures the level logci for bit bang serial reads.
+This function configures the level logic for bit bang serial reads.
 
 Pass PI_BB_SER_INVERT to invert the serial logic.  Pass PI_BB_SER_NORMAL for
 normal logic.  Default is PI_BB_SER_NORMAL.
@@ -1839,7 +1845,7 @@ invert: 0-1
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
-PI_NOT_IN_SER_MODE, or PI_BAD_SER_INVERT.
+PI_NOT_SERIAL_GPIO, or PI_BAD_SER_INVERT.
 
 The gpio must be opened for bit bang reading of serial data using
 [*gpioSerialReadOpen*] prior to calling this function.
@@ -4103,6 +4109,9 @@ The number of bytes of data in a buffer.
 int::
 A whole number, negative or positive.
 
+invert::
+A flag used to set normal or inverted bit bang serial data level logic.
+
 level::
 The level of a gpio.  Low or High.
 
@@ -4792,8 +4801,7 @@ after this command is issued.
 #define PI_CHAIN_NESTING   -118 // chain counters nested too deeply
 #define PI_CHAIN_TOO_BIG   -119 // chain is too long
 #define PI_DEPRECATED      -120 // deprecated function removed
-#define PI_NOT_IN_SER_MODE -121 // gpio not opened for bit-bang serial
-#define PI_BAD_SER_INVERT  -122 // bit-bang serial invert not 0 or 1
+#define PI_BAD_SER_INVERT  -121 // bit bang serial invert not 0 or 1
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

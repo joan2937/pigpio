@@ -2189,7 +2189,7 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 
 .IP "\fBint bb_serial_invert(unsigned user_gpio, unsigned invert)\fP"
 .IP "" 4
-This function inverts the serial logic for bit bang reading of serial data.
+This function inverts serial logic for big bang serial reads.
 
 .br
 
@@ -2197,7 +2197,8 @@ This function inverts the serial logic for bit bang reading of serial data.
 
 .EX
 user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
-   invert: 0-1, 1 invert , 0 normal.
+.br
+   invert: 0-1, 1 invert, 0 normal.
 .br
 
 .EE
@@ -2205,7 +2206,7 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_NOT_IN_SER_MODE or PI_BAD_SER_INVERT.
+Returns 0 if OK, otherwise PI_NOT_SERIAL_GPIO or PI_BAD_SER_INVERT.
 
 .IP "\fBint i2c_open(unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags)\fP"
 .IP "" 4
@@ -2235,6 +2236,42 @@ No flags are currently defined.  This parameter should be set to zero.
 .br
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
+
+.br
+
+.br
+For the SMBus commands the low level transactions are shown at the end
+of the function description.  The following abbreviations are used.
+
+.br
+
+.br
+
+.EX
+S     (1 bit) : Start bit
+.br
+P     (1 bit) : Stop bit
+.br
+Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+.br
+A, NA (1 bit) : Accept and not accept bit.
+.br
+.br
+.br
+Addr  (7 bits): I2C 7 bit address.
+.br
+Comm  (8 bits): Command byte, a data byte which often selects a register.
+.br
+Data  (8 bits): A data byte.
+.br
+Count (8 bits): A data byte containing the length of a block operation.
+.br
+
+.br
+[..]: Data sent by the device.
+.br
+
+.EE
 
 .IP "\fBint i2c_close(unsigned handle)\fP"
 .IP "" 4
@@ -2281,7 +2318,13 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Quick command. smbus 2.0 5.5.1
+Quick command. SMBus 2.0 5.5.1
+
+.EX
+S Addr Rd/Wr [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_write_byte(unsigned handle, unsigned bVal)\fP"
 .IP "" 4
@@ -2308,7 +2351,13 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Send byte. smbus 2.0 5.5.2
+Send byte. SMBus 2.0 5.5.2
+
+.EX
+S Addr Wr [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_byte(unsigned handle)\fP"
 .IP "" 4
@@ -2333,7 +2382,13 @@ or PI_I2C_READ_FAILED.
 .br
 
 .br
-Receive byte. smbus 2.0 5.5.3
+Receive byte. SMBus 2.0 5.5.3
+
+.EX
+S Addr Rd [A] [Data] NA P
+.br
+
+.EE
 
 .IP "\fBint i2c_write_byte_data(unsigned handle, unsigned i2c_reg, unsigned bVal)\fP"
 .IP "" 4
@@ -2363,7 +2418,13 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Write byte. smbus 2.0 5.5.4
+Write byte. SMBus 2.0 5.5.4
+
+.EX
+S Addr Wr [A] Comm [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_write_word_data(unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
 .IP "" 4
@@ -2393,7 +2454,13 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Write word. smbus 2.0 5.5.4
+Write word. SMBus 2.0 5.5.4
+
+.EX
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_byte_data(unsigned handle, unsigned i2c_reg)\fP"
 .IP "" 4
@@ -2421,7 +2488,13 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Read byte. smbus 2.0 5.5.5
+Read byte. SMBus 2.0 5.5.5
+
+.EX
+S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_word_data(unsigned handle, unsigned i2c_reg)\fP"
 .IP "" 4
@@ -2449,7 +2522,13 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Read word. smbus 2.0 5.5.5
+Read word. SMBus 2.0 5.5.5
+
+.EX
+S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+.br
+
+.EE
 
 .IP "\fBint i2c_process_call(unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
 .IP "" 4
@@ -2479,7 +2558,15 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Process call. smbus 2.0 5.5.6
+Process call. SMBus 2.0 5.5.6
+
+.EX
+S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+.br
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
+.br
+
+.EE
 
 .IP "\fBint i2c_write_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2511,7 +2598,13 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .br
-Block write. smbus 2.0 5.5.7
+Block write. SMBus 2.0 5.5.7
+
+.EX
+S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_block_data(unsigned handle, unsigned i2c_reg, char *buf)\fP"
 .IP "" 4
@@ -2546,7 +2639,15 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .br
-Block read. smbus 2.0 5.5.7
+Block read. SMBus 2.0 5.5.7
+
+.EX
+S Addr Wr [A] Comm [A]
+.br
+   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+.br
+
+.EE
 
 .IP "\fBint i2c_block_process_call(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2590,7 +2691,15 @@ bytes sent/received must be 32 or less.
 .br
 
 .br
-Block write-block read. smbus 2.0 5.5.8
+Block write-block read. SMBus 2.0 5.5.8
+
+.EX
+S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+.br
+   S Addr Rd [A] [Count] A [Data] ... A P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_i2c_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -2619,6 +2728,18 @@ i2c_reg: 0-255, the register to read.
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
+.br
+
+.br
+
+.EX
+S Addr Wr [A] Comm [A]
+.br
+   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+.br
+
+.EE
+
 .IP "\fBint i2c_write_i2c_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes 1 to 32 bytes to the specified register of the device
@@ -2645,6 +2766,16 @@ i2c_reg: 0-255, the register to write.
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
+
+.br
+
+.br
+
+.EX
+S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+.br
+
+.EE
 
 .IP "\fBint i2c_read_device(unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
@@ -4005,6 +4136,13 @@ The number of bytes of data in a buffer.
 
 .IP "\fBint\fP" 0
 A whole number, negative or positive.
+
+.br
+
+.br
+
+.IP "\fBinvert\fP" 0
+A flag used to set normal or inverted bit bang serial data level logic.
 
 .br
 

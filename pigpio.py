@@ -264,7 +264,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.20"
+VERSION = "1.21"
 
 exceptions = True
 
@@ -558,8 +558,7 @@ PI_BAD_CHAIN_DELAY  =-117
 PI_CHAIN_NESTING    =-118
 PI_CHAIN_TOO_BIG    =-119
 PI_DEPRECATED       =-120
-PI_NOT_IN_SER_MODE  =-121
-PI_BAD_SER_INVERT   =-122
+PI_BAD_SER_INVERT   =-121
 
 # pigpio error text
 
@@ -682,8 +681,7 @@ _errors=[
    [PI_CHAIN_NESTING     , "chain counters nested too deeply"],
    [PI_CHAIN_TOO_BIG     , "chain is too long"],
    [PI_DEPRECATED        , "deprecated function removed"],
-   [PI_NOT_IN_SER_MODE   , "gpio not opened for bit-bang serial"],
-   [PI_BAD_SER_INVERT    , "bit-bang serial invert not 0 or 1"],
+   [PI_BAD_SER_INVERT    , "bit bang serial invert not 0 or 1"],
 
 ]
 
@@ -1316,12 +1314,27 @@ class pi():
       Notifications have the following structure.
 
       . .
-      I seqno - increments for each report
-      I flags - flags, if bit 5 is set then bits 0-4 of the flags
-                indicate a gpio which has had a watchdog timeout.
-      I tick  - time of sample.
-      I level - 32 bits of levels for gpios 0-31.
+      I seqno
+      I flags
+      I tick
+      I level
       . .
+
+      seqno: starts at 0 each time the handle is opened and then
+      increments by one for each report.
+
+      flags: two flags are defined, PI_NTFY_FLAGS_WDOG and
+      PI_NTFY_FLAGS_ALIVE.  If bit 5 is set (PI_NTFY_FLAGS_WDOG)
+      then bits 0-4 of the flags indicate a gpio which has had a
+      watchdog timeout; if bit 6 is set (PI_NTFY_FLAGS_ALIVE) this
+      indicates a keep alive signal on the pipe/socket and is sent
+      once a minute in the absence of other notification activity.
+
+      tick: the number of microseconds since system boot.  It wraps
+      around after 1h12m.
+
+      level: indicates the level of each gpio.  If bit 1<<x is set
+      then gpio x is high.
 
       ...
       h = pi.notify_open()
@@ -2143,6 +2156,23 @@ class pi():
       you will always run on the local Pi use the standard SMBus
       module instead.
 
+      For the SMBus commands the low level transactions are shown
+      at the end of the function description.  The following
+      abbreviations are used.
+
+      . .
+      S     (1 bit) : Start bit
+      P     (1 bit) : Stop bit
+      Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+      A, NA (1 bit) : Accept and not accept bit. 
+      Addr  (7 bits): I2C 7 bit address.
+      Comm  (8 bits): Command byte, which often selects a register.
+      Data  (8 bits): A data byte.
+      Count (8 bits): A byte containing the length of a block operation.
+
+      [..]: Data sent by the device.
+      . .
+
       ...
       h = pi.i2c_open(1, 0x53) # open device at address 0x53 on bus 1
       ...
@@ -2172,10 +2202,13 @@ class pi():
       """
       Sends a single bit to the device associated with handle.
 
-      SMBus 2.0 5.5.1 - Quick command.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          bit:= 0 or 1, the value to write.
+
+      SMBus 2.0 5.5.1 - Quick command.
+      . .
+      S Addr Rd/Wr [A] P
+      . .
 
       ...
       pi.i2c_write_quick(0, 1) # send 1 to device 0
@@ -2188,10 +2221,13 @@ class pi():
       """
       Sends a single byte to the device associated with handle.
 
-      SMBus 2.0 5.5.2 - Send byte.
-
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
       byte_val:= 0-255, the value to write.
+
+      SMBus 2.0 5.5.2 - Send byte.
+      . .
+      S Addr Wr [A] Data [A] P
+      . .
 
       ...
       pi.i2c_write_byte(1, 17)   # send byte   17 to device 1
@@ -2205,9 +2241,12 @@ class pi():
       """
       Reads a single byte from the device associated with handle.
 
-      SMBus 2.0 5.5.3 - Receive byte.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
+
+      SMBus 2.0 5.5.3 - Receive byte.
+      . .
+      S Addr Rd [A] [Data] NA P
+      . .
 
       ...
       b = pi.i2c_read_byte(2) # read a byte from device 2
@@ -2220,11 +2259,14 @@ class pi():
       Writes a single byte to the specified register of the device
       associated with handle.
 
-      SMBus 2.0 5.5.4 - Write byte.
-
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       byte_val:= 0-255, the value to write.
+
+      SMBus 2.0 5.5.4 - Write byte.
+      . .
+      S Addr Wr [A] Comm [A] Data [A] P
+      . .
 
       ...
       # send byte 0xC5 to reg 2 of device 1
@@ -2248,11 +2290,14 @@ class pi():
       Writes a single 16 bit word to the specified register of the
       device associated with handle.
 
-      SMBus 2.0 5.5.4 - Write word.
-
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       word_val:= 0-65535, the value to write.
+
+      SMBus 2.0 5.5.4 - Write word.
+      . .
+      S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+      . .
 
       ...
       # send word 0xA0C5 to reg 5 of device 4
@@ -2276,10 +2321,13 @@ class pi():
       Reads a single byte from the specified register of the device
       associated with handle.
 
-      SMBus 2.0 5.5.5 - Read byte.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
+
+      SMBus 2.0 5.5.5 - Read byte.
+      . .
+      S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+      . .
 
       ...
       # read byte from reg 17 of device 2
@@ -2296,10 +2344,13 @@ class pi():
       Reads a single 16 bit word from the specified register of the
       device associated with handle.
 
-      SMBus 2.0 5.5.5 - Read word.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
+
+      SMBus 2.0 5.5.5 - Read word.
+      . .
+      S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+      . .
 
       ...
       # read word from reg 2 of device 3
@@ -2316,11 +2367,15 @@ class pi():
       Writes 16 bits of data to the specified register of the device
       associated with handle and reads 16 bits of data in return.
 
-      SMBus 2.0 5.5.6 - Process call.
-
         handle:= >=0 (as returned by a prior call to [*i2c_open*]).
            reg:= >=0, the device register.
       word_val:= 0-65535, the value to write.
+
+      SMBus 2.0 5.5.6 - Process call.
+      . .
+      S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+         S Addr Rd [A] [DataLow] A [DataHigh] NA P
+      . .
 
       ...
       r = pi.i2c_process_call(h, 4, 0x1231)
@@ -2341,11 +2396,15 @@ class pi():
       Writes up to 32 bytes to the specified register of the device
       associated with handle.
 
-      SMBus 2.0 5.5.7 - Block write.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
+
+      SMBus 2.0 5.5.7 - Block write.
+      . .
+      S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A]
+         Data [A] P
+      . .
 
       ...
       pi.i2c_write_block_data(4, 5, b'hello')
@@ -2373,10 +2432,14 @@ class pi():
       Reads a block of up to 32 bytes from the specified register of
       the device associated with handle.
 
-      SMBus 2.0 5.5.7 - Block read.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
+
+      SMBus 2.0 5.5.7 - Block read.
+      . .
+      S Addr Wr [A] Comm [A]
+         S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+      . .
 
       The amount of returned data is set by the device.
 
@@ -2408,8 +2471,6 @@ class pi():
       associated with handle and reads a device specified number
       of bytes of data in return.
 
-      SMBus 2.0 5.5.8 - Block write-block read.
-
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
         data:= the bytes to write.
@@ -2417,6 +2478,12 @@ class pi():
       The SMBus 2.0 documentation states that a minimum of 1 byte may
       be sent and a minimum of 1 byte may be received.  The total
       number of bytes sent/received must be 32 or less.
+
+      SMBus 2.0 5.5.8 - Block write-block read.
+      . .
+      S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+         S Addr Rd [A] [Count] A [Data] ... A P
+      . .
 
       The returned value is a tuple of the number of bytes read and a
       bytearray containing the bytes.  If there was an error the
@@ -2458,6 +2525,11 @@ class pi():
          reg:= >=0, the device register.
         data:= the bytes to write.
 
+      . .
+      S Addr Wr [A] Comm [A]
+         S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+      . .
+
       ...
       pi.i2c_write_i2c_block_data(4, 5, 'hello')
 
@@ -2487,6 +2559,10 @@ class pi():
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
          reg:= >=0, the device register.
        count:= >0, the number of bytes to read.
+
+      . .
+      S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+      . .
 
       The returned value is a tuple of the number of bytes read and a
       bytearray containing the bytes.  If there was an error the
@@ -3738,8 +3814,7 @@ def xref():
    PI_CHAIN_NESTING = -118
    PI_CHAIN_TOO_BIG = -119
    PI_DEPRECATED = -120
-   PI_NOT_IN_SER_MODE  =-121
-   PI_BAD_SER_INVERT   =-122
+   PI_BAD_SER_INVERT   = -121
    . .
 
    frequency: 0-40000
@@ -3808,6 +3883,10 @@ def xref():
 
    i2c_flags: 32 bit
    No I2C flags are currently defined.
+
+   invert: 0-1
+   A flag used to set normal or inverted bit bang serial data
+   level logic.
 
    level: 0-1 (2)
    CLEAR = 0 

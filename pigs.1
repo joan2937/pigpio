@@ -645,7 +645,7 @@ The gpio must be one of the following.
 5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
 6   clock 2  A+/B+/Pi2 and compute module only
 20  clock 0  A+/B+/Pi2 and compute module only
-21  clock 1  All models but Type 2 B (reserved for system use)
+21  clock 1  All models but Type 2 (reserved for system use)
 
 .EE
 
@@ -742,7 +742,7 @@ The gpio must be one of the following.
 This command returns the hardware revision of the Pi.
 
 .br
-The hardware revision is found in the last 4 characters on the Type sion
+The hardware revision is found in the last 4 characters on the revision
 line of /proc/cpuinfo.
 
 .br
@@ -2570,6 +2570,35 @@ ERROR: no serial read in progress on gpio
 
 .br
 
+.IP "\fBSLRI u v\fP - Sets bit bang serial data logic levels"
+.IP "" 4
+
+.br
+This command sets the logic level for reading bit bang serial data
+on gpio \fBu\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+The invert parameter \fBv\fP is 1 for inverted signal, 0 for normal.
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs slri 17 1 # invert logic on gpio 17
+.br
+
+.br
+$ pigs slri 23 0 # use normal logic on gpio 23
+.br
+
+.EE
+
+.br
+
 .IP "\fBSLRO u b db\fP - Open gpio for bit bang serial data"
 .IP "" 4
 
@@ -2606,36 +2635,6 @@ $ pigs slro 23 19200 8
 -50
 .br
 ERROR: gpio already in use
-.br
-
-.EE
-
-.br
-
-.IP "\fBSLRI u i\fP - Invert serial logic for bit bang serial data"
-.IP "" 4
-
-.br
-This command inverts the serial logic when reading bit bang serial data.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-The invert parameter is 1 for inverted signal, 0 for normal.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs slri 17 1
-.br
-
-.br
-$ pigs slri 17 0
 .br
 
 .EE
@@ -3246,35 +3245,35 @@ done
 .br
 
 .br
-pigs wvcha \\ 
+pigs wvcha \
 .br
-   ${w[4]} ${w[3]} ${w[2]} \\ 
+   ${w[4]} ${w[3]} ${w[2]} \
 .br
-   255 0 \\ 
+   255 0 \
 .br
-      ${w[0]} ${w[0]} ${w[0]} \\ 
+      ${w[0]} ${w[0]} ${w[0]} \
 .br
-      255 0 \\ 
+      255 0 \
 .br
-         ${w[0]} ${w[1]} \\ 
+         ${w[0]} ${w[1]} \
 .br
-         255 2 0x88 0x13 \\ 
+         255 2 0x88 0x13 \
 .br
-      255 1 30 0 \\ 
+      255 1 30 0 \
 .br
-      255 0 \\ 
+      255 0 \
 .br
-         ${w[2]} ${w[3]} ${w[0]} \\ 
+         ${w[2]} ${w[3]} ${w[0]} \
 .br
-         ${w[3]} ${w[1]} ${w[2]} \\ 
+         ${w[3]} ${w[1]} ${w[2]} \
 .br
-      255 1 10 0 \\ 
+      255 1 10 0 \
 .br
-   255 1 5 0 \\ 
+   255 1 5 0 \
 .br
-   ${w[4]} ${w[4]} ${w[4]} \\ 
+   ${w[4]} ${w[4]} ${w[4]} \
 .br
-   255 2 0x20 0x4E \\ 
+   255 2 0x20 0x4E \
 .br
    ${w[0]} ${w[0]} ${w[0]}
 .br
@@ -3399,7 +3398,7 @@ ERROR: attempt to create an empty waveform
 
 .br
 
-.IP "\fBWVDEL wid\fP - Delete selected waveforms"
+.IP "\fBWVDEL wid\fP - Delete selected waveform"
 .IP "" 4
 
 .br
@@ -4123,7 +4122,7 @@ Again, ignore the details for now.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\\ 
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
 .br
  do sleep 0.2; done)
 .br
@@ -4163,7 +4162,7 @@ jp 999 jumps to tag 999 if the result is positive.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\\ 
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
 .br
  do sleep 0.2; done)
 .br
