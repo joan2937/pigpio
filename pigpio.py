@@ -3418,7 +3418,7 @@ class pi():
       status = pi.bb_serial_invert(17, 1)
       ...
       """
-      return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRI, user_gpio, invert, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRI, user_gpio, invert))
 
    def custom_1(self, arg1=0, arg2=0, argx=[]):
       """
