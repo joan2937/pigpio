@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 37+
+This version is for pigpio version 38+
 */
 
 #include <stdio.h>
@@ -57,6 +57,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_CF1,   "CF1",   195, 2}, // gpioCustom1
    {PI_CMD_CF2,   "CF2",   195, 6}, // gpioCustom2
+
+   {PI_CMD_CGI,   "CGI",   101, 4}, // gpioCfgGetInternals
+   {PI_CMD_CSI,   "CSI",   111, 1}, // gpioCfgSetInternals
 
    {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
    {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
@@ -240,6 +243,9 @@ BS2 bits         Set gpios in bank 2\n\
 \n\
 CF1 ...          Custom function 1\n\
 CF2 ...          Custom function 2\n\
+\n\
+CGI              Configuration get internals\n\
+CSI v            Configuration set internals\n\
 \n\
 GDC g            Get PWM dutycycle for gpio\n\
 GPW g            Get servo pulsewidth for gpio\n\
@@ -450,6 +456,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_HCLK_PASS    , "need password to use hardware clock 1"},
    {PI_HPWM_ILLEGAL     , "illegal, PWM in use for main clock"},
    {PI_BAD_DATABITS     , "serial data bits not 1-32"},
+   {PI_BAD_STOPBITS     , "serial (half) stop bits not 2-8"},
    {PI_MSG_TOOBIG       , "socket/pipe message too big"},
    {PI_BAD_MALLOC_MODE  , "bad memory allocation mode"},
    {PI_TOO_MANY_SEGS    , "too many I2C transaction segments"},
@@ -469,6 +476,9 @@ static errInfo_t errInfo[]=
    {PI_CHAIN_TOO_BIG    , "chain is too long"},
    {PI_DEPRECATED       , "deprecated function removed"},
    {PI_BAD_SER_INVERT   , "bit bang serial invert not 0 or 1"},
+   {PI_BAD_EDGE         , "bad ISR edge, not 1, 1, or 2"},
+   {PI_BAD_ISR_INIT     , "bad ISR initialisation"},
+   {PI_BAD_FOREVER      , "loop forever must be last chain command"},
 
 };
 
@@ -567,7 +577,7 @@ int cmdParse(
 
    switch (cmdInfo[idx].vt)
    {
-      case 101: /* BR1  BR2  H  HELP  HWVER
+      case 101: /* BR1  BR2  CGI  H  HELP  HWVER
                    DCRA  HALT  INRA  NO
                    PIGPV  POPA  PUSHA  RET  T  TICK  WVBSY  WVCLR
                    WVCRE  WVGO  WVGOR  WVHLT  WVNEW
@@ -578,8 +588,8 @@ int cmdParse(
 
          break;
 
-      case 111: /* BC1  BC2  BS1  BS2  
-                   ADD  AND  CMP  DIV  LDA  LDAB  MLT
+      case 111: /* ADD  AND  BC1  BC2  BS1  BS2  
+                   CMP  CSI  DIV  LDA  LDAB  MLT
                    MOD  OR  RLA  RRA  STAB  SUB  WAIT  XOR
 
                    One parameter, any value.

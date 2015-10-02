@@ -63,8 +63,8 @@ install:	$(ALL)
 	install -m 0755 -s pig2vcd       /usr/local/bin
 	install -m 0755 -s pigpiod       /usr/local/bin
 	install -m 0755 -s pigs          /usr/local/bin
-	python2 setup.py install
-	python3 setup.py install
+	if which python2; then python2 setup.py install; fi
+	if which python3; then python3 setup.py install; fi
 	install -m 0755 -d               /usr/local/man/man1
 	install -m 0644 *.1              /usr/local/man/man1
 	install -m 0755 -d               /usr/local/man/man3
@@ -79,12 +79,8 @@ uninstall:
 	rm -f /usr/local/bin/pig2vcd
 	rm -f /usr/local/bin/pigpiod
 	rm -f /usr/local/bin/pigs
-	echo removing python2 files
-	python2 setup.py install --record /tmp/pigpio >/dev/null
-	xargs rm -f < /tmp/pigpio >/dev/null
-	echo removing python3 files
-	python3 setup.py install --record /tmp/pigpio >/dev/null
-	xargs rm -f < /tmp/pigpio >/dev/null
+	if which python2; then python2 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
+	if which python3; then python3 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
 	rm -f /usr/local/man/man1/pig*.1
 	rm -f /usr/local/man/man3/pig*.3
 	ldconfig

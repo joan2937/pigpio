@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 18 */
+/* PIGPIOD_IF_VERSION 19 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,6 +80,7 @@ static int gPigHandle = -1;
 static int gPigNotify = -1;
 
 static uint32_t gNotifyBits;
+static uint32_t gLastLevel;
 
 callback_t *gCallBackFirst = 0;
 callback_t *gCallBackLast = 0;
@@ -220,8 +221,6 @@ static int pigpioOpenSocket(char *addr, char *port)
 
 static void dispatch_notification(gpioReport_t *r)
 {
-   static uint32_t lastLevel = 0;
-
    callback_t *p;
    uint32_t changed;
    int l, g;
@@ -233,9 +232,9 @@ static void dispatch_notification(gpioReport_t *r)
 
    if (r->flags == 0)
    {
-      changed = (r->level ^ lastLevel) & gNotifyBits;
+      changed = (r->level ^ gLastLevel) & gNotifyBits;
 
-      lastLevel = r->level;
+      gLastLevel = r->level;
 
       p = gCallBackFirst;
 
@@ -487,6 +486,7 @@ void stop_thread(pthread_t *pth)
    {
       pthread_cancel(*pth);
       pthread_join(*pth, NULL);
+      free(pth);
    }
 }
 
@@ -507,6 +507,8 @@ int pigpio_start(char *addrStr, char *portStr)
             if (gPigHandle < 0) return pigif_bad_noib;
             else
             {
+               gLastLevel = read_bank_1();
+
                pthNotify = start_thread(pthNotifyThread, 0);
                if (pthNotify)
                {
@@ -1539,4 +1541,5 @@ int wait_for_edge(unsigned user_gpio, unsigned edge, double timeout)
 
    return triggered;
 }
+
 

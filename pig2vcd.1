@@ -53,29 +53,22 @@ typedef struct
 .br
 
 .br
-seqno starts at 0 each time the handle is opened and then increments
-by one for each report.
+seqno: starts at 0 each time the handle is opened and then increments by one for each report.
 
 .br
 
 .br
-flags, if bit 5 is set then bits 0-4 of the flags indicate a gpio which
-has had a watchdog timeout.
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE. If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags indicate a gpio which has had a watchdog timeout; if bit 6 is set (PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the pipe/socket and is sent once a minute in the absence of other notification activity.
 
 .br
 
 .br
-tick is the number of microseconds since system boot.
+tick: the number of microseconds since system boot. It wraps around after 1h12m.
 
 .br
 
 .br
-level indicates the level of each gpio.
-
-.br
-
-.br
-pig2vcd takes these notifications and outputs a text format VCD.
+level: indicates the level of each gpio. If bit 1<<x is set then gpio x is high. pig2vcd takes these notifications and outputs a text format VCD.
 
 .br
 

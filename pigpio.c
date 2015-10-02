@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 37 */
+/* pigpio version 38 */
 
 /* include ------------------------------------------------------- */
 
@@ -867,36 +867,48 @@ typedef struct
 {
    callbk_t func;
    unsigned ex;
-   void *   userdata;
-   int      timeout;
+   void *userdata;
+   int timeout;
    uint32_t tick;
 } gpioAlert_t;
 
 typedef struct
 {
+   unsigned gpio;
+   pthread_t *pth;
+   callbk_t func;
+   unsigned edge;
+   int timeout;
+   unsigned ex;
+   void *userdata;
+   int inited;
+} gpioISR_t;
+
+typedef struct
+{
    callbk_t func;
    unsigned ex;
-   void *   userdata;
+   void *userdata;
 } gpioSignal_t;
 
 typedef struct
 {
    callbk_t func;
    unsigned ex;
-   void *   userdata;
+   void *userdata;
    uint32_t bits;
 } gpioGetSamples_t;
 
 typedef struct
 {
-   callbk_t        func;
-   unsigned        ex;
-   void *          userdata;
-   unsigned        id;
-   unsigned        running;
-   unsigned        millis;
+   callbk_t func;
+   unsigned ex;
+   void *userdata;
+   unsigned id;
+   unsigned running;
+   unsigned millis;
    struct timespec nextTick;
-   pthread_t       pthId;
+   pthread_t pthId;
 } gpioTimer_t;
 
 typedef struct
@@ -928,6 +940,7 @@ typedef struct
    uint32_t lastReportTick;
    int      fd;
    int      pipe;
+   int      max_emits;
 } gpioNotify_t;
 
 typedef struct
@@ -955,8 +968,9 @@ typedef struct
 
 typedef struct
 {
-   uint32_t startTick;
    uint32_t alertTicks;
+   uint32_t lateTicks;
+   uint32_t moreToDo;
    uint32_t diffTick[TICKSLOTS];
    uint32_t cbTicks;
    uint32_t cbCalls;
@@ -966,6 +980,9 @@ typedef struct
    uint32_t numSamples;
    uint32_t DMARestarts;
    uint32_t dmaInitCbsCount;
+   uint32_t goodPipeWrite;
+   uint32_t shortPipeWrite;
+   uint32_t wouldBlockPipeWrite;
 } gpioStats_t;
 
 typedef struct
@@ -977,9 +994,14 @@ typedef struct
    unsigned DMAsecondaryChannel;
    unsigned socketPort;
    unsigned ifFlags;
-   int      dbgLevel;
-   unsigned showStats;
    unsigned memAllocMode;
+   unsigned dbgLevel;
+   unsigned alertFreq;
+   uint32_t internals;
+      /*
+      0-3: dbgLevel
+      4-7: alertFreq
+      */
 } gpioCfg_t;
 
 typedef struct
@@ -1131,6 +1153,8 @@ static int pthSocketRunning = 0;
 
 static gpioAlert_t      gpioAlert  [PI_MAX_USER_GPIO+1];
 
+static gpioISR_t        gpioISR    [PI_MAX_USER_GPIO+1];
+
 static gpioGetSamples_t gpioGetSamples;
 
 static gpioInfo_t       gpioInfo   [PI_MAX_GPIO+1];
@@ -1199,9 +1223,10 @@ static volatile gpioCfg_t gpioCfg =
    PI_DEFAULT_DMA_SECONDARY_CHANNEL,
    PI_DEFAULT_SOCKET_PORT,
    PI_DEFAULT_IF_FLAGS,
-   DBG_MIN_LEVEL,
-   0,
    PI_DEFAULT_MEM_ALLOC_MODE,
+   0, /* dbgLevel */
+   0, /* alertFreq */
+   0, /* internals */
 };
 
 /* no initialisation required */
@@ -1413,6 +1438,14 @@ static void myGpioSetMode(unsigned gpio, unsigned mode)
 }
 
 
+/* ----------------------------------------------------------------------- */
+
+static int myGpioRead(unsigned gpio)
+{
+   if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0) return PI_ON;
+   else                                         return PI_OFF;
+}
+
 
 /* ----------------------------------------------------------------------- */
 
@@ -1552,11 +1585,12 @@ static uint32_t myGetTick(int pos)
 
 static int myPermit(unsigned gpio)
 {
-   if ((gpio <= PI_MAX_GPIO) &&
-       (gpioMask & ((uint64_t)(1)<<gpio)))
-      return 1;
-   else
-      return 0;
+   if (gpio <= PI_MAX_GPIO)
+   {
+      if (gpioMask & ((uint64_t)(1)<<gpio)) return 1;
+      else return 0;
+   }
+   return 1; /* will fail for bad gpio number */
 }
 
 static void flushMemory(void)
@@ -1689,13 +1723,16 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          res = gpioCustom1(p[1], p[2], buf, p[3]);
          break;
 
-
       case PI_CMD_CF2:
          /* a couple of extra precautions for untrusted code */
          if (p[2] > bufSize) p[2] = bufSize;
          res = gpioCustom2(p[1], buf, p[3], buf, p[2]);
          if (res > p[2]) res = p[2];
          break;
+
+      case PI_CMD_CGI: res = gpioCfgGetInternals(); break;
+
+      case PI_CMD_CSI: res = gpioCfgSetInternals(p[1]); break;
 
       case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
 
@@ -2226,13 +2263,10 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
 
 static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 {
-   int switchGpioOff;
    int newOff, oldOff, realRange, cycles, i;
 
    DBG(DBG_INTERNAL,
       "myGpioSetServo %d from %d to %d", gpio, oldVal, newVal);
-
-   switchGpioOff = 0;
 
    realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
    cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
@@ -2267,16 +2301,14 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
          for (i=0; i<SUPERCYCLE; i+=cycles)
             myClearGpioOn(gpio, i);
 
+         /* if in pulse then delay for the last cycle to complete */
+
+         if (myGpioRead(gpio)) myGpioDelay(PI_MAX_SERVO_PULSEWIDTH);
+
+         /* deschedule gpio off */
+
          for (i=0; i<SUPERLEVEL; i+=realRange)
             myClearGpioOff(gpio, i+oldOff);
-
-         switchGpioOff = 1;
-      }
-
-      if (switchGpioOff)
-      {
-         *(gpioReg + GPCLR0) = (1<<gpio);
-         *(gpioReg + GPCLR0) = (1<<gpio);
       }
    }
 }
@@ -4920,9 +4952,12 @@ static void sigHandler(int signum)
                break;
 
             case SIGPIPE:
-            case SIGCHLD:
             case SIGWINCH:
                DBG(DBG_USER, "signal %d ignored", signum);
+               break;
+
+            case SIGCHLD:
+               /* Used to notify threads of events */
                break;
 
             default:
@@ -4959,6 +4994,12 @@ static void sigSetHandler(void)
    }
 }
 
+unsigned alert_delays[]={
+   1000, 1068, 1145, 1235,
+   1339, 1463, 1613, 1796,
+   2027, 2326, 2727, 3297,
+   4167, 5660, 8823, 20000};
+
 /* ======================================================================= */
 
 static void * pthAlertThread(void *x)
@@ -4966,7 +5007,7 @@ static void * pthAlertThread(void *x)
    struct timespec req, rem;
    uint32_t oldLevel, newLevel, level, reportedLevel;
    uint32_t oldSlot,  newSlot;
-   uint32_t tick, expected;
+   uint32_t tick, expected, nowTick;
    int32_t diff;
    int cycle, pulse;
    int emit, seqno, emitted;
@@ -4975,6 +5016,10 @@ static void * pthAlertThread(void *x)
    int b, n, v;
    int err;
    int stopped;
+   int delayTicks;
+   uint32_t nextWakeTick;
+   int moreToDo;
+   int max_emits;
    char fifo[32];
 
    req.tv_sec = 0;
@@ -4985,10 +5030,6 @@ static void * pthAlertThread(void *x)
 
    reportedLevel = gpioReg[GPLEV0];
 
-   tick = systReg[SYST_CLO];
-
-   gpioStats.startTick = tick;
-
    oldSlot = dmaCurrentSlot(dmaNowAtICB());
 
    cycle = (oldSlot/PULSE_PER_CYCLE);
@@ -4996,48 +5037,15 @@ static void * pthAlertThread(void *x)
 
    stopped = 0;
 
+   moreToDo = 0;
+
+   tick = systReg[SYST_CLO];
+
+   nextWakeTick =
+      tick + alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
    while (1)
    {
-
-      if (dmaIn[DMA_CONBLK_AD])
-      {
-         if (stopped)
-         {
-            DBG(DBG_STARTUP, "****** GOING ******");
-            stopped = 0;
-         }
-      }
-      else
-      {
-         stopped = 1;
-
-         myGpioDelay(5000);
-
-         if (runState == PI_RUNNING)
-         {
-            /* should never be executed, leave code just in case */
-
-            gpioCfg.showStats = 1;
-
-            dmaInitCbs();
-            flushMemory();
-            initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIBus[0]);
-            myGpioDelay(5000); /* let DMA run for a while */
-            oldSlot = dmaCurrentSlot(dmaNowAtICB());
-            gpioStats.DMARestarts++;
-         }
-      }
-
-      gpioStats.alertTicks++;
-
-      req.tv_nsec = 850000;
-
-      while (nanosleep(&req, &rem))
-      {
-         req.tv_sec  = rem.tv_sec;
-         req.tv_nsec = rem.tv_nsec;
-      }
-
       newSlot = dmaCurrentSlot(dmaNowAtICB());
 
       numSamples = 0;
@@ -5086,25 +5094,19 @@ static void * pthAlertThread(void *x)
 
             if (diff < 0)
             {
-               /* shouldn't happen */
-
-               //gpioCfg.showStats = 1;
-
                gpioStats.diffTick[0]++;
             }
 
             else if (diff >= TICKSLOTS)
             {
-               /* shouldn't happen */
-
-               //gpioCfg.showStats = 1;
-
                gpioStats.diffTick[TICKSLOTS-1]++;
             }
 
             else gpioStats.diffTick[diff]++;
          }
       }
+
+      if (oldSlot == newSlot) moreToDo = 0; else moreToDo = 1;
 
       /* should gpioGetSamples be called */
 
@@ -5318,6 +5320,7 @@ static void * pthAlertThread(void *x)
             if (emit)
             {
                gpioNotify[n].lastReportTick = tick;
+               max_emits = gpioNotify[n].max_emits;
 
                if (emit > gpioStats.maxEmit) gpioStats.maxEmit = emit;
 
@@ -5325,15 +5328,15 @@ static void * pthAlertThread(void *x)
 
                while (emit > 0)
                {
-                  if (emit > MAX_EMITS)
+                  if (emit > max_emits)
                   {
                      gpioStats.emitFrags++;
 
                      err = write(gpioNotify[n].fd,
                               gpioReport+emitted,
-                              MAX_EMITS*sizeof(gpioReport_t));
+                              max_emits*sizeof(gpioReport_t));
 
-                     if (err != (MAX_EMITS*sizeof(gpioReport_t)))
+                     if (err != (max_emits*sizeof(gpioReport_t)))
                      {
                         if (err < 0)
                         {
@@ -5351,11 +5354,20 @@ static void * pthAlertThread(void *x)
                               intNotifyBits();
                               break;
                            }
+                           else gpioStats.wouldBlockPipeWrite++;
+                        }
+                        else
+                        {
+                           gpioCfg.internals |= PI_CFG_STATS;
+                           gpioStats.shortPipeWrite++;
+                           DBG(DBG_ALWAYS, "emitted %d, asked for %d",
+                              err/sizeof(gpioReport_t), max_emits);
                         }
                      }
+                     else gpioStats.goodPipeWrite++;
 
-                     emitted += MAX_EMITS;
-                     emit    -= MAX_EMITS;
+                     emitted += max_emits;
+                     emit    -= max_emits;
                   }
                   else
                   {
@@ -5380,8 +5392,17 @@ static void * pthAlertThread(void *x)
                               intNotifyBits();
                               break;
                            }
+                           else gpioStats.wouldBlockPipeWrite++;
+                        }
+                        else
+                        {
+                           gpioCfg.internals |= PI_CFG_STATS;
+                           gpioStats.shortPipeWrite++;
+                           DBG(DBG_ALWAYS, "emitted %d, asked for %d",
+                              err/sizeof(gpioReport_t), emit);
                         }
                      }
+                     else gpioStats.goodPipeWrite++;
 
                      emitted += emit;
                      emit = 0;
@@ -5423,6 +5444,91 @@ static void * pthAlertThread(void *x)
          gpioStats.maxSamples = numSamples;
 
       gpioStats.numSamples += numSamples;
+
+      /* Check that DMA is running okay */
+
+      if (dmaIn[DMA_CONBLK_AD])
+      {
+         if (stopped)
+         {
+            DBG(DBG_STARTUP, "****** GOING ******");
+            stopped = 0;
+         }
+      }
+      else
+      {
+         stopped = 1;
+
+         myGpioDelay(5000);
+
+         if (runState == PI_RUNNING)
+         {
+            /* should never be executed, leave code just in case */
+
+            gpioCfg.internals |= PI_CFG_STATS;
+
+            dmaInitCbs();
+            flushMemory();
+            initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIBus[0]);
+            myGpioDelay(5000); /* let DMA run for a while */
+            oldSlot = dmaCurrentSlot(dmaNowAtICB());
+            gpioStats.DMARestarts++;
+         }
+      }
+
+      nowTick = systReg[SYST_CLO];
+
+      if (moreToDo)
+      {
+         gpioStats.moreToDo++;
+
+         /* rebase wake up time */
+
+         nextWakeTick = nowTick +
+            alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
+         req.tv_nsec = 0;
+      }
+      else
+      {
+         delayTicks = nextWakeTick - nowTick;
+
+         if (delayTicks < 0)
+         {
+            gpioStats.lateTicks++;
+
+            /* rebase wake up time */
+
+            nextWakeTick = nowTick +
+               alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
+            req.tv_nsec = 0;
+         }
+         else
+         {
+            gpioStats.alertTicks++;
+
+            nextWakeTick +=
+               alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
+            req.tv_nsec = (delayTicks * 1000);
+         }
+      }
+
+      if (req.tv_nsec)
+      {
+         req.tv_sec = 0;
+
+         while (nanosleep(&req, &rem))
+         {
+            req.tv_sec  = rem.tv_sec;
+            req.tv_nsec = rem.tv_nsec;
+         }
+      }
+
+      nextWakeTick +=
+         alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
    }
 
    return 0;
@@ -5960,12 +6066,14 @@ static void *pthSocketThreadHandler(void *fdC)
       switch (p[0])
       {
          case PI_CMD_NOIB:
+
             p[3] = gpioNotifyOpenInBand(sock);
 
-            /* Enable the Nagle algorithm. */
+           /* Enable the Nagle algorithm. */
             opt = 0;
             setsockopt(
                sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
+
             break;
 
          case PI_CMD_PROCP:
@@ -7041,7 +7149,8 @@ int initInitialise(void)
 
    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
 
-   sched_setscheduler(0, SCHED_FIFO, &param);
+   if (gpioCfg.internals & PI_CFG_RT_PRIORITY)
+      sched_setscheduler(0, SCHED_FIFO, &param);
 
    initClock(1); /* initialise main clock */
 
@@ -7350,11 +7459,16 @@ void gpioTerminate(void)
    if (dmaReg != MAP_FAILED) dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
 
 #ifndef EMBEDDED_IN_VM
-   if (gpioCfg.showStats)
+   if (gpioCfg.internals & PI_CFG_STATS)
    {
+      fprintf(stderr,
+         "\n#####################################################\n");
       fprintf(stderr,
          "If you didn't request stats please cut & paste the\n"
          "following and e-mail to pigpio@abyz.co.uk\n");
+
+      fprintf(stderr, "pigpio version=%d internals=%X\n",
+         PIGPIO_VERSION, gpioCfg.internals);
 
       fprintf(stderr,
          "micros=%d allocMode=%d dmaInitCbs=%d DMARestarts=%d\n",
@@ -7366,18 +7480,21 @@ void gpioTerminate(void)
          gpioStats.numSamples, gpioStats.maxSamples,
          gpioStats.maxEmit, gpioStats.emitFrags);
 
-      fprintf(stderr, "cbTicks %d, cbCalls %u alertTicks %u\n",
-         gpioStats.cbTicks, gpioStats.cbCalls, gpioStats.alertTicks);
+      fprintf(stderr, "cbTicks %d, cbCalls %u\n",
+         gpioStats.cbTicks, gpioStats.cbCalls);
+
+      fprintf(stderr, "pipe: good %u, short %u, would block %u\n",
+         gpioStats.goodPipeWrite, gpioStats.shortPipeWrite,
+         gpioStats.wouldBlockPipeWrite);
+
+      fprintf(stderr, "alertTicks %u, lateTicks %u, moreToDo %u\n",
+         gpioStats.alertTicks, gpioStats.lateTicks, gpioStats.moreToDo);
 
       for (i=0; i< TICKSLOTS; i++)
          fprintf(stderr, "%9u ", gpioStats.diffTick[i]);
 
-      fprintf(stderr, "\n");
-
-      fprintf(stderr, "\n");
-
       fprintf(stderr,
-         "#####################################################\n");
+         "\n#####################################################\n\n\n");
    }
 #endif
 
@@ -8637,6 +8754,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
                   "chain counters nested too deep (at %d)", i);
 
             stk_pos[stk_lev++] = cb;
+
             i += 2;
          }
          else if (cmd == 1) /* loop end */
@@ -8708,7 +8826,6 @@ int gpioWaveChain(char *buf, unsigned bufSize)
 
                counters++;
             }
-            loop = -1;
          }
          else if (cmd == 2) /* delay us */
          {
@@ -8750,6 +8867,34 @@ int gpioWaveChain(char *buf, unsigned bufSize)
                p->length = 4 * cycles / PI_WF_MICROS;
                p->next   = waveCbPOadr(chainGetCB(cb));
             }
+         }
+         else if (cmd == 3) /* repeat loop forever */
+         {
+            i += 2;
+
+            loop = 0;
+            if (--stk_lev >= 0) loop = stk_pos[stk_lev];
+
+            if ((loop < 1) || (loop == cb))
+               SOFT_ERROR(PI_BAD_CHAIN_LOOP,
+                  "empty chain loop (at %d)", i);
+
+            chaincb = chainGetCB(cb++);
+            if (chaincb < 0)
+               SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+            if (i < bufSize)
+               SOFT_ERROR(PI_BAD_FOREVER,
+                  "loop forever must be last command");
+
+            p = rawWaveCBAdr(chaincb);
+
+            /* dummy src and dest */
+            p->info = NORMAL_DMA;
+            p->src = (uint32_t) (&dmaOBus[0]->periphData);
+            p->dst = (uint32_t) (&dmaOBus[0]->periphData);
+            p->length = 4;
+            p->next = waveCbPOadr(chainGetCB(loop));
          }
          else
             SOFT_ERROR(PI_BAD_CHAIN_CMD,
@@ -9495,6 +9640,212 @@ int gpioSetAlertFuncEx(unsigned gpio, gpioAlertFuncEx_t f, void *userdata)
    return 0;
 }
 
+static void *pthISRThread(void *x)
+{
+   gpioISR_t *isr = x;
+   int fd;
+   int retval;
+   uint32_t tick;
+   int level;
+   uint32_t levels;
+   struct pollfd pfd;
+   char buf[64];
+
+   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d f=%x u=%d data=%x",
+      isr->gpio, isr->edge, isr->timeout, (uint32_t)isr->func,
+      isr->ex, (uint32_t)isr->userdata);
+
+   sprintf(buf, "/sys/class/gpio/gpio%d/value", isr->gpio);
+
+   if ((fd = open(buf, O_RDONLY)) < 0)
+   {
+      DBG(DBG_ALWAYS, "gpio %d not exported", isr->gpio);
+      return NULL;
+   }
+
+   pfd.fd = fd;
+
+   pfd.events = POLLPRI;
+
+   lseek(fd, 0, SEEK_SET);    /* consume any prior interrupt */
+   read(fd, buf, sizeof buf);
+
+   while (1)
+   {
+      retval = poll(&pfd, 1, isr->timeout); /* wait for interrupt */
+
+      tick = systReg[SYST_CLO];
+
+      levels = *(gpioReg + GPLEV0);
+
+      if (retval >= 0)
+      {
+         lseek(fd, 0, SEEK_SET);    /* consume interrupt */
+         read(fd, buf, sizeof buf);
+         if (retval)
+         {
+            if (levels & (1<<isr->gpio)) level = PI_ON; else level = PI_OFF;
+         }
+         else level = PI_TIMEOUT;
+
+         if (isr->ex) (isr->func)(isr->gpio, level, tick, isr->userdata);
+         else         (isr->func)(isr->gpio, level, tick);
+      }
+   }
+
+   return NULL;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+static int intGpioSetISRFunc(
+   unsigned gpio,
+   unsigned edge,
+   int timeout,
+   void *f,
+   int user,
+   void *userdata)
+{
+   char buf[64];
+
+   char *edge_str[]={"rising\n", "falling\n", "both\n"};
+   int fd;
+   int err;
+
+   DBG(DBG_INTERNAL,
+      "gpio=%d edge=%d timeout=%d function=%08X user=%d userdata=%08X",
+      gpio, edge, timeout, (uint32_t)f, user, (uint32_t)userdata);
+
+   if (f)
+   {
+      if (!gpioISR[gpio].inited) /* export gpio if unexported */
+      {
+         fd = open("/sys/class/gpio/export", O_WRONLY);
+         if (fd < 0) return PI_BAD_ISR_INIT;
+
+         /* ignore write fail if already exported */
+         sprintf(buf, "%d\n", gpio);
+         err = write(fd, buf, strlen(buf));
+         close(fd);
+
+         sprintf(buf, "/sys/class/gpio/gpio%d/direction", gpio);
+         fd = open(buf, O_WRONLY);
+         if (fd < 0) return PI_BAD_ISR_INIT;
+
+         err = write(fd, "in\n", 3);
+         close(fd);
+         if (err != 3) return PI_BAD_ISR_INIT;
+
+         gpioISR[gpio].gpio = gpio;
+         gpioISR[gpio].edge = -1;
+         gpioISR[gpio].timeout = -1;
+
+         gpioISR[gpio].inited = 1;
+      }
+
+      if (gpioISR[gpio].edge != edge)
+      {
+         sprintf(buf, "/sys/class/gpio/gpio%d/edge", gpio);
+         fd = open(buf, O_WRONLY);
+         if (fd < 0) return PI_BAD_ISR_INIT;
+
+         err = write(fd, edge_str[edge], strlen(edge_str[edge]));
+         close(fd);
+         if (err != strlen(edge_str[edge])) return PI_BAD_ISR_INIT;
+
+         gpioISR[gpio].edge = edge;
+
+         if (gpioISR[gpio].pth != NULL)
+            pthread_kill(*gpioISR[gpio].pth, SIGCHLD);
+      }
+
+      if (timeout <= 0) timeout = -1;
+      if (gpioISR[gpio].timeout != timeout)
+      {
+         gpioISR[gpio].timeout = timeout;
+
+         if (gpioISR[gpio].pth != NULL)
+            pthread_kill(*gpioISR[gpio].pth, SIGCHLD);
+      }
+
+      gpioISR[gpio].func = f;
+      gpioISR[gpio].ex = user;
+      gpioISR[gpio].userdata = userdata;
+
+      if (gpioISR[gpio].pth == NULL)
+         gpioISR[gpio].pth = gpioStartThread(pthISRThread, &gpioISR[gpio]);
+   }
+   else /* null function, delete ISR, unexport gpio */
+   {
+      if (gpioISR[gpio].pth) /* delete any existing ISR */
+      {
+         gpioStopThread(gpioISR[gpio].pth);
+         gpioISR[gpio].func = NULL;
+         gpioISR[gpio].pth = NULL;
+      }
+
+      if (gpioISR[gpio].inited) /* unexport any gpio */
+      {
+         fd = open("/sys/class/gpio/unexport", O_WRONLY);
+         if (fd < 0) return PI_BAD_ISR_INIT;
+         sprintf(buf, "%d\n", gpio);
+         err = write(fd, buf, strlen(buf));
+         close(fd);
+         if (err != sizeof(buf)) return PI_BAD_ISR_INIT;
+         gpioISR[gpio].inited = 0;
+      }
+   }
+
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+int gpioSetISRFunc(
+   unsigned gpio,
+   unsigned edge,
+   int timeout,
+   gpioISRFunc_t f)
+{
+   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d function=%08X",
+      gpio, edge, timeout, (uint32_t)f);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (edge > EITHER_EDGE)
+      SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
+
+   return intGpioSetISRFunc(gpio, edge, timeout, f, 0, NULL);
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+int gpioSetISRFuncEx(
+   unsigned gpio,
+   unsigned edge,
+   int timeout,
+   gpioAlertFuncEx_t f,
+   void *userdata)
+{
+   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d function=%08X userdata=%08X",
+      gpio, edge, timeout, (uint32_t)f, (uint32_t)userdata);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (edge > EITHER_EDGE)
+      SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
+
+   return intGpioSetISRFunc(gpio, edge, timeout, f, 1, userdata);
+}
+
 
 /* ----------------------------------------------------------------------- */
 
@@ -9538,6 +9889,7 @@ int gpioNotifyOpen(void)
    gpioNotify[slot].bits  = 0;
    gpioNotify[slot].fd    = fd;
    gpioNotify[slot].pipe  = 1;
+   gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
 
    return slot;
@@ -9572,6 +9924,7 @@ static int gpioNotifyOpenInBand(int fd)
    gpioNotify[slot].bits  = 0;
    gpioNotify[slot].fd    = fd;
    gpioNotify[slot].pipe  = 0;
+   gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
 
    return slot;
@@ -9940,6 +10293,7 @@ void gpioStopThread(pthread_t *pth)
    {
       pthread_cancel(*pth);
       pthread_join(*pth, NULL);
+      free(pth);
    }
 }
 
@@ -10793,34 +11147,33 @@ int gpioCfgMemAlloc(unsigned memAllocMode)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
+uint32_t gpioCfgGetInternals(void)
+{
+   return gpioCfg.internals;
+}
+
+int gpioCfgSetInternals(uint32_t cfgVal)
+{
+   gpioCfg.internals = cfgVal;
+   gpioCfg.dbgLevel = cfgVal & 0xF;
+   gpioCfg.alertFreq = (cfgVal>>4) & 0xF;
+   return 0;
+}
+
+int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)
 {
    int retVal = PI_BAD_CFG_INTERNAL;
 
    DBG(DBG_USER, "cfgWhat=%u, cfgVal=%d", cfgWhat, cfgVal);
 
-   /*
-   133084774
-   207081315
-   293640712
-   394342930
-   472769257
-   430873902
-   635370313
-   684442696
-   786301093
-   816051706
-   858202631
-   997413601
-   */
-
    switch(cfgWhat)
    {
       case 562484977:
 
-         gpioCfg.showStats = cfgVal;
+         if (cfgVal) gpioCfg.internals |= PI_CFG_STATS;
+         else gpioCfg.internals &= (~PI_CFG_STATS);
 
-         DBG(DBG_ALWAYS, "showStats is %u", cfgVal);
+         DBG(DBG_ALWAYS, "show stats is %u", cfgVal);
 
          retVal = 0;
 
@@ -10828,21 +11181,23 @@ int gpioCfgInternals(unsigned cfgWhat, int cfgVal)
 
       case 984762879:
 
-         if (cfgVal < DBG_ALWAYS) cfgVal = DBG_ALWAYS;
+         if ((cfgVal >= DBG_ALWAYS) && (cfgVal <= DBG_MAX_LEVEL))
+         {
+            
+            gpioCfg.dbgLevel = cfgVal;
+            gpioCfg.internals = (gpioCfg.internals & (~0xF)) | cfgVal;
 
-         if (cfgVal > DBG_MAX_LEVEL) cfgVal = DBG_MAX_LEVEL;
+            DBG(DBG_ALWAYS, "Debug level is %u", cfgVal);
 
-         gpioCfg.dbgLevel = cfgVal;
-
-         DBG(DBG_ALWAYS, "Debug level is %u", cfgVal);
-
-         retVal = 0;
+            retVal = 0;
+         }
 
          break;
    }
 
    return retVal;
 }
+
 
 /* include any user customisations */
 

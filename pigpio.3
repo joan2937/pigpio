@@ -1104,7 +1104,7 @@ void aFunction(int gpio, int level, uint32_t tick)
 .br
 
 .br
-gpioSetAlertFunc(4, aFunction);
+gpioSetAlertFunc(4F, aFunction);
 .br
 
 .EE
@@ -1154,6 +1154,135 @@ registered per gpio.
 
 .br
 See \fBgpioSetAlertFunc\fP for further details.
+
+.IP "\fBint gpioSetISRFunc(unsigned user_gpio, unsigned edge, int timeout, gpioISRFunc_t f)\fP"
+.IP "" 4
+Registers a function to be called (a callback) whenever the specified
+gpio interrupt occurs.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+.br
+  timeout: interrupt timeout in milliseconds (<=0 to cancel)
+.br
+        f: the callback function
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+or PI_BAD_ISR_INIT.
+
+.br
+
+.br
+One function may be registered per gpio.
+
+.br
+
+.br
+The function is passed the gpio, the current level, and the
+current tick.  The level will be PI_TIMEOUT if the optional
+interrupt timeout expires.
+
+.br
+
+.br
+The underlying Linux sysfs gpio interface is used to provide
+the interrupt services.
+
+.br
+
+.br
+The first time the function is called, with a non-NULL f, the
+gpio is exported, set to be an input, and set to interrupt
+on the given edge and timeout.
+
+.br
+
+.br
+Subsequent calls, with a non-NULL f, can vary one or more of the
+edge, timeout, or function.
+
+.br
+
+.br
+The ISR may be cancelled by passing a NULL f, in which case the
+gpio is unexported.
+
+.br
+
+.br
+The tick is that read at the time the process was informed of
+the interrupt.  This will be a variable number of microseconds
+after the interrupt occurred.  Typically the latency will be of
+the order of 50 microseconds.  The latency is not guaranteed
+and will vary with system load.
+
+.br
+
+.br
+The level is that read at the time the process was informed of
+the interrupt, or PI_TIMEOUT if the optional interrupt timeout
+expired.  It may not be the same as the expected edge as
+interrupts happening in rapid succession may be missed by the
+kernel (i.e. this mechanism can not be used to capture several
+interrupts only a few microseconds apart).
+
+.IP "\fBint gpioSetISRFuncEx(unsigned user_gpio, unsigned edge, int timeout, gpioISRFuncEx_t f, void *userdata)\fP"
+.IP "" 4
+Registers a function to be called (a callback) whenever the specified
+gpio interrupt occurs.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+.br
+  timeout: interrupt timeout in milliseconds (<=0 to cancel)
+.br
+        f: the callback function
+.br
+ userdata: pointer to arbitrary user data
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+or PI_BAD_ISR_INIT.
+
+.br
+
+.br
+The function is passed the gpio, the current level, the
+current tick, and the userdata pointer.
+
+.br
+
+.br
+Only one of \fBgpioSetISRFunc\fP or \fBgpioSetISRFuncEx\fP can be
+registered per gpio.
+
+.br
+
+.br
+See \fBgpioSetISRFunc\fP for further details.
 
 .IP "\fBint gpioNotifyOpen(void)\fP"
 .IP "" 4
@@ -1905,18 +2034,26 @@ The following command codes are supported:
 .br
 
 .br
-Name          Cmd & Data   Meaning
+Name           Cmd & Data   Meaning
 
 .br
-Loop Start    255 0        Identify start of a wave block
+Loop Start     255 0        Identify start of a wave block
 
 .br
-Loop Repeat   255 1 x y    loop x + y*256 times
+Loop Repeat    255 1 x y    loop x + y*256 times
 
 .br
-Delay         255 2 x y    delay x + y*256 microseconds
+Delay          255 2 x y    delay x + y*256 microseconds
 
 .br
+Loop Forever   255 3        loop forever
+
+.br
+
+.br
+
+.br
+If present Loop Forever must be the last entry in the chain.
 
 .br
 
@@ -5064,7 +5201,7 @@ method uses the mailbox property interface to allocate bus memory.
 Auto will use the mailbox method unless a larger than default buffer
 size is requested with \fBgpioCfgBufferSize\fP.
 
-.IP "\fBint gpioCfgInternals(unsigned cfgWhat, int cfgVal)\fP"
+.IP "\fBint gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)\fP"
 .IP "" 4
 Used to tune internal settings.
 
@@ -5076,6 +5213,26 @@ Used to tune internal settings.
 cfgWhat: see source code
 .br
  cfgVal: see source code
+.br
+
+.EE
+
+.IP "\fBuint32_t gpioCfgGetInternals(void)\fP"
+.IP "" 4
+This function returns the current library internal configuration
+settings.
+
+.IP "\fBint gpioCfgSetInternals(uint32_t cfgVal)\fP"
+.IP "" 4
+This function sets the current library internal configuration
+settings.
+
+.br
+
+.br
+
+.EX
+cfgVal: see source code
 .br
 
 .EE
@@ -5698,9 +5855,9 @@ The hardware clock frequency.
 .br
 
 .EX
-#define PI_HW_CLK_MIN_FREQ 4689
+PI_HW_CLK_MIN_FREQ 4689
 .br
-#define PI_HW_CLK_MAX_FREQ 250000000
+PI_HW_CLK_MAX_FREQ 250000000
 .br
 
 .EE
@@ -5734,9 +5891,9 @@ waveform.
 .br
 
 .EX
-#define PI_MIN_WAVE_DATABITS 1
+PI_MIN_WAVE_DATABITS 1
 .br
-#define PI_MAX_WAVE_DATABITS 32
+PI_MAX_WAVE_DATABITS 32
 .br
 
 .EE
@@ -5782,6 +5939,28 @@ A number representing the ratio of on time to off time for PWM.
 .br
 The number may vary between 0 and range (default 255) where
 0 is off and range is fully on.
+
+.br
+
+.br
+
+.IP "\fBedge\fP: 0-2" 0
+The type of gpio edge to generate an intrrupt.  See\fBgpioSetISRFunc\fP,
+and \fBgpioSetISRFuncEx\fP.
+
+.br
+
+.br
+
+.EX
+RISING_EDGE 0
+.br
+FALLING_EDGE 1
+.br
+EITHER_EDGE 2
+.br
+
+.EE
 
 .br
 
@@ -5956,6 +6135,34 @@ typedef void (*gpioGetSamplesFunc_t)
 typedef void (*gpioGetSamplesFuncEx_t)
 .br
    (const gpioSample_t *samples, int numSamples, void *userdata);
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBgpioISRFunc_t\fP" 0
+
+.EX
+typedef void (*gpioISRFunc_t)
+.br
+   (int gpio, int level, uint32_t tick);
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBgpioISRFuncEx_t\fP" 0
+
+.EX
+typedef void (*gpioISRFuncEx_t)
+.br
+   (int gpio, int level, uint32_t tick, void *userdata);
 .br
 
 .EE
@@ -6551,7 +6758,7 @@ The hardware PWM dutycycle.
 .br
 
 .EX
-#define PI_HW_PWM_RANGE 1000000
+PI_HW_PWM_RANGE 1000000
 .br
 
 .EE
@@ -6568,9 +6775,9 @@ The hardware PWM frequency.
 .br
 
 .EX
-#define PI_HW_PWM_MIN_FREQ 1
+PI_HW_PWM_MIN_FREQ 1
 .br
-#define PI_HW_PWM_MAX_FREQ 125000000
+PI_HW_PWM_MAX_FREQ 125000000
 .br
 
 .EE
@@ -6940,9 +7147,9 @@ to a waveform.
 .br
 
 .EX
-#define PI_MIN_WAVE_HALFSTOPBITS 2
+PI_MIN_WAVE_HALFSTOPBITS 2
 .br
-#define PI_MAX_WAVE_HALFSTOPBITS 8
+PI_MAX_WAVE_HALFSTOPBITS 8
 .br
 
 .EE
@@ -6959,12 +7166,30 @@ An array of characters.
 .br
 
 .IP "\fBtimeout\fP" 0
-A gpio watchdog timeout in milliseconds.
+A gpio level change timeout in milliseconds.
+
+.br
+
+.br
+\fBgpioSetWatchdog\fP
 
 .EX
 PI_MIN_WDOG_TIMEOUT 0
 .br
 PI_MAX_WDOG_TIMEOUT 60000
+.br
+
+.EE
+
+.br
+
+.br
+\fBgpioSetISRFunc\fP and \fBgpioSetISRFuncEx\fP
+
+.EX
+<=0 cancel timeout
+.br
+>0 timeout after specified milliseconds
 .br
 
 .EE
@@ -7361,6 +7586,12 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_CGI   95
+.br
+#define PI_CMD_CSI   96
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -7618,6 +7849,12 @@ A 16-bit word value.
 .br
 #define PI_BAD_SER_INVERT  -121 // bit bang serial invert not 0 or 1
 .br
+#define PI_BAD_EDGE        -122 // bad ISR edge value, not 0-2
+.br
+#define PI_BAD_ISR_INIT    -123 // bad ISR initialisation
+.br
+#define PI_BAD_FOREVER     -124 // loop forever must be last chain command
+.br
 
 .br
 #define PI_PIGIF_ERR_0    -2000
@@ -7670,6 +7907,10 @@ A 16-bit word value.
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
 .br
 #define PI_DEFAULT_MEM_ALLOC_MODE        PI_MEM_ALLOC_AUTO
+.br
+
+.br
+#define PI_DEFAULT_CFG_INTERNALS         0
 .br
 
 .br

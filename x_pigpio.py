@@ -592,18 +592,27 @@ def t9():
 
    t9cb = pi.callback(GPIO)
 
+   old_exceptions = pigpio.exceptions
+
+   pigpio.exceptions = False
+
    s = pi.store_script(script)
 
    # Ensure the script has finished initing.
    while True:
-      time.sleep(0.1)
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_INITING:
          break
+      time.sleep(0.1)
 
    oc = t9cb.tally()
    pi.run_script(s, [99, GPIO])
-   time.sleep(2)
+   while True:
+      e, p = pi.script_status(s)
+      if e != pigpio.PI_SCRIPT_RUNNING:
+         break
+      time.sleep(0.1)
+   time.sleep(0.3)
    c = t9cb.tally() - oc
    CHECK(9, 1, c, 100, 0, "store/run script")
 
@@ -613,9 +622,9 @@ def t9():
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
          break
-      time.sleep(0.5)
+      time.sleep(0.1)
+   time.sleep(0.3)
    c = t9cb.tally() - oc
-   time.sleep(0.1)
    CHECK(9, 2, c, 201, 0, "run script/script status")
 
    oc = t9cb.tally()
@@ -627,12 +636,14 @@ def t9():
       if p[9] < 1900:
          pi.stop_script(s)
       time.sleep(0.1)
+   time.sleep(0.3)
    c = t9cb.tally() - oc
-   time.sleep(0.1)
-   CHECK(9, 3, c, 110, 10, "run/stop script/script status")
+   CHECK(9, 3, c, 110, 20, "run/stop script/script status")
 
    e = pi.delete_script(s)
    CHECK(9, 4, e, 0, 0, "delete script")
+
+   pigpio.exceptions = old_exceptions
 
 def ta():
    print("Serial link tests.")

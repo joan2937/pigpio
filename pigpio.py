@@ -264,7 +264,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.21"
+VERSION = "1.22"
 
 exceptions = True
 
@@ -433,7 +433,7 @@ _PI_CMD_I2CZ =92
 
 _PI_CMD_WVCHA=93
 
-_PI_CMD_SLRI= 94
+_PI_CMD_SLRI =94
 
 # pigpio error numbers
 
@@ -899,7 +899,7 @@ class _callback_thread(threading.Thread):
    def run(self):
       """Runs the notification thread."""
 
-      lastLevel = 0
+      lastLevel = _pigpio_command(self.control,  _PI_CMD_BR1, 0, 0)
 
       MSG_SIZ = 12
 
@@ -2014,10 +2014,13 @@ class pi():
 
       The following command codes are supported:
 
-      Name        @ Cmd & Data @ Meaning
-      Loop Start  @ 255 0      @ Identify start of a wave block
-      Loop Repeat @ 255 1 x y  @ loop x + y*256 times
-      Delay       @ 255 2 x y  @ delay x + y*256 microseconds
+      Name         @ Cmd & Data @ Meaning
+      Loop Start   @ 255 0      @ Identify start of a wave block
+      Loop Repeat  @ 255 1 x y  @ loop x + y*256 times
+      Delay        @ 255 2 x y  @ delay x + y*256 microseconds
+      Loop Forever @ 255 3      @ loop forever
+
+      If present Loop Forever must be the last entry in the chain.
 
       The code is currently dimensioned to support a chain with
       roughly 600 entries and 20 loop counters.

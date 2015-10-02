@@ -39,6 +39,11 @@ gpio sample buffer in milliseconds
 100-10000
 default 120
 
+.IP "\fB-c value\fP"
+library internal settings
+
+default 0
+
 .IP "\fB-d value\fP"
 primary DMA channel
 0-14
@@ -158,13 +163,18 @@ affect updateable gpios.
 .br
 
 .br
-There are two special cases.
+There are several special cases.
 
 .br
 
 .br
-The activity LED may be written (gpio 16 for type 1 and 2
-boards, gpio 47 for type 3 boards).
+The activity LED (green) may be written (gpio 16 for type 1 and 2
+boards, gpio 47 for type 3 boards)
+
+.br
+
+.br
+The power LED (red) may be written on type 3 boards (gpio 35).
 
 .br
 

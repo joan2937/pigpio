@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 18
+#define PIGPIOD_IF_VERSION 20
 
 /*TEXT
 
@@ -282,10 +282,6 @@ typedef void (*CBFuncEx_t)
    (unsigned user_gpio, unsigned level, uint32_t tick, void * user);
 
 typedef struct callback_s callback_t;
-
-#define RISING_EDGE  0
-#define FALLING_EDGE 1
-#define EITHER_EDGE  2
 
 /*F*/
 double time_time(void);
@@ -1207,10 +1203,13 @@ Delays between waves may be added with the delay command.
 
 The following command codes are supported:
 
-Name        @ Cmd & Data @ Meaning
-Loop Start  @ 255 0      @ Identify start of a wave block
-Loop Repeat @ 255 1 x y  @ loop x + y*256 times
-Delay       @ 255 2 x y  @ delay x + y*256 microseconds
+Name         @ Cmd & Data @ Meaning
+Loop Start   @ 255 0      @ Identify start of a wave block
+Loop Repeat  @ 255 1 x y  @ loop x + y*256 times
+Delay        @ 255 2 x y  @ delay x + y*256 microseconds
+Loop Forever @ 255 3      @ loop forever
+
+If present Loop Forever must be the last entry in the chain.
 
 The code is currently dimensioned to support a chain with roughly
 600 entries and 20 loop counters.

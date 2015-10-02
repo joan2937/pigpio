@@ -1735,18 +1735,26 @@ The following command codes are supported:
 .br
 
 .br
-Name          Cmd & Data   Meaning
+Name           Cmd & Data   Meaning
 
 .br
-Loop Start    255 0        Identify start of a wave block
+Loop Start     255 0        Identify start of a wave block
 
 .br
-Loop Repeat   255 1 x y    loop x + y*256 times
+Loop Repeat    255 1 x y    loop x + y*256 times
 
 .br
-Delay         255 2 x y    delay x + y*256 microseconds
+Delay          255 2 x y    delay x + y*256 microseconds
 
 .br
+Loop Forever   255 3        loop forever
+
+.br
+
+.br
+
+.br
+If present Loop Forever must be the last entry in the chain.
 
 .br
 
