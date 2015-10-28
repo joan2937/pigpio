@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 38+
+This version is for pigpio version 39+
 */
 
 #include <stdio.h>
@@ -60,6 +60,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_CGI,   "CGI",   101, 4}, // gpioCfgGetInternals
    {PI_CMD_CSI,   "CSI",   111, 1}, // gpioCfgSetInternals
+
+   {PI_CMD_FG,    "FG",    121, 0}, // gpioGlitchFilter
+   {PI_CMD_FN,    "FN",    131, 0}, // gpioNoiseFilter
 
    {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
    {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
@@ -246,6 +249,9 @@ CF2 ...          Custom function 2\n\
 \n\
 CGI              Configuration get internals\n\
 CSI v            Configuration set internals\n\
+\n\
+FG g steady      Set glitch filter on gpio\n\
+FN g steady active | Set noise filter on gpio\n\
 \n\
 GDC g            Get PWM dutycycle for gpio\n\
 GPW g            Get servo pulsewidth for gpio\n\
@@ -479,6 +485,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_EDGE         , "bad ISR edge, not 1, 1, or 2"},
    {PI_BAD_ISR_INIT     , "bad ISR initialisation"},
    {PI_BAD_FOREVER      , "loop forever must be last chain command"},
+   {PI_BAD_FILTER       , "bad filter parameter"},
 
 };
 

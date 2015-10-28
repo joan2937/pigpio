@@ -514,6 +514,37 @@ configuration settings to \fBv\fP.
 
 .br
 
+.IP "\fBFG u stdy\fP - Set a glitch filter on a gpio"
+.IP "" 4
+
+.br
+Level changes on the gpio are not reported unless the level
+has been stable for at least \fBstdy\fP microseconds.  The
+level is then reported.  Level changes of less than \fBstdy\fP
+microseconds are ignored.
+
+.br
+Note, each (stable) edge will be timestamped \fBstdy\fP microseconds
+after it was first detected.
+
+.br
+
+.IP "\fBFN u stdy actv\fP - Set a noise filter on a gpio"
+.IP "" 4
+
+.br
+Level changes on the gpio are ignored until a level which has
+been stable for \fBstdy\fP microseconds is detected.  Level
+changes on the gpio are then reported for \fBactv\fP microseconds
+after which the process repeats.
+
+.br
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
+
+.br
+
 .IP "\fBGDC u\fP - Get gpio PWM dutycycle"
 .IP "" 4
 
@@ -3696,6 +3727,15 @@ ERROR: non existent wave id
 
 .br
 
+.IP "\fBactv\fP - 0-1000000" 0
+
+.br
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by \fBstdy\fP microseconds of
+a stable level).
+
+.br
+
 .IP "\fBb\fP - baud" 0
 The command expects the baud rate in bits per second for
 the transmission of serial data (I2C/SPI/serial link, waves).
@@ -3955,6 +3995,15 @@ The command expects a script id as returned by a call to \fBPROC\fP.
 
 .IP "\fBspf\fP - SPI flags (32 bits)" 0
 See \fBSPIO\fP.
+
+.br
+
+.IP "\fBstdy\fP - 0-300000" 0
+
+.br
+The number of microseconds level changes must be stable for
+before reporting the level changed (\fBFG\fP) or triggering
+the active part of a noise filter (\fBFN\fP).
 
 .br
 

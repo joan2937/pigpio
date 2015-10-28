@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 20
+#define PIGPIOD_IF_VERSION 21
 
 /*TEXT
 
@@ -166,6 +166,9 @@ bb_serial_invert           Invert serial logic (1 invert, 0 normal)
 hardware_clock             Start hardware clock on supported gpios
 hardware_PWM               Start hardware PWM on supported gpios
 
+set_glitch_filter         Set a glitch filter on a gpio
+set_noise_filter          Set a noise filter on a gpio
+
 SCRIPTS
 
 store_script               Store a script
@@ -275,6 +278,9 @@ time_time                  Float number of seconds since the epoch
 
 OVERVIEW*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef void (*CBFunc_t)  (unsigned user_gpio, unsigned level, uint32_t tick);
 
@@ -778,6 +784,50 @@ to the fifo with the flags set to indicate a watchdog timeout.
 
 The [*callback*] and [*callback_ex*] functions interpret the flags
 and will call registered callbacks for the gpio with level TIMEOUT.
+D*/
+
+/*F*/
+int set_glitch_filter(unsigned user_gpio, unsigned steady);
+/*D
+Sets a glitch filter on a gpio.
+
+Level changes on the gpio are not reported unless the level
+has been stable for at least [*steady*] microseconds.  The
+level is then reported.  Level changes of less than [*steady*]
+microseconds are ignored.
+
+. .
+user_gpio: 0-31
+   steady: 0-300000
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+Note, each (stable) edge will be timestamped [*steady*] microseconds
+after it was first detected.
+D*/
+
+/*F*/
+int set_noise_filter(unsigned user_gpio, unsigned steady, unsigned active);
+/*D
+Sets a noise filter on a gpio.
+
+Level changes on the gpio are ignored until a level which has
+been stable for [*steady*] microseconds is detected.  Level changes
+on the gpio are then reported for [*active*] microseconds after
+which the process repeats.
+
+. .
+user_gpio: 0-31
+   steady: 0-300000
+   active: 0-1000000
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
 D*/
 
 /*F*/
@@ -2367,8 +2417,7 @@ D*/
 /*F*/
 int callback_cancel(unsigned callback_id);
 /*D
-This function fim
-cancels a callback identified by its id.
+This function cancels a callback identified by its id.
 
 . .
 callback_id: >=0, as returned by a call to [*callback*] or [*callback_ex*].
@@ -2395,6 +2444,12 @@ The function returns when the edge occurs or after the timeout.
 D*/
 
 /*PARAMS
+
+active :: 0-1000000
+
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by [*steady*] microseconds of
+a stable level).
 
 *addrStr::
 A string specifying the host or IP address of the Pi running
@@ -2737,6 +2792,12 @@ A SPI channel, 0-2.
 spi_flags::
 See [*spi_open*].
 
+steady :: 0-300000
+
+The number of microseconds level changes must be stable for
+before reporting the level changed ([*set_glitch_filter*]) or triggering
+the active part of a noise filter ([*set_noise_filter*]).
+
 stop_bits::2-8
 The number of (half) stop bits to be used when adding serial data
 to a waveform.
@@ -2812,6 +2873,10 @@ typedef enum
 } pigifError_t;
 
 /*DEF_E*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

@@ -1014,6 +1014,79 @@ to the fifo with the flags set to indicate a watchdog timeout.
 The \fBcallback\fP and \fBcallback_ex\fP functions interpret the flags
 and will call registered callbacks for the gpio with level TIMEOUT.
 
+.IP "\fBint set_glitch_filter(unsigned user_gpio, unsigned steady)\fP"
+.IP "" 4
+Sets a glitch filter on a gpio.
+
+.br
+
+.br
+Level changes on the gpio are not reported unless the level
+has been stable for at least \fBsteady\fP microseconds.  The
+level is then reported.  Level changes of less than \fBsteady\fP
+microseconds are ignored.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+   steady: 0-300000
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+.br
+
+.br
+Note, each (stable) edge will be timestamped \fBsteady\fP microseconds
+after it was first detected.
+
+.IP "\fBint set_noise_filter(unsigned user_gpio, unsigned steady, unsigned active)\fP"
+.IP "" 4
+Sets a noise filter on a gpio.
+
+.br
+
+.br
+Level changes on the gpio are ignored until a level which has
+been stable for \fBsteady\fP microseconds is detected.  Level changes
+on the gpio are then reported for \fBactive\fP microseconds after
+which the process repeats.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+   steady: 0-300000
+.br
+   active: 0-1000000
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+.br
+
+.br
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
+
 .IP "\fBuint32_t read_bank_1(void)\fP"
 .IP "" 4
 Read the levels of the bank 1 gpios (gpios 0-31).
@@ -3697,8 +3770,7 @@ the gpio has the identified edge.
 
 .IP "\fBint callback_cancel(unsigned callback_id)\fP"
 .IP "" 4
-This function fim
-cancels a callback identified by its id.
+This function cancels a callback identified by its id.
 
 .br
 
@@ -3744,6 +3816,19 @@ The function returns 1 if the edge occurred, otherwise 0.
 .br
 The function returns when the edge occurs or after the timeout.
 .SH PARAMETERS
+
+.br
+
+.br
+
+.IP "\fBactive\fP: 0-1000000" 0
+
+.br
+
+.br
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by \fBsteady\fP microseconds of
+a stable level).
 
 .br
 
@@ -4503,6 +4588,19 @@ A SPI channel, 0-2.
 
 .IP "\fBspi_flags\fP" 0
 See \fBspi_open\fP.
+
+.br
+
+.br
+
+.IP "\fBsteady\fP: 0-300000" 0
+
+.br
+
+.br
+The number of microseconds level changes must be stable for
+before reporting the level changed (\fBset_glitch_filter\fP) or triggering
+the active part of a noise filter (\fBset_noise_filter\fP).
 
 .br
 

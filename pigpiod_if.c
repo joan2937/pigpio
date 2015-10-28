@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 19 */
+/* PIGPIOD_IF_VERSION 21 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -740,10 +740,10 @@ int wave_tx_repeat(void) /* DEPRECATED */
    {return pigpio_command(gPigCommand, PI_CMD_WVGOR, 0, 0, 1);}
 
 int wave_send_once(unsigned wave_id)
-   {return pigpio_command(gPigCommand, PI_CMD_WVTX, 0, 0, 1);}
+   {return pigpio_command(gPigCommand, PI_CMD_WVTX, wave_id, 0, 1);}
 
 int wave_send_repeat(unsigned wave_id)
-   {return pigpio_command(gPigCommand, PI_CMD_WVTXR, 0, 0, 1);}
+   {return pigpio_command(gPigCommand, PI_CMD_WVTXR, wave_id, 0, 1);}
 
 int wave_chain(char *buf, unsigned bufSize)
 {
@@ -814,6 +814,28 @@ int gpio_trigger(unsigned user_gpio, unsigned pulseLen, uint32_t level)
 
    return pigpio_command_ext(
       gPigCommand, PI_CMD_TRIG, user_gpio, pulseLen, 4, 1, ext, 1);
+}
+
+int set_glitch_filter(unsigned user_gpio, unsigned steady)
+   {return pigpio_command(gPigCommand, PI_CMD_FG, user_gpio, steady, 1);}
+
+int set_noise_filter(unsigned user_gpio, unsigned steady, unsigned active)
+{
+   gpioExtent_t ext[1];
+   
+   /*
+   p1=user_gpio
+   p2=steady
+   p3=4
+   ## extension ##
+   unsigned active
+   */
+
+   ext[0].size = sizeof(uint32_t);
+   ext[0].ptr = &active;
+
+   return pigpio_command_ext(
+      gPigCommand, PI_CMD_FN, user_gpio, steady, 4, 1, ext, 1);
 }
 
 int store_script(char *script)

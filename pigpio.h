@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 38
+#define PIGPIO_VERSION 39
 
 /*TEXT
 
@@ -183,6 +183,9 @@ gpioSerialReadClose        Closes a gpio for bit bang serial reads
 
 gpioHardwareClock          Start hardware clock on supported gpios
 gpioHardwarePWM            Start hardware PWM on supported gpios
+
+gpioGlitchFilter           Set a glitch filter on a gpio
+gpioNoiseFilter            Set a noise filter on a gpio
 
 SCRIPTS
 
@@ -735,6 +738,11 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_MEM_ALLOC_AUTO    0
 #define PI_MEM_ALLOC_PAGEMAP 1
 #define PI_MEM_ALLOC_MAILBOX 2
+
+/* filters */
+
+#define PI_MAX_STEADY  300000
+#define PI_MAX_ACTIVE 1000000
 
 /* gpioCfgInternals */
 
@@ -2883,6 +2891,52 @@ D*/
 
 
 /*F*/
+int gpioNoiseFilter(unsigned user_gpio, unsigned steady, unsigned active);
+/*D
+Sets a noise filter on a gpio.
+
+Level changes on the gpio are ignored until a level which has
+been stable for [*steady*] microseconds is detected.  Level changes
+on the gpio are then reported for [*active*] microseconds after
+which the process repeats.
+
+. .
+user_gpio: 0-31
+   steady: 0-300000
+   active: 0-1000000
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
+D*/
+
+
+/*F*/
+int gpioGlitchFilter(unsigned user_gpio, unsigned steady);
+/*D
+Sets a glitch filter on a gpio.
+
+Level changes on the gpio are not reported unless the level
+has been stable for at least [*steady*] microseconds.  The
+level is then reported.  Level changes of less than [*steady*]
+microseconds are ignored.
+
+. .
+user_gpio: 0-31
+   steady: 0-300000
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+Note, each (stable) edge will be timestamped [*steady*] microseconds
+after it was first detected.
+D*/
+
+
+/*F*/
 int gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits);
 /*D
 Registers a function to be called (a callback) every millisecond
@@ -3945,6 +3999,12 @@ D*/
 
 /*PARAMS
 
+active :: 0-1000000
+
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by [*steady*] microseconds of
+a stable level).
+
 *arg::
 
 A pointer to a void object passed to a thread started by gpioStartThread.
@@ -4580,6 +4640,12 @@ The SPI slave select gpio in a raw SPI transaction.
 spiTxBits::
 The number of bits to transfer dring a raw SPI transaction
 
+steady :: 0-300000
+
+The number of microseconds level changes must be stable for
+before reporting the level changed ([*gpioGlitchFilter*]) or triggering
+the active part of a noise filter ([*gpioNoiseFilter*]).
+
 stop_bits::2-8
 The number of (half) stop bits to be used when adding serial data
 to a waveform.
@@ -4786,6 +4852,9 @@ PARAMS*/
 #define PI_CMD_CGI   95
 #define PI_CMD_CSI   96
 
+#define PI_CMD_FG    97
+#define PI_CMD_FN    98
+
 #define PI_CMD_NOIB  99
 
 /*DEF_E*/
@@ -4975,6 +5044,7 @@ after this command is issued.
 #define PI_BAD_EDGE        -122 // bad ISR edge value, not 0-2
 #define PI_BAD_ISR_INIT    -123 // bad ISR initialisation
 #define PI_BAD_FOREVER     -124 // loop forever must be last chain command
+#define PI_BAD_FILTER      -125 // bad filter parameter
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

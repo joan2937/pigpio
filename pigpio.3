@@ -3862,6 +3862,79 @@ gpioSetWatchdog(4, 5);
 
 .EE
 
+.IP "\fBint gpioNoiseFilter(unsigned user_gpio, unsigned steady, unsigned active)\fP"
+.IP "" 4
+Sets a noise filter on a gpio.
+
+.br
+
+.br
+Level changes on the gpio are ignored until a level which has
+been stable for \fBsteady\fP microseconds is detected.  Level changes
+on the gpio are then reported for \fBactive\fP microseconds after
+which the process repeats.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+   steady: 0-300000
+.br
+   active: 0-1000000
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+.br
+
+.br
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
+
+.IP "\fBint gpioGlitchFilter(unsigned user_gpio, unsigned steady)\fP"
+.IP "" 4
+Sets a glitch filter on a gpio.
+
+.br
+
+.br
+Level changes on the gpio are not reported unless the level
+has been stable for at least \fBsteady\fP microseconds.  The
+level is then reported.  Level changes of less than \fBsteady\fP
+microseconds are ignored.
+
+.br
+
+.br
+
+.EX
+user_gpio: 0-31
+.br
+   steady: 0-300000
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+.br
+
+.br
+Note, each (stable) edge will be timestamped \fBsteady\fP microseconds
+after it was first detected.
+
 .IP "\fBint gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits)\fP"
 .IP "" 4
 Registers a function to be called (a callback) every millisecond
@@ -5620,6 +5693,19 @@ Not intended for general use.
 
 .br
 
+.IP "\fBactive\fP: 0-1000000" 0
+
+.br
+
+.br
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by \fBsteady\fP microseconds of
+a stable level).
+
+.br
+
+.br
+
 .IP "\fB*arg\fP" 0
 
 .br
@@ -7138,6 +7224,19 @@ The number of bits to transfer dring a raw SPI transaction
 
 .br
 
+.IP "\fBsteady\fP: 0-300000" 0
+
+.br
+
+.br
+The number of microseconds level changes must be stable for
+before reporting the level changed (\fBgpioGlitchFilter\fP) or triggering
+the active part of a noise filter (\fBgpioNoiseFilter\fP).
+
+.br
+
+.br
+
 .IP "\fBstop_bits\fP: 2-8" 0
 The number of (half) stop bits to be used when adding serial data
 to a waveform.
@@ -7592,6 +7691,12 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_FG    97
+.br
+#define PI_CMD_FN    98
+.br
+
+.br
 #define PI_CMD_NOIB  99
 .br
 
@@ -7854,6 +7959,8 @@ A 16-bit word value.
 #define PI_BAD_ISR_INIT    -123 // bad ISR initialisation
 .br
 #define PI_BAD_FOREVER     -124 // loop forever must be last chain command
+.br
+#define PI_BAD_FILTER      -125 // bad filter parameter
 .br
 
 .br

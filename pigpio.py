@@ -123,6 +123,7 @@ Intermediate
 gpio_trigger              Send a trigger pulse to a gpio
 
 set_watchdog              Set a watchdog on a gpio
+set_filter                Set an activity filter on a gpio
 
 set_PWM_range             Configure PWM range of a gpio
 get_PWM_range             Get configured PWM range of a gpio
@@ -155,6 +156,9 @@ bb_serial_invert          Invert serial logic (1 invert, 0 normal)
 
 hardware_clock            Start hardware clock on supported gpios
 hardware_PWM              Start hardware PWM on supported gpios
+
+set_glitch_filter         Set a glitch filter on a gpio
+set_noise_filter          Set a noise filter on a gpio
 
 Scripts
 
@@ -256,6 +260,7 @@ get_pigpio_version        Get the pigpio version
 pigpio.error_text         Gets error text from error number
 pigpio.tickDiff           Returns difference between two ticks
 """
+
 import sys
 import socket
 import struct
@@ -264,7 +269,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.22"
+VERSION = "1.23"
 
 exceptions = True
 
@@ -435,6 +440,12 @@ _PI_CMD_WVCHA=93
 
 _PI_CMD_SLRI =94
 
+_PI_CMD_CGI  =95
+_PI_CMD_CSI  =96
+
+_PI_CMD_FG   =97
+_PI_CMD_FN   =98
+
 # pigpio error numbers
 
 _PI_INIT_FAILED     =-1
@@ -559,6 +570,11 @@ PI_CHAIN_NESTING    =-118
 PI_CHAIN_TOO_BIG    =-119
 PI_DEPRECATED       =-120
 PI_BAD_SER_INVERT   =-121
+_PI_BAD_EDGE        =-122
+_PI_BAD_ISR_INIT    =-123
+PI_BAD_FOREVER      =-124
+PI_BAD_FILTER       =-125
+
 
 # pigpio error text
 
@@ -682,6 +698,10 @@ _errors=[
    [PI_CHAIN_TOO_BIG     , "chain is too long"],
    [PI_DEPRECATED        , "deprecated function removed"],
    [PI_BAD_SER_INVERT    , "bit bang serial invert not 0 or 1"],
+   [_PI_BAD_EDGE         , "bad ISR edge value, not 0-2"],
+   [_PI_BAD_ISR_INIT     , "bad ISR initialisation"],
+   [PI_BAD_FOREVER       , "loop forever must be last chain command"],
+   [PI_BAD_FILTER        , "bad filter parameter"],
 
 ]
 
@@ -867,6 +887,7 @@ class _callback_thread(threading.Thread):
       self.monitor = 0
       self.callbacks = []
       self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.sl.s.settimeout(None)
       self.sl.s.connect((host, port))
       self.handle = _pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0)
       self.go = True
@@ -3215,6 +3236,63 @@ class pi():
       return _u2i(_pigpio_command_ext(
          self.sl, _PI_CMD_TRIG, user_gpio, pulse_len, 4, extents))
 
+   def set_glitch_filter(self, user_gpio, steady):
+      """
+      Sets a glitch filter on a gpio.
+
+      Level changes on the gpio are not reported unless the level
+      has been stable for at least [*steady*] microseconds.  The
+      level is then reported.  Level changes of less than [*steady*]
+      microseconds are ignored.
+
+      user_gpio:= 0-31
+         steady:= 0-300000
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+      Note, each (stable) edge will be timestamped [*steady*]
+      microseconds after it was first detected.
+
+      ...
+      pi.set_glitch_filter(23, 100)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_FG, user_gpio, steady))
+
+   def set_noise_filter(self, user_gpio, steady, active):
+      """
+      Sets a noise filter on a gpio.
+
+      Level changes on the gpio are ignored until a level which has
+      been stable for [*steady*] microseconds is detected.  Level
+      changes on the gpio are then reported for [*active*]
+      microseconds after which the process repeats.
+
+      user_gpio:= 0-31
+         steady:= 0-300000
+         active:= 0-1000000
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
+
+      Note, level changes before and after the active period may
+      be reported.  Your software must be designed to cope with
+      such reports.
+
+      ...
+      pi.set_noise_filter(23, 1000, 5000)
+      ...
+      """
+      # pigpio message format
+
+      # I p1 user_gpio
+      # I p2 steady
+      # I p3 4
+      ## extension ##
+      # I active
+      extents = [struct.pack("I", active)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_FN, user_gpio, steady, 4, extents))
+
    def store_script(self, script):
       """
       Store a script for later execution.
@@ -3600,6 +3678,7 @@ class pi():
       self._port = int(port)
 
       self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.sl.s.settimeout(None)
 
       # Disable the Nagle algorithm.
       self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -3653,6 +3732,12 @@ class pi():
 
 def xref():
    """
+   active: 0-1000000
+   The number of microseconds level changes are reported for once
+   a noise filter has been triggered (by [*steady*] microseconds of
+   a stable level).
+
+
    arg1:
    An unsigned argument passed to a user customised function.  Its
    meaning is defined by the customiser.
@@ -3981,6 +4066,13 @@ def xref():
 
    spi_flags: 32 bit
    See [*spi_open*].
+
+   steady: 0-300000
+
+   The number of microseconds level changes must be stable for
+   before reporting the level changed ([*set_glitch_filter*])
+   or triggering the active part of a noise filter
+   ([*set_noise_filter*]).
 
    t1:
    A tick (earlier).

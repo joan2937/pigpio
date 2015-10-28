@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 38 */
+/* pigpio version 39 */
 
 /* include ------------------------------------------------------- */
 
@@ -734,7 +734,7 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define PI_WF_MICROS   1
 
-#define DATUMS 2000
+#define DATUMS 4000
 
 #define DEFAULT_PWM_IDX 5
 
@@ -868,8 +868,17 @@ typedef struct
    callbk_t func;
    unsigned ex;
    void *userdata;
-   int timeout;
-   uint32_t tick;
+   uint32_t wdTick;
+   uint32_t fnTick;
+   uint32_t fnTick2;
+   uint32_t fnLBitV;
+   int wdSteadyUs;
+   int fnSteadyUs;
+   int fnActiveUs;
+   uint32_t fgTick;
+   uint32_t fgDebounceUs;
+   uint32_t fgRBitV;
+   uint32_t fgLBitV;
 } gpioAlert_t;
 
 typedef struct
@@ -1144,6 +1153,7 @@ static volatile uint32_t alertBits   = 0;
 static volatile uint32_t monitorBits = 0;
 static volatile uint32_t notifyBits  = 0;
 static volatile uint32_t scriptBits  = 0;
+static volatile uint32_t filterBits  = 0;
 
 static volatile int runState = PI_STARTING;
 
@@ -1733,6 +1743,15 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
       case PI_CMD_CGI: res = gpioCfgGetInternals(); break;
 
       case PI_CMD_CSI: res = gpioCfgSetInternals(p[1]); break;
+
+      case PI_CMD_FG:
+         res = gpioGlitchFilter(p[1], p[2]);
+         break;
+
+      case PI_CMD_FN:
+         memcpy(&p[4], buf, 4);
+         res = gpioNoiseFilter(p[1], p[2], p[4]);
+         break;
 
       case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
 
@@ -4994,26 +5013,165 @@ static void sigSetHandler(void)
    }
 }
 
-unsigned alert_delays[]={
-   1000, 1068, 1145, 1235,
-   1339, 1463, 1613, 1796,
-   2027, 2326, 2727, 3297,
-   4167, 5660, 8823, 20000};
+unsigned alert_delays[]=
+{
+   1000, 1034, 1071, 1111, 1154, 1200, 1250, 1304,
+   1364, 1429, 1500, 1579, 1667, 1765, 1875, 2000
+};
 
 /* ======================================================================= */
+
+static void alertGlitchFilter(int numSamples)
+{
+   int i, j, diff;
+   uint32_t DebounceUs, Tick, RBitV, LBitV;
+   uint32_t bit, bitV;
+
+   if (!numSamples) return;
+
+   for (i=0; i<=PI_MAX_USER_GPIO; i++)
+   {
+      bit = (1<<i);
+
+      if (monitorBits & bit)
+      {
+         DebounceUs = gpioAlert[i].fgDebounceUs;
+
+         if (DebounceUs)
+         {
+            RBitV = gpioAlert[i].fgRBitV;
+            LBitV = gpioAlert[i].fgLBitV;
+            Tick = gpioAlert[i].fgTick;
+
+            for (j=0; j<numSamples; j++)
+            {
+               bitV = gpioSample[j].level & bit;
+
+               if (bitV ^ LBitV)
+               {
+                  /* Difference between level and last level.
+                     Restart debounce timer. */
+
+                  Tick = gpioSample[j].tick;
+                  LBitV = bitV;
+               }
+
+               if (bitV ^ RBitV)
+               {
+                  /* Difference between level and reported level. */
+
+                  diff = gpioSample[j].tick - Tick;
+                  if (diff >= DebounceUs)
+                  {
+                     /* Level steady for debounce period. */
+
+                     RBitV = bitV;
+                  }
+                  else
+                  {
+                     /* Keep reporting old level. */
+
+                     gpioSample[j].level ^= bit;
+                  }
+               }
+            }
+
+            gpioAlert[i].fgRBitV = RBitV;
+            gpioAlert[i].fgLBitV = LBitV;
+            gpioAlert[i].fgTick = Tick;
+         }
+      }
+   }
+}
+
+static void alertActivityFilter(int numSamples)
+{
+   int i, j, diff;
+   uint32_t LBitV;
+   uint32_t bit;
+   uint32_t firstTick, nowTick, lastTick;
+
+   if (!numSamples) return;
+
+   firstTick = gpioSample[0].tick;
+   lastTick = gpioSample[numSamples-1].tick;
+
+   for (i=0; i<=PI_MAX_USER_GPIO; i++)
+   {
+      bit = (1<<i);
+
+      if ((monitorBits & bit)  &&
+         (gpioAlert[i].wdSteadyUs || gpioAlert[i].fnSteadyUs))
+      {
+         if (gpioAlert[i].fnSteadyUs)
+         {
+            diff = firstTick - gpioAlert[i].fnTick2;
+
+            if (diff >= 0)
+            {
+               /* Stop reporting gpio changes */
+               filterBits |= bit;
+            }
+         }
+
+         LBitV = gpioAlert[i].fnLBitV;
+
+         for (j=0; j<numSamples; j++)
+         {
+            if ((gpioSample[j].level & bit) != LBitV)
+            {
+               nowTick = gpioSample[j].tick;
+
+               if (gpioAlert[i].fnSteadyUs)
+               {
+                  diff = nowTick - gpioAlert[i].fnTick;
+
+                  if (diff >= gpioAlert[i].fnSteadyUs)
+                  {
+                     /* Start reporting gpio changes */
+                     filterBits &= (~bit);
+                     gpioAlert[i].fnTick2 =
+                        nowTick + gpioAlert[i].fnActiveUs;
+                  }
+               }
+
+               LBitV = gpioSample[j].level & bit;
+
+               gpioAlert[i].fnTick = nowTick;
+               gpioAlert[i].wdTick = nowTick;
+            }
+         }
+
+         gpioAlert[i].fnLBitV = LBitV;
+
+         if (gpioAlert[i].fnSteadyUs)
+         {
+            diff = lastTick - gpioAlert[i].fnTick;
+
+            if (diff >= gpioAlert[i].fnSteadyUs)
+            {
+               /* Start reporting gpio changes */
+               filterBits &= (~bit);
+               gpioAlert[i].fnTick2 = lastTick + gpioAlert[i].fnActiveUs;
+            }
+         }
+      }
+   }
+}
 
 static void * pthAlertThread(void *x)
 {
    struct timespec req, rem;
    uint32_t oldLevel, newLevel, level, reportedLevel;
    uint32_t oldSlot,  newSlot;
-   uint32_t tick, expected, nowTick;
+   uint32_t stick, expected, nowTick;
    int32_t diff;
    int cycle, pulse;
    int emit, seqno, emitted;
    uint32_t changes, bits, changedBits, timeoutBits;
    int numSamples, d;
    int b, n, v;
+   int rp, wp;
    int err;
    int stopped;
    int delayTicks;
@@ -5039,10 +5197,10 @@ static void * pthAlertThread(void *x)
 
    moreToDo = 0;
 
-   tick = systReg[SYST_CLO];
+   stick = systReg[SYST_CLO];
 
    nextWakeTick =
-      tick + alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+      stick + alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
 
    while (1)
    {
@@ -5054,25 +5212,22 @@ static void * pthAlertThread(void *x)
 
       oldLevel = reportedLevel & monitorBits;
 
+      /* Work through latest samples saving any level
+         changes of gpios of interest.
+      */
+
       while ((oldSlot != newSlot) && (numSamples < DATUMS))
       {
          level = myGetLevel(oldSlot++);
 
          newLevel = (level & monitorBits);
 
-         if (newLevel != oldLevel)
-         {
-            gpioSample[numSamples].tick  = tick;
-            gpioSample[numSamples].level = level;
+         gpioSample[numSamples].tick  = stick;
+         gpioSample[numSamples].level = level;
 
-            changedBits |= (newLevel ^ oldLevel);
+         numSamples++;
 
-            oldLevel = newLevel;
-
-            numSamples++;
-         }
-
-         tick += gpioCfg.clockMicros;
+         stick += gpioCfg.clockMicros;
 
          if (++pulse >= PULSE_PER_CYCLE)
          {
@@ -5084,11 +5239,11 @@ static void * pthAlertThread(void *x)
                oldSlot = 0;
             }
 
-            expected = tick;
+            expected = stick;
 
-            tick = myGetTick(cycle);
+            stick = myGetTick(cycle);
 
-            diff = tick - expected;
+            diff = stick - expected;
 
             diff += (TICKSLOTS/2);
 
@@ -5108,7 +5263,35 @@ static void * pthAlertThread(void *x)
 
       if (oldSlot == newSlot) moreToDo = 0; else moreToDo = 1;
 
-      /* should gpioGetSamples be called */
+      /* Apply glitch filter */
+
+      alertGlitchFilter(numSamples);
+
+      /* Compact samples */
+
+      wp = 0;
+
+      for (rp=0; rp<numSamples; rp++)
+      {
+         level = gpioSample[rp].level;
+
+         newLevel = (level & monitorBits);
+
+         if (newLevel != oldLevel)
+         {
+            gpioSample[wp].tick  = gpioSample[rp].tick;
+            gpioSample[wp].level = level;
+            wp++;
+
+            changedBits |= (newLevel ^ oldLevel);
+
+            oldLevel = newLevel;
+         }
+      }
+
+      numSamples = wp;
+
+      /* Write compacted samples. */
 
       if (changedBits)
       {
@@ -5127,29 +5310,23 @@ static void * pthAlertThread(void *x)
          }
       }
 
-      /* reset timeouts for any changed bits */
+      /* Apply activity filter */
 
-      if (changedBits)
-      {
-         for (b=0; b<=PI_MAX_USER_GPIO; b++)
-         {
-            if (changedBits & (1<<b)) gpioAlert[b].tick = tick;
-         }
-      }
+      alertActivityFilter(numSamples);
 
       /* call alert callbacks for each bit transition */
 
-      if (changedBits & alertBits)
+      if ((changedBits & alertBits) & (~filterBits))
       {
-         oldLevel = reportedLevel & alertBits;
+         oldLevel = (reportedLevel & alertBits) & (~filterBits);
 
          for (d=0; d<numSamples; d++)
          {
-            newLevel = gpioSample[d].level & alertBits;
+            newLevel = (gpioSample[d].level & alertBits) & (~filterBits);
 
             if (newLevel != oldLevel)
             {
-               changes = newLevel ^ oldLevel;
+               changes = (newLevel ^ oldLevel) & (~filterBits);
 
                for (b=0; b<=PI_MAX_USER_GPIO; b++)
                {
@@ -5178,33 +5355,33 @@ static void * pthAlertThread(void *x)
          }
       }
 
-      /* check for timeout watchdogs */
+      /* check for watchdog timeouts */
 
       timeoutBits = 0;
 
       for (b=0; b<=PI_MAX_USER_GPIO; b++)
       {
-         if (gpioAlert[b].timeout)
+         if (gpioAlert[b].wdSteadyUs)
          {
-            diff = tick - gpioAlert[b].tick;
+            diff = stick - gpioAlert[b].wdTick;
 
-            if (diff > (gpioAlert[b].timeout*1000))
+            if (diff >= gpioAlert[b].wdSteadyUs)
             {
                timeoutBits |= (1<<b);
 
-               gpioAlert[b].tick += (gpioAlert[b].timeout*1000);
+               gpioAlert[b].wdTick += gpioAlert[b].wdSteadyUs;
 
                if (gpioAlert[b].func)
                {
                   if (gpioAlert[b].ex)
                   {
                      (gpioAlert[b].func)
-                        (b, PI_TIMEOUT, tick, gpioAlert[b].userdata);
+                        (b, PI_TIMEOUT, stick, gpioAlert[b].userdata);
                   }
                   else
                   {
                      (gpioAlert[b].func)
-                        (b, PI_TIMEOUT, tick);
+                        (b, PI_TIMEOUT, stick);
                   }
                }
             }
@@ -5228,7 +5405,7 @@ static void * pthAlertThread(void *x)
          }
          else if (gpioNotify[n].state == PI_NOTIFY_RUNNING)
          {
-            bits = gpioNotify[n].bits;
+            bits = gpioNotify[n].bits & (~filterBits);
 
             emit = 0;
 
@@ -5254,7 +5431,8 @@ static void * pthAlertThread(void *x)
                      gpioReport[emit].seqno = seqno;
                      gpioReport[emit].flags = 0;
                      gpioReport[emit].tick  = gpioSample[d].tick;
-                     gpioReport[emit].level = gpioSample[d].level;
+                     gpioReport[emit].level =
+                        gpioSample[d].level & (~filterBits);
 
                      oldLevel = newLevel;
 
@@ -5270,6 +5448,8 @@ static void * pthAlertThread(void *x)
                bits        is the set of notification bits
                timeoutBits is the set of timed out bits
             */
+
+            bits = gpioNotify[n].bits;
 
             if (timeoutBits & bits)
             {
@@ -5289,7 +5469,7 @@ static void * pthAlertThread(void *x)
                      gpioReport[emit].seqno = seqno;
                      gpioReport[emit].flags = PI_NTFY_FLAGS_WDOG |
                                               PI_NTFY_FLAGS_BIT(b);
-                     gpioReport[emit].tick  = tick;
+                     gpioReport[emit].tick  = stick;
                      gpioReport[emit].level = newLevel;
 
                      emit++;
@@ -5300,7 +5480,7 @@ static void * pthAlertThread(void *x)
 
             if (!emit)
             {
-               if ((tick - gpioNotify[n].lastReportTick) > 60000000)
+               if ((stick - gpioNotify[n].lastReportTick) > 60000000)
                {
                   if (numSamples)
                      newLevel = gpioSample[numSamples-1].level;
@@ -5309,7 +5489,7 @@ static void * pthAlertThread(void *x)
 
                   gpioReport[emit].seqno = seqno;
                   gpioReport[emit].flags = PI_NTFY_FLAGS_ALIVE;
-                  gpioReport[emit].tick  = tick;
+                  gpioReport[emit].tick  = stick;
                   gpioReport[emit].level = newLevel;
 
                   emit++;
@@ -5319,7 +5499,7 @@ static void * pthAlertThread(void *x)
 
             if (emit)
             {
-               gpioNotify[n].lastReportTick = tick;
+               gpioNotify[n].lastReportTick = stick;
                max_emits = gpioNotify[n].max_emits;
 
                if (emit > gpioStats.maxEmit) gpioStats.maxEmit = emit;
@@ -9785,14 +9965,14 @@ static int intGpioSetISRFunc(
          gpioISR[gpio].pth = NULL;
       }
 
-      if (gpioISR[gpio].inited) /* unexport any gpio */
+      if (gpioISR[gpio].inited) /* unexport the gpio */
       {
          fd = open("/sys/class/gpio/unexport", O_WRONLY);
          if (fd < 0) return PI_BAD_ISR_INIT;
          sprintf(buf, "%d\n", gpio);
          err = write(fd, buf, strlen(buf));
          close(fd);
-         if (err != sizeof(buf)) return PI_BAD_ISR_INIT;
+         if (err != strlen(buf)) return PI_BAD_ISR_INIT;
          gpioISR[gpio].inited = 0;
       }
    }
@@ -10093,8 +10273,72 @@ int gpioSetWatchdog(unsigned gpio, unsigned timeout)
       SOFT_ERROR(PI_BAD_WDOG_TIMEOUT,
          "gpio %d, bad timeout (%d)", gpio, timeout);
 
-   gpioAlert[gpio].timeout = timeout;
-   gpioAlert[gpio].tick    = systReg[SYST_CLO];
+   gpioAlert[gpio].wdTick   = systReg[SYST_CLO];
+   gpioAlert[gpio].wdSteadyUs = timeout*1000;
+
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+int gpioNoiseFilter(unsigned gpio, unsigned steady, unsigned active)
+{
+   DBG(DBG_USER, "gpio=%d steady=%d active=%d", gpio, steady, active);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (steady > PI_MAX_STEADY)
+      SOFT_ERROR(PI_BAD_FILTER, "bad steady (%d)", steady);
+
+   if (active > PI_MAX_ACTIVE)
+      SOFT_ERROR(PI_BAD_FILTER, "bad active (%d)", active);
+
+   gpioAlert[gpio].fnTick  = systReg[SYST_CLO];
+   gpioAlert[gpio].fnTick2  = gpioAlert[gpio].fnTick;
+   gpioAlert[gpio].fnSteadyUs = steady;
+   gpioAlert[gpio].fnActiveUs = active;
+
+   if (steady) filterBits |= (1<<gpio);
+   else        filterBits &= (~(1<<gpio));
+
+   return 0;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+int gpioGlitchFilter(unsigned gpio, unsigned steady)
+{
+   DBG(DBG_USER, "gpio=%d steady=%d", gpio, steady);
+
+   CHECK_INITED;
+
+   if (gpio > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+
+   if (steady > PI_MAX_STEADY)
+      SOFT_ERROR(PI_BAD_FILTER, "bad steady (%d)", steady);
+
+   if (steady)
+   {
+      gpioAlert[gpio].fgTick  = systReg[SYST_CLO];
+
+      if (gpioRead_Bits_0_31() & (1<<gpio))
+      {
+         gpioAlert[gpio].fgLBitV = (1<<gpio);
+         gpioAlert[gpio].fgRBitV = 0 ;
+      }
+      else
+      {
+         gpioAlert[gpio].fgLBitV = 0 ;
+         gpioAlert[gpio].fgRBitV = (1<<gpio);
+      }
+   }
+
+   gpioAlert[gpio].fgDebounceUs = steady;
 
    return 0;
 }
