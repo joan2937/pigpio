@@ -1,17 +1,17 @@
 
 ." Process this file with
-." groff -man -Tascii pigpiod_if.3
+." groff -man -Tascii pigpiod_if2.3
 ."
-.TH pigpiod_if 3 2012-2015 Linux "pigpio archive"
+.TH pigpiod_if2 3 2012-2015 Linux "pigpio archive"
 .SH NAME
-pigpiod_if - A C library to interface to the pigpio daemon.
+pigpiod_if2 - A C library to interface to the pigpio daemon.
 
 .SH SYNOPSIS
 
-#include <pigpiod_if.h>
+#include <pigpiod_if2.h>
 
 
-gcc -Wall -pthread -o prog prog.c -lpigpiod_if -lrt
+gcc -Wall -pthread -o prog prog.c -lpigpiod_if2 -lrt
 
  ./prog
 .SH DESCRIPTION
@@ -20,13 +20,7 @@ gcc -Wall -pthread -o prog prog.c -lpigpiod_if -lrt
 .br
 
 .br
-THIS LIBRARY IS DEPRECATED.  NEW CODE SHOULD BE WRITTEN TO
-USE THE MORE VERSATILE pigpiod_if2 LIBRARY.
-
-.br
-
-.br
-pigpiod_if is a C library for the Raspberry which allows control
+pigpiod_if2 is a C library for the Raspberry which allows control
 of the gpios via the socket interface to the pigpio daemon.
 .br
 
@@ -119,7 +113,7 @@ The PWM and servo pulses are timed using the DMA and PWM/PCM peripherals.
 .br
 
 .br
-Include <pigpiod_if.h> in your source files.
+Include <pigpiod_if2.h> in your source files.
 
 .br
 
@@ -131,7 +125,7 @@ Assuming your source is in prog.c use the following command to build
 .br
 
 .EX
-gcc -Wall -pthread -o prog prog.c -lpigpiod_if -lrt
+gcc -Wall -pthread -o prog prog.c -lpigpiod_if2 -lrt
 .br
 
 .EE
@@ -150,7 +144,7 @@ sudo pigpiod
 .br
 
 .br
- ./prog # sudo is not required to run programs linked to pigpiod_if
+ ./prog # sudo is not required to run programs linked to pigpiod_if2
 .br
 
 .EE
@@ -158,7 +152,7 @@ sudo pigpiod
 .br
 
 .br
-For examples see x_pigpiod_if.c within the pigpio archive file.
+For examples see x_pigpiod_if2.c within the pigpio archive file.
 
 .br
 
@@ -208,7 +202,7 @@ errnum: the error code.
 
 .IP "\fBunsigned pigpiod_if_version(void)\fP"
 .IP "" 4
-Return the pigpiod_if version.
+Return the pigpiod_if2 version.
 
 .IP "\fBpthread_t *start_thread(gpioThreadFunc_t thread_func, void *userdata)\fP"
 .IP "" 4
@@ -297,12 +291,33 @@ portStr: specifies the port address used by the Pi running the
 
 .EE
 
-.IP "\fBvoid pigpio_stop(void)\fP"
+.br
+
+.br
+Returns an integer value greater than or equal to zero if OK.
+
+.br
+
+.br
+This value is passed to the GPIO routines to specify the Pi
+to be operated on.
+
+.IP "\fBvoid pigpio_stop(int pi)\fP"
 .IP "" 4
-Terminates the connection to the pigpio daemon and releases
+Terminates the connection to a pigpio daemon and releases
 resources used by the library.
 
-.IP "\fBint set_mode(unsigned gpio, unsigned mode)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint set_mode(int pi, unsigned gpio, unsigned mode)\fP"
 .IP "" 4
 Set the gpio mode.
 
@@ -311,6 +326,8 @@ Set the gpio mode.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 gpio: 0-53.
 .br
 mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
@@ -326,7 +343,7 @@ mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_MODE,
 or PI_NOT_PERMITTED.
 
-.IP "\fBint get_mode(unsigned gpio)\fP"
+.IP "\fBint get_mode(int pi, unsigned gpio)\fP"
 .IP "" 4
 Get the gpio mode.
 
@@ -335,6 +352,8 @@ Get the gpio mode.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 gpio: 0-53.
 .br
 
@@ -345,7 +364,7 @@ gpio: 0-53.
 .br
 Returns the gpio mode if OK, otherwise PI_BAD_GPIO.
 
-.IP "\fBint set_pull_up_down(unsigned gpio, unsigned pud)\fP"
+.IP "\fBint set_pull_up_down(int pi, unsigned gpio, unsigned pud)\fP"
 .IP "" 4
 Set or clear the gpio pull-up/down resistor.
 
@@ -354,6 +373,8 @@ Set or clear the gpio pull-up/down resistor.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 gpio: 0-53.
 .br
  pud: PI_PUD_UP, PI_PUD_DOWN, PI_PUD_OFF.
@@ -367,7 +388,7 @@ gpio: 0-53.
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_PUD,
 or PI_NOT_PERMITTED.
 
-.IP "\fBint gpio_read(unsigned gpio)\fP"
+.IP "\fBint gpio_read(int pi, unsigned gpio)\fP"
 .IP "" 4
 Read the gpio level.
 
@@ -376,6 +397,8 @@ Read the gpio level.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 gpio:0-53.
 .br
 
@@ -386,7 +409,7 @@ gpio:0-53.
 .br
 Returns the gpio level if OK, otherwise PI_BAD_GPIO.
 
-.IP "\fBint gpio_write(unsigned gpio, unsigned level)\fP"
+.IP "\fBint gpio_write(int pi, unsigned gpio, unsigned level)\fP"
 .IP "" 4
 Write the gpio level.
 
@@ -395,6 +418,8 @@ Write the gpio level.
 .br
 
 .EX
+   pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  gpio: 0-53.
 .br
 level: 0, 1.
@@ -418,7 +443,7 @@ Notes
 .br
 If PWM or servo pulses are active on the gpio they are switched off.
 
-.IP "\fBint set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle)\fP"
+.IP "\fBint set_PWM_dutycycle(int pi, unsigned user_gpio, unsigned dutycycle)\fP"
 .IP "" 4
 Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
 
@@ -427,6 +452,8 @@ Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 dutycycle: 0-range (range defaults to 255).
@@ -447,7 +474,7 @@ Notes
 The \fBset_PWM_range\fP function may be used to change the
 default range of 255.
 
-.IP "\fBint get_PWM_dutycycle(unsigned user_gpio)\fP"
+.IP "\fBint get_PWM_dutycycle(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 Return the PWM dutycycle in use on a gpio.
 
@@ -456,6 +483,8 @@ Return the PWM dutycycle in use on a gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 
@@ -484,7 +513,7 @@ will be 500000 (500k) out of 1000000 (1M).
 If hardware PWM is active on the gpio the reported dutycycle
 will be out of a 1000000 (1M).
 
-.IP "\fBint set_PWM_range(unsigned user_gpio, unsigned range)\fP"
+.IP "\fBint set_PWM_range(int pi, unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
 Set the range of PWM values to be used on the gpio.
 
@@ -493,6 +522,8 @@ Set the range of PWM values to be used on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
     range: 25-40000.
@@ -542,7 +573,7 @@ for each of the 18 available gpio frequencies is
 .br
 The real value set by set_PWM_range is (dutycycle * real range) / range.
 
-.IP "\fBint get_PWM_range(unsigned user_gpio)\fP"
+.IP "\fBint get_PWM_range(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 Get the range of PWM values being used on the gpio.
 
@@ -551,6 +582,8 @@ Get the range of PWM values being used on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 
@@ -568,7 +601,7 @@ otherwise PI_BAD_USER_GPIO.
 If a hardware clock or hardware PWM is active on the gpio the
 reported range will be 1000000 (1M).
 
-.IP "\fBint get_PWM_real_range(unsigned user_gpio)\fP"
+.IP "\fBint get_PWM_real_range(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 Get the real underlying range of PWM values being used on the gpio.
 
@@ -577,6 +610,8 @@ Get the real underlying range of PWM values being used on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 
@@ -604,7 +639,7 @@ will be approximately 250M divided by the set PWM frequency.
 
 .br
 
-.IP "\fBint set_PWM_frequency(unsigned user_gpio, unsigned frequency)\fP"
+.IP "\fBint set_PWM_frequency(int pi, unsigned user_gpio, unsigned frequency)\fP"
 .IP "" 4
 Set the frequency (in Hz) of the PWM to be used on the gpio.
 
@@ -613,6 +648,8 @@ Set the frequency (in Hz) of the PWM to be used on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 frequency: 0- (Hz).
@@ -687,7 +724,7 @@ off and then back on at the new frequency.
 
 .EE
 
-.IP "\fBint get_PWM_frequency(unsigned user_gpio)\fP"
+.IP "\fBint get_PWM_frequency(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 Get the frequency of PWM being used on the gpio.
 
@@ -696,6 +733,8 @@ Get the frequency of PWM being used on the gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 
@@ -725,7 +764,7 @@ will be that set by \fBhardware_PWM\fP.
 Returns the frequency (in hertz) used for the gpio if OK,
 otherwise PI_BAD_USER_GPIO.
 
-.IP "\fBint set_servo_pulsewidth(unsigned user_gpio, unsigned pulsewidth)\fP"
+.IP "\fBint set_servo_pulsewidth(int pi, unsigned user_gpio, unsigned pulsewidth)\fP"
 .IP "" 4
 Start (500-2500) or stop (0) servo pulses on the gpio.
 
@@ -734,6 +773,8 @@ Start (500-2500) or stop (0) servo pulses on the gpio.
 .br
 
 .EX
+        pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  user_gpio: 0-31.
 .br
 pulsewidth: 0 (off), 500 (anti-clockwise) - 2500 (clockwise).
@@ -824,7 +865,7 @@ Thereafter use the \fBset_PWM_dutycycle\fP function to move the servo,
 e.g. set_PWM_dutycycle(25, 1500) will set a 1500 us pulse.
 .br
 
-.IP "\fBint get_servo_pulsewidth(unsigned user_gpio)\fP"
+.IP "\fBint get_servo_pulsewidth(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 Return the servo pulsewidth in use on a gpio.
 
@@ -833,6 +874,8 @@ Return the servo pulsewidth in use on a gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
 
@@ -843,9 +886,19 @@ user_gpio: 0-31.
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 
-.IP "\fBint notify_open(void)\fP"
+.IP "\fBint notify_open(int pi)\fP"
 .IP "" 4
 Get a free notification handle.
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -875,7 +928,7 @@ named /dev/pigpiox (where x is the handle number).
 E.g. if the function returns 15 then the notifications must be
 read from /dev/pigpio15.
 
-.IP "\fBint notify_begin(unsigned handle, uint32_t bits)\fP"
+.IP "\fBint notify_begin(int pi, unsigned handle, uint32_t bits)\fP"
 .IP "" 4
 Start notifications on a previously opened handle.
 
@@ -884,6 +937,8 @@ Start notifications on a previously opened handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: 0-31 (as returned by \fBnotify_open\fP)
 .br
   bits: a mask indicating the gpios to be notified.
@@ -928,7 +983,7 @@ I (32 bit) level
 
 .EE
 
-.IP "\fBint notify_pause(unsigned handle)\fP"
+.IP "\fBint notify_pause(int pi, unsigned handle)\fP"
 .IP "" 4
 Pause notifications on a previously opened handle.
 
@@ -937,6 +992,8 @@ Pause notifications on a previously opened handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: 0-31 (as returned by \fBnotify_open\fP)
 .br
 
@@ -953,7 +1010,7 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE.
 Notifications for the handle are suspended until
 \fBnotify_begin\fP is called again.
 
-.IP "\fBint notify_close(unsigned handle)\fP"
+.IP "\fBint notify_close(int pi, unsigned handle)\fP"
 .IP "" 4
 Stop notifications on a previously opened handle and
 release the handle for reuse.
@@ -963,6 +1020,8 @@ release the handle for reuse.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: 0-31 (as returned by \fBnotify_open\fP)
 .br
 
@@ -973,7 +1032,7 @@ handle: 0-31 (as returned by \fBnotify_open\fP)
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
-.IP "\fBint set_watchdog(unsigned user_gpio, unsigned timeout)\fP"
+.IP "\fBint set_watchdog(int pi, unsigned user_gpio, unsigned timeout)\fP"
 .IP "" 4
 Sets a watchdog for a gpio.
 
@@ -982,6 +1041,8 @@ Sets a watchdog for a gpio.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
   timeout: 0-60000.
@@ -1023,7 +1084,7 @@ to the fifo with the flags set to indicate a watchdog timeout.
 The \fBcallback\fP and \fBcallback_ex\fP functions interpret the flags
 and will call registered callbacks for the gpio with level TIMEOUT.
 
-.IP "\fBint set_glitch_filter(unsigned user_gpio, unsigned steady)\fP"
+.IP "\fBint set_glitch_filter(int pi, unsigned user_gpio, unsigned steady)\fP"
 .IP "" 4
 Sets a glitch filter on a gpio.
 
@@ -1040,6 +1101,8 @@ microseconds are ignored.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31
 .br
    steady: 0-300000
@@ -1058,7 +1121,7 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 Note, each (stable) edge will be timestamped \fBsteady\fP microseconds
 after it was first detected.
 
-.IP "\fBint set_noise_filter(unsigned user_gpio, unsigned steady, unsigned active)\fP"
+.IP "\fBint set_noise_filter(int pi, unsigned user_gpio, unsigned steady, unsigned active)\fP"
 .IP "" 4
 Sets a noise filter on a gpio.
 
@@ -1075,6 +1138,8 @@ which the process repeats.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31
 .br
    steady: 0-300000
@@ -1096,9 +1161,19 @@ Note, level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
 
-.IP "\fBuint32_t read_bank_1(void)\fP"
+.IP "\fBuint32_t read_bank_1(int pi)\fP"
 .IP "" 4
 Read the levels of the bank 1 gpios (gpios 0-31).
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1106,9 +1181,19 @@ Read the levels of the bank 1 gpios (gpios 0-31).
 The returned 32 bit integer has a bit set if the corresponding
 gpio is logic 1.  Gpio n has bit value (1<<n).
 
-.IP "\fBuint32_t read_bank_2(void)\fP"
+.IP "\fBuint32_t read_bank_2(int pi)\fP"
 .IP "" 4
 Read the levels of the bank 2 gpios (gpios 32-53).
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1116,7 +1201,7 @@ Read the levels of the bank 2 gpios (gpios 32-53).
 The returned 32 bit integer has a bit set if the corresponding
 gpio is logic 1.  Gpio n has bit value (1<<(n-32)).
 
-.IP "\fBint clear_bank_1(uint32_t bits)\fP"
+.IP "\fBint clear_bank_1(int pi, uint32_t bits)\fP"
 .IP "" 4
 Clears gpios 0-31 if the corresponding bit in bits is set.
 
@@ -1125,6 +1210,8 @@ Clears gpios 0-31 if the corresponding bit in bits is set.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 bits: a bit mask with 1 set if the corresponding gpio is
 .br
       to be cleared.
@@ -1143,7 +1230,7 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 A status of PI_SOME_PERMITTED indicates that the user is not
 allowed to write to one or more of the gpios.
 
-.IP "\fBint clear_bank_2(uint32_t bits)\fP"
+.IP "\fBint clear_bank_2(int pi, uint32_t bits)\fP"
 .IP "" 4
 Clears gpios 32-53 if the corresponding bit (0-21) in bits is set.
 
@@ -1152,6 +1239,8 @@ Clears gpios 32-53 if the corresponding bit (0-21) in bits is set.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 bits: a bit mask with 1 set if the corresponding gpio is
 .br
       to be cleared.
@@ -1170,7 +1259,7 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 A status of PI_SOME_PERMITTED indicates that the user is not
 allowed to write to one or more of the gpios.
 
-.IP "\fBint set_bank_1(uint32_t bits)\fP"
+.IP "\fBint set_bank_1(int pi, uint32_t bits)\fP"
 .IP "" 4
 Sets gpios 0-31 if the corresponding bit in bits is set.
 
@@ -1179,6 +1268,8 @@ Sets gpios 0-31 if the corresponding bit in bits is set.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 bits: a bit mask with 1 set if the corresponding gpio is
 .br
       to be set.
@@ -1197,7 +1288,7 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 A status of PI_SOME_PERMITTED indicates that the user is not
 allowed to write to one or more of the gpios.
 
-.IP "\fBint set_bank_2(uint32_t bits)\fP"
+.IP "\fBint set_bank_2(int pi, uint32_t bits)\fP"
 .IP "" 4
 Sets gpios 32-53 if the corresponding bit (0-21) in bits is set.
 
@@ -1206,6 +1297,8 @@ Sets gpios 32-53 if the corresponding bit (0-21) in bits is set.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 bits: a bit mask with 1 set if the corresponding gpio is
 .br
       to be set.
@@ -1224,7 +1317,7 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 A status of PI_SOME_PERMITTED indicates that the user is not
 allowed to write to one or more of the gpios.
 
-.IP "\fBint hardware_clock(unsigned gpio, unsigned clkfreq)\fP"
+.IP "\fBint hardware_clock(int pi, unsigned gpio, unsigned clkfreq)\fP"
 .IP "" 4
 Starts a hardware clock on a gpio at the specified frequency.
 Frequencies above 30MHz are unlikely to work.
@@ -1234,6 +1327,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
      gpio: see description
 .br
 frequency: 0 (off) or 4689-250000000 (250M)
@@ -1295,7 +1390,7 @@ Access to clock 1 is protected by a password as its use will likely
 crash the Pi.  The password is given by or'ing 0x5A000000 with the
 gpio number.
 
-.IP "\fBint hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty)\fP"
+.IP "\fBint hardware_PWM(int pi, unsigned gpio, unsigned PWMfreq, uint32_t PWMduty)\fP"
 .IP "" 4
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
@@ -1318,6 +1413,8 @@ daemon is started (option -t).
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
    gpio: see descripton
 .br
 PWMfreq: 0 (off) or 1-125000000 (125M)
@@ -1374,9 +1471,19 @@ The gpio must be one of the following.
 
 .EE
 
-.IP "\fBuint32_t get_current_tick(void)\fP"
+.IP "\fBuint32_t get_current_tick(int pi)\fP"
 .IP "" 4
 Gets the current system tick.
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1393,9 +1500,19 @@ As tick is an unsigned 32 bit quantity it wraps around after
 
 .br
 
-.IP "\fBuint32_t get_hardware_revision(void)\fP"
+.IP "\fBuint32_t get_hardware_revision(int pi)\fP"
 .IP "" 4
 Get the Pi's hardware revision number.
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1435,11 +1552,21 @@ Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
 .br
 Type 3 boards have hardware revision numbers of 16 or greater.
 
-.IP "\fBuint32_t get_pigpio_version(void)\fP"
+.IP "\fBuint32_t get_pigpio_version(int pi)\fP"
 .IP "" 4
 Returns the pigpio version.
 
-.IP "\fBint wave_clear(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_clear(int pi)\fP"
 .IP "" 4
 This function clears all waveforms and any data added by calls to the
 \fBwave_add_*\fP functions.
@@ -1447,9 +1574,19 @@ This function clears all waveforms and any data added by calls to the
 .br
 
 .br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.br
+
+.br
 Returns 0 if OK.
 
-.IP "\fBint wave_add_new(void)\fP"
+.IP "\fBint wave_add_new(int pi)\fP"
 .IP "" 4
 This function starts a new empty waveform.  You wouldn't normally need
 to call this function as it is automatically called after a waveform is
@@ -1458,9 +1595,19 @@ created with the \fBwave_create\fP function.
 .br
 
 .br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.br
+
+.br
 Returns 0 if OK.
 
-.IP "\fBint wave_add_generic(unsigned numPulses, gpioPulse_t *pulses)\fP"
+.IP "\fBint wave_add_generic(int pi, unsigned numPulses, gpioPulse_t *pulses)\fP"
 .IP "" 4
 This function adds a number of pulses to the current waveform.
 
@@ -1469,6 +1616,8 @@ This function adds a number of pulses to the current waveform.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 numPulses: the number of pulses.
 .br
    pulses: an array of pulses.
@@ -1500,7 +1649,7 @@ for gpio#1 can be added, and then gpio#2 etc.
 If the added waveform is intended to start after or within the existing
 waveform then the first pulse should consist solely of a delay.
 
-.IP "\fBint wave_add_serial(unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset, unsigned numBytes, char *str)\fP"
+.IP "\fBint wave_add_serial(int pi, unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset, unsigned numBytes, char *str)\fP"
 .IP "" 4
 This function adds a waveform representing serial data to the
 existing waveform (if any).  The serial data starts offset
@@ -1511,6 +1660,8 @@ microseconds from the start of the waveform.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
      baud: 50-1000000
@@ -1572,12 +1723,22 @@ For \fBdata_bits\fP 9-16 there will be two bytes per character.
 .br
 For \fBdata_bits\fP 17-32 there will be four bytes per character.
 
-.IP "\fBint wave_create(void)\fP"
+.IP "\fBint wave_create(int pi)\fP"
 .IP "" 4
 This function creates a waveform from the data provided by the prior
 calls to the \fBwave_add_*\fP functions.  Upon success a wave id
 greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
 PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1680,7 +1841,7 @@ specified delay between the pulse and the next.
 Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 
-.IP "\fBint wave_delete(unsigned wave_id)\fP"
+.IP "\fBint wave_delete(int pi, unsigned wave_id)\fP"
 .IP "" 4
 This function deletes the waveform with id wave_id.
 
@@ -1689,6 +1850,8 @@ This function deletes the waveform with id wave_id.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 
@@ -1704,7 +1867,7 @@ Wave ids are allocated in order, 0, 1, 2, etc.
 .br
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 
-.IP "\fBint wave_send_once(unsigned wave_id)\fP"
+.IP "\fBint wave_send_once(int pi, unsigned wave_id)\fP"
 .IP "" 4
 This function transmits the waveform with id wave_id.  The waveform
 is sent once.
@@ -1719,6 +1882,8 @@ NOTE: Any hardware PWM started by \fBhardware_PWM\fP will be cancelled.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 
@@ -1730,7 +1895,7 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 
-.IP "\fBint wave_send_repeat(unsigned wave_id)\fP"
+.IP "\fBint wave_send_repeat(int pi, unsigned wave_id)\fP"
 .IP "" 4
 This function transmits the waveform with id wave_id.  The waveform
 cycles until cancelled (either by the sending of a new waveform or
@@ -1746,6 +1911,8 @@ NOTE: Any hardware PWM started by \fBhardware_PWM\fP will be cancelled.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 
@@ -1757,7 +1924,7 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 
-.IP "\fBint wave_chain(char *buf, unsigned bufSize)\fP"
+.IP "\fBint wave_chain(int pi, char *buf, unsigned bufSize)\fP"
 .IP "" 4
 This function transmits a chain of waveforms.
 
@@ -1778,6 +1945,8 @@ codes and related data.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
     buf: pointer to the wave_ids and optional command codes
 .br
 bufSize: the number of bytes in buf
@@ -1853,7 +2022,7 @@ The code is currently dimensioned to support a chain with roughly
 .EX
 #include <stdio.h>
 .br
-#include <pigpiod_if.h>
+#include <pigpiod_if2.h>
 .br
 
 .br
@@ -1867,15 +2036,17 @@ int main(int argc, char *argv[])
 .br
 {
 .br
-   int i, wid[WAVES];
+   int i, pi, wid[WAVES];
 .br
 
 .br
-   if (pigpio_start(0, 0)<0) return -1;
+   pi = pigpio_start(0, 0);
+.br
+   if (pi<0) return -1;
 .br
 
 .br
-   set_mode(GPIO, PI_OUTPUT);
+   set_mode(pi, GPIO, PI_OUTPUT);
 .br
 
 .br
@@ -1883,7 +2054,7 @@ int main(int argc, char *argv[])
 .br
    {
 .br
-      wave_add_generic(2, (gpioPulse_t[])
+      wave_add_generic(pi, 2, (gpioPulse_t[])
 .br
          {{1<<GPIO, 0,        20},
 .br
@@ -1891,13 +2062,13 @@ int main(int argc, char *argv[])
 .br
 
 .br
-      wid[i] = wave_create();
+      wid[i] = wave_create(pi);
 .br
    }
 .br
 
 .br
-   wave_chain((char []) {
+   wave_chain(pi, (char []) {
 .br
       wid[4], wid[3], wid[2],       // transmit waves 4+3+2
 .br
@@ -1935,22 +2106,22 @@ int main(int argc, char *argv[])
 .br
 
 .br
-   while (wave_tx_busy()) time_sleep(0.1);
+   while (wave_tx_busy(pi)) time_sleep(0.1);
 .br
 
 .br
-   for (i=0; i<WAVES; i++) wave_delete(wid[i]);
+   for (i=0; i<WAVES; i++) wave_delete(pi, wid[i]);
 .br
 
 .br
-   pigpio_stop();
+   pigpio_stop(pi);
 .br
 }
 .br
 
 .EE
 
-.IP "\fBint wave_tx_busy(void)\fP"
+.IP "\fBint wave_tx_busy(int pi)\fP"
 .IP "" 4
 This function checks to see if a waveform is currently being
 transmitted.
@@ -1958,11 +2129,31 @@ transmitted.
 .br
 
 .br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.br
+
+.br
 Returns 1 if a waveform is currently being transmitted, otherwise 0.
 
-.IP "\fBint wave_tx_stop(void)\fP"
+.IP "\fBint wave_tx_stop(int pi)\fP"
 .IP "" 4
 This function stops the transmission of the current waveform.
+
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
 
 .br
 
@@ -1974,51 +2165,141 @@ Returns 0 if OK.
 .br
 This function is intended to stop a waveform started with the repeat mode.
 
-.IP "\fBint wave_get_micros(void)\fP"
+.IP "\fBint wave_get_micros(int pi)\fP"
 .IP "" 4
 This function returns the length in microseconds of the current
 waveform.
 
-.IP "\fBint wave_get_high_micros(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_high_micros(int pi)\fP"
 .IP "" 4
 This function returns the length in microseconds of the longest waveform
 created since the pigpio daemon was started.
 
-.IP "\fBint wave_get_max_micros(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_max_micros(int pi)\fP"
 .IP "" 4
 This function returns the maximum possible size of a waveform in
 .br
 microseconds.
 
-.IP "\fBint wave_get_pulses(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_pulses(int pi)\fP"
 .IP "" 4
 This function returns the length in pulses of the current waveform.
 
-.IP "\fBint wave_get_high_pulses(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_high_pulses(int pi)\fP"
 .IP "" 4
 This function returns the length in pulses of the longest waveform
 created since the pigpio daemon was started.
 
-.IP "\fBint wave_get_max_pulses(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_max_pulses(int pi)\fP"
 .IP "" 4
 This function returns the maximum possible size of a waveform in pulses.
 
-.IP "\fBint wave_get_cbs(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_cbs(int pi)\fP"
 .IP "" 4
 This function returns the length in DMA control blocks of the current
 waveform.
 
-.IP "\fBint wave_get_high_cbs(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_high_cbs(int pi)\fP"
 .IP "" 4
 This function returns the length in DMA control blocks of the longest
 waveform created since the pigpio daemon was started.
 
-.IP "\fBint wave_get_max_cbs(void)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint wave_get_max_cbs(int pi)\fP"
 .IP "" 4
 This function returns the maximum possible size of a waveform in DMA
 control blocks.
 
-.IP "\fBint gpio_trigger(unsigned user_gpio, unsigned pulseLen, unsigned level)\fP"
+.br
+
+.br
+
+.EX
+pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+
+.EE
+
+.IP "\fBint gpio_trigger(int pi, unsigned user_gpio, unsigned pulseLen, unsigned level)\fP"
 .IP "" 4
 This function sends a trigger pulse to a gpio.  The gpio is set to
 level for pulseLen microseconds and then reset to not level.
@@ -2028,6 +2309,8 @@ level for pulseLen microseconds and then reset to not level.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
  pulseLen: 1-100.
@@ -2043,7 +2326,7 @@ user_gpio: 0-31.
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_LEVEL,
 PI_BAD_PULSELEN, or PI_NOT_PERMITTED.
 
-.IP "\fBint store_script(char *script)\fP"
+.IP "\fBint store_script(int pi, char *script)\fP"
 .IP "" 4
 This function stores a script for later execution.
 
@@ -2052,6 +2335,8 @@ This function stores a script for later execution.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 script: the text of the script.
 .br
 
@@ -2063,7 +2348,7 @@ script: the text of the script.
 The function returns a script id if the script is valid,
 otherwise PI_BAD_SCRIPT.
 
-.IP "\fBint run_script(unsigned script_id, unsigned numPar, uint32_t *param)\fP"
+.IP "\fBint run_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param)\fP"
 .IP "" 4
 This function runs a stored script.
 
@@ -2072,6 +2357,8 @@ This function runs a stored script.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 script_id: >=0, as returned by \fBstore_script\fP.
 .br
    numPar: 0-10, the number of parameters.
@@ -2093,7 +2380,7 @@ PI_TOO_MANY_PARAM
 param is an array of up to 10 parameters which may be referenced in
 the script as p0 to p9.
 
-.IP "\fBint script_status(unsigned script_id, uint32_t *param)\fP"
+.IP "\fBint script_status(int pi, unsigned script_id, uint32_t *param)\fP"
 .IP "" 4
 This function returns the run status of a stored script as well
 as the current values of parameters 0 to 9.
@@ -2103,6 +2390,8 @@ as the current values of parameters 0 to 9.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 script_id: >=0, as returned by \fBstore_script\fP.
 .br
     param: an array to hold the returned 10 parameters.
@@ -2144,7 +2433,7 @@ PI_SCRIPT_FAILED
 .br
 The current value of script parameters 0 to 9 are returned in param.
 
-.IP "\fBint stop_script(unsigned script_id)\fP"
+.IP "\fBint stop_script(int pi, unsigned script_id)\fP"
 .IP "" 4
 This function stops a running script.
 
@@ -2153,6 +2442,8 @@ This function stops a running script.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 script_id: >=0, as returned by \fBstore_script\fP.
 .br
 
@@ -2163,7 +2454,7 @@ script_id: >=0, as returned by \fBstore_script\fP.
 .br
 The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 
-.IP "\fBint delete_script(unsigned script_id)\fP"
+.IP "\fBint delete_script(int pi, unsigned script_id)\fP"
 .IP "" 4
 This function deletes a stored script.
 
@@ -2172,6 +2463,8 @@ This function deletes a stored script.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 script_id: >=0, as returned by \fBstore_script\fP.
 .br
 
@@ -2182,7 +2475,7 @@ script_id: >=0, as returned by \fBstore_script\fP.
 .br
 The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 
-.IP "\fBint bb_serial_read_open(unsigned user_gpio, unsigned baud, unsigned data_bits)\fP"
+.IP "\fBint bb_serial_read_open(int pi, unsigned user_gpio, unsigned baud, unsigned data_bits)\fP"
 .IP "" 4
 This function opens a gpio for bit bang reading of serial data.
 
@@ -2191,6 +2484,8 @@ This function opens a gpio for bit bang reading of serial data.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
      baud: 50-250000
@@ -2218,7 +2513,7 @@ bb_serial_read.
 It is the caller's responsibility to read data from the cyclic buffer
 in a timely fashion.
 
-.IP "\fBint bb_serial_read(unsigned user_gpio, void *buf, size_t bufSize)\fP"
+.IP "\fBint bb_serial_read(int pi, unsigned user_gpio, void *buf, size_t bufSize)\fP"
 .IP "" 4
 This function copies up to bufSize bytes of data read from the
 bit bang serial cyclic buffer to the buffer starting at buf.
@@ -2228,6 +2523,8 @@ bit bang serial cyclic buffer to the buffer starting at buf.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
       buf: an array to receive the read bytes.
@@ -2258,7 +2555,7 @@ For \fBdata_bits\fP 9-16 there will be two bytes per character.
 .br
 For \fBdata_bits\fP 17-32 there will be four bytes per character.
 
-.IP "\fBint bb_serial_read_close(unsigned user_gpio)\fP"
+.IP "\fBint bb_serial_read_close(int pi, unsigned user_gpio)\fP"
 .IP "" 4
 This function closes a gpio for bit bang reading of serial data.
 
@@ -2267,6 +2564,8 @@ This function closes a gpio for bit bang reading of serial data.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 
@@ -2277,7 +2576,7 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 
-.IP "\fBint bb_serial_invert(unsigned user_gpio, unsigned invert)\fP"
+.IP "\fBint bb_serial_invert(int pi, unsigned user_gpio, unsigned invert)\fP"
 .IP "" 4
 This function inverts serial logic for big bang serial reads.
 
@@ -2286,6 +2585,8 @@ This function inverts serial logic for big bang serial reads.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
    invert: 0-1, 1 invert, 0 normal.
@@ -2298,7 +2599,7 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
 Returns 0 if OK, otherwise PI_NOT_SERIAL_GPIO or PI_BAD_SER_INVERT.
 
-.IP "\fBint i2c_open(unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags)\fP"
+.IP "\fBint i2c_open(int pi, unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags)\fP"
 .IP "" 4
 This returns a handle for the device at address i2c_addr on bus i2c_bus.
 
@@ -2307,6 +2608,8 @@ This returns a handle for the device at address i2c_addr on bus i2c_bus.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
   i2c_bus: 0-1.
 .br
  i2c_addr: 0x00-0x7F.
@@ -2338,23 +2641,23 @@ of the function description.  The following abbreviations are used.
 .br
 
 .EX
-S     (1 bit) : Start bit
+S       (1 bit) : Start bit
 .br
-P     (1 bit) : Stop bit
+P       (1 bit) : Stop bit
 .br
-Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+Rd/Wr   (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
 .br
-A, NA (1 bit) : Accept and not accept bit.
+A, NA   (1 bit) : Accept and not accept bit.
 .br
 .br
 .br
-Addr  (7 bits): I2C 7 bit address.
+Addr    (7 bits): I2C 7 bit address.
 .br
-Comm  (8 bits): Command byte, a data byte which often selects a register.
+i2c_reg (8 bits): A byte which often selects a register.
 .br
-Data  (8 bits): A data byte.
+Data    (8 bits): A data byte.
 .br
-Count (8 bits): A data byte containing the length of a block operation.
+Count   (8 bits): A byte defining the length of a block operation.
 .br
 
 .br
@@ -2363,7 +2666,7 @@ Count (8 bits): A data byte containing the length of a block operation.
 
 .EE
 
-.IP "\fBint i2c_close(unsigned handle)\fP"
+.IP "\fBint i2c_close(int pi, unsigned handle)\fP"
 .IP "" 4
 This closes the I2C device associated with the handle.
 
@@ -2372,6 +2675,8 @@ This closes the I2C device associated with the handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 
@@ -2382,7 +2687,7 @@ handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
-.IP "\fBint i2c_write_quick(unsigned handle, unsigned bit)\fP"
+.IP "\fBint i2c_write_quick(int pi, unsigned handle, unsigned bit)\fP"
 .IP "" 4
 This sends a single bit (in the Rd/Wr bit) to the device associated
 with handle.
@@ -2392,6 +2697,8 @@ with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
    bit: 0-1, the value to write.
@@ -2411,12 +2718,12 @@ PI_I2C_WRITE_FAILED.
 Quick command. SMBus 2.0 5.5.1
 
 .EX
-S Addr Rd/Wr [A] P
+S Addr bit [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_write_byte(unsigned handle, unsigned bVal)\fP"
+.IP "\fBint i2c_write_byte(int pi, unsigned handle, unsigned bVal)\fP"
 .IP "" 4
 This sends a single byte to the device associated with handle.
 
@@ -2425,6 +2732,8 @@ This sends a single byte to the device associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
   bVal: 0-0xFF, the value to write.
@@ -2444,12 +2753,12 @@ PI_I2C_WRITE_FAILED.
 Send byte. SMBus 2.0 5.5.2
 
 .EX
-S Addr Wr [A] Data [A] P
+S Addr Wr [A] bVal [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_byte(unsigned handle)\fP"
+.IP "\fBint i2c_read_byte(int pi, unsigned handle)\fP"
 .IP "" 4
 This reads a single byte from the device associated with handle.
 
@@ -2458,6 +2767,8 @@ This reads a single byte from the device associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 
@@ -2480,7 +2791,7 @@ S Addr Rd [A] [Data] NA P
 
 .EE
 
-.IP "\fBint i2c_write_byte_data(unsigned handle, unsigned i2c_reg, unsigned bVal)\fP"
+.IP "\fBint i2c_write_byte_data(int pi, unsigned handle, unsigned i2c_reg, unsigned bVal)\fP"
 .IP "" 4
 This writes a single byte to the specified register of the device
 associated with handle.
@@ -2490,6 +2801,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write.
@@ -2511,12 +2824,12 @@ PI_I2C_WRITE_FAILED.
 Write byte. SMBus 2.0 5.5.4
 
 .EX
-S Addr Wr [A] Comm [A] Data [A] P
+S Addr Wr [A] i2c_reg [A] bVal [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_write_word_data(unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
+.IP "\fBint i2c_write_word_data(int pi, unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
 .IP "" 4
 This writes a single 16 bit word to the specified register of the device
 associated with handle.
@@ -2526,6 +2839,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write.
@@ -2547,12 +2862,12 @@ PI_I2C_WRITE_FAILED.
 Write word. SMBus 2.0 5.5.4
 
 .EX
-S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+S Addr Wr [A] i2c_reg [A] wval_Low [A] wVal_High [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_byte_data(unsigned handle, unsigned i2c_reg)\fP"
+.IP "\fBint i2c_read_byte_data(int pi, unsigned handle, unsigned i2c_reg)\fP"
 .IP "" 4
 This reads a single byte from the specified register of the device
 associated with handle.
@@ -2562,6 +2877,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to read.
@@ -2581,12 +2898,12 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 Read byte. SMBus 2.0 5.5.5
 
 .EX
-S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+S Addr Wr [A] i2c_reg [A] S Addr Rd [A] [Data] NA P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_word_data(unsigned handle, unsigned i2c_reg)\fP"
+.IP "\fBint i2c_read_word_data(int pi, unsigned handle, unsigned i2c_reg)\fP"
 .IP "" 4
 This reads a single 16 bit word from the specified register of the device
 associated with handle.
@@ -2596,6 +2913,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to read.
@@ -2615,12 +2934,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 Read word. SMBus 2.0 5.5.5
 
 .EX
-S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+S Addr Wr [A] i2c_reg [A]
+.br
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
 .br
 
 .EE
 
-.IP "\fBint i2c_process_call(unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
+.IP "\fBint i2c_process_call(int pi, unsigned handle, unsigned i2c_reg, unsigned wVal)\fP"
 .IP "" 4
 This writes 16 bits of data to the specified register of the device
 associated with handle and and reads 16 bits of data in return.
@@ -2630,6 +2951,8 @@ associated with handle and and reads 16 bits of data in return.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write/read.
@@ -2651,14 +2974,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 Process call. SMBus 2.0 5.5.6
 
 .EX
-S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+S Addr Wr [A] i2c_reg [A] wVal_Low [A] wVal_High [A]
 .br
    S Addr Rd [A] [DataLow] A [DataHigh] NA P
 .br
 
 .EE
 
-.IP "\fBint i2c_write_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
+.IP "\fBint i2c_write_block_data(int pi, unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes up to 32 bytes to the specified register of the device
 associated with handle.
@@ -2668,6 +2991,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write.
@@ -2691,12 +3016,14 @@ PI_I2C_WRITE_FAILED.
 Block write. SMBus 2.0 5.5.7
 
 .EX
-S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+S Addr Wr [A] i2c_reg [A] count [A] buf0 [A] buf1 [A] ...
+.br
+   [A] bufn [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_block_data(unsigned handle, unsigned i2c_reg, char *buf)\fP"
+.IP "\fBint i2c_read_block_data(int pi, unsigned handle, unsigned i2c_reg, char *buf)\fP"
 .IP "" 4
 This reads a block of up to 32 bytes from the specified register of
 the device associated with handle.
@@ -2706,6 +3033,8 @@ the device associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to read.
@@ -2732,14 +3061,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 Block read. SMBus 2.0 5.5.7
 
 .EX
-S Addr Wr [A] Comm [A]
+S Addr Wr [A] i2c_reg [A]
 .br
-   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+   S Addr Rd [A] [Count] A [buf0] A [buf1] A ... A [bufn] NA P
 .br
 
 .EE
 
-.IP "\fBint i2c_block_process_call(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
+.IP "\fBint i2c_block_process_call(int pi, unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes data bytes to the specified register of the device
 associated with handle and reads a device specified number
@@ -2750,6 +3079,8 @@ of bytes of data in return.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write/read.
@@ -2784,14 +3115,14 @@ bytes sent/received must be 32 or less.
 Block write-block read. SMBus 2.0 5.5.8
 
 .EX
-S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+S Addr Wr [A] i2c_reg [A] count [A] buf0 [A] ...
 .br
    S Addr Rd [A] [Count] A [Data] ... A P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_i2c_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
+.IP "\fBint i2c_read_i2c_block_data(int pi, unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
 This reads count bytes from the specified register of the device
 associated with handle .  The count may be 1-32.
@@ -2801,6 +3132,8 @@ associated with handle .  The count may be 1-32.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to read.
@@ -2823,14 +3156,14 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 .br
 
 .EX
-S Addr Wr [A] Comm [A]
+S Addr Wr [A] i2c_reg [A]
 .br
-   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+   S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
 .br
 
 .EE
 
-.IP "\fBint i2c_write_i2c_block_data(unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
+.IP "\fBint i2c_write_i2c_block_data(int pi, unsigned handle, unsigned i2c_reg, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes 1 to 32 bytes to the specified register of the device
 associated with handle.
@@ -2840,6 +3173,8 @@ associated with handle.
 .br
 
 .EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
 i2c_reg: 0-255, the register to write.
@@ -2862,12 +3197,12 @@ PI_I2C_WRITE_FAILED.
 .br
 
 .EX
-S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+S Addr Wr [A] i2c_reg [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
 .br
 
 .EE
 
-.IP "\fBint i2c_read_device(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint i2c_read_device(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This reads count bytes from the raw device into buf.
 
@@ -2876,6 +3211,8 @@ This reads count bytes from the raw device into buf.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
    buf: an array to receive the read data bytes.
@@ -2891,7 +3228,17 @@ handle: >=0, as returned by a call to \fBi2c_open\fP.
 Returns count (>0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_READ_FAILED.
 
-.IP "\fBint i2c_write_device(unsigned handle, char *buf, unsigned count)\fP"
+.br
+
+.br
+
+.EX
+S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
+.br
+
+.EE
+
+.IP "\fBint i2c_write_device(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This writes count bytes from buf to the raw device.
 
@@ -2900,6 +3247,8 @@ This writes count bytes from buf to the raw device.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2c_open\fP.
 .br
    buf: an array containing the data bytes to write.
@@ -2915,7 +3264,17 @@ handle: >=0, as returned by a call to \fBi2c_open\fP.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
-.IP "\fBint i2c_zip(unsigned handle, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.br
+
+.br
+
+.EX
+S Addr Wr [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
+.br
+
+.EE
+
+.IP "\fBint i2c_zip(int pi, unsigned handle, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
 .IP "" 4
 This function executes a sequence of I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -2926,6 +3285,8 @@ which contains the concatenated command codes and associated data.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBi2cOpen\fP
 .br
  inBuf: pointer to the concatenated I2C commands, see below
@@ -3034,7 +3395,7 @@ End
 
 .br
 
-.IP "\fBint bb_i2c_open(unsigned SDA, unsigned SCL, unsigned baud)\fP"
+.IP "\fBint bb_i2c_open(int pi, unsigned SDA, unsigned SCL, unsigned baud)\fP"
 .IP "" 4
 This function selects a pair of gpios for bit banging I2C at a
 specified baud rate.
@@ -3061,6 +3422,8 @@ o I2C on any pair of spare gpios
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
  SDA: 0-31
 .br
  SCL: 0-31
@@ -3087,7 +3450,7 @@ NOTE:
 The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
 a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
 
-.IP "\fBint bb_i2c_close(unsigned SDA)\fP"
+.IP "\fBint bb_i2c_close(int pi, unsigned SDA)\fP"
 .IP "" 4
 This function stops bit banging I2C on a pair of gpios previously
 opened with \fBbb_i2c_open\fP.
@@ -3097,6 +3460,8 @@ opened with \fBbb_i2c_open\fP.
 .br
 
 .EX
+ pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 SDA: 0-31, the SDA gpio used in a prior call to \fBbb_i2c_open\fP
 .br
 
@@ -3107,7 +3472,7 @@ SDA: 0-31, the SDA gpio used in a prior call to \fBbb_i2c_open\fP
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
 
-.IP "\fBint bb_i2c_zip(unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.IP "\fBint bb_i2c_zip(int pi, unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
 .IP "" 4
 This function executes a sequence of bit banged I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -3118,6 +3483,8 @@ which contains the concatenated command codes and associated data.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
    SDA: 0-31 (as used in a prior call to \fBbb_i2c_open\fP)
 .br
  inBuf: pointer to the concatenated I2C commands, see below
@@ -3245,7 +3612,7 @@ End
 
 .EE
 
-.IP "\fBint spi_open(unsigned spi_channel, unsigned baud, unsigned spi_flags)\fP"
+.IP "\fBint spi_open(int pi, unsigned spi_channel, unsigned baud, unsigned spi_flags)\fP"
 .IP "" 4
 This function returns a handle for the SPI device on channel.
 Data will be transferred at baud bits per second.  The flags may
@@ -3264,6 +3631,8 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
+         pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 spi_channel: 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
 .br
        baud: 32K-125M (values above 30M are unlikely to work).
@@ -3378,7 +3747,7 @@ sets 8 bits per word.  Auxiliary SPI device only.
 .br
 The other bits in flags should be set to zero.
 
-.IP "\fBint spi_close(unsigned handle)\fP"
+.IP "\fBint spi_close(int pi, unsigned handle)\fP"
 .IP "" 4
 This functions closes the SPI device identified by the handle.
 
@@ -3387,6 +3756,8 @@ This functions closes the SPI device identified by the handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
 
@@ -3397,7 +3768,7 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
-.IP "\fBint spi_read(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint spi_read(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This function reads count bytes of data from the SPI
 device associated with the handle.
@@ -3407,6 +3778,8 @@ device associated with the handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
    buf: an array to receive the read data bytes.
@@ -3422,7 +3795,7 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint spi_write(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint spi_write(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes of data from buf to the SPI
 device associated with the handle.
@@ -3432,6 +3805,8 @@ device associated with the handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
    buf: the data bytes to write.
@@ -3447,7 +3822,7 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint spi_xfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)\fP"
+.IP "\fBint spi_xfer(int pi, unsigned handle, char *txBuf, char *rxBuf, unsigned count)\fP"
 .IP "" 4
 This function transfers count bytes of data from txBuf to the SPI
 device associated with the handle.  Simultaneously count bytes of
@@ -3458,6 +3833,8 @@ data are read from the device and placed in rxBuf.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBspi_open\fP.
 .br
  txBuf: the data bytes to write.
@@ -3475,7 +3852,7 @@ handle: >=0, as returned by a call to \fBspi_open\fP.
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint serial_open(char *ser_tty, unsigned baud, unsigned ser_flags)\fP"
+.IP "\fBint serial_open(int pi, char *ser_tty, unsigned baud, unsigned ser_flags)\fP"
 .IP "" 4
 This function opens a serial device at a specified baud rate
 with specified flags.
@@ -3485,6 +3862,8 @@ with specified flags.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
   ser_tty: the serial device to open, /dev/tty*.
 .br
      baud: the baud rate in bits per second, see below.
@@ -3512,7 +3891,7 @@ The baud rate must be one of 50, 75, 110, 134, 150,
 .br
 No flags are currently defined.  This parameter should be set to zero.
 
-.IP "\fBint serial_close(unsigned handle)\fP"
+.IP "\fBint serial_close(int pi, unsigned handle)\fP"
 .IP "" 4
 This function closes the serial device associated with handle.
 
@@ -3521,6 +3900,8 @@ This function closes the serial device associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 
@@ -3531,7 +3912,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
-.IP "\fBint serial_write_byte(unsigned handle, unsigned bVal)\fP"
+.IP "\fBint serial_write_byte(int pi, unsigned handle, unsigned bVal)\fP"
 .IP "" 4
 This function writes bVal to the serial port associated with handle.
 
@@ -3540,6 +3921,8 @@ This function writes bVal to the serial port associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 
@@ -3551,7 +3934,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_SER_WRITE_FAILED.
 
-.IP "\fBint serial_read_byte(unsigned handle)\fP"
+.IP "\fBint serial_read_byte(int pi, unsigned handle)\fP"
 .IP "" 4
 This function reads a byte from the serial port associated with handle.
 
@@ -3560,6 +3943,8 @@ This function reads a byte from the serial port associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 
@@ -3571,7 +3956,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns the read byte (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_SER_READ_NO_DATA, or PI_SER_READ_FAILED.
 
-.IP "\fBint serial_write(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint serial_write(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes from buf to the the serial port
 associated with handle.
@@ -3581,6 +3966,8 @@ associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
    buf: the array of bytes to write.
@@ -3596,7 +3983,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_SER_WRITE_FAILED.
 
-.IP "\fBint serial_read(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint serial_read(int pi, unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This function reads up to count bytes from the the serial port
 associated with handle and writes them to buf.
@@ -3606,6 +3993,8 @@ associated with handle and writes them to buf.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
    buf: an array to receive the read data.
@@ -3621,7 +4010,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, PI_SER_READ_NO_DATA, or PI_SER_WRITE_FAILED.
 
-.IP "\fBint serial_data_available(unsigned handle)\fP"
+.IP "\fBint serial_data_available(int pi, unsigned handle)\fP"
 .IP "" 4
 Returns the number of bytes available to be read from the
 device associated with handle.
@@ -3631,6 +4020,8 @@ device associated with handle.
 .br
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 
@@ -3642,7 +4033,7 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns the number of bytes of data available (>=0) if OK,
 otherwise PI_BAD_HANDLE.
 
-.IP "\fBint custom_1(unsigned arg1, unsigned arg2, char *argx, unsigned argc)\fP"
+.IP "\fBint custom_1(int pi, unsigned arg1, unsigned arg2, char *argx, unsigned argc)\fP"
 .IP "" 4
 This function is available for user customisation.
 
@@ -3656,6 +4047,8 @@ It returns a single integer value.
 .br
 
 .EX
+  pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 arg1: >=0
 .br
 arg2: >=0
@@ -3672,7 +4065,7 @@ argc: number of extra arguments
 .br
 Returns >= 0 if OK, less than 0 indicates a user defined error.
 
-.IP "\fBint custom_2(unsigned arg1, char *argx, unsigned argc, char *retBuf, unsigned retMax)\fP"
+.IP "\fBint custom_2(int pi, unsigned arg1, char *argx, unsigned argc, char *retBuf, unsigned retMax)\fP"
 .IP "" 4
 This function is available for user customisation.
 
@@ -3688,6 +4081,8 @@ rather than just an integer.
 The return value is an integer indicating the number of returned bytes.
 
 .EX
+    pi: 0- (as returned by \fBpigpio_start\fP).
+.br
   arg1: >=0
 .br
   argc: extra (byte) arguments
@@ -3711,7 +4106,7 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 .br
 Note, the number of returned bytes will be retMax or less.
 
-.IP "\fBint callback(unsigned user_gpio, unsigned edge, CBFunc_t f)\fP"
+.IP "\fBint callback(int pi, unsigned user_gpio, unsigned edge, CBFunc_t f)\fP"
 .IP "" 4
 This function initialises a new callback.
 
@@ -3720,6 +4115,8 @@ This function initialises a new callback.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
@@ -3741,7 +4138,7 @@ pigif_duplicate_callback, or pigif_bad_callback.
 The callback is called with the gpio, edge, and tick, whenever the
 gpio has the identified edge.
 
-.IP "\fBint callback_ex(unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *userdata)\fP"
+.IP "\fBint callback_ex(int pi, unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *userdata)\fP"
 .IP "" 4
 This function initialises a new callback.
 
@@ -3750,6 +4147,8 @@ This function initialises a new callback.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
@@ -3773,10 +4172,6 @@ pigif_duplicate_callback, or pigif_bad_callback.
 The callback is called with the gpio, edge, tick, and user, whenever
 the gpio has the identified edge.
 
-.br
-
-.br
-
 .IP "\fBint callback_cancel(unsigned callback_id)\fP"
 .IP "" 4
 This function cancels a callback identified by its id.
@@ -3796,7 +4191,7 @@ callback_id: >=0, as returned by a call to \fBcallback\fP or \fBcallback_ex\fP.
 .br
 The function returns 0 if OK, otherwise pigif_callback_not_found.
 
-.IP "\fBint wait_for_edge(unsigned user_gpio, unsigned edge, double timeout)\fP"
+.IP "\fBint wait_for_edge(int pi, unsigned user_gpio, unsigned edge, double timeout)\fP"
 .IP "" 4
 This function waits for edge on the gpio for up to timeout
 seconds.
@@ -3806,6 +4201,8 @@ seconds.
 .br
 
 .EX
+       pi: 0- (as returned by \fBpigpio_start\fP).
+.br
 user_gpio: 0-31.
 .br
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
@@ -4380,6 +4777,14 @@ An array of script parameters.
 
 .br
 
+.IP "\fBpi\fP" 0
+An integer defining a connected Pi.  The value is returned by
+\fBpigpio_start\fP upon success.
+
+.br
+
+.br
+
 .IP "\fB*portStr\fP" 0
 A string specifying the port address used by the Pi running
 the pigpio daemon.  It may be NULL in which case "8888"
@@ -4699,7 +5104,53 @@ See \fBgpio\fP.
 .br
 
 .IP "\fB*userdata\fP" 0
+
+.br
+
+.br
 A pointer to arbitrary user data.  This may be used to identify the instance.
+
+.br
+
+.br
+You must ensure that the pointer is in scope at the time it is processed.  If
+it is a pointer to a global this is automatic.  Do not pass the address of a
+local variable.  If you want to pass a transient object then use the
+following technique.
+
+.br
+
+.br
+In the calling function:
+
+.br
+
+.br
+user_type *userdata;
+.br
+user_type my_userdata;
+
+.br
+
+.br
+userdata = malloc(sizeof(user_type));
+.br
+*userdata = my_userdata;
+
+.br
+
+.br
+In the receiving function:
+
+.br
+
+.br
+user_type my_userdata = *(user_type*)userdata;
+
+.br
+
+.br
+free(userdata);
 
 .br
 
@@ -4739,7 +5190,7 @@ A 16-bit word value.
 .br
 
 .br
-.SH pigpiod_if Error Codes
+.SH pigpiod_if2 Error Codes
 
 .EX
 
@@ -4770,6 +5221,10 @@ typedef enum
 .br
    pigif_callback_not_found = -2010,
 .br
+   pigif_unconnected_pi     = -2011,
+.br
+   pigif_too_many_pis       = -2012,
+.br
 } pigifError_t;
 .br
 
@@ -4779,7 +5234,7 @@ typedef enum
 
 .SH SEE ALSO
 
-pigpiod(1), pig2vcd(1), pigs(1), pigpio(3), pigpiod_if2(3)
+pigpiod(1), pig2vcd(1), pigs(1), pigpio(3), pigpiod_if(3)
 .SH AUTHOR
 
 joan@abyz.co.uk

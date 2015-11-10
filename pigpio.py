@@ -269,7 +269,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.23"
+VERSION = "1.24"
 
 exceptions = True
 
@@ -2190,9 +2190,9 @@ class pi():
       Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
       A, NA (1 bit) : Accept and not accept bit. 
       Addr  (7 bits): I2C 7 bit address.
-      Comm  (8 bits): Command byte, which often selects a register.
+      reg   (8 bits): Command byte, which often selects a register.
       Data  (8 bits): A data byte.
-      Count (8 bits): A byte containing the length of a block operation.
+      Count (8 bits): A byte defining the length of a block operation.
 
       [..]: Data sent by the device.
       . .
@@ -2231,7 +2231,7 @@ class pi():
 
       SMBus 2.0 5.5.1 - Quick command.
       . .
-      S Addr Rd/Wr [A] P
+      S Addr bit [A] P
       . .
 
       ...
@@ -2250,7 +2250,7 @@ class pi():
 
       SMBus 2.0 5.5.2 - Send byte.
       . .
-      S Addr Wr [A] Data [A] P
+      S Addr Wr [A] byte_val [A] P
       . .
 
       ...
@@ -2289,7 +2289,7 @@ class pi():
 
       SMBus 2.0 5.5.4 - Write byte.
       . .
-      S Addr Wr [A] Comm [A] Data [A] P
+      S Addr Wr [A] reg [A] byte_val [A] P
       . .
 
       ...
@@ -2320,7 +2320,7 @@ class pi():
 
       SMBus 2.0 5.5.4 - Write word.
       . .
-      S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+      S Addr Wr [A] reg [A] word_val_Low [A] word_val_High [A] P
       . .
 
       ...
@@ -2350,7 +2350,7 @@ class pi():
 
       SMBus 2.0 5.5.5 - Read byte.
       . .
-      S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+      S Addr Wr [A] reg [A] S Addr Rd [A] [Data] NA P
       . .
 
       ...
@@ -2373,7 +2373,7 @@ class pi():
 
       SMBus 2.0 5.5.5 - Read word.
       . .
-      S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+      S Addr Wr [A] reg [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
       . .
 
       ...
@@ -2397,7 +2397,7 @@ class pi():
 
       SMBus 2.0 5.5.6 - Process call.
       . .
-      S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+      S Addr Wr [A] reg [A] word_val_Low [A] word_val_High [A]
          S Addr Rd [A] [DataLow] A [DataHigh] NA P
       . .
 
@@ -2426,8 +2426,8 @@ class pi():
 
       SMBus 2.0 5.5.7 - Block write.
       . .
-      S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A]
-         Data [A] P
+      S Addr Wr [A] reg [A] len(data) [A] data0 [A] data1 [A] ... [A]
+         datan [A] P
       . .
 
       ...
@@ -2461,7 +2461,7 @@ class pi():
 
       SMBus 2.0 5.5.7 - Block read.
       . .
-      S Addr Wr [A] Comm [A]
+      S Addr Wr [A] reg [A]
          S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
       . .
 
@@ -2505,7 +2505,7 @@ class pi():
 
       SMBus 2.0 5.5.8 - Block write-block read.
       . .
-      S Addr Wr [A] Comm [A] Count [A] Data [A] ...
+      S Addr Wr [A] reg [A] len(data) [A] data0 [A] ... datan [A]
          S Addr Rd [A] [Count] A [Data] ... A P
       . .
 
@@ -2550,8 +2550,7 @@ class pi():
         data:= the bytes to write.
 
       . .
-      S Addr Wr [A] Comm [A]
-         S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+      S Addr Wr [A] reg [A] data0 [A] data1 [A] ... [A] datan [NA] P
       . .
 
       ...
@@ -2585,7 +2584,8 @@ class pi():
        count:= >0, the number of bytes to read.
 
       . .
-      S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+      S Addr Wr [A] reg [A]
+         S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
       . .
 
       The returned value is a tuple of the number of bytes read and a
@@ -2626,6 +2626,10 @@ class pi():
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
        count:= >0, the number of bytes to read.
 
+      . .
+      S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+      . .
+
       The returned value is a tuple of the number of bytes read and a
       bytearray containing the bytes.  If there was an error the
       number of bytes read will be less than zero (and will contain
@@ -2651,6 +2655,10 @@ class pi():
 
       handle:= >=0 (as returned by a prior call to [*i2c_open*]).
         data:= the bytes to write.
+
+      . .
+      S Addr Wr [A] data0 [A] data1 [A] ... [A] datan [A] P
+      . .
 
       ...
       pi.i2c_write_device(h, b"\\x12\\x34\\xA8")
@@ -3902,7 +3910,9 @@ def xref():
    PI_CHAIN_NESTING = -118
    PI_CHAIN_TOO_BIG = -119
    PI_DEPRECATED = -120
-   PI_BAD_SER_INVERT   = -121
+   PI_BAD_SER_INVERT = -121
+   PI_BAD_FOREVER = -124
+   PI_BAD_FILTER = -125
    . .
 
    frequency: 0-40000

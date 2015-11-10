@@ -4,43 +4,56 @@ SIZE     = size
 SHLIB    = gcc -shared
 STRIPLIB = strip --strip-unneeded
 
-CFLAGS += -O3 -Wall
+CFLAGS += -O3 -Wall -pthread
 
-ALL = libpigpiod_if.so pigs
+ALL = libpigpiod_if.so libpigpiod_if2.so pigs x_pigpiod_if x_pigpiod_if2
 
 all: $(ALL) pigpio.py setup.py
 
 pigpiod_if.o: pigpiod_if.c pigpio.h command.h pigpiod_if.h
 	$(CC) $(CFLAGS) -fpic -c -o pigpiod_if.o pigpiod_if.c
 
+pigpiod_if2.o: pigpiod_if2.c pigpio.h command.h pigpiod_if2.h
+	$(CC) $(CFLAGS) -fpic -c -o pigpiod_if2.o pigpiod_if2.c
+
 command.o: command.c pigpio.h command.h
 	$(CC) $(CFLAGS) -fpic -c -o command.o command.c
-
 
 pigs: command.o pigs.o
 	$(CC) $(CFLAGS) -fpic -o pigs pigs.c command.c
 
+x_pigpiod_if:  x_pigpiod_if.o $(LIB1)
+	$(CC) -o x_pigpiod_if x_pigpiod_if.o $(LL1)
+
+x_pigpiod_if2:  x_pigpiod_if2.o $(LIB2)
+	$(CC) -o x_pigpiod_if2 x_pigpiod_if2.o $(LL2)
+
 clean:
 	rm -f *.o *.i *.s *~ $(ALL)
 
-install: $(LIB) 
-	install -m 0755 -d              /usr/local/include
-	install -m 0644 pigpio.h        /usr/local/include
-	install -m 0644 pigpiod_if.h    /usr/local/include
-	install -m 0755 -d              /usr/local/lib
-	install -m 0644 libpigpiod_if.so /usr/local/lib
-	install -m 0755 -d              /usr/local/bin
-	install -m 0755 pigs            /usr/local/bin
+install: $(LIB1) $(LIB2)
+	install -m 0755 -d                /usr/local/include
+	install -m 0644 pigpio.h          /usr/local/include
+	install -m 0644 pigpiod_if.h      /usr/local/include
+	install -m 0644 pigpiod_if2.h     /usr/local/include
+	install -m 0755 -d                /usr/local/lib
+	install -m 0644 libpigpiod_if.so  /usr/local/lib
+	install -m 0644 libpigpiod_if2.so /usr/local/lib
+	install -m 0755 -d                /usr/local/bin
+	install -m 0755 pigs              /usr/local/bin
 	python2 setup.py install
 	python3 setup.py install
-	install -m 0755 -d              /usr/local/man/man1
-	install -m 0644 *.1             /usr/local/man/man1
-	install -m 0755 -d              /usr/local/man/man3
-	install -m 0644 *.3             /usr/local/man/man3
+	install -m 0755 -d                /usr/local/man/man1
+	install -m 0644 *.1               /usr/local/man/man1
+	install -m 0755 -d                /usr/local/man/man3
+	install -m 0644 *.3               /usr/local/man/man3
 
 uninstall:
 	rm -f /usr/local/include/pigpio.h
+	rm -f /usr/local/include/pigpiod_if.h
+	rm -f /usr/local/include/pigpiod_if2.h
 	rm -f /usr/local/lib/libpigpiod_if.so
+	rm -f /usr/local/lib/libpigpiod_if2.so
 	echo removing python2 files
 	python2 setup.py install --record /tmp/pigpio >/dev/null
 	xargs rm -f < /tmp/pigpio >/dev/null
@@ -51,18 +64,30 @@ uninstall:
 	rm -f /usr/local/man/man1/pig*.1
 	rm -f /usr/local/man/man3/pig*.3
 
-LIB = libpigpiod_if.so
-OBJ = pigpiod_if.o command.o
+LL1	= -L. -lpigpiod_if -pthread -lrt
+LL2	= -L. -lpigpiod_if2 -pthread -lrt
 
-$(LIB): $(OBJ)
-	$(SHLIB) -o $(LIB) $(OBJ)
-	$(STRIPLIB) $(LIB)
-	$(SIZE)   $(LIB)
+LIB1 = libpigpiod_if.so
+OBJ1 = pigpiod_if.o command.o
+
+LIB2 = libpigpiod_if2.so
+OBJ2 = pigpiod_if2.o command.o
+
+$(LIB1): $(OBJ1)
+	$(SHLIB) -o $(LIB1) $(OBJ1)
+	$(STRIPLIB) $(LIB1)
+	$(SIZE)     $(LIB1)
+
+$(LIB2): $(OBJ2)
+	$(SHLIB) -o $(LIB2) $(OBJ2)
+	$(STRIPLIB) $(LIB2)
+	$(SIZE)     $(LIB2)
 
 # generated using gcc -MM *.c
 
 command.o: command.c pigpio.h command.h
 pigpiod.o: pigpiod.c pigpio.h
 pigpiod_if.o: pigpiod_if.c pigpio.h pigpiod_if.h command.h
+pigpiod_if2.o: pigpiod_if2.c pigpio.h pigpiod_if2.h command.h
 pigs.o: pigs.c pigpio.h command.h
 

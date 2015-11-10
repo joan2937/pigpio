@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 39
+#define PIGPIO_VERSION 40
 
 /*TEXT
 
@@ -83,7 +83,7 @@ Assuming your source is in prog.c use the following command to build and
 run the executable.
 
 . .
-gcc -o prog prog.c -lpigpio -lpthread -lrt
+gcc -Wall -pthread -o prog prog.c -lpigpio -lrt
 sudo ./prog
 . .
 
@@ -2034,14 +2034,14 @@ For the SMBus commands the low level transactions are shown at the end
 of the function description.  The following abbreviations are used.
 
 . .
-S     (1 bit) : Start bit
-P     (1 bit) : Stop bit
-Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
-A, NA (1 bit) : Accept and not accept bit. 
-Addr  (7 bits): I2C 7 bit address.
-Comm  (8 bits): Command byte, a data byte which often selects a register.
-Data  (8 bits): A data byte.
-Count (8 bits): A data byte containing the length of a block operation.
+S      (1 bit) : Start bit
+P      (1 bit) : Stop bit
+Rd/Wr  (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
+A, NA  (1 bit) : Accept and not accept bit. 
+Addr   (7 bits): I2C 7 bit address.
+i2cReg (8 bits): Command byte, a byte which often selects a register.
+Data   (8 bits): A data byte.
+Count  (8 bits): A byte defining the length of a block operation.
 
 [..]: Data sent by the device.
 . .
@@ -2077,7 +2077,7 @@ PI_I2C_WRITE_FAILED.
 
 Quick command. SMBus 2.0 5.5.1
 . .
-S Addr Rd/Wr [A] P
+S Addr bit [A] P
 . .
 D*/
 
@@ -2097,7 +2097,7 @@ PI_I2C_WRITE_FAILED.
 
 Send byte. SMBus 2.0 5.5.2
 . .
-S Addr Wr [A] Data [A] P
+S Addr Wr [A] bVal [A] P
 . .
 D*/
 
@@ -2138,7 +2138,7 @@ PI_I2C_WRITE_FAILED.
 
 Write byte. SMBus 2.0 5.5.4
 . .
-S Addr Wr [A] Comm [A] Data [A] P
+S Addr Wr [A] i2cReg [A] bVal [A] P
 . .
 D*/
 
@@ -2160,7 +2160,7 @@ PI_I2C_WRITE_FAILED.
 
 Write word. SMBus 2.0 5.5.4
 . .
-S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P
+S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A] P
 . .
 D*/
 
@@ -2181,7 +2181,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Read byte. SMBus 2.0 5.5.5
 . .
-S Addr Wr [A] Comm [A] S Addr Rd [A] [Data] NA P
+S Addr Wr [A] i2cReg [A] S Addr Rd [A] [Data] NA P
 . .
 D*/
 
@@ -2202,7 +2202,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Read word. SMBus 2.0 5.5.5
 . .
-S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+S Addr Wr [A] i2cReg [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
 . .
 D*/
 
@@ -2224,7 +2224,7 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Process call. SMBus 2.0 5.5.6
 . .
-S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A]
+S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A]
    S Addr Rd [A] [DataLow] A [DataHigh] NA P
 . .
 D*/
@@ -2249,7 +2249,8 @@ PI_I2C_WRITE_FAILED.
 
 Block write. SMBus 2.0 5.5.7
 . .
-S Addr Wr [A] Comm [A] Count [A] Data [A] Data [A] ... [A] Data [A] P
+S Addr Wr [A] i2cReg [A] count [A]
+   buf0 [A] buf1 [A] ... [A] bufn [A] P
 . .
 D*/
 
@@ -2273,8 +2274,8 @@ PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 Block read. SMBus 2.0 5.5.7
 . .
-S Addr Wr [A] Comm [A]
-   S Addr Rd [A] [Count] A [Data] A [Data] A ... A [Data] NA P
+S Addr Wr [A] i2cReg [A]
+   S Addr Rd [A] [Count] A [buf0] A [buf1] A ... A [bufn] NA P
 . .
 D*/
 
@@ -2303,8 +2304,8 @@ bytes sent/received must be 32 or less.
 
 Block write-block read. SMBus 2.0 5.5.8
 . .
-S Addr Wr [A] Comm [A] Count [A] Data [A] ...
-   S Addr Rd [A] [Count] A [Data] ... A P
+S Addr Wr [A] i2cReg [A] count [A] buf0 [A] ... bufn [A]
+   S Addr Rd [A] [Count] A [buf0] A ... [bufn] A P
 . .
 D*/
 
@@ -2327,8 +2328,8 @@ Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_I2C_READ_FAILED.
 
 . .
-S Addr Wr [A] Comm [A]
-   S Addr Rd [A] [Data] A [Data] A ... A [Data] NA P
+S Addr Wr [A] i2cReg [A]
+   S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
 . .
 D*/
 
@@ -2351,7 +2352,7 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
 
 . .
-S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
+S Addr Wr [A] i2cReg [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
 . .
 D*/
 
@@ -2368,6 +2369,10 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 
 Returns count (>0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_READ_FAILED.
+
+. .
+S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
+. .
 D*/
 
 
@@ -2384,6 +2389,10 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 
 Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
 PI_I2C_WRITE_FAILED.
+
+. .
+S Addr Wr [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
+. .
 D*/
 
 /*F*/
@@ -3046,13 +3055,13 @@ D*/
 
 
 /*F*/
-pthread_t *gpioStartThread(gpioThreadFunc_t f, void *arg);
+pthread_t *gpioStartThread(gpioThreadFunc_t f, void *userdata);
 /*D
 Starts a new thread of execution with f as the main routine.
 
 . .
-  f: the main function for the new thread
-arg: a pointer to arbitrary user data
+       f: the main function for the new thread
+userdata: a pointer to arbitrary user data
 . .
 
 Returns a pointer to pthread_t if OK, otherwise NULL.
@@ -4005,10 +4014,6 @@ The number of microseconds level changes are reported for once
 a noise filter has been triggered (by [*steady*] microseconds of
 a stable level).
 
-*arg::
-
-A pointer to a void object passed to a thread started by gpioStartThread.
-
 arg1::
 
 An unsigned argument passed to a user customised function.  Its
@@ -4716,6 +4721,25 @@ See [*gpio*].
 *userdata::
 
 A pointer to arbitrary user data.  This may be used to identify the instance.
+
+You must ensure that the pointer is in scope at the time it is processed.  If
+it is a pointer to a global this is automatic.  Do not pass the address of a
+local variable.  If you want to pass a transient object then use the
+following technique.
+
+In the calling function:
+
+user_type *userdata; 
+user_type my_userdata;
+
+userdata = malloc(sizeof(user_type)); 
+*userdata = my_userdata;
+
+In the receiving function:
+
+user_type my_userdata = *(user_type*)userdata;
+
+free(userdata);
 
 void::
 

@@ -34,6 +34,9 @@ For more information, please refer to <http://unlicense.org/>
 
 /*TEXT
 
+THIS LIBRARY IS DEPRECATED.  NEW CODE SHOULD BE WRITTEN TO
+USE THE MORE VERSATILE pigpiod_if2 LIBRARY.
+
 pigpiod_if is a C library for the Raspberry which allows control
 of the gpios via the socket interface to the pigpio daemon. 
 
@@ -78,7 +81,7 @@ Include <pigpiod_if.h> in your source files.
 Assuming your source is in prog.c use the following command to build
 
 . .
-gcc -o prog prog.c -lpigpiod_if
+gcc -Wall -pthread -o prog prog.c -lpigpiod_if -lrt
 . .
 
 to run make sure the pigpio daemon is running

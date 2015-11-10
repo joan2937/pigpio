@@ -13,18 +13,20 @@ IN THAT DIRECTORY
 Enter the following two commands (in this order)
 
 make
-make install
+sudo make install
 
 This will install
 
 o the library (libpigpio.so) in /usr/local/lib
 o the library (libpigpiod_if.so) in /usr/local/lib
+o the library (libpigpiod_if2.so) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
+o the header file (pigpiod_if2.h) in /usr/local/include
 o the daemon (pigpiod) in /usr/local/bin
 o the socket interface (pigs) in /usr/local/bin
 o the utility pig2vcd in /usr/local/bin
-o man pages in /usr/local/man/man1 and man3
+o man pages in /usr/local/man/man1 and /usr/local/man/man3
 o the Python module pigpio.py for Python 2 and 3
 
 TEST (optional)
@@ -48,19 +50,21 @@ To test the pigpio daemon do
 
 sudo pigpiod
 
-./x_pigpiod_if # test the C I/F to the pigpio daemon
-./x_pigpio.py  # test the Python I/F to the pigpio daemon
-./x_pigs       # test the socket I/F to the pigpio daemon
-./x_pipe       # test the pipe I/F to the pigpio daemon
+./x_pigpiod_if  # test the C I/F to the pigpio daemon
+./x_pigpiod_if2 # test the C I/F to the pigpio daemon
+./x_pigpio.py   # test the Python I/F to the pigpio daemon
+./x_pigs        # test the socket I/F to the pigpio daemon
+./x_pipe        # test the pipe I/F to the pigpio daemon
 
 EXAMPLE CODE
 
 x_pigpio.c, pig2vcd.c, and pigpiod.c show examples of interfacing
 with the pigpio library.
 
-pigs.c, pigpio.py, x_pigpiod_if.c, x_pigpio.py, x_pigs, and x_pipe
-show examples of interfacing with the pigpio daemon.  x_pipe uses
-the pipe interface, the others use the socket interface.
+pigs.c, pigpio.py, x_pigpiod_if, x_pigpiod_if2.c, x_pigpio.py,
+x_pigs, and x_pipe show examples of interfacing with the pigpio
+daemon.  x_pipe uses the pipe interface, the others use the
+socket interface.
 
 DAEMON
 
@@ -123,6 +127,7 @@ In particular this allows you to use the following on non-Pi's.
 o pigs
 o the pigpio Python module
 o the C socket I/F using libpigpiod_if (header file pigpiod_if.h)
+o the C socket I/F using libpigpiod_if2 (header file pigpiod_if2.h)
 
 On a Linux machine
 
@@ -133,10 +138,12 @@ make -f MakeRemote install
 This will install
 
 o the library (libpigpiod_if.so) in /usr/local/lib
+o the library (libpigpiod_if2.so) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
+o the header file (pigpiod_if2.h) in /usr/local/include
 o the socket interface (pigs) in /usr/local/bin
-o man pages in /usr/local/man/man1 and man3
+o man pages in /usr/local/man/man1 and /usr/local/man/man3
 o the Python module pigpio.py
 
 On Windows machines (and possibly Macs)
@@ -145,8 +152,8 @@ The Python module should install with
 
 python setup.py install
 
-pigs and pigpiod_if.c will need minor mods to reflect the
-Window's/Mac's socket interface.
+pigs, pigpiod_if, and pigpiod_if2 will need minor mods to
+reflect the Windows/Mac socket interface.
 
 DOCUMENTATION
 
@@ -160,6 +167,7 @@ man pig2vcd
 
 man pigpio
 man pigpiod_if
+man pigpiod_if2
 
 pydoc pigpio
 

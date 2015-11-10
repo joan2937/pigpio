@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 39 */
+/* pigpio version 40 */
 
 /* include ------------------------------------------------------- */
 
@@ -1374,6 +1374,8 @@ static void initHWClk
 static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr);
 
 int gpioWaveTxStart(unsigned wave_mode); /* deprecated */
+
+static void closeOrphanedNotifications(int slot, int fd);
 
 
 /* ======================================================================= */
@@ -5394,6 +5396,7 @@ static void * pthAlertThread(void *x)
          {
             if (gpioNotify[n].pipe)
             {
+               DBG(DBG_INTERNAL, "close notify pipe %d", gpioNotify[n].fd);
                close(gpioNotify[n].fd);
 
                sprintf(fifo, "/dev/pigpio%d", n);
@@ -5499,6 +5502,8 @@ static void * pthAlertThread(void *x)
 
             if (emit)
             {
+               DBG(DBG_FAST_TICK, "notification %d (%d reports, %x-%x)",
+                  n, emit, gpioReport[0].seqno,  gpioReport[emit-1].seqno);
                gpioNotify[n].lastReportTick = stick;
                max_emits = gpioNotify[n].max_emits;
 
@@ -6221,7 +6226,10 @@ static void *pthSocketThreadHandler(void *fdC)
             if (recv(sock, buf, p[3], MSG_WAITALL) != p[3])
             {
                /* Serious error.  No point continuing. */
-               DBG(DBG_ALWAYS, "recv failed for %d bytes", p[3]);
+               DBG(DBG_ALWAYS,
+                  "recv failed for %d bytes, sock=%d", p[3], sock);
+
+               closeOrphanedNotifications(-1, sock);
 
                close(sock);
 
@@ -6231,7 +6239,10 @@ static void *pthSocketThreadHandler(void *fdC)
          else
          {
             /* Serious error.  No point continuing. */
-            DBG(DBG_ALWAYS, "ext too large %d(%d)", p[3], sizeof(buf));
+            DBG(DBG_ALWAYS,
+               "ext too large %d(%d), sock=%d", p[3], sizeof(buf), sock);
+
+            closeOrphanedNotifications(-1, sock);
 
             close(sock);
 
@@ -6299,6 +6310,8 @@ static void *pthSocketThreadHandler(void *fdC)
       }
    }
 
+   closeOrphanedNotifications(-1, sock);
+
    close(sock);
 
    return 0;
@@ -6339,6 +6352,8 @@ static void * pthSocketThread(void *x)
       accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c)))
    {
       pthread_t thr;
+
+      closeOrphanedNotifications(-1, fdC);
 
       sock = malloc(sizeof(int));
 
@@ -7122,6 +7137,16 @@ static void initReleaseResources(void)
    DBG(DBG_STARTUP, "");
 
    /* shut down running threads */
+
+   for (i=0; i<=PI_MAX_USER_GPIO; i++)
+   {
+      if (gpioISR[i].pth)
+      {
+         /* destroy thread, unexport GPIO */
+
+         gpioSetISRFunc(i, 0, 0, NULL);
+      }
+   }
 
    for (i=0; i<=PI_MAX_TIMER; i++)
    {
@@ -10026,6 +10051,24 @@ int gpioSetISRFuncEx(
    return intGpioSetISRFunc(gpio, edge, timeout, f, 1, userdata);
 }
 
+static void closeOrphanedNotifications(int slot, int fd)
+{
+   int i;
+
+   /* Check for and close any orphaned notifications. */
+
+   for (i=0; i<PI_NOTIFY_SLOTS; i++)
+   {
+      if ((i != slot) &&
+          (gpioNotify[i].state != PI_NOTIFY_CLOSED) &&
+          (gpioNotify[i].fd == fd))
+      {
+         DBG(DBG_USER, "closed orphaned fd=%d (handle=%d)", fd, i);
+         gpioNotify[i].state = PI_NOTIFY_CLOSED;
+         intNotifyBits();
+      }
+   }
+}
 
 /* ----------------------------------------------------------------------- */
 
@@ -10072,6 +10115,8 @@ int gpioNotifyOpen(void)
    gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
 
+   closeOrphanedNotifications(slot, fd);
+
    return slot;
 }
 
@@ -10082,7 +10127,7 @@ static int gpioNotifyOpenInBand(int fd)
 {
    int i, slot;
 
-   DBG(DBG_USER, "");
+   DBG(DBG_USER, "fd=%d", fd);
 
    CHECK_INITED;
 
@@ -10106,6 +10151,8 @@ static int gpioNotifyOpenInBand(int fd)
    gpioNotify[slot].pipe  = 0;
    gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
+
+   closeOrphanedNotifications(slot, fd);
 
    return slot;
 }
@@ -10491,12 +10538,12 @@ int gpioSetTimerFuncEx(unsigned id, unsigned millis, gpioTimerFuncEx_t f,
 
 /* ----------------------------------------------------------------------- */
 
-pthread_t *gpioStartThread(gpioThreadFunc_t f, void *arg)
+pthread_t *gpioStartThread(gpioThreadFunc_t f, void *userdata)
 {
    pthread_t *pth;
    pthread_attr_t pthAttr;
 
-   DBG(DBG_USER, "f=%08X, arg=%08X", (uint32_t)f, (uint32_t)arg);
+   DBG(DBG_USER, "f=%08X, userdata=%08X", (uint32_t)f, (uint32_t)userdata);
 
    CHECK_INITED_RET_NULL_PTR;
 
@@ -10516,7 +10563,7 @@ pthread_t *gpioStartThread(gpioThreadFunc_t f, void *arg)
          SOFT_ERROR(NULL, "pthread_attr_setstacksize failed");
       }
 
-      if (pthread_create(pth, &pthAttr, f, arg))
+      if (pthread_create(pth, &pthAttr, f, userdata))
       {
          free(pth);
          SOFT_ERROR(NULL, "pthread_create failed");

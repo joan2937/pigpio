@@ -556,7 +556,7 @@ int cmdParse(
    char *p8;
    int32_t *p32;
    char c;
-   uint32_t tp1, tp2, tp3;
+   uint32_t tp1=0, tp2=0, tp3=0;
    int8_t to1, to2, to3;
    int eaten;
 
