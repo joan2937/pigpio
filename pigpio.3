@@ -1369,6 +1369,21 @@ else
 
 .EE
 
+.IP "\fBint gpioNotifyOpenWithSize(int bufSize)\fP"
+.IP "" 4
+This function requests a free notification handle.
+
+.br
+
+.br
+It differs from \fBgpioNotifyOpen\fP in that the pipe size may be
+specified, whereas \fBgpioNotifyOpen\fP uses the default pipe size.
+
+.br
+
+.br
+See \fBgpioNotifyOpen\fP for further details.
+
 .IP "\fBint gpioNotifyBegin(unsigned handle, uint32_t bits)\fP"
 .IP "" 4
 This function starts notifications on a previously opened handle.

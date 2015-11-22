@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 40
+#define PIGPIO_VERSION 41
 
 /*TEXT
 
@@ -172,6 +172,7 @@ gpioSetGetSamplesFuncEx    Requests a gpio samples callback, extended
 gpioSetTimerFuncEx         Request a regular timed callback, extended
 
 gpioNotifyOpen             Request a notification handle
+gpioNotifyOpenWithSize     Request a notification handle with sized pipe
 gpioNotifyBegin            Start notifications for selected gpios
 gpioNotifyPause            Pause notifications
 gpioNotifyClose            Close a notification
@@ -1409,6 +1410,18 @@ else
    // Error.
 }
 ...
+D*/
+
+
+/*F*/
+int gpioNotifyOpenWithSize(int bufSize);
+/*D
+This function requests a free notification handle.
+
+It differs from [*gpioNotifyOpen*] in that the pipe size may be
+specified, whereas [*gpioNotifyOpen*] uses the default pipe size.
+
+See [*gpioNotifyOpen*] for further details.
 D*/
 
 

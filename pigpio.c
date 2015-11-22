@@ -25,9 +25,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 40 */
+/* pigpio version 41 */
 
 /* include ------------------------------------------------------- */
+
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <string.h>
@@ -39,11 +41,11 @@ For more information, please refer to <http://unlicense.org/>
 #include <syslog.h>
 #include <poll.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
-#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <limits.h>
 #include <pthread.h>
@@ -2966,7 +2968,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
 int i2cWriteQuick(unsigned handle, unsigned bit)
 {
-   int err;
+   int status;
 
    DBG(DBG_USER, "handle=%d bit=%d", handle, bit);
 
@@ -2984,17 +2986,22 @@ int i2cWriteQuick(unsigned handle, unsigned bit)
    if (bit > 1)
       SOFT_ERROR(PI_BAD_PARAM, "bad bit (%d)", bit);
 
-   err = my_smbus_access(
+   status = my_smbus_access(
       i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
 
-   if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-   return err;
+   return status;
 }
 
 int i2cReadByte(unsigned handle)
 {
    union my_smbus_data data;
+   int status;
 
    DBG(DBG_USER, "handle=%d", handle);
 
@@ -3009,17 +3016,22 @@ int i2cReadByte(unsigned handle)
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE) == 0)
       SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
 
-   if (my_smbus_access(
-      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data))
+   status = my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
-   else
-      return 0xFF & data.byte;
+   }
+
+   return 0xFF & data.byte;
 }
 
 
 int i2cWriteByte(unsigned handle, unsigned bVal)
 {
-   int err;
+   int status;
 
    DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
 
@@ -3037,22 +3049,27 @@ int i2cWriteByte(unsigned handle, unsigned bVal)
    if (bVal > 0xFF)
       SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
 
-   err = my_smbus_access(
+   status = my_smbus_access(
             i2cInfo[handle].fd,
             PI_I2C_SMBUS_WRITE,
             bVal,
             PI_I2C_SMBUS_BYTE,
             NULL);
 
-   if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-   return err;
+   return status;
 }
 
 
 int i2cReadByteData(unsigned handle, unsigned reg)
 {
    union my_smbus_data data;
+   int status;
 
    DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
 
@@ -3070,11 +3087,16 @@ int i2cReadByteData(unsigned handle, unsigned reg)
    if (reg > 0xFF)
       SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (my_smbus_access(
-      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data))
+   status = my_smbus_access(i2cInfo[handle].fd,
+            PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
-   else
-      return 0xFF & data.byte;
+   }
+
+   return 0xFF & data.byte;
 }
 
 
@@ -3082,7 +3104,7 @@ int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
 {
    union my_smbus_data data;
 
-   int err;
+   int status;
 
    DBG(DBG_USER, "handle=%d reg=%d bVal=%d", handle, reg, bVal);
 
@@ -3105,22 +3127,27 @@ int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
 
    data.byte = bVal;
 
-   err = my_smbus_access(
+   status = my_smbus_access(
             i2cInfo[handle].fd,
             PI_I2C_SMBUS_WRITE,
             reg,
             PI_I2C_SMBUS_BYTE_DATA,
             &data);
 
-   if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-   return err;
+   return status;
 }
 
 
 int i2cReadWordData(unsigned handle, unsigned reg)
 {
    union my_smbus_data data;
+   int status;
 
    DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
 
@@ -3138,15 +3165,20 @@ int i2cReadWordData(unsigned handle, unsigned reg)
    if (reg > 0xFF)
       SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (my_smbus_access(
+   status = (my_smbus_access(
       i2cInfo[handle].fd,
       PI_I2C_SMBUS_READ,
       reg,
       PI_I2C_SMBUS_WORD_DATA,
-      &data))
+      &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
-   else
-      return 0xFFFF & data.word;
+   }
+
+   return 0xFFFF & data.word;
 }
 
 
@@ -3154,7 +3186,7 @@ int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
 {
    union my_smbus_data data;
 
-   int err;
+   int status;
 
    DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
 
@@ -3177,22 +3209,27 @@ int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
 
    data.word = wVal;
 
-   err = my_smbus_access(
+   status = my_smbus_access(
             i2cInfo[handle].fd,
             PI_I2C_SMBUS_WRITE,
             reg,
             PI_I2C_SMBUS_WORD_DATA,
             &data);
 
-   if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-   return err;
+   return status;
 }
 
 
 int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
 {
    union my_smbus_data data;
+   int status;
 
    DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
 
@@ -3215,14 +3252,19 @@ int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
 
    data.word = wVal;
 
-   if (my_smbus_access(
+   status = (my_smbus_access(
       i2cInfo[handle].fd,
       PI_I2C_SMBUS_WRITE,
       reg, PI_I2C_SMBUS_PROC_CALL,
-      &data))
+      &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
-   else
-      return 0xFFFF & data.word;
+   }
+
+   return 0xFFFF & data.word;
 }
 
 
@@ -3230,7 +3272,7 @@ int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
 {
    union my_smbus_data data;
 
-   int i;
+   int i, status;
 
    DBG(DBG_USER, "handle=%d reg=%d buf=%08X", handle, reg, (unsigned)buf);
 
@@ -3248,13 +3290,18 @@ int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
    if (reg > 0xFF)
       SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (my_smbus_access(
+   status = (my_smbus_access(
       i2cInfo[handle].fd,
       PI_I2C_SMBUS_READ,
       reg,
       PI_I2C_SMBUS_BLOCK_DATA,
-      &data))
+      &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
+   }
    else
    {
       if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
@@ -3272,7 +3319,7 @@ int i2cWriteBlockData(
 {
    union my_smbus_data data;
 
-   int i, err;
+   int i, status;
 
    DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
       handle, reg, count, myBuf2Str(count, buf));
@@ -3297,16 +3344,20 @@ int i2cWriteBlockData(
    for (i=1; i<=count; i++) data.block[i] = buf[i-1];
    data.block[0] = count;
 
-   err = my_smbus_access(
+   status = my_smbus_access(
             i2cInfo[handle].fd,
             PI_I2C_SMBUS_WRITE,
             reg,
             PI_I2C_SMBUS_BLOCK_DATA,
             &data);
 
-    if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-    return err;
+   return status;
 }
 
 
@@ -3315,7 +3366,7 @@ int i2cBlockProcessCall(
 {
    union my_smbus_data data;
 
-   int i;
+   int i, status;
 
    DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
       handle, reg, count, myBuf2Str(count, buf));
@@ -3339,10 +3390,16 @@ int i2cBlockProcessCall(
 
    for (i=1; i<=count; i++) data.block[i] = buf[i-1];
    data.block[0] = count;
-   if (my_smbus_access(
+
+   status = (my_smbus_access(
       i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg,
-      PI_I2C_SMBUS_BLOCK_PROC_CALL, &data))
+      PI_I2C_SMBUS_BLOCK_PROC_CALL, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
+   }
    else
    {
       if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
@@ -3360,7 +3417,7 @@ int i2cReadI2CBlockData(
 {
    union my_smbus_data data;
 
-   int i;
+   int i, status;
    uint32_t size;
 
    DBG(DBG_USER, "handle=%d reg=%d count=%d buf=%08X",
@@ -3389,9 +3446,15 @@ int i2cReadI2CBlockData(
       size = PI_I2C_SMBUS_I2C_BLOCK_DATA;
 
    data.block[0] = count;
-   if (my_smbus_access(
-      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data))
+
+   status = (my_smbus_access(
+      i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
       return PI_I2C_READ_FAILED;
+   }
    else
    {
       if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
@@ -3409,7 +3472,7 @@ int i2cWriteI2CBlockData(
 {
    union my_smbus_data data;
 
-   int i, err;
+   int i, status;
 
    DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
       handle, reg, count, myBuf2Str(count, buf));
@@ -3435,16 +3498,20 @@ int i2cWriteI2CBlockData(
 
    data.block[0] = count;
 
-   err = my_smbus_access(
+   status = my_smbus_access(
             i2cInfo[handle].fd,
             PI_I2C_SMBUS_WRITE,
             reg,
             PI_I2C_SMBUS_I2C_BLOCK_BROKEN,
             &data);
 
-   if (err < 0) return PI_I2C_WRITE_FAILED;
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
 
-   return err;
+   return status;
 }
 
 int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
@@ -3468,9 +3535,12 @@ int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
    bytes = write(i2cInfo[handle].fd, buf, count);
 
    if (bytes != count)
+   {
+      DBG(DBG_USER, "error=%d (%m)", bytes);
       return PI_I2C_WRITE_FAILED;
-   else
-      return 0;
+   }
+
+   return 0;
 }
 
 int i2cReadDevice(unsigned handle, char *buf, unsigned count)
@@ -3494,9 +3564,12 @@ int i2cReadDevice(unsigned handle, char *buf, unsigned count)
    bytes = read(i2cInfo[handle].fd, buf, count);
 
    if (bytes != count)
+   {
+      DBG(DBG_USER, "error=%d (%m)", bytes);
       return PI_I2C_READ_FAILED;
-   else
-      return bytes;
+   }
+
+   return bytes;
 }
 
 int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
@@ -5161,17 +5234,21 @@ static void alertActivityFilter(int numSamples)
    }
 }
 
+
+
+
+
 static void * pthAlertThread(void *x)
 {
    struct timespec req, rem;
    uint32_t oldLevel, newLevel, level, reportedLevel;
    uint32_t oldSlot,  newSlot;
-   uint32_t stick, expected, nowTick;
+   uint32_t stick, expected, nowTick, ft;
    int32_t diff;
    int cycle, pulse;
    int emit, seqno, emitted;
    uint32_t changes, bits, changedBits, timeoutBits;
-   int numSamples, d;
+   int numSamples, d, ticks, i;
    int b, n, v;
    int rp, wp;
    int err;
@@ -5192,8 +5269,11 @@ static void * pthAlertThread(void *x)
 
    oldSlot = dmaCurrentSlot(dmaNowAtICB());
 
+   oldSlot = (oldSlot / PULSE_PER_CYCLE) * PULSE_PER_CYCLE;
+
    cycle = (oldSlot/PULSE_PER_CYCLE);
-   pulse = (oldSlot%PULSE_PER_CYCLE);
+
+   pulse = 0;
 
    stopped = 0;
 
@@ -5207,6 +5287,8 @@ static void * pthAlertThread(void *x)
    while (1)
    {
       newSlot = dmaCurrentSlot(dmaNowAtICB());
+
+      newSlot = (newSlot / PULSE_PER_CYCLE) * PULSE_PER_CYCLE;
 
       numSamples = 0;
 
@@ -5246,6 +5328,22 @@ static void * pthAlertThread(void *x)
             stick = myGetTick(cycle);
 
             diff = stick - expected;
+
+            if ((diff < -1) || (diff > 1))
+            {
+               if (gpioCfg.clockMicros > 1)
+               {
+                  ft = gpioSample[numSamples-PULSE_PER_CYCLE].tick;
+
+                  ticks = stick - ft;
+
+                  for (i=1; i<PULSE_PER_CYCLE; i++)
+                  {
+                     gpioSample[numSamples-PULSE_PER_CYCLE+i].tick =
+                        ((i*ticks)/PULSE_PER_CYCLE) + ft;
+                  }
+               }
+            }
 
             diff += (TICKSLOTS/2);
 
@@ -10072,12 +10170,12 @@ static void closeOrphanedNotifications(int slot, int fd)
 
 /* ----------------------------------------------------------------------- */
 
-int gpioNotifyOpen(void)
+int gpioNotifyOpenWithSize(int bufSize)
 {
    int i, slot, fd;
    char name[32];
 
-   DBG(DBG_USER, "");
+   DBG(DBG_USER, "bufSize=%d", bufSize);
 
    CHECK_INITED;
 
@@ -10108,6 +10206,17 @@ int gpioNotifyOpen(void)
       SOFT_ERROR(PI_BAD_PATHNAME, "open %s failed (%m)", name);
    }
 
+   if (bufSize != 0)
+   {
+      i = fcntl(fd, F_SETPIPE_SZ, bufSize);
+      if (i != bufSize)
+      {
+         gpioNotify[slot].state = PI_NOTIFY_CLOSED;
+         SOFT_ERROR(PI_BAD_PATHNAME,
+            "fcntl %s size %d failed (%m)", name, bufSize);
+      }
+   }
+
    gpioNotify[slot].seqno = 0;
    gpioNotify[slot].bits  = 0;
    gpioNotify[slot].fd    = fd;
@@ -10120,6 +10229,10 @@ int gpioNotifyOpen(void)
    return slot;
 }
 
+int gpioNotifyOpen(void)
+{
+   return gpioNotifyOpenWithSize(0);
+}
 
 /* ----------------------------------------------------------------------- */
 
