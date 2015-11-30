@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 41 */
+/* pigpio version 42 */
 
 /* include ------------------------------------------------------- */
 
@@ -5244,7 +5244,7 @@ static void * pthAlertThread(void *x)
    uint32_t oldLevel, newLevel, level, reportedLevel;
    uint32_t oldSlot,  newSlot;
    uint32_t stick, expected, nowTick, ft;
-   int32_t diff;
+   int32_t diff, minDiff, stickInited;
    int cycle, pulse;
    int emit, seqno, emitted;
    uint32_t changes, bits, changedBits, timeoutBits;
@@ -5279,10 +5279,13 @@ static void * pthAlertThread(void *x)
 
    moreToDo = 0;
 
-   stick = systReg[SYST_CLO];
+   stickInited = 0;
+   stick = 0;
 
    nextWakeTick =
       stick + alert_delays[(gpioCfg.internals>>PI_CFG_ALERT_FREQ)&15];
+
+   minDiff = gpioCfg.clockMicros / 2;
 
    while (1)
    {
@@ -5303,8 +5306,6 @@ static void * pthAlertThread(void *x)
       while ((oldSlot != newSlot) && (numSamples < DATUMS))
       {
          level = myGetLevel(oldSlot++);
-
-         newLevel = (level & monitorBits);
 
          gpioSample[numSamples].tick  = stick;
          gpioSample[numSamples].level = level;
@@ -5327,11 +5328,11 @@ static void * pthAlertThread(void *x)
 
             stick = myGetTick(cycle);
 
-            diff = stick - expected;
-
-            if ((diff < -1) || (diff > 1))
+            if (stickInited)
             {
-               if (gpioCfg.clockMicros > 1)
+               diff = stick - expected;
+
+               if (abs(diff) > minDiff)
                {
                   ft = gpioSample[numSamples-PULSE_PER_CYCLE].tick;
 
@@ -5343,21 +5344,26 @@ static void * pthAlertThread(void *x)
                         ((i*ticks)/PULSE_PER_CYCLE) + ft;
                   }
                }
+
+               diff += (TICKSLOTS/2);
+
+               if (diff < 0)
+               {
+                  gpioStats.diffTick[0]++;
+               }
+
+               else if (diff >= TICKSLOTS)
+               {
+                  gpioStats.diffTick[TICKSLOTS-1]++;
+               }
+
+               else gpioStats.diffTick[diff]++;
             }
-
-            diff += (TICKSLOTS/2);
-
-            if (diff < 0)
+            else
             {
-               gpioStats.diffTick[0]++;
+               stickInited = 1;
+               numSamples = 0;
             }
-
-            else if (diff >= TICKSLOTS)
-            {
-               gpioStats.diffTick[TICKSLOTS-1]++;
-            }
-
-            else gpioStats.diffTick[diff]++;
          }
       }
 
@@ -7766,10 +7772,6 @@ void gpioTerminate(void)
    {
       fprintf(stderr,
          "\n#####################################################\n");
-      fprintf(stderr,
-         "If you didn't request stats please cut & paste the\n"
-         "following and e-mail to pigpio@abyz.co.uk\n");
-
       fprintf(stderr, "pigpio version=%d internals=%X\n",
          PIGPIO_VERSION, gpioCfg.internals);
 
