@@ -84,6 +84,7 @@ void fatal(char *fmt, ...)
 void usage()
 {
    fprintf(stderr, "\n" \
+      "pigpio V%d\n" \
       "Usage: sudo pigpiod [OPTION] ...\n" \
       "   -a value, DMA mode, 0=AUTO, 1=PMAP, 2=MBOX,   default AUTO\n" \
       "   -b value, gpio sample buffer in milliseconds, default 120\n" \
@@ -100,7 +101,7 @@ void usage()
       "sudo pigpiod -s 2 -b 200 -f\n" \
       "  Set a sample rate of 2 microseconds with a 200 millisecond\n" \
       "  buffer.  Disable the fifo interface.\n" \
-   "\n");
+   "\n", PIGPIO_VERSION);
 }
 
 static uint64_t getNum(char *str, int *err)
