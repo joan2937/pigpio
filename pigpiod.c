@@ -93,6 +93,7 @@ void usage()
       "   -e value, secondary DMA channel, 0-6,         default 5\n" \
       "   -f,       disable fifo interface,             default enabled\n" \
       "   -k,       disable socket interface,           default enabled\n" \
+      "   -l,       localhost socket only               default all interfaces\n" \
       "   -p value, socket port, 1024-32000,            default 8888\n" \
       "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
       "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
@@ -120,7 +121,7 @@ static void initOpts(int argc, char *argv[])
    int opt, err, i;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fkp:s:t:x:")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fklp:s:t:x:")) != -1)
    {
       switch (opt)
       {
@@ -165,6 +166,10 @@ static void initOpts(int argc, char *argv[])
 
          case 'k':
             ifFlags |= PI_DISABLE_SOCK_IF;
+            break; 
+
+         case 'l':
+            ifFlags |= PI_LOCALHOST_SOCK_IF;
             break; 
 
          case 'p':

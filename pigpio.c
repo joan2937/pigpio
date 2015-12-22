@@ -7496,7 +7496,14 @@ int initInitialise(void)
       if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
 
       server.sin_family = AF_INET;
-      server.sin_addr.s_addr = INADDR_ANY;
+      if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
+      {
+         server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      }
+      else
+      {
+         server.sin_addr.s_addr = htonl(INADDR_ANY);
+      }
       server.sin_port = htons(port);
 
       if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
@@ -11508,7 +11515,7 @@ int gpioCfgInterfaces(unsigned ifFlags)
 
    CHECK_NOT_INITED;
 
-   if (ifFlags > 3)
+   if (ifFlags > 7)
       SOFT_ERROR(PI_BAD_IF_FLAGS, "bad ifFlags (%X)", ifFlags);
 
    gpioCfg.ifFlags = ifFlags;
