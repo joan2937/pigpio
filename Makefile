@@ -27,6 +27,13 @@ LL2      = -L. -lpigpiod_if -pthread -lrt
 
 LL3      = -L. -lpigpiod_if2 -pthread -lrt
 
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+includedir = $(prefix)/include
+libdir = $(prefix)/lib
+mandir = $(prefix)/man
+
 all:	$(ALL)
 
 pigpio.o: pigpio.c pigpio.h command.h custom.cext
@@ -63,41 +70,41 @@ clean:
 	rm -f *.o *.i *.s *~ $(ALL)
 
 install:	$(ALL)
-	install -m 0755 -d                /opt/pigpio/cgi
-	install -m 0755 -d                /usr/local/include
-	install -m 0644 pigpio.h          /usr/local/include
-	install -m 0644 pigpiod_if.h      /usr/local/include
-	install -m 0644 pigpiod_if2.h     /usr/local/include
-	install -m 0755 -d                /usr/local/lib
-	install -m 0755 libpigpio.so      /usr/local/lib
-	install -m 0755 libpigpiod_if.so  /usr/local/lib
-	install -m 0755 libpigpiod_if2.so /usr/local/lib
-	install -m 0755 -d                /usr/local/bin
-	install -m 0755 -s pig2vcd        /usr/local/bin
-	install -m 0755 -s pigpiod        /usr/local/bin
-	install -m 0755 -s pigs           /usr/local/bin
+	install -m 0755 -d                $(DESTDIR)/opt/pigpio/cgi
+	install -m 0755 -d                $(DESTDIR)$(includedir)
+	install -m 0644 pigpio.h          $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if.h      $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if2.h     $(DESTDIR)$(includedir)
+	install -m 0755 -d                $(DESTDIR)$(libdir)
+	install -m 0755 libpigpio.so      $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if.so  $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if2.so $(DESTDIR)$(libdir)
+	install -m 0755 -d                $(DESTDIR)$(bindir)
+	install -m 0755 -s pig2vcd        $(DESTDIR)$(bindir)
+	install -m 0755 -s pigpiod        $(DESTDIR)$(bindir)
+	install -m 0755 -s pigs           $(DESTDIR)$(bindir)
 	if which python2; then python2 setup.py install; fi
 	if which python3; then python3 setup.py install; fi
-	install -m 0755 -d                /usr/local/man/man1
-	install -m 0644 *.1               /usr/local/man/man1
-	install -m 0755 -d                /usr/local/man/man3
-	install -m 0644 *.3               /usr/local/man/man3
+	install -m 0755 -d                $(DESTDIR)$(mandir)/man1
+	install -m 0644 *.1               $(DESTDIR)$(mandir)/man1
+	install -m 0755 -d                $(DESTDIR)$(mandir)/man3
+	install -m 0644 *.3               $(DESTDIR)$(mandir)/man3
 	ldconfig
 
 uninstall:
-	rm -f /usr/local/include/pigpio.h
-	rm -f /usr/local/include/pigpiod_if.h
-	rm -f /usr/local/include/pigpiod_if2.h
-	rm -f /usr/local/lib/libpigpio.so
-	rm -f /usr/local/lib/libpigpiod_if.so
-	rm -f /usr/local/lib/libpigpiod_if2.so
-	rm -f /usr/local/bin/pig2vcd
-	rm -f /usr/local/bin/pigpiod
-	rm -f /usr/local/bin/pigs
+	rm -f $(DESTDIR)$(includedir)/pigpio.h
+	rm -f $(DESTDIR)$(includedir)/pigpiod_if.h
+	rm -f $(DESTDIR)$(includedir)/pigpiod_if2.h
+	rm -f $(DESTDIR)$(libdir)/libpigpio.so
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so
+	rm -f $(DESTDIR)$(bindir)/pig2vcd
+	rm -f $(DESTDIR)$(bindir)/pigpiod
+	rm -f $(DESTDIR)$(bindir)/pigs
 	if which python2; then python2 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
 	if which python3; then python3 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
-	rm -f /usr/local/man/man1/pig*.1
-	rm -f /usr/local/man/man3/pig*.3
+	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
+	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
 	ldconfig
 
 $(LIB1):	$(OBJ1)
