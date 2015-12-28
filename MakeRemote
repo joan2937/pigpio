@@ -8,6 +8,13 @@ CFLAGS += -O3 -Wall -pthread
 
 ALL = libpigpiod_if.so libpigpiod_if2.so pigs x_pigpiod_if x_pigpiod_if2
 
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+includedir = $(prefix)/include
+libdir = $(prefix)/lib
+mandir = $(prefix)/man
+
 all: $(ALL) pigpio.py setup.py
 
 pigpiod_if.o: pigpiod_if.c pigpio.h command.h pigpiod_if.h
@@ -32,37 +39,37 @@ clean:
 	rm -f *.o *.i *.s *~ $(ALL)
 
 install: $(LIB1) $(LIB2)
-	install -m 0755 -d                /usr/local/include
-	install -m 0644 pigpio.h          /usr/local/include
-	install -m 0644 pigpiod_if.h      /usr/local/include
-	install -m 0644 pigpiod_if2.h     /usr/local/include
-	install -m 0755 -d                /usr/local/lib
-	install -m 0644 libpigpiod_if.so  /usr/local/lib
-	install -m 0644 libpigpiod_if2.so /usr/local/lib
-	install -m 0755 -d                /usr/local/bin
-	install -m 0755 pigs              /usr/local/bin
+	install -m 0755 -d                $(DESTDIR)$(includedir)
+	install -m 0644 pigpio.h          $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if.h      $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if2.h     $(DESTDIR)$(includedir)
+	install -m 0755 -d                $(DESTDIR)$(libdir)
+	install -m 0644 libpigpiod_if.so  $(DESTDIR)$(libdir)
+	install -m 0644 libpigpiod_if2.so $(DESTDIR)$(libdir)
+	install -m 0755 -d                $(DESTDIR)$(bindir)
+	install -m 0755 pigs              $(DESTDIR)$(bindir)
 	python2 setup.py install
 	python3 setup.py install
-	install -m 0755 -d                /usr/local/man/man1
-	install -m 0644 *.1               /usr/local/man/man1
-	install -m 0755 -d                /usr/local/man/man3
-	install -m 0644 *.3               /usr/local/man/man3
+	install -m 0755 -d                $(DESTDIR)$(mandir)/man1
+	install -m 0644 *.1               $(DESTDIR)$(mandir)/man1
+	install -m 0755 -d                $(DESTDIR)$(mandir)/man3
+	install -m 0644 *.3               $(DESTDIR)$(mandir)/man3
 
 uninstall:
-	rm -f /usr/local/include/pigpio.h
-	rm -f /usr/local/include/pigpiod_if.h
-	rm -f /usr/local/include/pigpiod_if2.h
-	rm -f /usr/local/lib/libpigpiod_if.so
-	rm -f /usr/local/lib/libpigpiod_if2.so
+	rm -f $(DESTDIR)$(includedir)/pigpio.h
+	rm -f $(DESTDIR)$(includedir)/pigpiod_if.h
+	rm -f $(DESTDIR)$(includedir)/pigpiod_if2.h
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so
 	echo removing python2 files
 	python2 setup.py install --record /tmp/pigpio >/dev/null
 	xargs rm -f < /tmp/pigpio >/dev/null
 	echo removing python3 files
 	python3 setup.py install --record /tmp/pigpio >/dev/null
 	xargs rm -f < /tmp/pigpio >/dev/null
-	rm -f /usr/local/bin/pigs
-	rm -f /usr/local/man/man1/pig*.1
-	rm -f /usr/local/man/man3/pig*.3
+	rm -f $(DESTDIR)$(bindir)/pigs
+	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
+	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
 
 LL1	= -L. -lpigpiod_if -pthread -lrt
 LL2	= -L. -lpigpiod_if2 -pthread -lrt
