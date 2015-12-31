@@ -4,9 +4,9 @@ gcc -o x_pigpiod_if2 x_pigpiod_if2.c -lpigpiod_if2 -lpthread
 
 *** WARNING ************************************************
 *                                                          *
-* All the tests make extensive use of gpio 4 (pin P1-7).   *
+* All the tests make extensive use of gpio 25 (pin 22).    *
 * Ensure that either nothing or just a LED is connected to *
-* gpio 4 before running any of the tests.                  *
+* gpio 25 before running any of the tests.                 *
 *                                                          *
 * Some tests are statistical in nature and so may on       *
 * occasion fail.  Repeated failures on the same test or    *
@@ -24,7 +24,7 @@ gcc -o x_pigpiod_if2 x_pigpiod_if2.c -lpigpiod_if2 -lpthread
 
 #include "pigpiod_if2.h"
 
-#define GPIO 4
+#define GPIO 25
 
 void CHECK(int t, int st, int got, int expect, int pc, char *desc)
 {
@@ -254,7 +254,7 @@ void t4(int pi)
    set_PWM_range(pi, GPIO, 100);
 
    h = notify_open(pi);
-   e = notify_begin(pi, h, (1<<4));
+   e = notify_begin(pi, h, (1<<GPIO));
    CHECK(4, 1, e, 0, 0, "notify open/begin");
 
    time_sleep(1);
@@ -286,10 +286,10 @@ void t4(int pi)
       {
          if (s != r.seqno) seq_ok = 0;
 
-         if (n) if (l != (r.level&(1<<4))) toggle_ok = 0;
+         if (n) if (l != (r.level&(1<<GPIO))) toggle_ok = 0;
 
-         if (r.level&(1<<4)) l = 0;
-         else                l = (1<<4);
+         if (r.level&(1<<GPIO)) l = 0;
+         else                   l = (1<<GPIO);
            
          s++;
          n++;
@@ -514,7 +514,7 @@ void t7(int pi)
 
 void t8(int pi)
 {
-   int v, t, i;
+   int v;
 
    printf("Bank read/write tests.\n");
 
@@ -534,13 +534,11 @@ void t8(int pi)
    v = gpio_read(pi, GPIO);
    CHECK(8, 4, v, 1, 0, "set bank 1");
 
-   t = 0;
-   v = (1<<16);
-   for (i=0; i<100; i++)
-   {
-      if (read_bank_2(pi) & v) t++;
-   };
-   CHECK(8, 5, t, 60, 75, "read bank 2");
+   v = read_bank_2(pi);
+
+   if (v) v = 0; else v = 1;
+
+   CHECK(8, 5, v, 0, 0, "read bank 2");
 
    v = clear_bank_2(pi, 0);
    CHECK(8, 6, v, 0, 0, "clear bank 2");

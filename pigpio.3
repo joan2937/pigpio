@@ -3409,7 +3409,7 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -3418,7 +3418,7 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
- spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
+ spiChan: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device)
 .br
     baud: 32K-125M (values above 30M are unlikely to work)
 .br
@@ -3492,7 +3492,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 .br
 
@@ -4673,11 +4673,11 @@ The gpio must be one of the following.
 .EX
 4   clock 0  All models
 .br
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
 .br
-6   clock 2  A+/B+/Pi2 and compute module only
+6   clock 2  A+/B+/Pi2/Zero and compute module only
 .br
-20  clock 0  A+/B+/Pi2 and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 .br
 21  clock 1  All models but Rev.2 B (reserved for system use)
 .br
@@ -4758,13 +4758,13 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
 .br
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 18  PWM channel 0  All models
 .br
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 
 .br
@@ -4780,6 +4780,25 @@ The gpio must be one of the following.
 .br
 
 .EE
+
+.br
+
+.br
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+.br
+
+.br
+The actual frequency set is 250 million / steps.
+
+.br
+
+.br
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 
 .IP "\fBint gpioTime(unsigned timetype, int *seconds, int *micros)\fP"
 .IP "" 4
@@ -5271,7 +5290,7 @@ Configures pigpio support of the fifo and socket interfaces.
 .br
 
 .EX
-ifFlags: 0-3
+ifFlags: 0-7
 .br
 
 .EE
@@ -5285,7 +5304,18 @@ The default setting (0) is that both interfaces are enabled.
 
 .br
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
+
+.br
+
+.br
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
+
+.br
+
+.br
+Or in PI_LOCALHOST_SOCK_IF to disable remote socket
+access (this means that the socket interface is only
+usable from the local Pi).
 
 .IP "\fBint gpioCfgMemAlloc(unsigned memAllocMode)\fP"
 .IP "" 4
@@ -7963,7 +7993,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
 .br
-#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2 for auxiliary SPI
+#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2/Zero for auxiliary SPI
 .br
 #define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
 .br

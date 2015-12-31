@@ -1,13 +1,13 @@
 #!/bin/bash
 
-GPIO=4
+GPIO=25
 
 #
 # This script serves as a confidence check that the pipe interface to
 # the pigpio library is ok.
 #
-# The script uses gpio 4 (P1-7).  Make sure that nothing (or only a LED)
-# is connected to gpio 4 before running the script.
+# The script uses gpio 25 (pin 22).  Make sure that nothing (or only a LED)
+# is connected to gpio 25 before running the script.
 #
 # To run the script
 # sudo pigpiod # if not already running

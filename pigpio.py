@@ -269,7 +269,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.24"
+VERSION = "1.25"
 
 exceptions = True
 
@@ -667,7 +667,7 @@ _errors=[
    [PI_UNKNOWN_COMMAND   , "unknown command"],
    [PI_SPI_XFER_FAILED   , "SPI xfer/read/write failed"],
    [_PI_BAD_POINTER      , "bad (NULL) pointer"],
-   [PI_NO_AUX_SPI        , "need a A+/B+/Pi2 for auxiliary SPI"],
+   [PI_NO_AUX_SPI        , "need a A+/B+/Pi2/Zero for auxiliary SPI"],
    [PI_NOT_PWM_GPIO      , "gpio is not in use for PWM"],
    [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
    [PI_NOT_HCLK_GPIO     , "gpio has no hardware clock"],
@@ -1564,10 +1564,10 @@ class pi():
 
       . .
       4   clock 0  All models
-      5   clock 1  A+/B+/Pi2 and compute module only
+      5   clock 1  A+/B+/Pi2/Zero and compute module only
                    (reserved for system use)
-      6   clock 2  A+/B+/Pi2 and compute module only
-      20  clock 0  A+/B+/Pi2 and compute module only
+      6   clock 2  A+/B+/Pi2/Zero and compute module only
+      20  clock 0  A+/B+/Pi2/Zero and compute module only
       21  clock 1  All models but Rev.2 B (reserved for system use)
 
       32  clock 0  Compute module only
@@ -1615,10 +1615,10 @@ class pi():
       The gpio must be one of the following.
 
       . .
-      12  PWM channel 0  A+/B+/Pi2 and compute module only
-      13  PWM channel 1  A+/B+/Pi2 and compute module only
+      12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+      13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
       18  PWM channel 0  All models
-      19  PWM channel 1  A+/B+/Pi2 and compute module only
+      19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
       40  PWM channel 0  Compute module only
       41  PWM channel 1  Compute module only
@@ -1626,6 +1626,16 @@ class pi():
       52  PWM channel 0  Compute module only
       53  PWM channel 1  Compute module only
       . .
+
+      The actual number of steps beween off and fully on is the
+      integral part of 250 million divided by PWMfreq.
+
+      The actual frequency set is 250 million / steps.
+
+      There will only be a million steps for a PWMfreq of 250.
+      Lower frequencies will have more steps and higher
+      frequencies will have fewer steps.  PWMduty is
+      automatically scaled to take this into account.
 
       ...
       pi.hardware_PWM(18, 800, 250000) # 800Hz 25% dutycycle
@@ -2895,12 +2905,12 @@ class pi():
       modify the default behaviour of 4-wire operation, mode 0,
       active low chip select.
 
-      An auxiliary SPI device is available on the A+/B+/Pi2 and may be
-      selected by setting the A bit in the flags.  The auxiliary
-      device has 3 chip selects and a selectable word size in bits.
+      An auxiliary SPI device is available on the A+/B+/Pi2/Zero
+      and may be selected by setting the A bit in the flags.
+      The auxiliary device has 3 chip selects and a selectable
+      word size in bits.
 
-
-      spi_channel:= 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
+      spi_channel:= 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device).
              baud:= 32K-125M (values above 30M are unlikely to work).
         spi_flags:= see below.
 
@@ -2935,7 +2945,7 @@ class pi():
       and 1 otherwise.
 
       A is 0 for the standard SPI device, 1 for the auxiliary SPI.
-      The auxiliary device is only present on the A+/B+/Pi2.
+      The auxiliary device is only present on the A+/B+/Pi2/Zero.
 
       W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
       Standard SPI device only.
@@ -3631,9 +3641,13 @@ class pi():
                      FALLING_EDGE.
       wait_timeout:= 0.0- (default 60.0).
 
-      The function returns as soon as the edge is detected
-      or after the number of seconds specified by timeout has
-      expired.
+      The function returns when the edge is detected or after
+      the number of seconds specified by timeout has expired.
+
+      Do not use this function for precise timing purposes,
+      the edge is only checked 20 times a second. Whenever
+      you need to know the accurate time of GPIO events use
+      a [*callback*] function.
 
       The function returns True if the edge is detected,
       otherwise False.

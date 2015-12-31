@@ -2,9 +2,9 @@
 
 #*** WARNING ************************************************
 #*                                                          *
-#* All the tests make extensive use of gpio 4 (pin P1-7).   *
+#* All the tests make extensive use of gpio 25 (pin 22).    *
 #* Ensure that either nothing or just a LED is connected to *
-#* gpio 4 before running any of the tests.                  *
+#* gpio 25 before running any of the tests.                 *
 #*                                                          *
 #* Some tests are statistical in nature and so may on       *
 #* occasion fail.  Repeated failures on the same test or    *
@@ -17,7 +17,7 @@ import struct
 
 import pigpio
 
-GPIO=4
+GPIO=25
 
 def STRCMP(r, s):
 
@@ -243,7 +243,7 @@ def t4():
    pi.set_PWM_range(GPIO, 100)
 
    h = pi.notify_open()
-   e = pi.notify_begin(h, (1<<4))
+   e = pi.notify_begin(h, (1<<GPIO))
    CHECK(4, 1, e, 0, 0, "notify open/begin")
 
    time.sleep(1)
@@ -281,7 +281,7 @@ def t4():
             if s != S:
                seq_ok = 0
 
-            L = v & (1<<4)
+            L = v & (1<<GPIO)
 
             if n:
                if l != L:
@@ -290,7 +290,7 @@ def t4():
             if L:
                l = 0
             else:
-               l = (1<<4)
+               l = (1<<GPIO)
            
             s += 1
             n += 1
@@ -549,12 +549,14 @@ def t8():
    v = pi.read(GPIO)
    CHECK(8, 4, v, 1, 0, "set bank 1")
 
-   t = 0
-   v = (1<<16)
-   for i in range(100):
-      if pi.read_bank_2() & v:
-         t += 1
-   CHECK(8, 5, t, 60, 75, "read bank 2")
+   v = pi.read_bank_2()
+
+   if v:
+      v = 0
+   else:
+      v = 1
+
+   CHECK(8, 5, v, 0, 0, "read bank 2")
 
    v = pi.clear_bank_2(0)
    CHECK(8, 6, v, 0, 0, "clear bank 2")

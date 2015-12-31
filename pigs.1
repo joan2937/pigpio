@@ -687,9 +687,9 @@ The gpio must be one of the following.
 
 .EX
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2 and compute module only
-20  clock 0  A+/B+/Pi2 and compute module only
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2/Zero and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 21  clock 1  All models but Type 2 (reserved for system use)
 
 .EE
@@ -762,10 +762,10 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2 and compute module only
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
 .EE
 
@@ -779,6 +779,19 @@ The gpio must be one of the following.
 53  PWM channel 1  Compute module only
 
 .EE
+
+.br
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by \fBpf\fP.
+
+.br
+The actual frequency set is 250 million / steps.
+
+.br
+There will only be a million steps for a \fBpf\fP of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  \fBpdc\fP is
+automatically scaled to take this into account.
 
 .br
 
@@ -2736,7 +2749,7 @@ Speeds between 32kbps and 125Mbps are allowed.  Speeds above 30Mbps
 are unlikely to work.
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -2783,7 +2796,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 .br
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard

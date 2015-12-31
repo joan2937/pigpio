@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 42
+#define PIGPIO_VERSION 43
 
 /*TEXT
 
@@ -2620,12 +2620,12 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
- spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
+ spiChan: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device)
     baud: 32K-125M (values above 30M are unlikely to work)
 spiFlags: see below
 . .
@@ -2657,7 +2657,7 @@ px is 0 if CEx is active low (default) and 1 for active high.
 ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
 SPI device only.
@@ -3366,9 +3366,9 @@ The gpio must be one of the following.
 
 . .
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2 and compute module only
-20  clock 0  A+/B+/Pi2 and compute module only
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2/Zero and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 21  clock 1  All models but Rev.2 B (reserved for system use)
 
 32  clock 0  Compute module only
@@ -3412,10 +3412,10 @@ share a PWM channel.
 The gpio must be one of the following.
 
 . .
-12  PWM channel 0  A+/B+/Pi2 and compute module only
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
 40  PWM channel 0  Compute module only
 41  PWM channel 1  Compute module only
@@ -3423,6 +3423,16 @@ The gpio must be one of the following.
 52  PWM channel 0  Compute module only
 53  PWM channel 1  Compute module only
 . .
+
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+The actual frequency set is 250 million / steps.
+
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 D*/
 
 /*F*/
@@ -3707,13 +3717,18 @@ int gpioCfgInterfaces(unsigned ifFlags);
 Configures pigpio support of the fifo and socket interfaces.
 
 . .
-ifFlags: 0-3
+ifFlags: 0-7
 . .
 
 The default setting (0) is that both interfaces are enabled.
 
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
+
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
+
+Or in PI_LOCALHOST_SOCK_IF to disable remote socket
+access (this means that the socket interface is only
+usable from the local Pi).
 D*/
 
 
@@ -5048,7 +5063,7 @@ after this command is issued.
 #define PI_UNKNOWN_COMMAND  -88 // unknown command
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
-#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2 for auxiliary SPI
+#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2/Zero for auxiliary SPI
 #define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
 #define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // gpio has no hardware clock
@@ -5116,4 +5131,5 @@ after this command is issued.
 /*DEF_E*/
 
 #endif
+
 

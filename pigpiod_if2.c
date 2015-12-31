@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 1 */
+/* PIGPIOD_IF2_VERSION 2 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1650,7 +1650,7 @@ int wait_for_edge(int pi, unsigned user_gpio, unsigned edge, double timeout)
 
    id = callback_ex(pi, user_gpio, edge, _wfe, &triggered);
 
-   while (!triggered && (time_time() < due)) time_sleep(0.1);
+   while (!triggered && (time_time() < due)) time_sleep(0.05);
 
    callback_cancel(id);
 

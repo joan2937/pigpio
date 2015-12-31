@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 42 */
+/* pigpio version 43 */
 
 /* include ------------------------------------------------------- */
 
@@ -11615,4 +11615,5 @@ int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)
 /* include any user customisations */
 
 #include "custom.cext"
+
 

@@ -4,9 +4,9 @@ sudo ./x_pigpio
 
 *** WARNING ************************************************
 *                                                          *
-* All the tests make extensive use of gpio 4 (pin P1-7).   *
+* All the tests make extensive use of gpio 25 (pin 22).    *
 * Ensure that either nothing or just a LED is connected to *
-* gpio 4 before running any of the tests.                  *
+* gpio 25 before running any of the tests.                 *
 *                                                          *
 * Some tests are statistical in nature and so may on       *
 * occasion fail.  Repeated failures on the same test or    *
@@ -27,7 +27,7 @@ sudo ./x_pigpio
 
 #define USERDATA 18249013
 
-#define GPIO 4
+#define GPIO 25
 
 void CHECK(int t, int st, int got, int expect, int pc, char *desc)
 {
@@ -273,7 +273,7 @@ void t4()
    gpioSetPWMrange(GPIO, 100);
 
    h = gpioNotifyOpen();
-   e = gpioNotifyBegin(h, (1<<4));
+   e = gpioNotifyBegin(h, (1<<GPIO));
    CHECK(4, 1, e, 0, 0, "notify open/begin");
 
    time_sleep(1);
@@ -305,10 +305,10 @@ void t4()
       {
          if (s != r.seqno) seq_ok = 0;
 
-         if (n) if (l != (r.level&(1<<4))) toggle_ok = 0;
+         if (n) if (l != (r.level&(1<<GPIO))) toggle_ok = 0;
 
-         if (r.level&(1<<4)) l = 0;
-         else                l = (1<<4);
+         if (r.level&(1<<GPIO)) l = 0;
+         else                   l = (1<<GPIO);
            
          s++;
          n++;
@@ -522,7 +522,7 @@ void t7()
 
 void t8()
 {
-   int v, t, i;
+   int v;
 
    printf("Bank read/write tests.\n");
 
@@ -542,13 +542,11 @@ void t8()
    v = gpioRead(GPIO);
    CHECK(8, 4, v, 1, 0, "set bank 1");
 
-   t = 0;
-   v = (1<<16);
-   for (i=0; i<100; i++)
-   {
-      if (gpioRead_Bits_32_53() & v) t++;
-   };
-   CHECK(8, 5, t, 60, 75, "read bank 2");
+   v = gpioRead_Bits_32_53();
+
+   if (v) v = 0; else v = 1;
+
+   CHECK(8, 5, v, 0, 0, "read bank 2");
 
    v = gpioWrite_Bits_32_53_Clear(0);
    CHECK(8, 6, v, 0, 0, "clear bank 2");
