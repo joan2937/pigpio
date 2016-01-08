@@ -205,6 +205,12 @@ bit 0 READ_LAST_NOT_SET_ERROR
             myTimeStamp(), __FUNCTION__ , ## arg);                 \
    }
 
+#ifndef DISABLE_SER_CHECK_INITED
+#define SER_CHECK_INITED CHECK_INITED
+#else
+#define SER_CHECK_INITED
+#endif
+
 #define CHECK_INITED                                               \
    do                                                              \
    {                                                               \
@@ -4416,7 +4422,7 @@ int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
 
    DBG(DBG_USER, "tty=%s serBaud=%d serFlags=0x%X", tty, serBaud, serFlags);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (strncmp("/dev/tty", tty, 8))
       SOFT_ERROR(PI_BAD_SER_DEVICE, "bad device (%s)", tty);
@@ -4495,7 +4501,7 @@ int serClose(unsigned handle)
 {
    DBG(DBG_USER, "handle=%d", handle);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
@@ -4517,7 +4523,7 @@ int serWriteByte(unsigned handle, unsigned bVal)
 
    DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
@@ -4542,7 +4548,7 @@ int serReadByte(unsigned handle)
 
    DBG(DBG_USER, "handle=%d", handle);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
@@ -4566,7 +4572,7 @@ int serWrite(unsigned handle, char *buf, unsigned count)
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
@@ -4589,7 +4595,7 @@ int serRead(unsigned handle, char *buf, unsigned count)
 
    DBG(DBG_USER, "handle=%d count=%d buf=0x%X", handle, count, (unsigned)buf);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
@@ -4622,7 +4628,7 @@ int serDataAvailable(unsigned handle)
 
    DBG(DBG_USER, "handle=%d", handle);
 
-   CHECK_INITED;
+   SER_CHECK_INITED;
 
    if (handle >= PI_SER_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
