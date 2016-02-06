@@ -574,6 +574,13 @@ def t8():
    pigpio.exceptions = True
    CHECK(8, 9, v, pigpio.PI_SOME_PERMITTED, 0, "set bank 2")
 
+def t9waitNotHalted(s):
+   for check in range(10):
+      time.sleep(0.1)
+      e, p = pi.script_status(s)
+      if e != pigpio.PI_SCRIPT_HALTED:
+         return
+
 def t9():
    print("Script store/run/status/stop/delete tests.")
 
@@ -609,28 +616,37 @@ def t9():
 
    oc = t9cb.tally()
    pi.run_script(s, [99, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
          break
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 1, c, 100, 0, "store/run script")
 
    oc = t9cb.tally()
    pi.run_script(s, [200, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
          break
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 2, c, 201, 0, "run script/script status")
 
    oc = t9cb.tally()
    pi.run_script(s, [2000, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
@@ -638,7 +654,7 @@ def t9():
       if p[9] < 1900:
          pi.stop_script(s)
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 3, c, 110, 20, "run/stop script/script status")
 

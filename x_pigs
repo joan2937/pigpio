@@ -189,9 +189,9 @@ if [[ $s = "" ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 
 s=$(pigs wvclr)
 if [[ $s = "" ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
-s=$(pigs slro $GPIO 1200 8)
+s=$(pigs slro $GPIO 4800 8)
 if [[ $s = "" ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
-s=$(pigs wvas $GPIO 1200 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e)
+s=$(pigs wvas $GPIO 4800 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e)
 if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 s=$(pigs m $GPIO w)
 if [[ $s = "" ]]; then echo "SLR-d ok"; else echo "SLR-d fail ($s)"; fi
@@ -199,7 +199,7 @@ w=$(pigs wvcre)
 if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
 s=$(pigs wvtx $w)
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
-sleep 0.2
+sleep 0.4
 s=$(pigs slr $GPIO 100)
 e="15 109 121 32 110 97 109 101 32 105 115 32 106 111 97 110"
 if [[ $s = $e ]]

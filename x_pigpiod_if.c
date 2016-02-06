@@ -113,6 +113,7 @@ void t2()
    dc = get_PWM_dutycycle(GPIO);
    CHECK(2, 4, dc, 128, 0, "get PWM dutycycle");
 
+   time_sleep(0.2);
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
@@ -122,6 +123,7 @@ void t2()
    f = get_PWM_frequency(GPIO);
    CHECK(2, 6, f, 100, 0, "set/get PWM frequency");
 
+   time_sleep(0.2);
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;
@@ -131,6 +133,7 @@ void t2()
    f = get_PWM_frequency(GPIO);
    CHECK(2, 8, f, 1000, 0, "set/get PWM frequency");
 
+   time_sleep(0.2);
    oc = t2_count;
    time_sleep(2);
    f = t2_count - oc;

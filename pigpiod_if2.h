@@ -2429,7 +2429,7 @@ Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, or
 PI_SER_OPEN_FAILED.
 
 The baud rate must be one of 50, 75, 110, 134, 150,
-200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
 38400, 57600, 115200, or 230400.
 
 No flags are currently defined.  This parameter should be set to zero.

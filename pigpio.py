@@ -123,7 +123,6 @@ Intermediate
 gpio_trigger              Send a trigger pulse to a gpio
 
 set_watchdog              Set a watchdog on a gpio
-set_filter                Set an activity filter on a gpio
 
 set_PWM_range             Configure PWM range of a gpio
 get_PWM_range             Get configured PWM range of a gpio
@@ -269,7 +268,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.25"
+VERSION = "1.26"
 
 exceptions = True
 
@@ -962,6 +961,7 @@ class _callback:
       """
       self._notify = notify
       self.count=0
+      self._reset = False
       if func is None:
          func=self._tally
       self.callb = _callback_ADT(user_gpio, edge, func)
@@ -973,6 +973,9 @@ class _callback:
 
    def _tally(self, user_gpio, level, tick):
       """Increment the callback called count."""
+      if self._reset:
+         self._reset = False
+         self.count = 0
       self.count += 1
 
    def tally(self):
@@ -984,6 +987,13 @@ class _callback:
       callback function.
       """
       return self.count
+
+   def reset_tally(self):
+      """
+      Resets the tally count to zero.
+      """
+      self._reset = True
+      self.count = 0
 
 class _wait_for_edge:
    """Encapsulates waiting for gpio edges."""
@@ -3103,7 +3113,7 @@ class pi():
       module instead.
 
       The baud rate must be one of 50, 75, 110, 134, 150,
-      200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+      200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
       38400, 57600, 115200, or 230400.
 
       ...
@@ -3608,7 +3618,8 @@ class pi():
 
       If a user callback is not specified a default tally callback is
       provided which simply counts edges.  The count may be retrieved
-      by calling the tally function.
+      by calling the tally function.  The count may be reset to zero
+      by calling the reset_tally function.
 
       The callback may be cancelled by calling the cancel function.
 
@@ -3626,6 +3637,8 @@ class pi():
       cb3 = pi.callback(17)
 
       print(cb3.tally())
+
+      cb3.reset_tally()
 
       cb1.cancel() # To cancel callback cb1.
       ...
@@ -3696,8 +3709,10 @@ class pi():
       self.sl = _socklock()
       self._notify  = None
 
+      port = int(port)
+
       self._host = host
-      self._port = int(port)
+      self._port = port
 
       self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       self.sl.s.settimeout(None)
@@ -3706,23 +3721,22 @@ class pi():
       self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
       try:
-         self.sl.s.connect((self._host, self._port))
-         self._notify = _callback_thread(self.sl, self._host, self._port)
+         self.sl.s.connect((host, port))
+         self._notify = _callback_thread(self.sl, host, port)
 
       except socket.error:
          self.connected = False
          if self.sl.s is not None:
             self.sl.s = None
-         if self._host == '':
+         if host == '':
             h = "localhost"
          else:
-            h = self._host
+            h = host
 
-         errStr = "Can't connect to pigpio on {}({})".format(
-            str(h), str(self._port))
+         s = "Can't connect to pigpio at {}({})".format(str(h), str(port))
 
          print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-         print(errStr)
+         print(s)
          print("")
          print("Did you start the pigpio daemon? E.g. sudo pigpiod")
          print("")
@@ -3743,6 +3757,8 @@ class pi():
       pi.stop()
       ...
       """
+
+      self.connected = False
 
       if self._notify is not None:
          self._notify.stop()
@@ -4121,7 +4137,7 @@ def xref():
    See [*gpio*].
 
    wait_timeout: 0.0 -
-   The number of seconds to wait in wait_for_edge before timing out.
+   The number of seconds to wait in [*wait_for_edge*] before timing out.
 
    wave_add_*:
    One of [*wave_add_new*] , [*wave_add_generic*], [*wave_add_serial*].

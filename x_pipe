@@ -261,10 +261,10 @@ if [[ $s = 0 ]]; then echo "SERVO-d ok"; else echo "SERVO-d fail ($s)"; fi
 echo "wvclr" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-a ok"; else echo "SLR-a fail ($s)"; fi
-echo "slro $GPIO 1200 8" >/dev/pigpio
+echo "slro $GPIO 4800 8" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "SLR-b ok"; else echo "SLR-b fail ($s)"; fi
-echo "wvas $GPIO 1200 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e" >/dev/pigpio
+echo "wvas $GPIO 4800 8 2 0 0x6d 0x79 0x20 0x6e 0x61 0x6d 0x65 0x20 0x69 0x73 0x20 0x6a 0x6f 0x61 0x6e" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 95 ]]; then echo "SLR-c ok"; else echo "SLR-c fail ($s)"; fi
 echo "m $GPIO w" >/dev/pigpio
@@ -276,7 +276,7 @@ if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($w)"; fi
 echo "wvtx $w" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 191 ]]; then echo "SLR-e ok"; else echo "SLR-e fail ($s)"; fi
-sleep 0.2
+sleep 0.4
 echo "slr $GPIO 100" >/dev/pigpio
 read -t 1 s </dev/pigout
 e="15 109 121 32 110 97 109 101 32 105 115 32 106 111 97 110"
