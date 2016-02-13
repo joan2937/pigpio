@@ -490,12 +490,12 @@ void t7()
    /* type of edge shouldn't matter for watchdogs */
    callback(GPIO, FALLING_EDGE, t7cbf);
 
-   set_watchdog(GPIO, 10); /* 10 ms, 100 per second */
+   set_watchdog(GPIO, 50); /* 50 ms, 20 per second */
    time_sleep(0.5);
    oc = t7_count;
    time_sleep(2);
    c = t7_count - oc;
-   CHECK(7, 1, c, 200, 1, "set watchdog on count");
+   CHECK(7, 1, c, 39, 5, "set watchdog on count");
 
    set_watchdog(GPIO, 0); /* 0 switches watchdog off */
    time_sleep(0.5);
