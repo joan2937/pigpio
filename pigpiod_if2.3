@@ -1093,8 +1093,8 @@ Sets a glitch filter on a gpio.
 .br
 Level changes on the gpio are not reported unless the level
 has been stable for at least \fBsteady\fP microseconds.  The
-level is then reported.  Level changes of less than \fBsteady\fP
-microseconds are ignored.
+level is then reported.  Level changes of less than
+\fBsteady\fP microseconds are ignored.
 
 .br
 
@@ -1398,8 +1398,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .br
-NOTE: Any waveform started by \fBwave_send_once\fP, \fBwave_send_repeat\fP,
-or \fBwave_chain\fP will be cancelled.
+NOTE: Any waveform started by \fBwave_send_*\fP or \fBwave_chain\fP
+will be cancelled.
 
 .br
 
@@ -1936,6 +1936,65 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 
 .EE
+
+.br
+
+.br
+Returns the number of DMA control blocks in the waveform if OK,
+otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+
+.IP "\fBint wave_send_using_mode(int pi, unsigned wave_id, unsigned mode)\fP"
+.IP "" 4
+Transmits the waveform with id wave_id using mode mode.
+
+.br
+
+.br
+
+.EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+wave_id: >=0, as returned by \fBwave_create\fP.
+.br
+   mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+.br
+         PI_WAVE_MODE_ONE_SHOT_SYNC, or PI_WAVE_MODE_REPEAT_SYNC.
+.br
+
+.EE
+
+.br
+
+.br
+PI_WAVE_MODE_ONE_SHOT: same as \fBwave_send_once\fP.
+
+.br
+
+.br
+PI_WAVE_MODE_REPEAT same as \fBwave_send_repeat\fP.
+
+.br
+
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC same as \fBwave_send_once\fP but tries
+to sync with the previous waveform.
+
+.br
+
+.br
+PI_WAVE_MODE_REPEAT_SYNC same as \fBwave_send_repeat\fP but tries
+to sync with the previous waveform.
+
+.br
+
+.br
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+.br
+
+.br
+NOTE: Any hardware PWM started by \fBhardware_PWM\fP will be cancelled.
 
 .br
 
@@ -4721,8 +4780,8 @@ PI_TIMEOUT 2
 
 .br
 
-.IP "\fBmode\fP: 0-7" 0
-The operational mode of a gpio, normally INPUT or OUTPUT.
+.IP "\fBmode\fP" 0
+1. The operational mode of a gpio, normally INPUT or OUTPUT.
 
 .br
 
@@ -4744,6 +4803,27 @@ PI_ALT3 7
 PI_ALT4 3
 .br
 PI_ALT5 2
+.br
+
+.EE
+
+.br
+
+.br
+2. The mode of waveform transmission.
+
+.br
+
+.br
+
+.EX
+PI_WAVE_MODE_ONE_SHOT      0
+.br
+PI_WAVE_MODE_REPEAT        1
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+.br
+PI_WAVE_MODE_REPEAT_SYNC   3
 .br
 
 .EE

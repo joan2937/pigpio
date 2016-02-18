@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 45
+#define PIGPIO_VERSION 46
 
 /*TEXT
 
@@ -599,8 +599,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* wave tx mode */
 
-#define PI_WAVE_MODE_ONE_SHOT 0
-#define PI_WAVE_MODE_REPEAT   1
+#define PI_WAVE_MODE_ONE_SHOT      0
+#define PI_WAVE_MODE_REPEAT        1
+#define PI_WAVE_MODE_ONE_SHOT_SYNC 2
+#define PI_WAVE_MODE_REPEAT_SYNC   3
 
 /* I2C, SPI, SER */
 
@@ -1748,12 +1750,18 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode);
 /*D
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
+The SYNC variants wait for the current waveform to reach the
+end of a cycle or finish before starting the new waveform.
+
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
 
 NOTE: Any hardware PWM started by [*gpioHardwarePWM*] will be cancelled.
 
 . .
   wave_id: >=0, as returned by [*gpioWaveCreate*]
-wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
+wave_mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+           PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC
 . .
 
 Returns the number of DMA control blocks in the waveform if OK,
@@ -4780,12 +4788,16 @@ A number identifying a waveform created by [*gpioWaveCreate*].
 
 wave_mode::
 
-The mode of waveform transmission, whether it is sent once or cycles
-repeatedly.
+The mode determines if the waveform is sent once or cycles
+repeatedly.  The SYNC variants wait for the current waveform
+to reach the end of a cycle or finish before starting the new
+waveform.
 
 . .
-PI_WAVE_MODE_ONE_SHOT 0
-PI_WAVE_MODE_REPEAT   1
+PI_WAVE_MODE_ONE_SHOT      0
+PI_WAVE_MODE_REPEAT        1
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+PI_WAVE_MODE_REPEAT_SYNC   3
 . .
 
 wVal::0-65535 (Hex 0x0-0xFFFF, Octal 0-0177777)
@@ -4910,6 +4922,8 @@ PARAMS*/
 
 #define PI_CMD_NOIB  99
 
+#define PI_CMD_WVTXM 100
+
 /*DEF_E*/
 
 /*
@@ -5005,7 +5019,7 @@ after this command is issued.
 #define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 #define PI_INITIALISED      -32 // function called after gpioInitialise
-#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-1
+#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
 #define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
 #define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
 #define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses

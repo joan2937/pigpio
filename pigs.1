@@ -3700,6 +3700,51 @@ ERROR: non existent wave id
 
 .br
 
+.IP "\fBWVTXM wid wmde\fP - Transmits waveform using mode"
+.IP "" 4
+
+.br
+This command transmits the waveform with id \fBwid\fP using mode \fBwmde\fP.
+
+.br
+The mode may be send once (0), send repeatedly (1), send once but
+first sync with previous wave (2), or send repeatedly but first
+sync with previous wave (3).
+
+.br
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+.br
+NOTE: Any hardware PWM started by \fBHP\fP will be cancelled.
+
+.br
+Upon success the number of DMA control blocks in the waveform is returned.
+On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs wvtxm 1 3
+.br
+75
+.br
+
+.br
+$ pigs wvtxm 2 0
+.br
+-66
+.br
+ERROR: non existent wave id
+.br
+
+.EE
+
+.br
+
 .IP "\fBWVTXR wid\fP - Transmits waveform repeatedly"
 .IP "" 4
 
@@ -4078,6 +4123,21 @@ When a waveform is created it is given an id (0, 1, 2, ...).
 
 .br
 
+.IP "\fBwmde\fP - mode (0-3)" 0
+The command expects a wave transmission mode.
+
+.br
+0 = send once
+.br
+1 = send repeatedly
+.br
+2 = send once but first sync with previous wave
+.br
+3 = send repeatedly but first sync with previous wave
+.br
+
+.br
+
 .IP "\fBws\fP - wave stats sucommand (0-2)" 0
 The command expects a subcommand.
 
@@ -4349,6 +4409,8 @@ The WAIT command parameter is a bit-mask with 1 set for gpios of interest.
 .br
 The SYS script receives two unsigned parameters: the accumulator A and
 the current gpio levels.
+
+.br
 
 .SH SEE ALSO
 

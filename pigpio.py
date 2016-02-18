@@ -180,6 +180,7 @@ wave_delete               Deletes one or more waveforms
 
 wave_send_once            Transmits a waveform once
 wave_send_repeat          Transmits a waveform repeatedly
+wave_send_using_mode      Transmits a waveform in the chosen mode
 
 wave_chain                Transmits a chain of waveforms
 
@@ -268,7 +269,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.26"
+VERSION = "1.27"
 
 exceptions = True
 
@@ -320,6 +321,13 @@ PI_SCRIPT_FAILED =4
 NTFY_FLAGS_ALIVE = (1 << 6)
 NTFY_FLAGS_WDOG  = (1 << 5)
 NTFY_FLAGS_GPIO  = 31
+
+# wave modes
+
+WAVE_MODE_ONE_SHOT     =0
+WAVE_MODE_REPEAT       =1
+WAVE_MODE_ONE_SHOT_SYNC=2
+WAVE_MODE_REPEAT_SYNC  =3
 
 # pigpio command numbers
 
@@ -444,6 +452,8 @@ _PI_CMD_CSI  =96
 
 _PI_CMD_FG   =97
 _PI_CMD_FN   =98
+
+_PI_CMD_WVTXM=100
 
 # pigpio error numbers
 
@@ -1994,6 +2004,40 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTXR, wave_id, 0))
+
+   def wave_send_using_mode(self, wave_id, mode):
+      """
+      Transmits the waveform with id wave_id using mode mode.
+
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
+         mode:= WAVE_MODE_ONE_SHOT, WAVE_MODE_REPEAT,
+                WAVE_MODE_ONE_SHOT_SYNC, or WAVE_MODE_REPEAT_SYNC.
+
+      WAVE_MODE_ONE_SHOT: same as [*wave_send_once*].
+
+      WAVE_MODE_REPEAT same as [*wave_send_repeat*].
+
+      WAVE_MODE_ONE_SHOT_SYNC same as [*wave_send_once*] but tries
+      to sync with the previous waveform.
+
+      WAVE_MODE_REPEAT_SYNC same as [*wave_send_repeat*] but tries
+      to sync with the previous waveform.
+
+      WARNING: bad things may happen if you delete the previous
+      waveform before it has been synced to the new waveform.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
+
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
+
+      Returns the number of DMA control blocks used in the waveform.
+
+      ...
+      cbs = pi.wave_send_using_mode(wid, WAVE_MODE_REPEAT_SYNC)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTXM, wave_id, mode))
 
    def wave_tx_busy(self):
       """
@@ -4025,7 +4069,10 @@ def xref():
    SET = 1 
    TIMEOUT = 2 # only returned for a watchdog timeout
 
-   mode: 0-7
+   mode:
+
+   1.The operational mode of a gpio, normally INPUT or OUTPUT.
+
    ALT0 = 4 
    ALT1 = 5 
    ALT2 = 6 
@@ -4034,6 +4081,13 @@ def xref():
    ALT5 = 2 
    INPUT = 0 
    OUTPUT = 1
+
+   2. The mode of waveform transmission.
+
+   WAVE_MODE_ONE_SHOT = 0 
+   WAVE_MODE_REPEAT = 1 
+   WAVE_MODE_ONE_SHOT_SYNC = 2 
+   WAVE_MODE_REPEAT_SYNC = 3
 
    offset: 0-
    The offset wave data starts from the beginning of the waveform

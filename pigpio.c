@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 45 */
+/* pigpio version 46 */
 
 /* include ------------------------------------------------------- */
 
@@ -1133,6 +1133,9 @@ static int libInitialised = 0;
 /* initialise every gpioInitialise */
 
 static struct timespec libStarted;
+
+static uint32_t reportedLevel = 0;
+
 static int waveClockInited = 0;
 
 static volatile gpioStats_t gpioStats;
@@ -1164,6 +1167,8 @@ static int waveOutBotCB  = PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE;
 static int waveOutBotOOL = PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE;
 static int waveOutTopOOL = NUM_WAVE_OOL;
 static int waveOutCount = 0;
+
+static uint32_t *waveEndPtr = NULL;
 
 static volatile uint32_t alertBits   = 0;
 static volatile uint32_t monitorBits = 0;
@@ -2178,6 +2183,9 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_WVTX:
          res = gpioWaveTxSend(p[1], PI_WAVE_MODE_ONE_SHOT); break;
+
+      case PI_CMD_WVTXM:
+         res = gpioWaveTxSend(p[1], p[2]); break;
 
       case PI_CMD_WVTXR:
          res = gpioWaveTxSend(p[1], PI_WAVE_MODE_REPEAT); break;
@@ -5253,9 +5261,8 @@ static void alertNoiseFilter(gpioSample_t *sample, int numSamples)
    }
 }
 
-uint32_t _reportedLevel, _changedBits;
-
-static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
+static void alertEmit(
+   gpioSample_t *sample, int numSamples, uint32_t changedBits, uint32_t eTick)
 {
    uint32_t oldLevel, newLevel;
    int32_t diff;
@@ -5268,7 +5275,7 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
    char fifo[32];
    gpioReport_t report[MAX_REPORT];
 
-   if (_changedBits)
+   if (changedBits)
    {
       if (gpioGetSamples.func)
       {
@@ -5286,9 +5293,9 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
 
    /* call alert callbacks for each bit transition */
 
-   if (_changedBits & alertBits)
+   if (changedBits & alertBits)
    {
-      oldLevel = (_reportedLevel & alertBits);
+      oldLevel = (reportedLevel & alertBits);
 
       for (d=0; d<numSamples; d++)
       {
@@ -5328,28 +5335,31 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
 
    timeoutBits = 0;
 
-   for (b=0; b<=PI_MAX_USER_GPIO; b++)
+   if (wdogBits)
    {
-      if (gpioAlert[b].wdSteadyUs)
+      for (b=0; b<=PI_MAX_USER_GPIO; b++)
       {
-         diff = eTick - gpioAlert[b].wdTick;
-
-         if (diff >= gpioAlert[b].wdSteadyUs)
+         if (gpioAlert[b].wdSteadyUs)
          {
-            timeoutBits |= (1<<b);
+            diff = eTick - gpioAlert[b].wdTick;
 
-            gpioAlert[b].wdTick = eTick;
-
-            if (gpioAlert[b].func)
+            if (diff >= gpioAlert[b].wdSteadyUs)
             {
-               if (gpioAlert[b].ex)
+               timeoutBits |= (1<<b);
+
+               gpioAlert[b].wdTick = eTick;
+
+               if (gpioAlert[b].func)
                {
-                  (gpioAlert[b].func)
-                     (b, PI_TIMEOUT, eTick, gpioAlert[b].userdata);
-               }
-               else
-               {
-                  (gpioAlert[b].func)(b, PI_TIMEOUT, eTick);
+                  if (gpioAlert[b].ex)
+                  {
+                     (gpioAlert[b].func)(b, PI_TIMEOUT, eTick,
+                                            gpioAlert[b].userdata);
+                  }
+                  else
+                  {
+                     (gpioAlert[b].func)(b, PI_TIMEOUT, eTick);
+                  }
                }
             }
          }
@@ -5360,7 +5370,6 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
    {
       if (gpioNotify[n].state == PI_NOTIFY_CLOSING)
       {
-
          if (gpioNotify[n].pipe)
          {
             DBG(DBG_INTERNAL, "close notify pipe %d", gpioNotify[n].fd);
@@ -5372,7 +5381,6 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
          }
 
          gpioNotify[n].state = PI_NOTIFY_CLOSED;
-
       }
       else if (gpioNotify[n].state == PI_NOTIFY_RUNNING)
       {
@@ -5386,12 +5394,12 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
             notification.
 
             bits         is the set of notification bits
-            _changedBits is the set of changed bits
+            changedBits is the set of changed bits
          */
 
-         if (_changedBits & bits)
+         if (changedBits & bits)
          {
-            oldLevel = _reportedLevel & bits;
+            oldLevel = reportedLevel & bits;
 
             for (d=0; d<numSamples; d++)
             {
@@ -5434,7 +5442,7 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
                   if (numSamples)
                      newLevel = sample[numSamples-1].level;
                   else
-                     newLevel = _reportedLevel;
+                     newLevel = reportedLevel;
 
                   report[emit].seqno = seqno;
                   report[emit].flags = PI_NTFY_FLAGS_WDOG |
@@ -5455,7 +5463,7 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
                if (numSamples)
                   newLevel = sample[numSamples-1].level;
                else
-                  newLevel = _reportedLevel;
+                  newLevel = reportedLevel;
 
                report[emit].seqno = seqno;
                report[emit].flags = PI_NTFY_FLAGS_ALIVE;
@@ -5516,7 +5524,10 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
                            err/sizeof(gpioReport_t), max_emits);
                      }
                   }
-                  else gpioStats.goodPipeWrite++;
+                  else
+                  {
+                     gpioStats.goodPipeWrite++;
+                  }
 
                   emitted += max_emits;
                   emit    -= max_emits;
@@ -5554,7 +5565,10 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
                            err/sizeof(gpioReport_t), emit);
                      }
                   }
-                  else gpioStats.goodPipeWrite++;
+                  else
+                  {
+                     gpioStats.goodPipeWrite++;
+                  }
 
                   emitted += emit;
                   emit = 0;
@@ -5566,20 +5580,20 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
       }
    }
 
-   if (_changedBits & scriptBits)
+   if (changedBits & scriptBits)
    {
       for (n=0; n<PI_MAX_SCRIPTS; n++)
       {
          if ((gpioScript[n].state     == PI_SCRIPT_IN_USE)  &&
              (gpioScript[n].run_state == PI_SCRIPT_WAITING) &&
-             (gpioScript[n].waitBits & _changedBits))
+             (gpioScript[n].waitBits & changedBits))
          {
             pthread_mutex_lock(&gpioScript[n].pthMutex);
 
             if (gpioScript[n].run_state == PI_SCRIPT_WAITING)
             {
                gpioScript[n].changedBits =
-                  gpioScript[n].waitBits & _changedBits;
+                  gpioScript[n].waitBits & changedBits;
                pthread_cond_signal(&gpioScript[n].pthCond);
             }
 
@@ -5588,7 +5602,7 @@ static void alertEmit(gpioSample_t *sample, int numSamples, uint32_t eTick)
       }
    }
 
-   if (numSamples) _reportedLevel = sample[numSamples-1].level;
+   if (numSamples) reportedLevel = sample[numSamples-1].level;
 }
 
 static void alertWdogCheck(gpioSample_t *sample, int numSamples)
@@ -5629,10 +5643,11 @@ static void * pthAlertThread(void *x)
    uint32_t oldLevel, newLevel, level;
    uint32_t oldSlot,  newSlot;
    uint32_t expected, ft, sTick;
+   uint32_t changedBits;
    int32_t diff, minDiff, stickInited;
    int cycle, pulse;
    int numSamples, ticks, i;
-   int rp, compactedSamples, totalSamples;
+   int rp, reports, totalSamples;
    int stopped;
    int moreToDo;
    gpioSample_t sample[MAX_SAMPLE];
@@ -5643,7 +5658,9 @@ static void * pthAlertThread(void *x)
 
    spinWhileStarting();
 
-   _reportedLevel = gpioReg[GPLEV0];
+   reportedLevel = gpioReg[GPLEV0];
+
+   oldLevel = reportedLevel;
 
    oldSlot = dmaCurrentSlot(dmaNowAtICB());
 
@@ -5782,53 +5799,52 @@ static void * pthAlertThread(void *x)
 
       /* Compact samples */
 
-      _changedBits = 0;
-      oldLevel = _reportedLevel & monitorBits;
-
-      compactedSamples = 0;
+      changedBits = 0;
+      oldLevel &= monitorBits;
+      reports = 0;
       totalSamples = 0;
 
       for (rp=0; rp<numSamples; rp++)
       {
-         level = sample[rp].level;
-
-         newLevel = (level & monitorBits);
+         newLevel = (sample[rp].level & monitorBits);
 
          if (newLevel != oldLevel)
          {
-            sample[compactedSamples].tick  = sample[rp].tick;
-            sample[compactedSamples].level = level;
-            _changedBits |= (newLevel ^ oldLevel);
+            sample[reports].tick  = sample[rp].tick;
+            sample[reports].level = sample[rp].level;
+            changedBits |= (newLevel ^ oldLevel);
             oldLevel = newLevel;
 
-            compactedSamples++;
-            if (compactedSamples >= MAX_REPORT)
+            reports++;
+
+            if (reports >= MAX_REPORT)
             {
-               totalSamples += compactedSamples;
+               totalSamples += reports;
 
                /* Rebase watchdog timeouts */
-               if (wdogBits) alertWdogCheck(sample, compactedSamples);
+               if (wdogBits) alertWdogCheck(sample, reports);
 
-               gpioStats.numSamples += compactedSamples;
+               gpioStats.numSamples += reports;
 
-               alertEmit(sample, compactedSamples, sample[rp].tick);
+               alertEmit(sample, reports, changedBits, sample[rp].tick);
 
-               compactedSamples = 0;
+               changedBits = 0;
+               reports = 0;
             }
          }
       }
 
-      if (compactedSamples)
+      if (reports)
       {
-         totalSamples += compactedSamples;
+         totalSamples += reports;
 
          /* Rebase watchdog timeouts */
-         if (wdogBits) alertWdogCheck(sample, compactedSamples);
+         if (wdogBits) alertWdogCheck(sample, reports);
 
-         gpioStats.numSamples += compactedSamples;
+         gpioStats.numSamples += reports;
       }
 
-      alertEmit(sample, compactedSamples, sTick);
+      alertEmit(sample, reports, changedBits, sTick);
 
       if (totalSamples > gpioStats.maxSamples)
          gpioStats.maxSamples = numSamples;
@@ -8346,6 +8362,8 @@ int gpioWaveClear(void)
 
    waveOutCount = 0;
 
+   waveEndPtr = NULL;
+
    return 0;
 }
 
@@ -8818,7 +8836,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
    if ((wave_id >= waveOutCount) || waveInfo[wave_id].deleted)
       SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
 
-   if (wave_mode > PI_WAVE_MODE_REPEAT)
+   if (wave_mode > PI_WAVE_MODE_REPEAT_SYNC)
       SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
 
    if (!waveClockInited)
@@ -8828,16 +8846,28 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
       waveClockInited = 1;
    }
 
-   dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-
-   dmaOut[DMA_CONBLK_AD] = 0;
-
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
 
-   if (wave_mode == PI_WAVE_MODE_ONE_SHOT) p->next = 0;
-   else p->next = waveCbPOadr(waveInfo[wave_id].botCB+1);
+   if ((wave_mode & 1) == PI_WAVE_MODE_ONE_SHOT)
+      p->next = 0;
+   else
+      p->next = waveCbPOadr(waveInfo[wave_id].botCB+1);
 
-   initDMAgo((uint32_t *)dmaOut, waveCbPOadr(waveInfo[wave_id].botCB));
+   if (waveEndPtr && (wave_mode > PI_WAVE_MODE_REPEAT))
+   {
+      *waveEndPtr = waveCbPOadr(waveInfo[wave_id].botCB+1);
+
+      if (!dmaOut[DMA_CONBLK_AD])
+      {
+         initDMAgo((uint32_t *)dmaOut, waveCbPOadr(waveInfo[wave_id].botCB));
+      }
+   }
+   else
+   {
+      initDMAgo((uint32_t *)dmaOut, waveCbPOadr(waveInfo[wave_id].botCB));
+   }
+
+   waveEndPtr = &p->next;
 
    /* for compatability with the deprecated gpioWaveTxStart return the
       number of cbs
@@ -9035,7 +9065,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    rawCbs_t *p;
    int i, wid, cmd, loop, counters;
    unsigned cycles;
-   uint32_t repeat, next;
+   uint32_t repeat, next, *endPtr;
    int stk_pos[10], stk_lev=0;
 
    cb = 0;
@@ -9053,8 +9083,9 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    }
 
    dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-
    dmaOut[DMA_CONBLK_AD] = 0;
+   waveEndPtr = NULL;
+   endPtr = NULL;
 
    /* add delay cb at start of DMA */
 
@@ -9242,6 +9273,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
             p->dst = (uint32_t) (&dmaOBus[0]->periphData);
             p->length = 4;
             p->next = waveCbPOadr(chainGetCB(loop));
+            endPtr = &p->next;
          }
          else
             SOFT_ERROR(PI_BAD_CHAIN_CMD,
@@ -9290,7 +9322,11 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    p->length = 4;
    p->next = 0;
 
+   if (!endPtr) endPtr = &p->next;
+
    initDMAgo((uint32_t *)dmaOut, waveCbPOadr(chainGetCB(0)));
+
+   waveEndPtr = endPtr;
 
    return 0;
 }
@@ -9318,8 +9354,9 @@ int gpioWaveTxStop(void)
    CHECK_INITED;
 
    dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-
    dmaOut[DMA_CONBLK_AD] = 0;
+
+   waveEndPtr = NULL;
 
    return 0;
 }

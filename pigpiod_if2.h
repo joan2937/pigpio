@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 2
+#define PIGPIOD_IF2_VERSION 3
 
 /*TEXT
 
@@ -190,6 +190,7 @@ wave_delete                Deletes one or more waveforms
 
 wave_send_once             Transmits a waveform once
 wave_send_repeat           Transmits a waveform repeatedly
+wave_send_using_mode       Transmits a waveform in the chosen mode
 
 wave_chain                 Transmits a chain of waveforms
 
@@ -825,8 +826,8 @@ Sets a glitch filter on a gpio.
 
 Level changes on the gpio are not reported unless the level
 has been stable for at least [*steady*] microseconds.  The
-level is then reported.  Level changes of less than [*steady*]
-microseconds are ignored.
+level is then reported.  Level changes of less than
+[*steady*] microseconds are ignored.
 
 . .
        pi: 0- (as returned by [*pigpio_start*]).
@@ -1006,8 +1007,8 @@ int hardware_PWM(int pi, unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
-NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*],
-or [*wave_chain*] will be cancelled.
+NOTE: Any waveform started by [*wave_send_**] or [*wave_chain*]
+will be cancelled.
 
 This function is only valid if the pigpio main clock is PCM.  The
 main clock defaults to PCM but may be overridden when the pigpio
@@ -1276,6 +1277,7 @@ Wave ids are allocated in order, 0, 1, 2, etc.
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 D*/
 
+
 /*F*/
 int wave_send_once(int pi, unsigned wave_id);
 /*D
@@ -1293,6 +1295,7 @@ Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 D*/
 
+
 /*F*/
 int wave_send_repeat(int pi, unsigned wave_id);
 /*D
@@ -1306,6 +1309,38 @@ NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
      pi: 0- (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
 . .
+
+Returns the number of DMA control blocks in the waveform if OK,
+otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+D*/
+
+
+/*F*/
+int wave_send_using_mode(int pi, unsigned wave_id, unsigned mode);
+/*D
+Transmits the waveform with id wave_id using mode mode.
+
+. .
+     pi: 0- (as returned by [*pigpio_start*]).
+wave_id: >=0, as returned by [*wave_create*].
+   mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+         PI_WAVE_MODE_ONE_SHOT_SYNC, or PI_WAVE_MODE_REPEAT_SYNC.
+. .
+
+PI_WAVE_MODE_ONE_SHOT: same as [*wave_send_once*].
+
+PI_WAVE_MODE_REPEAT same as [*wave_send_repeat*].
+
+PI_WAVE_MODE_ONE_SHOT_SYNC same as [*wave_send_once*] but tries
+to sync with the previous waveform.
+
+PI_WAVE_MODE_REPEAT_SYNC same as [*wave_send_repeat*] but tries
+to sync with the previous waveform.
+
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
@@ -2858,8 +2893,8 @@ reported as PI_TIMEOUT.  See [*set_watchdog*].
 PI_TIMEOUT 2
 . .
 
-mode::0-7
-The operational mode of a gpio, normally INPUT or OUTPUT.
+mode::
+1. The operational mode of a gpio, normally INPUT or OUTPUT.
 
 . .
 PI_INPUT 0
@@ -2870,6 +2905,15 @@ PI_ALT2 6
 PI_ALT3 7
 PI_ALT4 3
 PI_ALT5 2
+. .
+
+2. The mode of waveform transmission.
+
+. .
+PI_WAVE_MODE_ONE_SHOT      0
+PI_WAVE_MODE_REPEAT        1
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+PI_WAVE_MODE_REPEAT_SYNC   3
 . .
 
 numBytes::
@@ -2997,7 +3041,7 @@ A SPI channel, 0-2.
 spi_flags::
 See [*spi_open*].
 
-steady :: 0-300000
+steady:: 0-300000
 
 The number of microseconds level changes must be stable for
 before reporting the level changed ([*set_glitch_filter*]) or triggering

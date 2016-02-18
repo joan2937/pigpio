@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 39+
+This version is for pigpio version 46+
 */
 
 #include <stdio.h>
@@ -185,6 +185,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_WVSM,  "WVSM",  112, 2}, // gpioWaveGet*Micros
    {PI_CMD_WVSP,  "WVSP",  112, 2}, // gpioWaveGet*Pulses
    {PI_CMD_WVTX,  "WVTX",  112, 2}, // gpioWaveTxSend
+   {PI_CMD_WVTXM, "WVTXM", 121, 2}, // gpioWaveTxSend
    {PI_CMD_WVTXR, "WVTXR", 112, 2}, // gpioWaveTxSend
 
    {PI_CMD_ADD  , "ADD"  , 111, 0},
@@ -345,6 +346,7 @@ WVSC 0,1,2       Wave get DMA control block stats\n\
 WVSM 0,1,2       Wave get micros stats\n\
 WVSP 0,1,2       Wave get pulses stats\n\
 WVTX wid         Transmit wave as one-shot\n\
+WVTXM wid wmde   Transmit wave using mode\n\
 WVTXR wid        Transmit wave repeatedly\n\
 \n\
 \n\
@@ -682,7 +684,7 @@ int cmdParse(
          break;
 
       case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
-                   PWM  S  SERVO  SLR  SLRI  W  WDOG  WRITE
+                   PWM  S  SERVO  SLR  SLRI  W  WDOG  WRITE WVTXM
 
                    Two positive parameters.
                 */

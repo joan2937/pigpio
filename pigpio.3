@@ -1968,6 +1968,14 @@ Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 .IP "" 4
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
+The SYNC variants wait for the current waveform to reach the
+end of a cycle or finish before starting the new waveform.
+
+.br
+
+.br
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
 
 .br
 
@@ -1981,7 +1989,9 @@ NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
 .EX
   wave_id: >=0, as returned by \fBgpioWaveCreate\fP
 .br
-wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
+wave_mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+.br
+           PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC
 .br
 
 .EE
@@ -7540,17 +7550,23 @@ A number identifying a waveform created by \fBgpioWaveCreate\fP.
 .br
 
 .br
-The mode of waveform transmission, whether it is sent once or cycles
-repeatedly.
+The mode determines if the waveform is sent once or cycles
+repeatedly.  The SYNC variants wait for the current waveform
+to reach the end of a cycle or finish before starting the new
+waveform.
 
 .br
 
 .br
 
 .EX
-PI_WAVE_MODE_ONE_SHOT 0
+PI_WAVE_MODE_ONE_SHOT      0
 .br
-PI_WAVE_MODE_REPEAT   1
+PI_WAVE_MODE_REPEAT        1
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+.br
+PI_WAVE_MODE_REPEAT_SYNC   3
 .br
 
 .EE
@@ -7802,6 +7818,10 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_WVTXM 100
+.br
+
+.br
 
 .EE
 .SH Error Codes
@@ -7877,7 +7897,7 @@ A 16-bit word value.
 .br
 #define PI_INITIALISED      -32 // function called after gpioInitialise
 .br
-#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-1
+#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
 .br
 #define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
 .br

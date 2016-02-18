@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 2 */
+/* PIGPIOD_IF2_VERSION 3 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -851,6 +851,9 @@ int wave_send_once(int pi, unsigned wave_id)
 
 int wave_send_repeat(int pi, unsigned wave_id)
    {return pigpio_command(pi, PI_CMD_WVTXR, wave_id, 0, 1);}
+
+int wave_send_using_mode(int pi, unsigned wave_id, unsigned mode)
+   {return pigpio_command(pi, PI_CMD_WVTXM, wave_id, mode, 1);}
 
 int wave_chain(int pi, char *buf, unsigned bufSize)
 {
