@@ -168,7 +168,7 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          break;
 
       case 5:
-         printf(cmdUsage);
+         printf("%s", cmdUsage);
          break;
 
       case 6: /* BI2CZ CF2 I2CPK I2CRD I2CRI I2CRK I2CZ SERR SLR SPIX SPIR */
@@ -283,7 +283,7 @@ int main(int argc , char *argv[])
          {
             if (command == PI_CMD_HELP)
             {
-               printf(cmdUsage);
+               printf("%s", cmdUsage);
             }
             else if (command == PI_CMD_PARSE)
             {

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 1
+#define PIGPIOD_IF2_VERSION 3
 
 /*TEXT
 
@@ -190,6 +190,7 @@ wave_delete                Deletes one or more waveforms
 
 wave_send_once             Transmits a waveform once
 wave_send_repeat           Transmits a waveform repeatedly
+wave_send_using_mode       Transmits a waveform in the chosen mode
 
 wave_chain                 Transmits a chain of waveforms
 
@@ -825,8 +826,8 @@ Sets a glitch filter on a gpio.
 
 Level changes on the gpio are not reported unless the level
 has been stable for at least [*steady*] microseconds.  The
-level is then reported.  Level changes of less than [*steady*]
-microseconds are ignored.
+level is then reported.  Level changes of less than
+[*steady*] microseconds are ignored.
 
 . .
        pi: 0- (as returned by [*pigpio_start*]).
@@ -982,9 +983,9 @@ The gpio must be one of the following.
 
 . .
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2 and compute module only
-20  clock 0  A+/B+/Pi2 and compute module only
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2/Zero and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 21  clock 1  All models but Rev.2 B (reserved for system use)
 
 32  clock 0  Compute module only
@@ -1006,8 +1007,8 @@ int hardware_PWM(int pi, unsigned gpio, unsigned PWMfreq, uint32_t PWMduty);
 Starts hardware PWM on a gpio at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
-NOTE: Any waveform started by [*wave_send_once*], [*wave_send_repeat*],
-or [*wave_chain*] will be cancelled.
+NOTE: Any waveform started by [*wave_send_**] or [*wave_chain*]
+will be cancelled.
 
 This function is only valid if the pigpio main clock is PCM.  The
 main clock defaults to PCM but may be overridden when the pigpio
@@ -1031,10 +1032,10 @@ share a PWM channel.
 The gpio must be one of the following.
 
 . .
-12  PWM channel 0  A+/B+/Pi2 and compute module only
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
 40  PWM channel 0  Compute module only
 41  PWM channel 1  Compute module only
@@ -1042,6 +1043,16 @@ The gpio must be one of the following.
 52  PWM channel 0  Compute module only
 53  PWM channel 1  Compute module only
 . .
+
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+The actual frequency set is 250 million / steps.
+
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 D*/
 
 
@@ -1266,6 +1277,7 @@ Wave ids are allocated in order, 0, 1, 2, etc.
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 D*/
 
+
 /*F*/
 int wave_send_once(int pi, unsigned wave_id);
 /*D
@@ -1283,6 +1295,7 @@ Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 D*/
 
+
 /*F*/
 int wave_send_repeat(int pi, unsigned wave_id);
 /*D
@@ -1296,6 +1309,38 @@ NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
      pi: 0- (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
 . .
+
+Returns the number of DMA control blocks in the waveform if OK,
+otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+D*/
+
+
+/*F*/
+int wave_send_using_mode(int pi, unsigned wave_id, unsigned mode);
+/*D
+Transmits the waveform with id wave_id using mode mode.
+
+. .
+     pi: 0- (as returned by [*pigpio_start*]).
+wave_id: >=0, as returned by [*wave_create*].
+   mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+         PI_WAVE_MODE_ONE_SHOT_SYNC, or PI_WAVE_MODE_REPEAT_SYNC.
+. .
+
+PI_WAVE_MODE_ONE_SHOT: same as [*wave_send_once*].
+
+PI_WAVE_MODE_REPEAT same as [*wave_send_repeat*].
+
+PI_WAVE_MODE_ONE_SHOT_SYNC same as [*wave_send_once*] but tries
+to sync with the previous waveform.
+
+PI_WAVE_MODE_REPEAT_SYNC same as [*wave_send_repeat*] but tries
+to sync with the previous waveform.
+
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
@@ -2274,13 +2319,13 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
          pi: 0- (as returned by [*pigpio_start*]).
-spi_channel: 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
+spi_channel: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device).
        baud: 32K-125M (values above 30M are unlikely to work).
   spi_flags: see below.
 . .
@@ -2312,7 +2357,7 @@ px is 0 if CEx is active low (default) and 1 for active high.
 ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
 SPI device only.
@@ -2419,7 +2464,7 @@ Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, or
 PI_SER_OPEN_FAILED.
 
 The baud rate must be one of 50, 75, 110, 134, 150,
-200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
 38400, 57600, 115200, or 230400.
 
 No flags are currently defined.  This parameter should be set to zero.
@@ -2624,9 +2669,14 @@ user_gpio: 0-31.
   timeout: >=0.
 . .
 
-The function returns 1 if the edge occurred, otherwise 0.
-
 The function returns when the edge occurs or after the timeout.
+
+Do not use this function for precise timing purposes,
+the edge is only checked 20 times a second. Whenever
+you need to know the accurate time of GPIO events use
+a [*callback*] function.
+
+The function returns 1 if the edge occurred, otherwise 0.
 D*/
 
 /*PARAMS
@@ -2843,8 +2893,8 @@ reported as PI_TIMEOUT.  See [*set_watchdog*].
 PI_TIMEOUT 2
 . .
 
-mode::0-7
-The operational mode of a gpio, normally INPUT or OUTPUT.
+mode::
+1. The operational mode of a gpio, normally INPUT or OUTPUT.
 
 . .
 PI_INPUT 0
@@ -2855,6 +2905,15 @@ PI_ALT2 6
 PI_ALT3 7
 PI_ALT4 3
 PI_ALT5 2
+. .
+
+2. The mode of waveform transmission.
+
+. .
+PI_WAVE_MODE_ONE_SHOT      0
+PI_WAVE_MODE_REPEAT        1
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+PI_WAVE_MODE_REPEAT_SYNC   3
 . .
 
 numBytes::
@@ -2982,7 +3041,7 @@ A SPI channel, 0-2.
 spi_flags::
 See [*spi_open*].
 
-steady :: 0-300000
+steady:: 0-300000
 
 The number of microseconds level changes must be stable for
 before reporting the level changed ([*set_glitch_filter*]) or triggering

@@ -60,7 +60,12 @@ disable fifo interface
 default enabled
 
 .IP "\fB-k\fP"
-disable socket interface
+disable local and remote socket interface
+
+default enabled
+
+.IP "\fB-l\fP"
+disable remote socket interface
 
 default enabled
 
@@ -78,6 +83,11 @@ default 5
 clock peripheral
 0=PWM 1=PCM
 default PCM
+
+.IP "\fB-v -V\fP"
+display pigpio version and exit
+
+
 
 .IP "\fB-x mask\fP"
 gpios which may be updated

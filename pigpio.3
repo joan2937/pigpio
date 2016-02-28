@@ -1968,6 +1968,14 @@ Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 .IP "" 4
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
+The SYNC variants wait for the current waveform to reach the
+end of a cycle or finish before starting the new waveform.
+
+.br
+
+.br
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
 
 .br
 
@@ -1981,7 +1989,9 @@ NOTE: Any hardware PWM started by \fBgpioHardwarePWM\fP will be cancelled.
 .EX
   wave_id: >=0, as returned by \fBgpioWaveCreate\fP
 .br
-wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
+wave_mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+.br
+           PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC
 .br
 
 .EE
@@ -3409,7 +3419,7 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -3418,7 +3428,7 @@ device has 3 chip selects and a selectable word size in bits.
 .br
 
 .EX
- spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
+ spiChan: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device)
 .br
     baud: 32K-125M (values above 30M are unlikely to work)
 .br
@@ -3492,7 +3502,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 .br
 
@@ -3658,7 +3668,7 @@ PI_SER_OPEN_FAILED.
 
 .br
 The baud rate must be one of 50, 75, 110, 134, 150,
-200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
 38400, 57600, 115200, or 230400.
 
 .br
@@ -4673,11 +4683,11 @@ The gpio must be one of the following.
 .EX
 4   clock 0  All models
 .br
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
 .br
-6   clock 2  A+/B+/Pi2 and compute module only
+6   clock 2  A+/B+/Pi2/Zero and compute module only
 .br
-20  clock 0  A+/B+/Pi2 and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 .br
 21  clock 1  All models but Rev.2 B (reserved for system use)
 .br
@@ -4758,13 +4768,13 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
 .br
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 18  PWM channel 0  All models
 .br
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 
 .br
@@ -4780,6 +4790,25 @@ The gpio must be one of the following.
 .br
 
 .EE
+
+.br
+
+.br
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+.br
+
+.br
+The actual frequency set is 250 million / steps.
+
+.br
+
+.br
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 
 .IP "\fBint gpioTime(unsigned timetype, int *seconds, int *micros)\fP"
 .IP "" 4
@@ -5271,7 +5300,7 @@ Configures pigpio support of the fifo and socket interfaces.
 .br
 
 .EX
-ifFlags: 0-3
+ifFlags: 0-7
 .br
 
 .EE
@@ -5285,7 +5314,18 @@ The default setting (0) is that both interfaces are enabled.
 
 .br
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
+
+.br
+
+.br
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
+
+.br
+
+.br
+Or in PI_LOCALHOST_SOCK_IF to disable remote socket
+access (this means that the socket interface is only
+usable from the local Pi).
 
 .IP "\fBint gpioCfgMemAlloc(unsigned memAllocMode)\fP"
 .IP "" 4
@@ -7510,17 +7550,23 @@ A number identifying a waveform created by \fBgpioWaveCreate\fP.
 .br
 
 .br
-The mode of waveform transmission, whether it is sent once or cycles
-repeatedly.
+The mode determines if the waveform is sent once or cycles
+repeatedly.  The SYNC variants wait for the current waveform
+to reach the end of a cycle or finish before starting the new
+waveform.
 
 .br
 
 .br
 
 .EX
-PI_WAVE_MODE_ONE_SHOT 0
+PI_WAVE_MODE_ONE_SHOT      0
 .br
-PI_WAVE_MODE_REPEAT   1
+PI_WAVE_MODE_REPEAT        1
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+.br
+PI_WAVE_MODE_REPEAT_SYNC   3
 .br
 
 .EE
@@ -7772,6 +7818,10 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_WVTXM 100
+.br
+
+.br
 
 .EE
 .SH Error Codes
@@ -7847,7 +7897,7 @@ A 16-bit word value.
 .br
 #define PI_INITIALISED      -32 // function called after gpioInitialise
 .br
-#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-1
+#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
 .br
 #define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
 .br
@@ -7963,7 +8013,7 @@ A 16-bit word value.
 .br
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
 .br
-#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2 for auxiliary SPI
+#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2/Zero for auxiliary SPI
 .br
 #define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
 .br

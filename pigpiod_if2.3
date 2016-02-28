@@ -1093,8 +1093,8 @@ Sets a glitch filter on a gpio.
 .br
 Level changes on the gpio are not reported unless the level
 has been stable for at least \fBsteady\fP microseconds.  The
-level is then reported.  Level changes of less than \fBsteady\fP
-microseconds are ignored.
+level is then reported.  Level changes of less than
+\fBsteady\fP microseconds are ignored.
 
 .br
 
@@ -1360,11 +1360,11 @@ The gpio must be one of the following.
 .EX
 4   clock 0  All models
 .br
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
 .br
-6   clock 2  A+/B+/Pi2 and compute module only
+6   clock 2  A+/B+/Pi2/Zero and compute module only
 .br
-20  clock 0  A+/B+/Pi2 and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 .br
 21  clock 1  All models but Rev.2 B (reserved for system use)
 .br
@@ -1398,8 +1398,8 @@ Frequencies above 30MHz are unlikely to work.
 .br
 
 .br
-NOTE: Any waveform started by \fBwave_send_once\fP, \fBwave_send_repeat\fP,
-or \fBwave_chain\fP will be cancelled.
+NOTE: Any waveform started by \fBwave_send_*\fP or \fBwave_chain\fP
+will be cancelled.
 
 .br
 
@@ -1448,13 +1448,13 @@ The gpio must be one of the following.
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
 .br
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 18  PWM channel 0  All models
 .br
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 .br
 
 .br
@@ -1470,6 +1470,25 @@ The gpio must be one of the following.
 .br
 
 .EE
+
+.br
+
+.br
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+.br
+
+.br
+The actual frequency set is 250 million / steps.
+
+.br
+
+.br
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 
 .IP "\fBuint32_t get_current_tick(int pi)\fP"
 .IP "" 4
@@ -1917,6 +1936,65 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 .br
 
 .EE
+
+.br
+
+.br
+Returns the number of DMA control blocks in the waveform if OK,
+otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
+
+.IP "\fBint wave_send_using_mode(int pi, unsigned wave_id, unsigned mode)\fP"
+.IP "" 4
+Transmits the waveform with id wave_id using mode mode.
+
+.br
+
+.br
+
+.EX
+     pi: 0- (as returned by \fBpigpio_start\fP).
+.br
+wave_id: >=0, as returned by \fBwave_create\fP.
+.br
+   mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+.br
+         PI_WAVE_MODE_ONE_SHOT_SYNC, or PI_WAVE_MODE_REPEAT_SYNC.
+.br
+
+.EE
+
+.br
+
+.br
+PI_WAVE_MODE_ONE_SHOT: same as \fBwave_send_once\fP.
+
+.br
+
+.br
+PI_WAVE_MODE_REPEAT same as \fBwave_send_repeat\fP.
+
+.br
+
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC same as \fBwave_send_once\fP but tries
+to sync with the previous waveform.
+
+.br
+
+.br
+PI_WAVE_MODE_REPEAT_SYNC same as \fBwave_send_repeat\fP but tries
+to sync with the previous waveform.
+
+.br
+
+.br
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+.br
+
+.br
+NOTE: Any hardware PWM started by \fBhardware_PWM\fP will be cancelled.
 
 .br
 
@@ -3622,7 +3700,7 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
@@ -3633,7 +3711,7 @@ device has 3 chip selects and a selectable word size in bits.
 .EX
          pi: 0- (as returned by \fBpigpio_start\fP).
 .br
-spi_channel: 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
+spi_channel: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device).
 .br
        baud: 32K-125M (values above 30M are unlikely to work).
 .br
@@ -3707,7 +3785,7 @@ ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 .br
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 .br
 
@@ -3883,7 +3961,7 @@ PI_SER_OPEN_FAILED.
 
 .br
 The baud rate must be one of 50, 75, 110, 134, 150,
-200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
 38400, 57600, 115200, or 230400.
 
 .br
@@ -4215,12 +4293,20 @@ user_gpio: 0-31.
 .br
 
 .br
-The function returns 1 if the edge occurred, otherwise 0.
-
-.br
-
-.br
 The function returns when the edge occurs or after the timeout.
+
+.br
+
+.br
+Do not use this function for precise timing purposes,
+the edge is only checked 20 times a second. Whenever
+you need to know the accurate time of GPIO events use
+a \fBcallback\fP function.
+
+.br
+
+.br
+The function returns 1 if the edge occurred, otherwise 0.
 .SH PARAMETERS
 
 .br
@@ -4694,8 +4780,8 @@ PI_TIMEOUT 2
 
 .br
 
-.IP "\fBmode\fP: 0-7" 0
-The operational mode of a gpio, normally INPUT or OUTPUT.
+.IP "\fBmode\fP" 0
+1. The operational mode of a gpio, normally INPUT or OUTPUT.
 
 .br
 
@@ -4717,6 +4803,27 @@ PI_ALT3 7
 PI_ALT4 3
 .br
 PI_ALT5 2
+.br
+
+.EE
+
+.br
+
+.br
+2. The mode of waveform transmission.
+
+.br
+
+.br
+
+.EX
+PI_WAVE_MODE_ONE_SHOT      0
+.br
+PI_WAVE_MODE_REPEAT        1
+.br
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+.br
+PI_WAVE_MODE_REPEAT_SYNC   3
 .br
 
 .EE

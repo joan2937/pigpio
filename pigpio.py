@@ -123,7 +123,6 @@ Intermediate
 gpio_trigger              Send a trigger pulse to a gpio
 
 set_watchdog              Set a watchdog on a gpio
-set_filter                Set an activity filter on a gpio
 
 set_PWM_range             Configure PWM range of a gpio
 get_PWM_range             Get configured PWM range of a gpio
@@ -181,6 +180,7 @@ wave_delete               Deletes one or more waveforms
 
 wave_send_once            Transmits a waveform once
 wave_send_repeat          Transmits a waveform repeatedly
+wave_send_using_mode      Transmits a waveform in the chosen mode
 
 wave_chain                Transmits a chain of waveforms
 
@@ -269,7 +269,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.24"
+VERSION = "1.27"
 
 exceptions = True
 
@@ -321,6 +321,13 @@ PI_SCRIPT_FAILED =4
 NTFY_FLAGS_ALIVE = (1 << 6)
 NTFY_FLAGS_WDOG  = (1 << 5)
 NTFY_FLAGS_GPIO  = 31
+
+# wave modes
+
+WAVE_MODE_ONE_SHOT     =0
+WAVE_MODE_REPEAT       =1
+WAVE_MODE_ONE_SHOT_SYNC=2
+WAVE_MODE_REPEAT_SYNC  =3
 
 # pigpio command numbers
 
@@ -445,6 +452,8 @@ _PI_CMD_CSI  =96
 
 _PI_CMD_FG   =97
 _PI_CMD_FN   =98
+
+_PI_CMD_WVTXM=100
 
 # pigpio error numbers
 
@@ -667,7 +676,7 @@ _errors=[
    [PI_UNKNOWN_COMMAND   , "unknown command"],
    [PI_SPI_XFER_FAILED   , "SPI xfer/read/write failed"],
    [_PI_BAD_POINTER      , "bad (NULL) pointer"],
-   [PI_NO_AUX_SPI        , "need a A+/B+/Pi2 for auxiliary SPI"],
+   [PI_NO_AUX_SPI        , "need a A+/B+/Pi2/Zero for auxiliary SPI"],
    [PI_NOT_PWM_GPIO      , "gpio is not in use for PWM"],
    [PI_NOT_SERVO_GPIO    , "gpio is not in use for servo pulses"],
    [PI_NOT_HCLK_GPIO     , "gpio has no hardware clock"],
@@ -962,6 +971,7 @@ class _callback:
       """
       self._notify = notify
       self.count=0
+      self._reset = False
       if func is None:
          func=self._tally
       self.callb = _callback_ADT(user_gpio, edge, func)
@@ -973,6 +983,9 @@ class _callback:
 
    def _tally(self, user_gpio, level, tick):
       """Increment the callback called count."""
+      if self._reset:
+         self._reset = False
+         self.count = 0
       self.count += 1
 
    def tally(self):
@@ -984,6 +997,13 @@ class _callback:
       callback function.
       """
       return self.count
+
+   def reset_tally(self):
+      """
+      Resets the tally count to zero.
+      """
+      self._reset = True
+      self.count = 0
 
 class _wait_for_edge:
    """Encapsulates waiting for gpio edges."""
@@ -1564,10 +1584,10 @@ class pi():
 
       . .
       4   clock 0  All models
-      5   clock 1  A+/B+/Pi2 and compute module only
+      5   clock 1  A+/B+/Pi2/Zero and compute module only
                    (reserved for system use)
-      6   clock 2  A+/B+/Pi2 and compute module only
-      20  clock 0  A+/B+/Pi2 and compute module only
+      6   clock 2  A+/B+/Pi2/Zero and compute module only
+      20  clock 0  A+/B+/Pi2/Zero and compute module only
       21  clock 1  All models but Rev.2 B (reserved for system use)
 
       32  clock 0  Compute module only
@@ -1615,10 +1635,10 @@ class pi():
       The gpio must be one of the following.
 
       . .
-      12  PWM channel 0  A+/B+/Pi2 and compute module only
-      13  PWM channel 1  A+/B+/Pi2 and compute module only
+      12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+      13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
       18  PWM channel 0  All models
-      19  PWM channel 1  A+/B+/Pi2 and compute module only
+      19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
       40  PWM channel 0  Compute module only
       41  PWM channel 1  Compute module only
@@ -1626,6 +1646,16 @@ class pi():
       52  PWM channel 0  Compute module only
       53  PWM channel 1  Compute module only
       . .
+
+      The actual number of steps beween off and fully on is the
+      integral part of 250 million divided by PWMfreq.
+
+      The actual frequency set is 250 million / steps.
+
+      There will only be a million steps for a PWMfreq of 250.
+      Lower frequencies will have more steps and higher
+      frequencies will have fewer steps.  PWMduty is
+      automatically scaled to take this into account.
 
       ...
       pi.hardware_PWM(18, 800, 250000) # 800Hz 25% dutycycle
@@ -1974,6 +2004,40 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTXR, wave_id, 0))
+
+   def wave_send_using_mode(self, wave_id, mode):
+      """
+      Transmits the waveform with id wave_id using mode mode.
+
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
+         mode:= WAVE_MODE_ONE_SHOT, WAVE_MODE_REPEAT,
+                WAVE_MODE_ONE_SHOT_SYNC, or WAVE_MODE_REPEAT_SYNC.
+
+      WAVE_MODE_ONE_SHOT: same as [*wave_send_once*].
+
+      WAVE_MODE_REPEAT same as [*wave_send_repeat*].
+
+      WAVE_MODE_ONE_SHOT_SYNC same as [*wave_send_once*] but tries
+      to sync with the previous waveform.
+
+      WAVE_MODE_REPEAT_SYNC same as [*wave_send_repeat*] but tries
+      to sync with the previous waveform.
+
+      WARNING: bad things may happen if you delete the previous
+      waveform before it has been synced to the new waveform.
+
+      NOTE: Any hardware PWM started by [*hardware_PWM*] will
+      be cancelled.
+
+      wave_id:= >=0 (as returned by a prior call to [*wave_create*]).
+
+      Returns the number of DMA control blocks used in the waveform.
+
+      ...
+      cbs = pi.wave_send_using_mode(wid, WAVE_MODE_REPEAT_SYNC)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVTXM, wave_id, mode))
 
    def wave_tx_busy(self):
       """
@@ -2895,12 +2959,12 @@ class pi():
       modify the default behaviour of 4-wire operation, mode 0,
       active low chip select.
 
-      An auxiliary SPI device is available on the A+/B+/Pi2 and may be
-      selected by setting the A bit in the flags.  The auxiliary
-      device has 3 chip selects and a selectable word size in bits.
+      An auxiliary SPI device is available on the A+/B+/Pi2/Zero
+      and may be selected by setting the A bit in the flags.
+      The auxiliary device has 3 chip selects and a selectable
+      word size in bits.
 
-
-      spi_channel:= 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
+      spi_channel:= 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device).
              baud:= 32K-125M (values above 30M are unlikely to work).
         spi_flags:= see below.
 
@@ -2935,7 +2999,7 @@ class pi():
       and 1 otherwise.
 
       A is 0 for the standard SPI device, 1 for the auxiliary SPI.
-      The auxiliary device is only present on the A+/B+/Pi2.
+      The auxiliary device is only present on the A+/B+/Pi2/Zero.
 
       W is 0 if the device is not 3-wire, 1 if the device is 3-wire.
       Standard SPI device only.
@@ -3093,7 +3157,7 @@ class pi():
       module instead.
 
       The baud rate must be one of 50, 75, 110, 134, 150,
-      200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+      200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
       38400, 57600, 115200, or 230400.
 
       ...
@@ -3598,7 +3662,8 @@ class pi():
 
       If a user callback is not specified a default tally callback is
       provided which simply counts edges.  The count may be retrieved
-      by calling the tally function.
+      by calling the tally function.  The count may be reset to zero
+      by calling the reset_tally function.
 
       The callback may be cancelled by calling the cancel function.
 
@@ -3617,6 +3682,8 @@ class pi():
 
       print(cb3.tally())
 
+      cb3.reset_tally()
+
       cb1.cancel() # To cancel callback cb1.
       ...
       """
@@ -3631,9 +3698,13 @@ class pi():
                      FALLING_EDGE.
       wait_timeout:= 0.0- (default 60.0).
 
-      The function returns as soon as the edge is detected
-      or after the number of seconds specified by timeout has
-      expired.
+      The function returns when the edge is detected or after
+      the number of seconds specified by timeout has expired.
+
+      Do not use this function for precise timing purposes,
+      the edge is only checked 20 times a second. Whenever
+      you need to know the accurate time of GPIO events use
+      a [*callback*] function.
 
       The function returns True if the edge is detected,
       otherwise False.
@@ -3682,8 +3753,10 @@ class pi():
       self.sl = _socklock()
       self._notify  = None
 
+      port = int(port)
+
       self._host = host
-      self._port = int(port)
+      self._port = port
 
       self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       self.sl.s.settimeout(None)
@@ -3692,23 +3765,22 @@ class pi():
       self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
       try:
-         self.sl.s.connect((self._host, self._port))
-         self._notify = _callback_thread(self.sl, self._host, self._port)
+         self.sl.s.connect((host, port))
+         self._notify = _callback_thread(self.sl, host, port)
 
       except socket.error:
          self.connected = False
          if self.sl.s is not None:
             self.sl.s = None
-         if self._host == '':
+         if host == '':
             h = "localhost"
          else:
-            h = self._host
+            h = host
 
-         errStr = "Can't connect to pigpio on {}({})".format(
-            str(h), str(self._port))
+         s = "Can't connect to pigpio at {}({})".format(str(h), str(port))
 
          print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-         print(errStr)
+         print(s)
          print("")
          print("Did you start the pigpio daemon? E.g. sudo pigpiod")
          print("")
@@ -3729,6 +3801,8 @@ class pi():
       pi.stop()
       ...
       """
+
+      self.connected = False
 
       if self._notify is not None:
          self._notify.stop()
@@ -3995,7 +4069,10 @@ def xref():
    SET = 1 
    TIMEOUT = 2 # only returned for a watchdog timeout
 
-   mode: 0-7
+   mode:
+
+   1.The operational mode of a gpio, normally INPUT or OUTPUT.
+
    ALT0 = 4 
    ALT1 = 5 
    ALT2 = 6 
@@ -4004,6 +4081,13 @@ def xref():
    ALT5 = 2 
    INPUT = 0 
    OUTPUT = 1
+
+   2. The mode of waveform transmission.
+
+   WAVE_MODE_ONE_SHOT = 0 
+   WAVE_MODE_REPEAT = 1 
+   WAVE_MODE_ONE_SHOT_SYNC = 2 
+   WAVE_MODE_REPEAT_SYNC = 3
 
    offset: 0-
    The offset wave data starts from the beginning of the waveform
@@ -4107,7 +4191,7 @@ def xref():
    See [*gpio*].
 
    wait_timeout: 0.0 -
-   The number of seconds to wait in wait_for_edge before timing out.
+   The number of seconds to wait in [*wait_for_edge*] before timing out.
 
    wave_add_*:
    One of [*wave_add_new*] , [*wave_add_generic*], [*wave_add_serial*].

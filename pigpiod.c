@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 38+
+This version is for pigpio version 43+
 */
 
 #include <sys/types.h>
@@ -97,6 +97,7 @@ void usage()
       "   -p value, socket port, 1024-32000,            default 8888\n" \
       "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
       "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
+      "   -v, -V,   display pigpio version and exit\n" \
       "   -x mask,  gpios which may be updated,         default board user gpios\n" \
       "EXAMPLE\n" \
       "sudo pigpiod -s 2 -b 200 -f\n" \
@@ -121,7 +122,7 @@ static void initOpts(int argc, char *argv[])
    int opt, err, i;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fklp:s:t:x:")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fklp:s:t:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -206,6 +207,12 @@ static void initOpts(int argc, char *argv[])
             else fatal("invalid -t option (%d)", i);
             break;
 
+         case 'v':
+         case 'V':
+            printf("%d\n", PIGPIO_VERSION);
+            exit(EXIT_SUCCESS);
+            break;
+
          case 'x':
             mask = getNum(optarg, &err);
             if (!err)
@@ -218,7 +225,7 @@ static void initOpts(int argc, char *argv[])
 
         default: /* '?' */
            usage();
-           exit(-1);
+           exit(EXIT_FAILURE);
         }
     }
 }
@@ -346,4 +353,5 @@ int main(int argc, char **argv)
 
    return 0;
 }
+
 

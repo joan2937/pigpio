@@ -2,9 +2,9 @@
 
 #*** WARNING ************************************************
 #*                                                          *
-#* All the tests make extensive use of gpio 4 (pin P1-7).   *
+#* All the tests make extensive use of gpio 25 (pin 22).    *
 #* Ensure that either nothing or just a LED is connected to *
-#* gpio 4 before running any of the tests.                  *
+#* gpio 25 before running any of the tests.                 *
 #*                                                          *
 #* Some tests are statistical in nature and so may on       *
 #* occasion fail.  Repeated failures on the same test or    *
@@ -17,7 +17,7 @@ import struct
 
 import pigpio
 
-GPIO=4
+GPIO=25
 
 def STRCMP(r, s):
 
@@ -109,7 +109,6 @@ def t2():
    f = t2_count - oc
    CHECK(2, 3, f, 0, 0, "set PWM dutycycle, callback")
 
-
    pi.set_PWM_dutycycle(GPIO, 128)
    dc = pi.get_PWM_dutycycle(GPIO)
    CHECK(2, 4, dc, 128, 0, "get PWM dutycycle")
@@ -154,6 +153,8 @@ def t2():
    CHECK(2, 13, rr, 200, 0, "get PWM real range")
 
    pi.set_PWM_dutycycle(GPIO, 0)
+
+   t2cb.cancel()
 
 t3_reset=True
 t3_count=0
@@ -234,6 +235,8 @@ def t3():
 
    pi.set_PWM_dutycycle(GPIO, 0)
 
+   t3cb.cancel()
+
 def t4():
 
    print("Pipe notification tests.")
@@ -243,7 +246,7 @@ def t4():
    pi.set_PWM_range(GPIO, 100)
 
    h = pi.notify_open()
-   e = pi.notify_begin(h, (1<<4))
+   e = pi.notify_begin(h, (1<<GPIO))
    CHECK(4, 1, e, 0, 0, "notify open/begin")
 
    time.sleep(1)
@@ -281,7 +284,7 @@ def t4():
             if s != S:
                seq_ok = 0
 
-            L = v & (1<<4)
+            L = v & (1<<GPIO)
 
             if n:
                if l != L:
@@ -290,7 +293,7 @@ def t4():
             if L:
                l = 0
             else:
-               l = (1<<4)
+               l = (1<<GPIO)
            
             s += 1
             n += 1
@@ -465,6 +468,8 @@ To the lascivious pleasing of a lute.
    e = pi.wave_delete(0)
    CHECK(5, 33, e, 0, 0, "wave delete")
 
+   t5cb.cancel()
+
 t6_count=0
 t6_on=0
 t6_on_tick=None
@@ -501,6 +506,8 @@ def t6():
 
    CHECK(6, 2, t6_on, tp, 25, "gpio trigger pulse length")
 
+   t6cb.cancel()
+
 t7_count=0
 
 def t7cbf(gpio, level, tick):
@@ -516,12 +523,12 @@ def t7():
    # type of edge shouldn't matter for watchdogs
    t7cb = pi.callback(GPIO, pigpio.FALLING_EDGE, t7cbf)
 
-   pi.set_watchdog(GPIO, 10) # 10 ms, 100 per second
+   pi.set_watchdog(GPIO, 50) # 50 ms, 20 per second
    time.sleep(0.5)
    oc = t7_count
    time.sleep(2)
    c = t7_count - oc
-   CHECK(7, 1, c, 200, 5, "set watchdog on count")
+   CHECK(7, 1, c, 39, 5, "set watchdog on count")
 
    pi.set_watchdog(GPIO, 0) # 0 switches watchdog off
    time.sleep(0.5)
@@ -529,6 +536,8 @@ def t7():
    time.sleep(2)
    c = t7_count - oc
    CHECK(7, 2, c, 0, 1, "set watchdog off count")
+
+   t7cb.cancel()
 
 def t8():
    print("Bank read/write tests.")
@@ -549,12 +558,14 @@ def t8():
    v = pi.read(GPIO)
    CHECK(8, 4, v, 1, 0, "set bank 1")
 
-   t = 0
-   v = (1<<16)
-   for i in range(100):
-      if pi.read_bank_2() & v:
-         t += 1
-   CHECK(8, 5, t, 60, 75, "read bank 2")
+   v = pi.read_bank_2()
+
+   if v:
+      v = 0
+   else:
+      v = 1
+
+   CHECK(8, 5, v, 0, 0, "read bank 2")
 
    v = pi.clear_bank_2(0)
    CHECK(8, 6, v, 0, 0, "clear bank 2")
@@ -571,6 +582,13 @@ def t8():
    v = pi.set_bank_2(0xffffff)
    pigpio.exceptions = True
    CHECK(8, 9, v, pigpio.PI_SOME_PERMITTED, 0, "set bank 2")
+
+def t9waitNotHalted(s):
+   for check in range(10):
+      time.sleep(0.1)
+      e, p = pi.script_status(s)
+      if e != pigpio.PI_SCRIPT_HALTED:
+         return
 
 def t9():
    print("Script store/run/status/stop/delete tests.")
@@ -607,28 +625,37 @@ def t9():
 
    oc = t9cb.tally()
    pi.run_script(s, [99, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
          break
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 1, c, 100, 0, "store/run script")
 
    oc = t9cb.tally()
    pi.run_script(s, [200, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
          break
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 2, c, 201, 0, "run script/script status")
 
    oc = t9cb.tally()
    pi.run_script(s, [2000, GPIO])
+
+   t9waitNotHalted(s)
+
    while True:
       e, p = pi.script_status(s)
       if e != pigpio.PI_SCRIPT_RUNNING:
@@ -636,12 +663,14 @@ def t9():
       if p[9] < 1900:
          pi.stop_script(s)
       time.sleep(0.1)
-   time.sleep(0.3)
+   time.sleep(0.2)
    c = t9cb.tally() - oc
    CHECK(9, 3, c, 110, 20, "run/stop script/script status")
 
    e = pi.delete_script(s)
    CHECK(9, 4, e, 0, 0, "delete script")
+
+   t9cb.cancel()
 
    pigpio.exceptions = old_exceptions
 
@@ -812,6 +841,116 @@ def tc():
    e = pi.spi_close(h)
    CHECK(12, 99, e, 0, 0, "spi close")
 
+def td():
+
+   print("Wavechains & filter tests.")
+
+   tdcb = pi.callback(GPIO)
+
+   pi.set_mode(GPIO, pigpio.OUTPUT)
+
+   pi.write(GPIO, pigpio.LOW)
+
+   e = pi.wave_clear()
+   CHECK(13, 1, e, 0, 0, "callback, set mode, wave clear")
+
+   wf = []
+
+   wf.append(pigpio.pulse(1<<GPIO, 0,  50))
+   wf.append(pigpio.pulse(0, 1<<GPIO,  70))
+   wf.append(pigpio.pulse(1<<GPIO, 0, 130))
+   wf.append(pigpio.pulse(0, 1<<GPIO, 150))
+   wf.append(pigpio.pulse(1<<GPIO, 0,  90))
+   wf.append(pigpio.pulse(0, 1<<GPIO, 110))
+
+   e = pi.wave_add_generic(wf)
+   CHECK(13, 2, e, 6, 0, "pulse, wave add generic")
+
+   wid = pi.wave_create()
+
+   chain = [
+      255, 0, wid, 255, 1, 128, 0, 255, 2, 0, 8,
+      255, 0, wid, 255, 1,   0, 1, 255, 2, 0, 4,
+      255, 0, wid, 255, 1,   0, 2]
+
+   e = pi.set_glitch_filter(GPIO, 0)
+   CHECK(13, 3, e, 0, 0, "clear glitch filter")
+
+   e = pi.set_noise_filter(GPIO, 0, 0)
+   CHECK(13, 4, e, 0, 0, "clear noise filter")
+
+   tdcb.reset_tally()
+   e = pi.wave_chain(chain)
+   CHECK(13, 5, e, 0, 0, "wave chain")
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.3)
+   tally = tdcb.tally()
+   CHECK(13, 6, tally, 2688, 2, "wave chain, tally")
+
+   pi.set_glitch_filter(GPIO, 80)
+   tdcb.reset_tally()
+   pi.wave_chain(chain)
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.3)
+   tally = tdcb.tally()
+   CHECK(13, 7, tally, 1792, 2, "glitch filter, wave chain, tally")
+
+   pi.set_glitch_filter(GPIO, 120)
+   tdcb.reset_tally()
+   pi.wave_chain(chain)
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.2)
+   tally = tdcb.tally()
+   CHECK(13, 8, tally, 896, 2, "glitch filter, wave chain, tally")
+
+   pi.set_glitch_filter(GPIO, 140)
+   tdcb.reset_tally()
+   pi.wave_chain(chain)
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.2)
+   tally = tdcb.tally()
+   CHECK(13, 9, tally, 0, 0, "glitch filter, wave chain, tally")
+
+   pi.set_glitch_filter(GPIO, 0)
+
+   pi.wave_chain(chain)
+   pi.set_noise_filter(GPIO, 1000, 150000)
+   tdcb.reset_tally()
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.2)
+   tally = tdcb.tally()
+   CHECK(13, 10, tally, 1500, 2, "noise filter, wave chain, tally")
+
+   pi.wave_chain(chain)
+   pi.set_noise_filter(GPIO, 2000, 150000)
+   tdcb.reset_tally()
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.2)
+   tally = tdcb.tally()
+   CHECK(13, 11, tally, 750, 2, "noise filter, wave chain, tally")
+
+   pi.wave_chain(chain)
+   pi.set_noise_filter(GPIO, 3000, 5000)
+   tdcb.reset_tally()
+   while pi.wave_tx_busy():
+      time.sleep(0.1)
+   time.sleep(0.2)
+   tally = tdcb.tally()
+   CHECK(13, 12, tally, 0, 2, "noise filter, wave chain, tally")
+
+   pi.set_noise_filter(GPIO, 0, 0)
+
+   e = pi.wave_delete(wid)
+   CHECK(13, 13, e, 0, 0, "wave delete")
+
+   tdcb.cancel()
+
 if len(sys.argv) > 1:
    tests = ""
    for C in sys.argv[1]:
@@ -820,7 +959,7 @@ if len(sys.argv) > 1:
          tests += c
 
 else:
-   tests = "0123456789"
+   tests = "0123456789d"
 
 pi = pigpio.pi()
 
@@ -840,6 +979,7 @@ if pi.connected:
    if 'a' in tests: ta()
    if 'b' in tests: tb()
    if 'c' in tests: tc()
+   if 'd' in tests: td()
 
 pi.stop()
 

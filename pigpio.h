@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 42
+#define PIGPIO_VERSION 46
 
 /*TEXT
 
@@ -599,8 +599,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* wave tx mode */
 
-#define PI_WAVE_MODE_ONE_SHOT 0
-#define PI_WAVE_MODE_REPEAT   1
+#define PI_WAVE_MODE_ONE_SHOT      0
+#define PI_WAVE_MODE_REPEAT        1
+#define PI_WAVE_MODE_ONE_SHOT_SYNC 2
+#define PI_WAVE_MODE_REPEAT_SYNC   3
 
 /* I2C, SPI, SER */
 
@@ -1748,12 +1750,18 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode);
 /*D
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
+The SYNC variants wait for the current waveform to reach the
+end of a cycle or finish before starting the new waveform.
+
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
 
 NOTE: Any hardware PWM started by [*gpioHardwarePWM*] will be cancelled.
 
 . .
   wave_id: >=0, as returned by [*gpioWaveCreate*]
-wave_mode: 0 (PI_WAVE_MODE_ONE_SHOT), 1 (PI_WAVE_MODE_REPEAT)
+wave_mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
+           PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC
 . .
 
 Returns the number of DMA control blocks in the waveform if OK,
@@ -2620,12 +2628,12 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
+An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
 selected by setting the A bit in the flags.  The auxiliary
 device has 3 chip selects and a selectable word size in bits.
 
 . .
- spiChan: 0-1 (0-2 for A+/B+/Pi2 auxiliary device)
+ spiChan: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device)
     baud: 32K-125M (values above 30M are unlikely to work)
 spiFlags: see below
 . .
@@ -2657,7 +2665,7 @@ px is 0 if CEx is active low (default) and 1 for active high.
 ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
 
 A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+auxiliary device is only present on the A+/B+/Pi2/Zero.
 
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
 SPI device only.
@@ -2761,7 +2769,7 @@ Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, or
 PI_SER_OPEN_FAILED.
 
 The baud rate must be one of 50, 75, 110, 134, 150,
-200, 300, 600, 1200, 1800, 2400, 4800, 9500, 19200,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
 38400, 57600, 115200, or 230400.
 
 No flags are currently defined.  This parameter should be set to zero.
@@ -3366,9 +3374,9 @@ The gpio must be one of the following.
 
 . .
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2 and compute module only
-20  clock 0  A+/B+/Pi2 and compute module only
+5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
+6   clock 2  A+/B+/Pi2/Zero and compute module only
+20  clock 0  A+/B+/Pi2/Zero and compute module only
 21  clock 1  All models but Rev.2 B (reserved for system use)
 
 32  clock 0  Compute module only
@@ -3412,10 +3420,10 @@ share a PWM channel.
 The gpio must be one of the following.
 
 . .
-12  PWM channel 0  A+/B+/Pi2 and compute module only
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
+13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
 
 40  PWM channel 0  Compute module only
 41  PWM channel 1  Compute module only
@@ -3423,6 +3431,16 @@ The gpio must be one of the following.
 52  PWM channel 0  Compute module only
 53  PWM channel 1  Compute module only
 . .
+
+The actual number of steps beween off and fully on is the
+integral part of 250 million divided by PWMfreq.
+
+The actual frequency set is 250 million / steps.
+
+There will only be a million steps for a PWMfreq of 250.
+Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
 D*/
 
 /*F*/
@@ -3707,13 +3725,18 @@ int gpioCfgInterfaces(unsigned ifFlags);
 Configures pigpio support of the fifo and socket interfaces.
 
 . .
-ifFlags: 0-3
+ifFlags: 0-7
 . .
 
 The default setting (0) is that both interfaces are enabled.
 
 Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
+
 Or in PI_DISABLE_SOCK_IF to disable the socket interface.
+
+Or in PI_LOCALHOST_SOCK_IF to disable remote socket
+access (this means that the socket interface is only
+usable from the local Pi).
 D*/
 
 
@@ -4765,12 +4788,16 @@ A number identifying a waveform created by [*gpioWaveCreate*].
 
 wave_mode::
 
-The mode of waveform transmission, whether it is sent once or cycles
-repeatedly.
+The mode determines if the waveform is sent once or cycles
+repeatedly.  The SYNC variants wait for the current waveform
+to reach the end of a cycle or finish before starting the new
+waveform.
 
 . .
-PI_WAVE_MODE_ONE_SHOT 0
-PI_WAVE_MODE_REPEAT   1
+PI_WAVE_MODE_ONE_SHOT      0
+PI_WAVE_MODE_REPEAT        1
+PI_WAVE_MODE_ONE_SHOT_SYNC 2
+PI_WAVE_MODE_REPEAT_SYNC   3
 . .
 
 wVal::0-65535 (Hex 0x0-0xFFFF, Octal 0-0177777)
@@ -4895,6 +4922,8 @@ PARAMS*/
 
 #define PI_CMD_NOIB  99
 
+#define PI_CMD_WVTXM 100
+
 /*DEF_E*/
 
 /*
@@ -4990,7 +5019,7 @@ after this command is issued.
 #define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 #define PI_INITIALISED      -32 // function called after gpioInitialise
-#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-1
+#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
 #define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
 #define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
 #define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses
@@ -5048,7 +5077,7 @@ after this command is issued.
 #define PI_UNKNOWN_COMMAND  -88 // unknown command
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
-#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2 for auxiliary SPI
+#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2/Zero for auxiliary SPI
 #define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
 #define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // gpio has no hardware clock
@@ -5116,4 +5145,5 @@ after this command is issued.
 /*DEF_E*/
 
 #endif
+
 
