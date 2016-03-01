@@ -57,7 +57,7 @@ if [[ $s = 0 ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 echo "h" >/dev/pigpio
 read -t 1 s </dev/pigout
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 bits         Clear gpios in bank 1" ]]
+if [[ $s = "BC1 bits         Clear GPIO in bank 1" ]]
 then echo "HELP-a ok"
 else echo "HELP-a fail ($s)"
 fi
@@ -65,7 +65,7 @@ read -t 1 -N 9000 </dev/pigout # dump rest of help
 echo "help" >/dev/pigpio
 read -t 1 s </dev/pigout
 read -t 1 s </dev/pigout
-if [[ $s = "BC1 bits         Clear gpios in bank 1" ]]
+if [[ $s = "BC1 bits         Clear GPIO in bank 1" ]]
 then echo "HELP-b ok"
 else echo "HELP-b fail ($s)"
 fi

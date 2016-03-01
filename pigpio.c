@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 46 */
+/* pigpio version 47 */
 
 /* include ------------------------------------------------------- */
 
@@ -2180,6 +2180,8 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
             default: res = PI_BAD_WVSP_COMMND;
          }
          break;
+
+      case PI_CMD_WVTAT: res = gpioWaveTxAt(); break;
 
       case PI_CMD_WVTX:
          res = gpioWaveTxSend(p[1], PI_WAVE_MODE_ONE_SHOT); break;
@@ -4785,6 +4787,53 @@ static unsigned dmaNowAtICB(void)
    }
 
    return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static int dmaNowAtOCB(void)
+{
+   unsigned cb;
+   unsigned page;
+   uint32_t cbAddr;
+
+   cbAddr = dmaOut[DMA_CONBLK_AD];
+
+   if (!cbAddr) return -PI_NO_TX_WAVE;
+
+   page = 0;
+
+   /* which page are we dma'ing? */
+
+   while (1)
+   {
+      cb = (cbAddr - ((int)dmaOBus[page])) / 32;
+
+      if (cb < CBS_PER_OPAGE) return (page*CBS_PER_OPAGE) + cb;
+
+      if (page++ >= DMAO_PAGES) break;
+   }
+
+   /* Try twice */
+
+   cbAddr = dmaOut[DMA_CONBLK_AD];
+
+   if (!cbAddr) return -PI_NO_TX_WAVE;
+
+   page = 0;
+
+   /* which page are we dma'ing? */
+
+   while (1)
+   {
+      cb = (cbAddr - ((int)dmaOBus[page])) / 32;
+
+      if (cb < CBS_PER_OPAGE) return (page*CBS_PER_OPAGE) + cb;
+
+      if (page++ >= DMAO_PAGES) break;
+   }
+
+   return -PI_WAVE_NOT_FOUND;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -8560,7 +8609,7 @@ int rawWaveAddSPI(
    unsigned spiBitLast,
    unsigned spiBits)
 {
-   int p, dbv, bit, halfbit;
+   int p, bit, dbv, halfbit;
    int rising_edge[2], read_cycle[2];
    uint32_t on_bits, off_bits;
    int tx_bit_pos;
@@ -8600,26 +8649,31 @@ int rawWaveAddSPI(
       p++;
    }
 
-   /* preset initial mosi bit in case it's read at leading clock bit */
-
    on_bits = 0;
    off_bits = 0;
 
    tx_bit_pos = 0;
 
+   /* preset initial mosi bit */
+
    if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
    {
-      dbv = 1;
       on_bits  |= (1<<(spi->mosi));
+      dbv = 1;
    }
    else
    {
+      off_bits |= (1<<(spi->mosi));
       dbv = 0;
-      off_bits  |= (1<<(spi->mosi));
    }
+
+   if (!spi->clk_pha) tx_bit_pos ++;
 
    if (spi->ss_pol) off_bits |= (1<<spiSS);
    else             on_bits  |= (1<<spiSS);
+
+   if (spi->clk_pol) on_bits  |= (1<<(spi->clk));
+   else              off_bits |= (1<<(spi->clk));
 
    wf[2][p].gpioOn  = on_bits;
    wf[2][p].gpioOff = off_bits;
@@ -8649,7 +8703,7 @@ int rawWaveAddSPI(
          {
             if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
             {
-               if (!dbv) on_bits |= (1<<(spi->mosi));
+               if (!dbv) on_bits  |= (1<<(spi->mosi));
                dbv = 1;
             }
             else
@@ -9343,6 +9397,30 @@ int gpioWaveTxBusy(void)
       return 1;
    else
       return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+
+int gpioWaveTxAt(void)
+{
+   int i, cb;
+
+   DBG(DBG_USER, "");
+
+   CHECK_INITED;
+
+   cb = dmaNowAtOCB();
+
+   if (cb < 0) return -cb;
+
+   for (i=0; i<PI_MAX_WAVES; i++)
+   {
+      if ( !waveInfo[i].deleted &&
+          (cb >= waveInfo[i].botCB) &&
+          (cb <= waveInfo[i].topCB) ) return i;
+   }
+
+   return PI_WAVE_NOT_FOUND;
 }
 
 /* ----------------------------------------------------------------------- */

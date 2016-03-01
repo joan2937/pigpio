@@ -31,31 +31,31 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 46
+#define PIGPIO_VERSION 47
 
 /*TEXT
 
-pigpio is a C library for the Raspberry which allows control of the gpios.
+pigpio is a C library for the Raspberry which allows control of the GPIO.
 
 *Features*
 
-o PWM on any of gpios 0-31
+o PWM on any of GPIO 0-31
 
-o servo pulses on any of gpios 0-31
+o servo pulses on any of GPIO 0-31
 
-o callbacks when any of gpios 0-31 change state
+o callbacks when any of GPIO 0-31 change state
 
 o callbacks at timed intervals
 
-o reading/writing all of the gpios in a bank as one operation
+o reading/writing all of the GPIO in a bank as one operation
 
-o individually setting gpio modes, reading and writing
+o individually setting GPIO modes, reading and writing
 
-o notifications when any of gpios 0-31 change state
+o notifications when any of GPIO 0-31 change state
 
 o the construction of output waveforms with microsecond timing
 
-o rudimentary permission control over gpios
+o rudimentary permission control over GPIO
 
 o a simple interface to start and stop new threads
 
@@ -63,9 +63,9 @@ o I2C, SPI, and serial link wrappers
 
 o creating and running scripts
 
-*gpios*
+*GPIO*
 
-ALL gpios are identified by their Broadcom number.
+ALL GPIO are identified by their Broadcom number.
 
 *Credits*
 
@@ -110,83 +110,83 @@ gpioTerminate              Stop library
 
 BEGINNER
 
-gpioSetMode                Set a gpio mode
-gpioGetMode                Get a gpio mode
+gpioSetMode                Set a GPIO mode
+gpioGetMode                Get a GPIO mode
 
-gpioSetPullUpDown          Set/clear gpio pull up/down resistor
+gpioSetPullUpDown          Set/clear GPIO pull up/down resistor
 
-gpioRead                   Read a gpio
-gpioWrite                  Write a gpio
+gpioRead                   Read a GPIO
+gpioWrite                  Write a GPIO
 
-gpioPWM                    Start/stop PWM pulses on a gpio
-gpioGetPWMdutycycle        Get dutycycle setting on a gpio
+gpioPWM                    Start/stop PWM pulses on a GPIO
+gpioGetPWMdutycycle        Get dutycycle setting on a GPIO
 
-gpioServo                  Start/stop servo pulses on a gpio
-gpioGetServoPulsewidth     Get pulsewidth setting on a gpio
+gpioServo                  Start/stop servo pulses on a GPIO
+gpioGetServoPulsewidth     Get pulsewidth setting on a GPIO
 
 gpioDelay                  Delay for a number of microseconds
 
-gpioSetAlertFunc           Request a gpio level change callback
+gpioSetAlertFunc           Request a GPIO level change callback
 
 gpioSetTimerFunc           Request a regular timed callback
 
 INTERMEDIATE
 
-gpioTrigger                Send a trigger pulse to a gpio.
+gpioTrigger                Send a trigger pulse to a GPIO.
 
-gpioSetWatchdog            Set a watchdog on a gpio.
+gpioSetWatchdog            Set a watchdog on a GPIO.
 
-gpioSetPWMrange            Configure PWM range for a gpio
-gpioGetPWMrange            Get configured PWM range for a gpio
+gpioSetPWMrange            Configure PWM range for a GPIO
+gpioGetPWMrange            Get configured PWM range for a GPIO
 
-gpioSetPWMfrequency        Configure PWM frequency for a gpio
-gpioGetPWMfrequency        Get configured PWM frequency for a gpio
+gpioSetPWMfrequency        Configure PWM frequency for a GPIO
+gpioGetPWMfrequency        Get configured PWM frequency for a GPIO
 
-gpioRead_Bits_0_31         Read all gpios in bank 1
-gpioRead_Bits_32_53        Read all gpios in bank 2
+gpioRead_Bits_0_31         Read all GPIO in bank 1
+gpioRead_Bits_32_53        Read all GPIO in bank 2
 
-gpioWrite_Bits_0_31_Clear  Clear selected gpios in bank 1
-gpioWrite_Bits_32_53_Clear Clear selected gpios in bank 2
+gpioWrite_Bits_0_31_Clear  Clear selected GPIO in bank 1
+gpioWrite_Bits_32_53_Clear Clear selected GPIO in bank 2
 
-gpioWrite_Bits_0_31_Set    Set selected gpios in bank 1
-gpioWrite_Bits_32_53_Set   Set selected gpios in bank 2
+gpioWrite_Bits_0_31_Set    Set selected GPIO in bank 1
+gpioWrite_Bits_32_53_Set   Set selected GPIO in bank 2
 
 gpioStartThread            Start a new thread
 gpioStopThread             Stop a previously started thread
 
 ADVANCED
 
-gpioGetPWMrealRange        Get underlying PWM range for a gpio
+gpioGetPWMrealRange        Get underlying PWM range for a GPIO
 
-gpioSetAlertFuncEx         Request a gpio change callback, extended
+gpioSetAlertFuncEx         Request a GPIO change callback, extended
 
-gpioSetISRFunc             Request a gpio interrupt callback
-gpioSetISRFuncEx           Request a gpio interrupt callback, extended
+gpioSetISRFunc             Request a GPIO interrupt callback
+gpioSetISRFuncEx           Request a GPIO interrupt callback, extended
 
 gpioSetSignalFunc          Request a signal callback
 gpioSetSignalFuncEx        Request a signal callback, extended
 
-gpioSetGetSamplesFunc      Requests a gpio samples callback
-gpioSetGetSamplesFuncEx    Requests a gpio samples callback, extended
+gpioSetGetSamplesFunc      Requests a GPIO samples callback
+gpioSetGetSamplesFuncEx    Requests a GPIO samples callback, extended
 
 gpioSetTimerFuncEx         Request a regular timed callback, extended
 
 gpioNotifyOpen             Request a notification handle
 gpioNotifyOpenWithSize     Request a notification handle with sized pipe
-gpioNotifyBegin            Start notifications for selected gpios
+gpioNotifyBegin            Start notifications for selected GPIO
 gpioNotifyPause            Pause notifications
 gpioNotifyClose            Close a notification
 
-gpioSerialReadOpen         Opens a gpio for bit bang serial reads
+gpioSerialReadOpen         Opens a GPIO for bit bang serial reads
 gpioSerialReadInvert       Configures normal/inverted for serial reads
-gpioSerialRead             Reads bit bang serial data from a gpio
-gpioSerialReadClose        Closes a gpio for bit bang serial reads
+gpioSerialRead             Reads bit bang serial data from a GPIO
+gpioSerialReadClose        Closes a GPIO for bit bang serial reads
 
-gpioHardwareClock          Start hardware clock on supported gpios
-gpioHardwarePWM            Start hardware PWM on supported gpios
+gpioHardwareClock          Start hardware clock on supported GPIO
+gpioHardwarePWM            Start hardware PWM on supported GPIO
 
-gpioGlitchFilter           Set a glitch filter on a gpio
-gpioNoiseFilter            Set a noise filter on a gpio
+gpioGlitchFilter           Set a glitch filter on a GPIO
+gpioNoiseFilter            Set a noise filter on a GPIO
 
 SCRIPTS
 
@@ -210,6 +210,8 @@ gpioWaveDelete             Deletes a waveform
 gpioWaveTxSend             Transmits a waveform
 
 gpioWaveChain              Transmits a chain of waveforms
+
+gpioWaveTxAt               Returns the current transmitting waveform
 
 gpioWaveTxBusy             Checks to see if the waveform has ended
 gpioWaveTxStop             Aborts the current waveform
@@ -255,8 +257,8 @@ i2cSegments                Performs multiple I2C transactions
 
 i2cZip                     Performs multiple I2C transactions
 
-bbI2COpen                  Opens gpios for bit banging I2C
-bbI2CClose                 Closes gpios for bit banging I2C
+bbI2COpen                  Opens GPIO for bit banging I2C
+bbI2CClose                 Closes GPIO for bit banging I2C
 bbI2CZip                   Performs multiple bit banged I2C transactions
 
 SPI
@@ -282,11 +284,11 @@ serDataAvailable           Returns number of bytes ready to be read
 
 CONFIGURATION
 
-gpioCfgBufferSize          Configure the gpio sample buffer size
-gpioCfgClock               Configure the gpio sample rate
+gpioCfgBufferSize          Configure the GPIO sample buffer size
+gpioCfgClock               Configure the GPIO sample rate
 gpioCfgDMAchannel          Configure the DMA channel (DEPRECATED)
 gpioCfgDMAchannels         Configure the DMA channels
-gpioCfgPermissions         Configure the gpio access permissions
+gpioCfgPermissions         Configure the GPIO access permissions
 gpioCfgInterfaces          Configure user interfaces
 gpioCfgSocketPort          Configure socket port
 gpioCfgMemAlloc            Configure DMA memory allocation mode
@@ -400,7 +402,7 @@ the maximum NUM_WAVE_CBS.
 OOLS are used from the bottom climbing up and from
 the top climbing down.
 
-The gpio on and off settings climb up from the bottom (botOOL/numBOOL).
+The GPIO on and off settings climb up from the bottom (botOOL/numBOOL).
 
 The level and tick read values are stored in descending locations
 from the top (topOOL/numTOOL).
@@ -422,9 +424,9 @@ typedef struct
 
 typedef struct
 {
-   int clk;     /* gpio for clock           */
-   int mosi;    /* gpio for MOSI            */
-   int miso;    /* gpio for MISO            */
+   int clk;     /* GPIO for clock           */
+   int mosi;    /* GPIO for MOSI            */
+   int miso;    /* GPIO for MISO            */
    int ss_pol;  /* slave select off state   */
    int ss_us;   /* delay after slave select */
    int clk_pol; /* clock off state          */
@@ -507,7 +509,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_LOW   0
 #define PI_HIGH  1
 
-/* level: only reported for gpio time-out, see gpioSetWatchdog */
+/* level: only reported for GPIO time-out, see gpioSetWatchdog */
 
 #define PI_TIMEOUT 2
 
@@ -576,11 +578,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_WAVE_MIN_BAUD      50
 #define PI_WAVE_MAX_BAUD 1000000
 
-//#define PI_SPI_MIN_BAUD     32000
-//#define PI_SPI_MAX_BAUD 125000000
-
-#define PI_SPI_MIN_BAUD     1
-#define PI_SPI_MAX_BAUD 500000000
+#define PI_SPI_MIN_BAUD     32000
+#define PI_SPI_MAX_BAUD 125000000
 
 #define PI_MIN_WAVE_DATABITS 1
 #define PI_MAX_WAVE_DATABITS 32
@@ -603,6 +602,11 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_WAVE_MODE_REPEAT        1
 #define PI_WAVE_MODE_ONE_SHOT_SYNC 2
 #define PI_WAVE_MODE_REPEAT_SYNC   3
+
+/* special wave at return values */
+
+#define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
+#define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
 
 /* I2C, SPI, SER */
 
@@ -809,7 +813,7 @@ D*/
 /*F*/
 int gpioSetMode(unsigned gpio, unsigned mode);
 /*D
-Sets the gpio mode, typically input or output.
+Sets the GPIO mode, typically input or output.
 
 . .
 gpio: 0-53
@@ -833,13 +837,13 @@ D*/
 /*F*/
 int gpioGetMode(unsigned gpio);
 /*D
-Gets the gpio mode.
+Gets the GPIO mode.
 
 . .
 gpio: 0-53
 . .
 
-Returns the gpio mode if OK, otherwise PI_BAD_GPIO.
+Returns the GPIO mode if OK, otherwise PI_BAD_GPIO.
 
 ...
 if (gpioGetMode(17) != PI_ALT0)
@@ -853,7 +857,7 @@ D*/
 /*F*/
 int gpioSetPullUpDown(unsigned gpio, unsigned pud);
 /*D
-Sets or clears resistor pull ups or downs on the gpio.
+Sets or clears resistor pull ups or downs on the GPIO.
 
 . .
 gpio: 0-53
@@ -875,18 +879,18 @@ D*/
 /*F*/
 int gpioRead (unsigned gpio);
 /*D
-Reads the gpio level, on or off.
+Reads the GPIO level, on or off.
 
 . .
 gpio: 0-53
 . .
 
-Returns the gpio level if OK, otherwise PI_BAD_GPIO.
+Returns the GPIO level if OK, otherwise PI_BAD_GPIO.
 
 Arduino style: digitalRead.
 
 ...
-printf("gpio24 is level %d\n", gpioRead(24));
+printf("gpio24 is level %d", gpioRead(24));
 ...
 D*/
 
@@ -894,7 +898,7 @@ D*/
 /*F*/
 int gpioWrite(unsigned gpio, unsigned level);
 /*D
-Sets the gpio level, on or off.
+Sets the GPIO level, on or off.
 
 . .
  gpio: 0-53
@@ -903,7 +907,7 @@ level: 0,1
 
 Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_LEVEL.
 
-If PWM or servo pulses are active on the gpio they are switched off.
+If PWM or servo pulses are active on the GPIO they are switched off.
 
 Arduino style: digitalWrite
 
@@ -916,7 +920,7 @@ D*/
 /*F*/
 int gpioPWM(unsigned user_gpio, unsigned dutycycle);
 /*D
-Starts PWM on the gpio, dutycycle between 0 (off) and range (fully on).
+Starts PWM on the GPIO, dutycycle between 0 (off) and range (fully on).
 Range defaults to 255.
 
 . .
@@ -947,7 +951,7 @@ D*/
 /*F*/
 int gpioGetPWMdutycycle(unsigned user_gpio);
 /*D
-Returns the PWM dutycycle setting for the gpio.
+Returns the PWM dutycycle setting for the GPIO.
 
 . .
 user_gpio: 0-31
@@ -957,12 +961,12 @@ Returns between 0 (off) and range (fully on) if OK, otherwise
 PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see [*gpioGetPWMrange*]).
+for the GPIO (see [*gpioGetPWMrange*]).
 
-If a hardware clock is active on the gpio the reported dutycycle
+If a hardware clock is active on the GPIO the reported dutycycle
 will be 500000 (500k) out of 1000000 (1M).
 
-If hardware PWM is active on the gpio the reported dutycycle
+If hardware PWM is active on the GPIO the reported dutycycle
 will be out of a 1000000 (1M).
 
 Normal PWM range defaults to 255.
@@ -972,7 +976,7 @@ D*/
 /*F*/
 int gpioSetPWMrange(unsigned user_gpio, unsigned range);
 /*D
-Selects the dutycycle range to be used for the gpio.  Subsequent calls
+Selects the dutycycle range to be used for the GPIO.  Subsequent calls
 to gpioPWM will use a dutycycle between 0 (off) and range (fully on).
 
 . .
@@ -980,10 +984,10 @@ user_gpio: 0-31
     range: 25-40000
 . .
 
-Returns the real range for the given gpio's frequency if OK,
+Returns the real range for the given GPIO's frequency if OK,
 otherwise PI_BAD_USER_GPIO or PI_BAD_DUTYRANGE.
 
-If PWM is currently active on the gpio its dutycycle will be scaled
+If PWM is currently active on the GPIO its dutycycle will be scaled
 to reflect the new range.
 
 The real range, the number of steps between fully off and fully
@@ -1007,14 +1011,14 @@ D*/
 /*F*/
 int gpioGetPWMrange(unsigned user_gpio);
 /*D
-Returns the dutycycle range used for the gpio if OK, otherwise
+Returns the dutycycle range used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
 
 . .
 user_gpio: 0-31
 . .
 
-If a hardware clock or hardware PWM is active on the gpio
+If a hardware clock or hardware PWM is active on the GPIO
 the reported range will be 1000000 (1M).
 
 ...
@@ -1026,17 +1030,17 @@ D*/
 /*F*/
 int gpioGetPWMrealRange(unsigned user_gpio);
 /*D
-Returns the real range used for the gpio if OK, otherwise
+Returns the real range used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
 
 . .
 user_gpio: 0-31
 . .
 
-If a hardware clock is active on the gpio the reported real
+If a hardware clock is active on the GPIO the reported real
 range will be 1000000 (1M).
 
-If hardware PWM is active on the gpio the reported real range
+If hardware PWM is active on the GPIO the reported real range
 will be approximately 250M divided by the set PWM frequency.
 
 ...
@@ -1048,7 +1052,7 @@ D*/
 /*F*/
 int gpioSetPWMfrequency(unsigned user_gpio, unsigned frequency);
 /*D
-Sets the frequency in hertz to be used for the gpio.
+Sets the frequency in hertz to be used for the GPIO.
 
 . .
 user_gpio: 0-31
@@ -1061,10 +1065,10 @@ PI_BAD_USER_GPIO.
 The selectable frequencies depend upon the sample rate which
 may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
 
-Each gpio can be independently set to one of 18 different PWM
+Each GPIO can be independently set to one of 18 different PWM
 frequencies.
 
-If PWM is currently active on the gpio it will be
+If PWM is currently active on the GPIO it will be
 switched off and then back on at the new frequency.
 
 The frequencies for each sample rate are:
@@ -1105,20 +1109,20 @@ D*/
 /*F*/
 int gpioGetPWMfrequency(unsigned user_gpio);
 /*D
-Returns the frequency (in hertz) used for the gpio if OK, otherwise
+Returns the frequency (in hertz) used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
 
 . .
 user_gpio: 0-31
 . .
 
-For normal PWM the frequency will be that defined for the gpio by
+For normal PWM the frequency will be that defined for the GPIO by
 [*gpioSetPWMfrequency*].
 
-If a hardware clock is active on the gpio the reported frequency
+If a hardware clock is active on the GPIO the reported frequency
 will be that set by [*gpioHardwareClock*].
 
-If hardware PWM is active on the gpio the reported frequency
+If hardware PWM is active on the GPIO the reported frequency
 will be that set by [*gpioHardwarePWM*].
 
 ...
@@ -1130,7 +1134,7 @@ D*/
 /*F*/
 int gpioServo(unsigned user_gpio, unsigned pulsewidth);
 /*D
-Starts servo pulses on the gpio, 0 (off), 500 (most anti-clockwise) to
+Starts servo pulses on the GPIO, 0 (off), 500 (most anti-clockwise) to
 2500 (most clockwise).
 
 . .
@@ -1146,8 +1150,8 @@ the mid-point of rotation.  You can DAMAGE a servo if you command it
 to move beyond its limits.
 
 The following causes an on pulse of 1500 microseconds duration to be
-transmitted on gpio 17 at a rate of 50 times per second. This will
-command a servo connected to gpio 17 to rotate to its mid-point.
+transmitted on GPIO 17 at a rate of 50 times per second. This will
+command a servo connected to GPIO 17 to rotate to its mid-point.
 
 ...
 gpioServo(17, 1000); // Move servo to safe position anti-clockwise.
@@ -1189,7 +1193,7 @@ D*/
 /*F*/
 int gpioGetServoPulsewidth(unsigned user_gpio);
 /*D
-Returns the servo pulsewidth setting for the gpio.
+Returns the servo pulsewidth setting for the GPIO.
 
 . .
 user_gpio: 0-31
@@ -1204,7 +1208,7 @@ D*/
 int gpioSetAlertFunc(unsigned user_gpio, gpioAlertFunc_t f);
 /*D
 Registers a function to be called (a callback) when the specified
-gpio changes state.
+GPIO changes state.
 
 . .
 user_gpio: 0-31
@@ -1213,13 +1217,13 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 
-One function may be registered per gpio.
+One function may be registered per GPIO.
 
-The function is passed the gpio, the new level, and the tick.
+The function is passed the GPIO, the new level, and the tick.
 
 The alert may be cancelled by passing NULL as the function.
 
-The gpios are sampled at a rate set when the library is started.
+The GPIO are sampled at a rate set when the library is started.
 
 If a value isn't specifically set the default of 5 us is used.
 
@@ -1251,10 +1255,10 @@ The tick value is the time stamp of the sample in microseconds, see
 ...
 void aFunction(int gpio, int level, uint32_t tick)
 {
-   printf("gpio %d became %d at %d\n", gpio, level, tick);
+   printf("GPIO %d became %d at %d", gpio, level, tick);
 }
 
-// call aFunction whenever gpio 4 changes state
+// call aFunction whenever GPIO 4 changes state
 
 gpioSetAlertFunc(4F, aFunction);
 ...
@@ -1266,7 +1270,7 @@ int gpioSetAlertFuncEx(
    unsigned user_gpio, gpioAlertFuncEx_t f, void *userdata);
 /*D
 Registers a function to be called (a callback) when the specified
-gpio changes state.
+GPIO changes state.
 
 . .
 user_gpio: 0-31
@@ -1276,13 +1280,13 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 
-One function may be registered per gpio.
+One function may be registered per GPIO.
 
-The function is passed the gpio, the new level, the tick, and
+The function is passed the GPIO, the new level, the tick, and
 the userdata pointer.
 
 Only one of [*gpioSetAlertFunc*] or [*gpioSetAlertFuncEx*] can be
-registered per gpio.
+registered per GPIO.
 
 See [*gpioSetAlertFunc*] for further details.
 D*/
@@ -1293,7 +1297,7 @@ int gpioSetISRFunc(
    unsigned user_gpio, unsigned edge, int timeout, gpioISRFunc_t f);
 /*D
 Registers a function to be called (a callback) whenever the specified
-gpio interrupt occurs.
+GPIO interrupt occurs.
 
 . .
 user_gpio: 0-31
@@ -1305,24 +1309,24 @@ user_gpio: 0-31
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
-One function may be registered per gpio.
+One function may be registered per GPIO.
 
-The function is passed the gpio, the current level, and the
+The function is passed the GPIO, the current level, and the
 current tick.  The level will be PI_TIMEOUT if the optional
 interrupt timeout expires.
 
-The underlying Linux sysfs gpio interface is used to provide
+The underlying Linux sysfs GPIO interface is used to provide
 the interrupt services.
 
 The first time the function is called, with a non-NULL f, the
-gpio is exported, set to be an input, and set to interrupt
+GPIO is exported, set to be an input, and set to interrupt
 on the given edge and timeout.
 
 Subsequent calls, with a non-NULL f, can vary one or more of the
 edge, timeout, or function.
 
 The ISR may be cancelled by passing a NULL f, in which case the
-gpio is unexported.
+GPIO is unexported.
 
 The tick is that read at the time the process was informed of
 the interrupt.  This will be a variable number of microseconds
@@ -1348,7 +1352,7 @@ int gpioSetISRFuncEx(
    void *userdata);
 /*D
 Registers a function to be called (a callback) whenever the specified
-gpio interrupt occurs.
+GPIO interrupt occurs.
 
 . .
 user_gpio: 0-31
@@ -1361,11 +1365,11 @@ user_gpio: 0-31
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
-The function is passed the gpio, the current level, the
+The function is passed the GPIO, the current level, the
 current tick, and the userdata pointer.
 
 Only one of [*gpioSetISRFunc*] or [*gpioSetISRFuncEx*] can be
-registered per gpio.
+registered per GPIO.
 
 See [*gpioSetISRFunc*] for further details.
 D*/
@@ -1379,7 +1383,7 @@ This function requests a free notification handle.
 Returns a handle greater than or equal to zero if OK,
 otherwise PI_NO_HANDLE.
 
-A notification is a method for being notified of gpio state changes
+A notification is a method for being notified of GPIO state changes
 via a pipe or socket.
 
 Pipe notifications for handle x will be available at the pipe
@@ -1435,12 +1439,12 @@ This function starts notifications on a previously opened handle.
 
 . .
 handle: >=0, as returned by [*gpioNotifyOpen*]
-  bits: a bit mask indicating the gpios of interest
+  bits: a bit mask indicating the GPIO of interest
 . .
 
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
-The notification sends state changes for each gpio whose corresponding
+The notification sends state changes for each GPIO whose corresponding
 bit in bits is set.
 
 Each notification occupies 12 bytes in the fifo and has the
@@ -1461,7 +1465,7 @@ by one for each report.
 
 flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
 If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags
-indicate a gpio which has had a watchdog timeout; if bit 6 is set
+indicate a GPIO which has had a watchdog timeout; if bit 6 is set
 (PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the
 pipe/socket and is sent once a minute in the absence of other
 notification activity.
@@ -1469,11 +1473,11 @@ notification activity.
 tick: the number of microseconds since system boot.  It wraps around
 after 1h12m.
 
-level: indicates the level of each gpio.  If bit 1<<x is set then
-gpio x is high.
+level: indicates the level of each GPIO.  If bit 1<<x is set then
+GPIO x is high.
 
 ...
-// Start notifications for gpios 1, 4, 6, 7, 10.
+// Start notifications for GPIO 1, 4, 6, 7, 10.
 
 //                         1
 //                         0  76 4  1
@@ -1569,7 +1573,7 @@ The pulses are interleaved in time order within the existing waveform
 (if any).
 
 Merging allows the waveform to be built in parts, that is the settings
-for gpio#1 can be added, and then gpio#2 etc.
+for GPIO#1 can be added, and then GPIO#2 etc.
 
 If the added waveform is intended to start after or within the existing
 waveform then the first pulse should consist of a delay.
@@ -1715,8 +1719,8 @@ typedef struct
 
 The fields specify
 
-1) the gpios to be switched on at the start of the pulse. 
-2) the gpios to be switched off at the start of the pulse. 
+1) the GPIO to be switched on at the start of the pulse. 
+2) the GPIO to be switched off at the start of the pulse. 
 3) the delay in microseconds before the next pulse.
 
 Any or all the fields can be zero.  It doesn't make any sense to
@@ -1825,7 +1829,7 @@ int main(int argc, char *argv[])
 
    gpioSetMode(GPIO, PI_OUTPUT);
 
-   printf("start piscope, press return\n"); getchar();
+   printf("start piscope, press return"); getchar();
 
    for (i=0; i<WAVES; i++)
    {
@@ -1859,11 +1863,24 @@ int main(int argc, char *argv[])
 
    for (i=0; i<WAVES; i++) gpioWaveDelete(wid[i]);
 
-   printf("stop piscope, press return\n"); getchar();
+   printf("stop piscope, press return"); getchar();
 
    gpioTerminate();
 }
 ...
+D*/
+
+
+/*F*/
+int gpioWaveTxAt(void);
+/*D
+This function returns the id of the waveform currently being
+transmitted.
+
+Returns the waveform id or one of the following special values:
+
+PI_WAVE_NOT_FOUND (9998) - transmitted wave not found. 
+PI_NO_TX_WAVE (9999) - no wave being transmitted.
 D*/
 
 
@@ -1961,7 +1978,7 @@ D*/
 /*F*/
 int gpioSerialReadOpen(unsigned user_gpio, unsigned baud, unsigned data_bits);
 /*D
-This function opens a gpio for bit bang reading of serial data.
+This function opens a GPIO for bit bang reading of serial data.
 
 . .
 user_gpio: 0-31
@@ -1995,7 +2012,7 @@ invert: 0-1
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
 PI_NOT_SERIAL_GPIO, or PI_BAD_SER_INVERT.
 
-The gpio must be opened for bit bang reading of serial data using
+The GPIO must be opened for bit bang reading of serial data using
 [*gpioSerialReadOpen*] prior to calling this function.
 D*/
 
@@ -2027,7 +2044,7 @@ D*/
 /*F*/
 int gpioSerialReadClose(unsigned user_gpio);
 /*D
-This function closes a gpio for bit bang reading of serial data.
+This function closes a GPIO for bit bang reading of serial data.
 
 . .
 user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
@@ -2510,7 +2527,7 @@ D*/
 /*F*/
 int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud);
 /*D
-This function selects a pair of gpios for bit banging I2C at a
+This function selects a pair of GPIO for bit banging I2C at a
 specified baud rate.
 
 Bit banging I2C allows for certain operations which are not possible
@@ -2519,7 +2536,7 @@ with the standard I2C driver.
 o baud rates as low as 50 
 o repeated starts 
 o clock stretching 
-o I2C on any pair of spare gpios
+o I2C on any pair of spare GPIO
 
 . .
  SDA: 0-31
@@ -2532,18 +2549,18 @@ PI_GPIO_IN_USE.
 
 NOTE:
 
-The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
+The GPIO used for SDA and SCL must have pull-ups to 3V3 connected.  As
 a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
 D*/
 
 /*F*/
 int bbI2CClose(unsigned SDA);
 /*D
-This function stops bit banging I2C on a pair of gpios previously
+This function stops bit banging I2C on a pair of GPIO previously
 opened with [*bbI2COpen*].
 
 . .
-SDA: 0-31, the SDA gpio used in a prior call to [*bbI2COpen*]
+SDA: 0-31, the SDA GPIO used in a prior call to [*bbI2COpen*]
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
@@ -2628,12 +2645,13 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
-selected by setting the A bit in the flags.  The auxiliary
-device has 3 chip selects and a selectable word size in bits.
+An auxiliary SPI device is available on all models but the
+A and B and may be selected by setting the A bit in the flags.
+The auxiliary device has 3 chip selects and a selectable word
+size in bits.
 
 . .
- spiChan: 0-1 (0-2 for A+/B+/Pi2/Zero auxiliary device)
+ spiChan: 0-1 (0-2 for the auxiliary SPI device)
     baud: 32K-125M (values above 30M are unlikely to work)
 spiFlags: see below
 . .
@@ -2662,10 +2680,9 @@ Mode POL PHA
 
 px is 0 if CEx is active low (default) and 1 for active high.
 
-ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2/Zero.
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.
 
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
 SPI device only.
@@ -2684,6 +2701,17 @@ device only.
 
 bbbbbb defines the word size in bits (0-32).  The default (0)
 sets 8 bits per word.  Auxiliary SPI device only.
+
+The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
+transfer data packed into 1, 2, or 4 bytes according to
+the word size in bits.
+
+For bits 1-8 there will be one byte per character. 
+For bits 9-16 there will be two bytes per character. 
+For bits 17-32 there will be four bytes per character.
+
+E.g. to transfer 32 12-bit words buf should contain 64 bytes
+and count should be 64.
 
 The other bits in flags should be set to zero.
 D*/
@@ -2866,7 +2894,7 @@ D*/
 /*F*/
 int gpioTrigger(unsigned user_gpio, unsigned pulseLen, unsigned level);
 /*D
-This function sends a trigger pulse to a gpio.  The gpio is set to
+This function sends a trigger pulse to a GPIO.  The GPIO is set to
 level for pulseLen microseconds and then reset to not level.
 
 . .
@@ -2883,7 +2911,7 @@ D*/
 /*F*/
 int gpioSetWatchdog(unsigned user_gpio, unsigned timeout);
 /*D
-Sets a watchdog for a gpio.
+Sets a watchdog for a GPIO.
 
 . .
 user_gpio: 0-31
@@ -2894,25 +2922,25 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_BAD_WDOG_TIMEOUT.
 
 The watchdog is nominally in milliseconds.
 
-One watchdog may be registered per gpio.
+One watchdog may be registered per GPIO.
 
 The watchdog may be cancelled by setting timeout to 0.
 
-If no level change has been detected for the gpio for timeout
+If no level change has been detected for the GPIO for timeout
 milliseconds:-
 
-1) any registered alert function for the gpio is called with
+1) any registered alert function for the GPIO is called with
    the level set to PI_TIMEOUT. 
-2) any notification for the gpio has a report written to the
+2) any notification for the GPIO has a report written to the
    fifo with the flags set to indicate a watchdog timeout.
 
 ...
 void aFunction(int gpio, int level, uint32_t tick)
 {
-   printf("gpio %d became %d at %d\n", gpio, level, tick);
+   printf("GPIO %d became %d at %d", gpio, level, tick);
 }
 
-// call aFunction whenever gpio 4 changes state
+// call aFunction whenever GPIO 4 changes state
 gpioSetAlertFunc(4, aFunction);
 
 //  or approximately every 5 millis
@@ -2924,11 +2952,11 @@ D*/
 /*F*/
 int gpioNoiseFilter(unsigned user_gpio, unsigned steady, unsigned active);
 /*D
-Sets a noise filter on a gpio.
+Sets a noise filter on a GPIO.
 
-Level changes on the gpio are ignored until a level which has
+Level changes on the GPIO are ignored until a level which has
 been stable for [*steady*] microseconds is detected.  Level changes
-on the gpio are then reported for [*active*] microseconds after
+on the GPIO are then reported for [*active*] microseconds after
 which the process repeats.
 
 . .
@@ -2948,9 +2976,9 @@ D*/
 /*F*/
 int gpioGlitchFilter(unsigned user_gpio, unsigned steady);
 /*D
-Sets a glitch filter on a gpio.
+Sets a glitch filter on a GPIO.
 
-Level changes on the gpio are not reported unless the level
+Level changes on the GPIO are not reported unless the level
 has been stable for at least [*steady*] microseconds.  The
 level is then reported.  Level changes of less than [*steady*]
 microseconds are ignored.
@@ -2971,11 +2999,11 @@ D*/
 int gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits);
 /*D
 Registers a function to be called (a callback) every millisecond
-with the latest gpio samples.
+with the latest GPIO samples.
 
 . .
    f: the function to call
-bits: the gpios of interest
+bits: the GPIO of interest
 . .
 
 Returns 0 if OK.
@@ -2990,8 +3018,8 @@ The callback may be cancelled by passing NULL as the function.
 The samples returned will be the union of bits, plus any active alerts,
 plus any active notifications.
 
-e.g.  if there are alerts for gpios 7, 8, and 9, notifications for gpios
-8, 10, 23, 24, and bits is (1<<23)|(1<<17) then samples for gpios
+e.g.  if there are alerts for GPIO 7, 8, and 9, notifications for GPIO
+8, 10, 23, 24, and bits is (1<<23)|(1<<17) then samples for GPIO
 7, 8, 9, 10, 17, 23, and 24 will be reported.
 D*/
 
@@ -3001,11 +3029,11 @@ int gpioSetGetSamplesFuncEx(
    gpioGetSamplesFuncEx_t f, uint32_t bits, void *userdata);
 /*D
 Registers a function to be called (a callback) every millisecond
-with the latest gpio samples.
+with the latest GPIO samples.
 
 . .
        f: the function to call
-    bits: the gpios of interest
+    bits: the GPIO of interest
 userdata: a pointer to arbitrary user data
 . .
 
@@ -3043,7 +3071,7 @@ The timer may be cancelled by passing NULL as the function.
 ...
 void bFunction(void)
 {
-   printf("two seconds have elapsed\n");
+   printf("two seconds have elapsed");
 }
 
 // call bFunction every 2000 milliseconds
@@ -3101,7 +3129,7 @@ void *myfunc(void *arg)
 {
    while (1)
    {
-      printf("%s\n", arg);
+      printf("%s", arg);
       sleep(1);
    }
 }
@@ -3281,30 +3309,30 @@ D*/
 /*F*/
 uint32_t gpioRead_Bits_0_31(void);
 /*D
-Returns the current level of gpios 0-31.
+Returns the current level of GPIO 0-31.
 D*/
 
 
 /*F*/
 uint32_t gpioRead_Bits_32_53(void);
 /*D
-Returns the current level of gpios 32-53.
+Returns the current level of GPIO 32-53.
 D*/
 
 
 /*F*/
 int gpioWrite_Bits_0_31_Clear(uint32_t bits);
 /*D
-Clears gpios 0-31 if the corresponding bit in bits is set.
+Clears GPIO 0-31 if the corresponding bit in bits is set.
 
 . .
-bits: a bit mask of gpios to clear
+bits: a bit mask of GPIO to clear
 . .
 
 Returns 0 if OK.
 
 ...
-// To clear (set to 0) gpios 4, 7, and 15
+// To clear (set to 0) GPIO 4, 7, and 15
 gpioWrite_Bits_0_31_Clear( (1<<4) | (1<<7) | (1<<15) );
 ...
 D*/
@@ -3313,10 +3341,10 @@ D*/
 /*F*/
 int gpioWrite_Bits_32_53_Clear(uint32_t bits);
 /*D
-Clears gpios 32-53 if the corresponding bit (0-21) in bits is set.
+Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 . .
-bits: a bit mask of gpios to clear
+bits: a bit mask of GPIO to clear
 . .
 
 Returns 0 if OK.
@@ -3326,10 +3354,10 @@ D*/
 /*F*/
 int gpioWrite_Bits_0_31_Set(uint32_t bits);
 /*D
-Sets gpios 0-31 if the corresponding bit in bits is set.
+Sets GPIO 0-31 if the corresponding bit in bits is set.
 
 . .
-bits: a bit mask of gpios to set
+bits: a bit mask of GPIO to set
 . .
 
 Returns 0 if OK.
@@ -3339,16 +3367,16 @@ D*/
 /*F*/
 int gpioWrite_Bits_32_53_Set(uint32_t bits);
 /*D
-Sets gpios 32-53 if the corresponding bit (0-21) in bits is set.
+Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 . .
-bits: a bit mask of gpios to set
+bits: a bit mask of GPIO to set
 . .
 
 Returns 0 if OK.
 
 ...
-// To set (set to 1) gpios 32, 40, and 53
+// To set (set to 1) GPIO 32, 40, and 53
 gpioWrite_Bits_32_53_Set((1<<(32-32)) | (1<<(40-32)) | (1<<(53-32)));
 ...
 D*/
@@ -3356,7 +3384,7 @@ D*/
 /*F*/
 int gpioHardwareClock(unsigned gpio, unsigned clkfreq);
 /*D
-Starts a hardware clock on a gpio at the specified frequency.
+Starts a hardware clock on a GPIO at the specified frequency.
 Frequencies above 30MHz are unlikely to work.
 
 . .
@@ -3367,17 +3395,17 @@ clkfreq: 0 (off) or 4689-250000000 (250M)
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
 PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
 
-The same clock is available on multiple gpios.  The latest
-frequency setting will be used by all gpios which share a clock.
+The same clock is available on multiple GPIO.  The latest
+frequency setting will be used by all GPIO which share a clock.
 
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 . .
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2/Zero and compute module only
-20  clock 0  A+/B+/Pi2/Zero and compute module only
-21  clock 1  All models but Rev.2 B (reserved for system use)
+5   clock 1  All models but A and B (reserved for system use)
+6   clock 2  All models but A and B
+20  clock 0  All models but A and B
+21  clock 1  All models but A and Rev.2 B (reserved for system use)
 
 32  clock 0  Compute module only
 34  clock 0  Compute module only
@@ -3388,13 +3416,13 @@ The gpio must be one of the following.
 
 Access to clock 1 is protected by a password as its use will likely
 crash the Pi.  The password is given by or'ing 0x5A000000 with the
-gpio number.
+GPIO number.
 D*/
 
 /*F*/
 int gpioHardwarePWM(unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
 /*D
-Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+Starts hardware PWM on a GPIO at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
 NOTE: Any waveform started by [*gpioWaveTxSend*], or
@@ -3413,17 +3441,17 @@ PWMduty: 0 (off) to 1000000 (1M)(fully on)
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HPWM_GPIO,
 PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ, or PI_HPWM_ILLEGAL.
 
-The same PWM channel is available on multiple gpios.  The latest
-frequency and dutycycle setting will be used by all gpios which
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
 share a PWM channel.
 
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 . .
-12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
-13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
+12  PWM channel 0  All models but A and B
+13  PWM channel 1  All models but A and B
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
+19  PWM channel 1  All models but A and B
 
 40  PWM channel 0  Compute module only
 41  PWM channel 1  Compute module only
@@ -3467,7 +3495,7 @@ int secs, mics;
 
 // print the number of seconds since the library was started
 gpioTime(PI_TIME_RELATIVE, &secs, &mics);
-printf("library started %d.%03d seconds ago\n", secs, mics/1000);
+printf("library started %d.%03d seconds ago", secs, mics/1000);
 ...
 D*/
 
@@ -3548,7 +3576,7 @@ endTick = gpioTick();
 
 diffTick = endTick - startTick;
 
-printf("some processing took %d microseconds\n", diffTick);
+printf("some processing took %d microseconds", diffTick);
 ...
 D*/
 
@@ -3564,7 +3592,7 @@ number the function returns 0.
 The hardware revision is the last few characters on the Revision line of
 /proc/cpuinfo.
 
-The revision number can be used to determine the assignment of gpios
+The revision number can be used to determine the assignment of GPIO
 to pins (see [*gpio*]).
 
 There are at least three types of board.
@@ -3591,7 +3619,7 @@ D*/
 /*F*/
 int gpioCfgBufferSize(unsigned cfgMillis);
 /*D
-Configures pigpio to buffer cfgMillis milliseconds of gpio samples.
+Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
 
 . .
 cfgMillis: 100-10000
@@ -3689,15 +3717,15 @@ D*/
 int gpioCfgPermissions(uint64_t updateMask);
 /*D
 Configures pigpio to only allow updates (writes or mode changes) for the
-gpios specified by the mask.
+GPIO specified by the mask.
 
 . .
-updateMask: bit (1<<n) is set for each gpio n which may be updated
+updateMask: bit (1<<n) is set for each GPIO n which may be updated
 . .
 
 The default setting depends upon the board revision (Type 1, 2, or 3).
-The user gpios are added to the mask.  If the board revision is not
-recognised then gpios 0-31 are allowed.
+The user GPIO are added to the mask.  If the board revision is not
+recognised then GPIO 0-31 are allowed.
 
 Unknown board @ PI_DEFAULT_UPDATE_MASK_R0 @ 0xFFFFFFFF 
 Type 1 board  @ PI_DEFAULT_UPDATE_MASK_R1 @ 0x03E6CF93 
@@ -3846,7 +3874,7 @@ existing waveform (if any).
 . .
         spi: a pointer to a spi object
      offset: microseconds from the start of the waveform
-      spiSS: the slave select gpio
+      spiSS: the slave select GPIO
         buf: the bits to transmit, most significant bit first
   spiTxBits: the number of bits to write
 spiBitFirst: the first bit to read
@@ -3880,7 +3908,7 @@ The pulses are interleaved in time order within the existing waveform
 (if any).
 
 Merging allows the waveform to be built in parts, that is the settings
-for gpio#1 can be added, and then gpio#2 etc.
+for GPIO#1 can be added, and then GPIO#2 etc.
 
 If the added waveform is intended to start after or within the existing
 waveform then the first pulse should consist of a delay.
@@ -4080,7 +4108,7 @@ A bit position within a byte or word.  The least significant bit is
 position 0.
 
 bits::
-A value used to select gpios.  If bit n of bits is set then gpio n is
+A value used to select GPIO.  If bit n of bits is set then GPIO n is
 selected.
 
 A convenient way to set bit n is to or in (1<<n).
@@ -4105,7 +4133,7 @@ A number identifying a DMA contol block.
 
 cfgMicros::
 
-The gpio sample rate in microseconds.  The default is 5us, or 200 thousand
+The GPIO sample rate in microseconds.  The default is 5us, or 200 thousand
 samples per second.
 
 cfgMillis:: 100-10000
@@ -4180,7 +4208,7 @@ The number may vary between 0 and range (default 255) where
 0 is off and range is fully on.
 
 edge::0-2
-The type of gpio edge to generate an intrrupt.  See[*gpioSetISRFunc*],
+The type of GPIO edge to generate an intrrupt.  See[*gpioSetISRFunc*],
 and [*gpioSetISRFuncEx*].
 
 . .
@@ -4195,28 +4223,28 @@ A function.
 
 frequency::0-
 
-The number of times a gpio is swiched on and off per second.  This
-can be set per gpio and may be as little as 5Hz or as much as
-40KHz.  The gpio will be on for a proportion of the time as defined
+The number of times a GPIO is swiched on and off per second.  This
+can be set per GPIO and may be as little as 5Hz or as much as
+40KHz.  The GPIO will be on for a proportion of the time as defined
 by its dutycycle.
 
 gpio::
 
-A Broadcom numbered gpio, in the range 0-53.
+A Broadcom numbered GPIO, in the range 0-53.
 
-There  are 54 General Purpose Input Outputs (gpios) named gpio0 through
+There  are 54 General Purpose Input Outputs (GPIO) named gpio0 through
 gpio53.
 
 They are split into two  banks.   Bank  1  consists  of  gpio0  through
 gpio31.  Bank 2 consists of gpio32 through gpio53.
 
-All the gpios which are safe for the user to read and write are in
-bank 1.  Not all gpios in bank 1 are safe though.  Type 1 boards
-have 17  safe gpios.  Type 2 boards have 21.  Type 3 boards have 26.
+All the GPIO which are safe for the user to read and write are in
+bank 1.  Not all GPIO in bank 1 are safe though.  Type 1 boards
+have 17  safe GPIO.  Type 2 boards have 21.  Type 3 boards have 26.
 
 See [*gpioHardwareRevision*].
 
-The user gpios are marked with an X in the following table.
+The user GPIO are marked with an X in the following table.
 
 . .
           0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
@@ -4374,7 +4402,7 @@ invert::
 A flag used to set normal or inverted bit bang serial data level logic.
 
 level::
-The level of a gpio.  Low or High.
+The level of a GPIO.  Low or High.
 
 . .
 PI_OFF 0
@@ -4387,7 +4415,7 @@ PI_LOW 0
 PI_HIGH 1
 . .
 
-There is one exception.  If a watchdog expires on a gpio the level will be
+There is one exception.  If a watchdog expires on a GPIO the level will be
 reported as PI_TIMEOUT.  See [*gpioSetWatchdog*].
 
 . .
@@ -4423,7 +4451,7 @@ A value representing milliseconds.
 
 mode::0-7
 
-The operational mode of a gpio, normally INPUT or OUTPUT.
+The operational mode of a GPIO, normally INPUT or OUTPUT.
 
 . .
 PI_INPUT 0
@@ -4485,7 +4513,7 @@ pos::
 The position of an item.
 
 primaryChannel:: 0-14
-The DMA channel used to time the sampling of gpios and to time servo and
+The DMA channel used to time the sampling of GPIO and to time servo and
 PWM pulses.
 
 *pth::
@@ -4498,7 +4526,7 @@ A thread identifier.
 
 pud::0-2
 
-The setting of the pull up/down resistor for a gpio, which may be off,
+The setting of the pull up/down resistor for a GPIO, which may be off,
 pull-up, or pull-down.
 . .
 PI_PUD_OFF 0
@@ -4560,9 +4588,9 @@ rawSPI_t::
 . .
 typedef struct
 {
-   int clk;     // gpio for clock
-   int mosi;    // gpio for MOSI
-   int miso;    // gpio for MISO
+   int clk;     // GPIO for clock
+   int mosi;    // GPIO for MOSI
+   int miso;    // GPIO for MISO
    int ss_pol;  // slave select off state
    int ss_us;   // delay after slave select
    int clk_pol; // clock off state
@@ -4590,6 +4618,10 @@ typedef struct
    uint16_t topCB;  // last CB used by wave
    uint16_t botOOL; // last OOL used by wave
    uint16_t topOOL; // first OOL used by wave
+   uint16_t deleted;
+   uint16_t numCB;
+   uint16_t numBOOL;
+   uint16_t numTOOL;
 } rawWaveInfo_t;
 . .
 
@@ -4607,7 +4639,7 @@ A pointer to a buffer to receive data.
 
 SCL::
 
-The user gpio to use for the clock when bit banging I2C.
+The user GPIO to use for the clock when bit banging I2C.
 
 *script::
 
@@ -4619,7 +4651,7 @@ An id of a stored script as returned by [*gpioStoreScript*].
 
 SDA::
 
-The user gpio to use for data when bit banging I2C.
+The user GPIO to use for data when bit banging I2C.
 
 secondaryChannel:: 0-6
 
@@ -4661,11 +4693,11 @@ A standard type used to indicate the size of an object in bytes.
 A pointer to a [*rawSPI_t*] structure.
 
 spiBitFirst::
-Gpio reads are made from spiBitFirst to spiBitLast.
+GPIO reads are made from spiBitFirst to spiBitLast.
 
 spiBitLast::
 
-Gpio reads are made from spiBitFirst to spiBitLast.
+GPIO reads are made from spiBitFirst to spiBitLast.
 
 spiBits::
 The number of bits to transfer in a raw SPI transaction.
@@ -4677,7 +4709,7 @@ spiFlags::
 See [*spiOpen*].
 
 spiSS::
-The SPI slave select gpio in a raw SPI transaction.
+The SPI slave select GPIO in a raw SPI transaction.
 
 spiTxBits::
 The number of bits to transfer dring a raw SPI transaction
@@ -4701,7 +4733,7 @@ PI_MAX_WAVE_HALFSTOPBITS 8
 An array of characters.
 
 timeout::
-A gpio level change timeout in milliseconds.
+A GPIO level change timeout in milliseconds.
 
 [*gpioSetWatchdog*]
 . .
@@ -4745,13 +4777,13 @@ A whole number >= 0.
 
 updateMask::
 
-A 64 bit mask indicating which gpios may be written to by the user.
+A 64 bit mask indicating which GPIO may be written to by the user.
 
-If gpio#n may be written then bit (1<<n) is set.
+If GPIO#n may be written then bit (1<<n) is set.
 
 user_gpio::
 
-0-31, a Broadcom numbered gpio.
+0-31, a Broadcom numbered GPIO.
 
 See [*gpio*].
 
@@ -4923,6 +4955,7 @@ PARAMS*/
 #define PI_CMD_NOIB  99
 
 #define PI_CMD_WVTXM 100
+#define PI_CMD_WVTAT 101
 
 /*DEF_E*/
 
@@ -4986,8 +5019,8 @@ after this command is issued.
 /*DEF_S Error Codes*/
 
 #define PI_INIT_FAILED       -1 // gpioInitialise failed
-#define PI_BAD_USER_GPIO     -2 // gpio not 0-31
-#define PI_BAD_GPIO          -3 // gpio not 0-53
+#define PI_BAD_USER_GPIO     -2 // GPIO not 0-31
+#define PI_BAD_GPIO          -3 // GPIO not 0-53
 #define PI_BAD_MODE          -4 // mode not 0-7
 #define PI_BAD_LEVEL         -5 // level not 0-1
 #define PI_BAD_PUD           -6 // pud not 0-2
@@ -5024,11 +5057,11 @@ after this command is issued.
 #define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
 #define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses
 #define PI_TOO_MANY_CHARS   -37 // waveform has too many chars
-#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read in progress on gpio
+#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read in progress on GPIO
 #define PI_BAD_SERIAL_STRUC -39 // bad (null) serial structure parameter
 #define PI_BAD_SERIAL_BUF   -40 // bad (null) serial buf parameter
-#define PI_NOT_PERMITTED    -41 // gpio operation not permitted
-#define PI_SOME_PERMITTED   -42 // one or more gpios not permitted
+#define PI_NOT_PERMITTED    -41 // GPIO operation not permitted
+#define PI_SOME_PERMITTED   -42 // one or more GPIO not permitted
 #define PI_BAD_WVSC_COMMND  -43 // bad WVSC subcommand
 #define PI_BAD_WVSM_COMMND  -44 // bad WVSM subcommand
 #define PI_BAD_WVSP_COMMND  -45 // bad WVSP subcommand
@@ -5036,7 +5069,7 @@ after this command is issued.
 #define PI_BAD_SCRIPT       -47 // invalid script
 #define PI_BAD_SCRIPT_ID    -48 // unknown script id
 #define PI_BAD_SER_OFFSET   -49 // add serial data offset > 30 minutes
-#define PI_GPIO_IN_USE      -50 // gpio already in use
+#define PI_GPIO_IN_USE      -50 // GPIO already in use
 #define PI_BAD_SERIAL_COUNT -51 // must read at least a byte at a time
 #define PI_BAD_PARAM_NUM    -52 // script parameter id not 0-9
 #define PI_DUP_TAG          -53 // script has duplicate tag
@@ -5077,11 +5110,11 @@ after this command is issued.
 #define PI_UNKNOWN_COMMAND  -88 // unknown command
 #define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
 #define PI_BAD_POINTER      -90 // bad (NULL) pointer
-#define PI_NO_AUX_SPI       -91 // need a A+/B+/Pi2/Zero for auxiliary SPI
-#define PI_NOT_PWM_GPIO     -92 // gpio is not in use for PWM
-#define PI_NOT_SERVO_GPIO   -93 // gpio is not in use for servo pulses
-#define PI_NOT_HCLK_GPIO    -94 // gpio has no hardware clock
-#define PI_NOT_HPWM_GPIO    -95 // gpio has no hardware PWM
+#define PI_NO_AUX_SPI       -91 // no auxiliary SPI on Pi A or B
+#define PI_NOT_PWM_GPIO     -92 // GPIO is not in use for PWM
+#define PI_NOT_SERVO_GPIO   -93 // GPIO is not in use for servo pulses
+#define PI_NOT_HCLK_GPIO    -94 // GPIO has no hardware clock
+#define PI_NOT_HPWM_GPIO    -95 // GPIO has no hardware PWM
 #define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 1-125M
 #define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
 #define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-250M
@@ -5094,7 +5127,7 @@ after this command is issued.
 #define PI_TOO_MANY_SEGS   -105 // too many I2C transaction segments
 #define PI_BAD_I2C_SEG     -106 // an I2C transaction segment failed
 #define PI_BAD_SMBUS_CMD   -107 // SMBus command not supported by driver
-#define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on gpio
+#define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on GPIO
 #define PI_BAD_I2C_WLEN    -109 // bad I2C write length
 #define PI_BAD_I2C_RLEN    -110 // bad I2C read length
 #define PI_BAD_I2C_CMD     -111 // bad I2C command

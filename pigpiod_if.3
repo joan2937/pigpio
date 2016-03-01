@@ -27,7 +27,7 @@ USE THE MORE VERSATILE pigpiod_if2 LIBRARY.
 
 .br
 pigpiod_if is a C library for the Raspberry which allows control
-of the gpios via the socket interface to the pigpio daemon.
+of the GPIO via the socket interface to the pigpio daemon.
 .br
 
 .br
@@ -37,17 +37,17 @@ of the gpios via the socket interface to the pigpio daemon.
 .br
 
 .br
-o PWM on any of gpios 0-31
+o PWM on any of GPIO 0-31
 
 .br
 
 .br
-o servo pulses on any of gpios 0-31
+o servo pulses on any of GPIO 0-31
 
 .br
 
 .br
-o callbacks when any of gpios 0-31 change state
+o callbacks when any of GPIO 0-31 change state
 
 .br
 
@@ -57,17 +57,17 @@ o callbacks at timed intervals
 .br
 
 .br
-o reading/writing all of the gpios in a bank as one operation
+o reading/writing all of the GPIO in a bank as one operation
 
 .br
 
 .br
-o individually setting gpio modes, reading and writing
+o individually setting GPIO modes, reading and writing
 
 .br
 
 .br
-o notifications when any of gpios 0-31 change state
+o notifications when any of GPIO 0-31 change state
 
 .br
 
@@ -77,7 +77,7 @@ o the construction of output waveforms with microsecond timing
 .br
 
 .br
-o rudimentary permission control over gpios
+o rudimentary permission control over GPIO
 
 .br
 
@@ -97,11 +97,11 @@ o creating and running scripts on the pigpio daemon
 .br
 
 .br
-.SS gpios
+.SS GPIO
 .br
 
 .br
-ALL gpios are identified by their Broadcom number.
+ALL GPIO are identified by their Broadcom number.
 
 .br
 
@@ -304,7 +304,7 @@ resources used by the library.
 
 .IP "\fBint set_mode(unsigned gpio, unsigned mode)\fP"
 .IP "" 4
-Set the gpio mode.
+Set the GPIO mode.
 
 .br
 
@@ -328,7 +328,7 @@ or PI_NOT_PERMITTED.
 
 .IP "\fBint get_mode(unsigned gpio)\fP"
 .IP "" 4
-Get the gpio mode.
+Get the GPIO mode.
 
 .br
 
@@ -343,11 +343,11 @@ gpio: 0-53.
 .br
 
 .br
-Returns the gpio mode if OK, otherwise PI_BAD_GPIO.
+Returns the GPIO mode if OK, otherwise PI_BAD_GPIO.
 
 .IP "\fBint set_pull_up_down(unsigned gpio, unsigned pud)\fP"
 .IP "" 4
-Set or clear the gpio pull-up/down resistor.
+Set or clear the GPIO pull-up/down resistor.
 
 .br
 
@@ -369,7 +369,7 @@ or PI_NOT_PERMITTED.
 
 .IP "\fBint gpio_read(unsigned gpio)\fP"
 .IP "" 4
-Read the gpio level.
+Read the GPIO level.
 
 .br
 
@@ -384,11 +384,11 @@ gpio:0-53.
 .br
 
 .br
-Returns the gpio level if OK, otherwise PI_BAD_GPIO.
+Returns the GPIO level if OK, otherwise PI_BAD_GPIO.
 
 .IP "\fBint gpio_write(unsigned gpio, unsigned level)\fP"
 .IP "" 4
-Write the gpio level.
+Write the GPIO level.
 
 .br
 
@@ -416,11 +416,11 @@ Notes
 .br
 
 .br
-If PWM or servo pulses are active on the gpio they are switched off.
+If PWM or servo pulses are active on the GPIO they are switched off.
 
 .IP "\fBint set_PWM_dutycycle(unsigned user_gpio, unsigned dutycycle)\fP"
 .IP "" 4
-Start (non-zero dutycycle) or stop (0) PWM pulses on the gpio.
+Start (non-zero dutycycle) or stop (0) PWM pulses on the GPIO.
 
 .br
 
@@ -449,7 +449,7 @@ default range of 255.
 
 .IP "\fBint get_PWM_dutycycle(unsigned user_gpio)\fP"
 .IP "" 4
-Return the PWM dutycycle in use on a gpio.
+Return the PWM dutycycle in use on a GPIO.
 
 .br
 
@@ -470,23 +470,23 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 .br
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see \fBget_PWM_range\fP).
+for the GPIO (see \fBget_PWM_range\fP).
 
 .br
 
 .br
-If a hardware clock is active on the gpio the reported dutycycle
+If a hardware clock is active on the GPIO the reported dutycycle
 will be 500000 (500k) out of 1000000 (1M).
 
 .br
 
 .br
-If hardware PWM is active on the gpio the reported dutycycle
+If hardware PWM is active on the GPIO the reported dutycycle
 will be out of a 1000000 (1M).
 
 .IP "\fBint set_PWM_range(unsigned user_gpio, unsigned range)\fP"
 .IP "" 4
-Set the range of PWM values to be used on the gpio.
+Set the range of PWM values to be used on the GPIO.
 
 .br
 
@@ -514,14 +514,14 @@ Notes
 .br
 
 .br
-If PWM is currently active on the gpio its dutycycle will be
+If PWM is currently active on the GPIO its dutycycle will be
 scaled to reflect the new range.
 
 .br
 
 .br
 The real range, the number of steps between fully off and fully on
-for each of the 18 available gpio frequencies is
+for each of the 18 available GPIO frequencies is
 
 .br
 
@@ -544,7 +544,7 @@ The real value set by set_PWM_range is (dutycycle * real range) / range.
 
 .IP "\fBint get_PWM_range(unsigned user_gpio)\fP"
 .IP "" 4
-Get the range of PWM values being used on the gpio.
+Get the range of PWM values being used on the GPIO.
 
 .br
 
@@ -559,18 +559,18 @@ user_gpio: 0-31.
 .br
 
 .br
-Returns the dutycycle range used for the gpio if OK,
+Returns the dutycycle range used for the GPIO if OK,
 otherwise PI_BAD_USER_GPIO.
 
 .br
 
 .br
-If a hardware clock or hardware PWM is active on the gpio the
+If a hardware clock or hardware PWM is active on the GPIO the
 reported range will be 1000000 (1M).
 
 .IP "\fBint get_PWM_real_range(unsigned user_gpio)\fP"
 .IP "" 4
-Get the real underlying range of PWM values being used on the gpio.
+Get the real underlying range of PWM values being used on the GPIO.
 
 .br
 
@@ -585,19 +585,19 @@ user_gpio: 0-31.
 .br
 
 .br
-Returns the real range used for the gpio if OK,
+Returns the real range used for the GPIO if OK,
 otherwise PI_BAD_USER_GPIO.
 
 .br
 
 .br
-If a hardware clock is active on the gpio the reported
+If a hardware clock is active on the GPIO the reported
 real range will be 1000000 (1M).
 
 .br
 
 .br
-If hardware PWM is active on the gpio the reported real range
+If hardware PWM is active on the GPIO the reported real range
 will be approximately 250M divided by the set PWM frequency.
 
 .br
@@ -606,7 +606,7 @@ will be approximately 250M divided by the set PWM frequency.
 
 .IP "\fBint set_PWM_frequency(unsigned user_gpio, unsigned frequency)\fP"
 .IP "" 4
-Set the frequency (in Hz) of the PWM to be used on the gpio.
+Set the frequency (in Hz) of the PWM to be used on the GPIO.
 
 .br
 
@@ -636,13 +636,13 @@ sample rate is set when the C pigpio library is started.
 .br
 
 .br
-Each gpio can be independently set to one of 18 different
+Each GPIO can be independently set to one of 18 different
 PWM frequencies.
 
 .br
 
 .br
-If PWM is currently active on the gpio it will be switched
+If PWM is currently active on the GPIO it will be switched
 off and then back on at the new frequency.
 
 .br
@@ -689,7 +689,7 @@ off and then back on at the new frequency.
 
 .IP "\fBint get_PWM_frequency(unsigned user_gpio)\fP"
 .IP "" 4
-Get the frequency of PWM being used on the gpio.
+Get the frequency of PWM being used on the GPIO.
 
 .br
 
@@ -704,30 +704,30 @@ user_gpio: 0-31.
 .br
 
 .br
-For normal PWM the frequency will be that defined for the gpio by
+For normal PWM the frequency will be that defined for the GPIO by
 \fBset_PWM_frequency\fP.
 
 .br
 
 .br
-If a hardware clock is active on the gpio the reported frequency
+If a hardware clock is active on the GPIO the reported frequency
 will be that set by \fBhardware_clock\fP.
 
 .br
 
 .br
-If hardware PWM is active on the gpio the reported frequency
+If hardware PWM is active on the GPIO the reported frequency
 will be that set by \fBhardware_PWM\fP.
 
 .br
 
 .br
-Returns the frequency (in hertz) used for the gpio if OK,
+Returns the frequency (in hertz) used for the GPIO if OK,
 otherwise PI_BAD_USER_GPIO.
 
 .IP "\fBint set_servo_pulsewidth(unsigned user_gpio, unsigned pulsewidth)\fP"
 .IP "" 4
-Start (500-2500) or stop (0) servo pulses on the gpio.
+Start (500-2500) or stop (0) servo pulses on the GPIO.
 
 .br
 
@@ -803,7 +803,7 @@ the servo pulsewidth.
 .br
 
 .br
-E.g. If you want to update a servo connected to gpio 25 at 400Hz
+E.g. If you want to update a servo connected to GPIO 25 at 400Hz
 
 .br
 
@@ -826,7 +826,7 @@ e.g. set_PWM_dutycycle(25, 1500) will set a 1500 us pulse.
 
 .IP "\fBint get_servo_pulsewidth(unsigned user_gpio)\fP"
 .IP "" 4
-Return the servo pulsewidth in use on a gpio.
+Return the servo pulsewidth in use on a GPIO.
 
 .br
 
@@ -856,7 +856,7 @@ otherwise PI_NO_HANDLE.
 .br
 
 .br
-A notification is a method for being notified of gpio state
+A notification is a method for being notified of GPIO state
 changes via a pipe.
 
 .br
@@ -886,7 +886,7 @@ Start notifications on a previously opened handle.
 .EX
 handle: 0-31 (as returned by \fBnotify_open\fP)
 .br
-  bits: a mask indicating the gpios to be notified.
+  bits: a mask indicating the GPIO to be notified.
 .br
 
 .EE
@@ -899,7 +899,7 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE.
 .br
 
 .br
-The notification sends state changes for each gpio whose
+The notification sends state changes for each GPIO whose
 corresponding bit in bits is set.
 
 .br
@@ -975,7 +975,7 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE.
 
 .IP "\fBint set_watchdog(unsigned user_gpio, unsigned timeout)\fP"
 .IP "" 4
-Sets a watchdog for a gpio.
+Sets a watchdog for a GPIO.
 
 .br
 
@@ -1003,7 +1003,7 @@ The watchdog is nominally in milliseconds.
 .br
 
 .br
-Only one watchdog may be registered per gpio.
+Only one watchdog may be registered per GPIO.
 
 .br
 
@@ -1013,24 +1013,24 @@ The watchdog may be cancelled by setting timeout to 0.
 .br
 
 .br
-If no level change has been detected for the gpio for timeout
-milliseconds any notification for the gpio has a report written
+If no level change has been detected for the GPIO for timeout
+milliseconds any notification for the GPIO has a report written
 to the fifo with the flags set to indicate a watchdog timeout.
 
 .br
 
 .br
 The \fBcallback\fP and \fBcallback_ex\fP functions interpret the flags
-and will call registered callbacks for the gpio with level TIMEOUT.
+and will call registered callbacks for the GPIO with level TIMEOUT.
 
 .IP "\fBint set_glitch_filter(unsigned user_gpio, unsigned steady)\fP"
 .IP "" 4
-Sets a glitch filter on a gpio.
+Sets a glitch filter on a GPIO.
 
 .br
 
 .br
-Level changes on the gpio are not reported unless the level
+Level changes on the GPIO are not reported unless the level
 has been stable for at least \fBsteady\fP microseconds.  The
 level is then reported.  Level changes of less than \fBsteady\fP
 microseconds are ignored.
@@ -1060,14 +1060,14 @@ after it was first detected.
 
 .IP "\fBint set_noise_filter(unsigned user_gpio, unsigned steady, unsigned active)\fP"
 .IP "" 4
-Sets a noise filter on a gpio.
+Sets a noise filter on a GPIO.
 
 .br
 
 .br
-Level changes on the gpio are ignored until a level which has
+Level changes on the GPIO are ignored until a level which has
 been stable for \fBsteady\fP microseconds is detected.  Level changes
-on the gpio are then reported for \fBactive\fP microseconds after
+on the GPIO are then reported for \fBactive\fP microseconds after
 which the process repeats.
 
 .br
@@ -1098,34 +1098,34 @@ such reports.
 
 .IP "\fBuint32_t read_bank_1(void)\fP"
 .IP "" 4
-Read the levels of the bank 1 gpios (gpios 0-31).
+Read the levels of the bank 1 GPIO (GPIO 0-31).
 
 .br
 
 .br
 The returned 32 bit integer has a bit set if the corresponding
-gpio is logic 1.  Gpio n has bit value (1<<n).
+GPIO is logic 1.  GPIO n has bit value (1<<n).
 
 .IP "\fBuint32_t read_bank_2(void)\fP"
 .IP "" 4
-Read the levels of the bank 2 gpios (gpios 32-53).
+Read the levels of the bank 2 GPIO (GPIO 32-53).
 
 .br
 
 .br
 The returned 32 bit integer has a bit set if the corresponding
-gpio is logic 1.  Gpio n has bit value (1<<(n-32)).
+GPIO is logic 1.  GPIO n has bit value (1<<(n-32)).
 
 .IP "\fBint clear_bank_1(uint32_t bits)\fP"
 .IP "" 4
-Clears gpios 0-31 if the corresponding bit in bits is set.
+Clears GPIO 0-31 if the corresponding bit in bits is set.
 
 .br
 
 .br
 
 .EX
-bits: a bit mask with 1 set if the corresponding gpio is
+bits: a bit mask with 1 set if the corresponding GPIO is
 .br
       to be cleared.
 .br
@@ -1141,18 +1141,18 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 
 .br
 A status of PI_SOME_PERMITTED indicates that the user is not
-allowed to write to one or more of the gpios.
+allowed to write to one or more of the GPIO.
 
 .IP "\fBint clear_bank_2(uint32_t bits)\fP"
 .IP "" 4
-Clears gpios 32-53 if the corresponding bit (0-21) in bits is set.
+Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 .br
 
 .br
 
 .EX
-bits: a bit mask with 1 set if the corresponding gpio is
+bits: a bit mask with 1 set if the corresponding GPIO is
 .br
       to be cleared.
 .br
@@ -1168,18 +1168,18 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 
 .br
 A status of PI_SOME_PERMITTED indicates that the user is not
-allowed to write to one or more of the gpios.
+allowed to write to one or more of the GPIO.
 
 .IP "\fBint set_bank_1(uint32_t bits)\fP"
 .IP "" 4
-Sets gpios 0-31 if the corresponding bit in bits is set.
+Sets GPIO 0-31 if the corresponding bit in bits is set.
 
 .br
 
 .br
 
 .EX
-bits: a bit mask with 1 set if the corresponding gpio is
+bits: a bit mask with 1 set if the corresponding GPIO is
 .br
       to be set.
 .br
@@ -1195,18 +1195,18 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 
 .br
 A status of PI_SOME_PERMITTED indicates that the user is not
-allowed to write to one or more of the gpios.
+allowed to write to one or more of the GPIO.
 
 .IP "\fBint set_bank_2(uint32_t bits)\fP"
 .IP "" 4
-Sets gpios 32-53 if the corresponding bit (0-21) in bits is set.
+Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 .br
 
 .br
 
 .EX
-bits: a bit mask with 1 set if the corresponding gpio is
+bits: a bit mask with 1 set if the corresponding GPIO is
 .br
       to be set.
 .br
@@ -1222,11 +1222,11 @@ Returns 0 if OK, otherwise PI_SOME_PERMITTED.
 
 .br
 A status of PI_SOME_PERMITTED indicates that the user is not
-allowed to write to one or more of the gpios.
+allowed to write to one or more of the GPIO.
 
 .IP "\fBint hardware_clock(unsigned gpio, unsigned clkfreq)\fP"
 .IP "" 4
-Starts a hardware clock on a gpio at the specified frequency.
+Starts a hardware clock on a GPIO at the specified frequency.
 Frequencies above 30MHz are unlikely to work.
 
 .br
@@ -1250,13 +1250,13 @@ PI_NOT_HCLK_GPIO, PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
 .br
 
 .br
-The same clock is available on multiple gpios.  The latest
-frequency setting will be used by all gpios which share a clock.
+The same clock is available on multiple GPIO.  The latest
+frequency setting will be used by all GPIO which share a clock.
 
 .br
 
 .br
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 .br
 
@@ -1265,13 +1265,13 @@ The gpio must be one of the following.
 .EX
 4   clock 0  All models
 .br
-5   clock 1  A+/B+/Pi2 and compute module only (reserved for system use)
+5   clock 1  All models but A and B (reserved for system use)
 .br
-6   clock 2  A+/B+/Pi2 and compute module only
+6   clock 2  All models but A and B
 .br
-20  clock 0  A+/B+/Pi2 and compute module only
+20  clock 0  All models but A and B
 .br
-21  clock 1  All models but Rev.2 B (reserved for system use)
+21  clock 1  All models but A and Rev.2 B (reserved for system use)
 .br
 
 .br
@@ -1293,11 +1293,11 @@ The gpio must be one of the following.
 .br
 Access to clock 1 is protected by a password as its use will likely
 crash the Pi.  The password is given by or'ing 0x5A000000 with the
-gpio number.
+GPIO number.
 
 .IP "\fBint hardware_PWM(unsigned gpio, unsigned PWMfreq, uint32_t PWMduty)\fP"
 .IP "" 4
-Starts hardware PWM on a gpio at the specified frequency and dutycycle.
+Starts hardware PWM on a GPIO at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
 
 .br
@@ -1337,27 +1337,27 @@ or PI_HPWM_ILLEGAL.
 .br
 
 .br
-The same PWM channel is available on multiple gpios.  The latest
-frequency and dutycycle setting will be used by all gpios which
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
 share a PWM channel.
 
 .br
 
 .br
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 .br
 
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2 and compute module only
+12  PWM channel 0  All models but A and B
 .br
-13  PWM channel 1  A+/B+/Pi2 and compute module only
+13  PWM channel 1  All models but A and B
 .br
 18  PWM channel 0  All models
 .br
-19  PWM channel 1  A+/B+/Pi2 and compute module only
+19  PWM channel 1  All models but A and B
 .br
 
 .br
@@ -1412,7 +1412,7 @@ hexadecimal number the function returns 0.
 .br
 
 .br
-The revision number can be used to determine the assignment of gpios
+The revision number can be used to determine the assignment of GPIO
 to pins (see \fBgpio\fP).
 
 .br
@@ -1492,7 +1492,7 @@ The pulses are interleaved in time order within the existing waveform
 
 .br
 Merging allows the waveform to be built in parts, that is the settings
-for gpio#1 can be added, and then gpio#2 etc.
+for GPIO#1 can be added, and then GPIO#2 etc.
 
 .br
 
@@ -1655,9 +1655,9 @@ The fields specify
 .br
 
 .br
-1) the gpios to be switched on at the start of the pulse.
+1) the GPIO to be switched on at the start of the pulse.
 .br
-2) the gpios to be switched off at the start of the pulse.
+2) the GPIO to be switched off at the start of the pulse.
 .br
 3) the delay in microseconds before the next pulse.
 .br
@@ -2020,7 +2020,7 @@ control blocks.
 
 .IP "\fBint gpio_trigger(unsigned user_gpio, unsigned pulseLen, unsigned level)\fP"
 .IP "" 4
-This function sends a trigger pulse to a gpio.  The gpio is set to
+This function sends a trigger pulse to a GPIO.  The GPIO is set to
 level for pulseLen microseconds and then reset to not level.
 
 .br
@@ -2184,7 +2184,7 @@ The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 
 .IP "\fBint bb_serial_read_open(unsigned user_gpio, unsigned baud, unsigned data_bits)\fP"
 .IP "" 4
-This function opens a gpio for bit bang reading of serial data.
+This function opens a GPIO for bit bang reading of serial data.
 
 .br
 
@@ -2260,7 +2260,7 @@ For \fBdata_bits\fP 17-32 there will be four bytes per character.
 
 .IP "\fBint bb_serial_read_close(unsigned user_gpio)\fP"
 .IP "" 4
-This function closes a gpio for bit bang reading of serial data.
+This function closes a GPIO for bit bang reading of serial data.
 
 .br
 
@@ -3036,7 +3036,7 @@ End
 
 .IP "\fBint bb_i2c_open(unsigned SDA, unsigned SCL, unsigned baud)\fP"
 .IP "" 4
-This function selects a pair of gpios for bit banging I2C at a
+This function selects a pair of GPIO for bit banging I2C at a
 specified baud rate.
 
 .br
@@ -3054,7 +3054,7 @@ o repeated starts
 .br
 o clock stretching
 .br
-o I2C on any pair of spare gpios
+o I2C on any pair of spare GPIO
 
 .br
 
@@ -3084,12 +3084,12 @@ NOTE:
 .br
 
 .br
-The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
+The GPIO used for SDA and SCL must have pull-ups to 3V3 connected.  As
 a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
 
 .IP "\fBint bb_i2c_close(unsigned SDA)\fP"
 .IP "" 4
-This function stops bit banging I2C on a pair of gpios previously
+This function stops bit banging I2C on a pair of GPIO previously
 opened with \fBbb_i2c_open\fP.
 
 .br
@@ -3097,7 +3097,7 @@ opened with \fBbb_i2c_open\fP.
 .br
 
 .EX
-SDA: 0-31, the SDA gpio used in a prior call to \fBbb_i2c_open\fP
+SDA: 0-31, the SDA GPIO used in a prior call to \fBbb_i2c_open\fP
 .br
 
 .EE
@@ -3255,16 +3255,17 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2 and may be
-selected by setting the A bit in the flags.  The auxiliary
-device has 3 chip selects and a selectable word size in bits.
+An auxiliary SPI device is available on all models but the
+A and B and may be selected by setting the A bit in the
+flags.  The auxiliary device has 3 chip selects and a
+selectable word size in bits.
 
 .br
 
 .br
 
 .EX
-spi_channel: 0-1 (0-2 for A+/B+/Pi2 auxiliary device).
+spi_channel: 0-1 (0-2 for the auxiliary SPI device).
 .br
        baud: 32K-125M (values above 30M are unlikely to work).
 .br
@@ -3332,13 +3333,12 @@ px is 0 if CEx is active low (default) and 1 for active high.
 .br
 
 .br
-ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
 .br
 
 .br
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2.
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.
 
 .br
 
@@ -3738,8 +3738,8 @@ pigif_duplicate_callback, or pigif_bad_callback.
 .br
 
 .br
-The callback is called with the gpio, edge, and tick, whenever the
-gpio has the identified edge.
+The callback is called with the GPIO, edge, and tick, whenever the
+GPIO has the identified edge.
 
 .IP "\fBint callback_ex(unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *userdata)\fP"
 .IP "" 4
@@ -3770,8 +3770,8 @@ pigif_duplicate_callback, or pigif_bad_callback.
 .br
 
 .br
-The callback is called with the gpio, edge, tick, and user, whenever
-the gpio has the identified edge.
+The callback is called with the GPIO, edge, tick, and user, whenever
+the GPIO has the identified edge.
 
 .br
 
@@ -3798,7 +3798,7 @@ The function returns 0 if OK, otherwise pigif_callback_not_found.
 
 .IP "\fBint wait_for_edge(unsigned user_gpio, unsigned edge, double timeout)\fP"
 .IP "" 4
-This function waits for edge on the gpio for up to timeout
+This function waits for edge on the GPIO for up to timeout
 seconds.
 
 .br
@@ -3900,7 +3900,7 @@ A value of 0 or 1.
 .br
 
 .IP "\fBbits\fP" 0
-A value used to select gpios.  If bit n of bits is set then gpio n is
+A value used to select GPIO.  If bit n of bits is set then GPIO n is
 selected.
 
 .br
@@ -4040,7 +4040,7 @@ The number may vary between 0 and range (default 255) where
 .br
 
 .IP "\fBedge\fP" 0
-Used to identify a gpio level transition of interest.  A rising edge is
+Used to identify a GPIO level transition of interest.  A rising edge is
 a level change from 0 to 1.  A falling edge is a level change from 1 to 0.
 
 .br
@@ -4077,9 +4077,9 @@ A function.
 .br
 
 .IP "\fBfrequency\fP: 0-" 0
-The number of times a gpio is swiched on and off per second.  This
-can be set per gpio and may be as little as 5Hz or as much as
-40KHz.  The gpio will be on for a proportion of the time as defined
+The number of times a GPIO is swiched on and off per second.  This
+can be set per GPIO and may be as little as 5Hz or as much as
+40KHz.  The GPIO will be on for a proportion of the time as defined
 by its dutycycle.
 
 .br
@@ -4091,12 +4091,12 @@ by its dutycycle.
 .br
 
 .IP "\fBgpio\fP" 0
-A Broadcom numbered gpio, in the range 0-53.
+A Broadcom numbered GPIO, in the range 0-53.
 
 .br
 
 .br
-There  are 54 General Purpose Input Outputs (gpios) named gpio0 through
+There  are 54 General Purpose Input Outputs (GPIO) named gpio0 through
 gpio53.
 
 .br
@@ -4108,9 +4108,9 @@ gpio31.  Bank 2 consists of gpio32 through gpio53.
 .br
 
 .br
-All the gpios which are safe for the user to read and write are in
-bank 1.  Not all gpios in bank 1 are safe though.  Type 1 boards
-have 17  safe gpios.  Type 2 boards have 21.  Type 3 boards have 26.
+All the GPIO which are safe for the user to read and write are in
+bank 1.  Not all GPIO in bank 1 are safe though.  Type 1 boards
+have 17  safe GPIO.  Type 2 boards have 21.  Type 3 boards have 26.
 
 .br
 
@@ -4120,7 +4120,7 @@ See \fBget_hardware_revision\fP.
 .br
 
 .br
-The user gpios are marked with an X in the following table.
+The user GPIO are marked with an X in the following table.
 
 .br
 
@@ -4251,7 +4251,7 @@ A flag used to set normal or inverted bit bang serial data level logic.
 .br
 
 .IP "\fBlevel\fP" 0
-The level of a gpio.  Low or High.
+The level of a GPIO.  Low or High.
 
 .br
 
@@ -4280,7 +4280,7 @@ PI_HIGH 1
 .br
 
 .br
-There is one exception.  If a watchdog expires on a gpio the level will be
+There is one exception.  If a watchdog expires on a GPIO the level will be
 reported as PI_TIMEOUT.  See \fBset_watchdog\fP.
 
 .br
@@ -4298,7 +4298,7 @@ PI_TIMEOUT 2
 .br
 
 .IP "\fBmode\fP: 0-7" 0
-The operational mode of a gpio, normally INPUT or OUTPUT.
+The operational mode of a GPIO, normally INPUT or OUTPUT.
 
 .br
 
@@ -4409,7 +4409,7 @@ A thread identifier.
 .br
 
 .IP "\fBpud\fP: 0-2" 0
-The setting of the pull up/down resistor for a gpio, which may be off,
+The setting of the pull up/down resistor for a GPIO, which may be off,
 pull-up, or pull-down.
 
 .EX
@@ -4533,7 +4533,7 @@ A pointer to a buffer to receive data.
 .br
 
 .IP "\fBSCL\fP" 0
-The user gpio to use for the clock when bit banging I2C.
+The user GPIO to use for the clock when bit banging I2C.
 
 .br
 
@@ -4554,7 +4554,7 @@ An id of a stored script as returned by \fBstore_script\fP.
 .br
 
 .IP "\fBSDA\fP" 0
-The user gpio to use for data when bit banging I2C.
+The user GPIO to use for data when bit banging I2C.
 
 .br
 
@@ -4651,7 +4651,7 @@ thread.
 .br
 
 .IP "\fBtimeout\fP" 0
-A gpio watchdog timeout in milliseconds.
+A GPIO watchdog timeout in milliseconds.
 
 .EX
 PI_MIN_WDOG_TIMEOUT 0
@@ -4687,7 +4687,7 @@ A whole number >= 0.
 .br
 
 .IP "\fBuser_gpio\fP" 0
-0-31, a Broadcom numbered gpio.
+0-31, a Broadcom numbered GPIO.
 
 .br
 

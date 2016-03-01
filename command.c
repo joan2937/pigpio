@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 46+
+This version is for pigpio version 47+
 */
 
 #include <stdio.h>
@@ -172,6 +172,7 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_WVAG,  "WVAG",  192, 2}, // gpioWaveAddGeneric
    {PI_CMD_WVAS,  "WVAS",  196, 2}, // gpioWaveAddSerial
+   {PI_CMD_WVTAT, "WVTAT", 101, 2}, // gpioWaveTxAt
    {PI_CMD_WVBSY, "WVBSY", 101, 2}, // gpioWaveTxBusy
    {PI_CMD_WVCHA, "WVCHA", 197, 0}, // gpioWaveChain
    {PI_CMD_WVCLR, "WVCLR", 101, 0}, // gpioWaveClear
@@ -235,15 +236,15 @@ cmdInfo_t cmdInfo[]=
 
 
 char * cmdUsage = "\n\
-BC1 bits         Clear gpios in bank 1\n\
-BC2 bits         Clear gpios in bank 2\n\
+BC1 bits         Clear GPIO in bank 1\n\
+BC2 bits         Clear GPIO in bank 2\n\
 BI2CC sda        Close bit bang I2C\n\
 BI2CO sda scl baud | Open bit bang I2C\n\
 BI2CZ sda ...    I2C bit bang multiple transactions\n\
-BR1              Read bank 1 gpios\n\
-BR2              Read bank 2 gpios\n\
-BS1 bits         Set gpios in bank 2\n\
-BS2 bits         Set gpios in bank 2\n\
+BR1              Read bank 1 GPIO\n\
+BR2              Read bank 2 GPIO\n\
+BS1 bits         Set GPIO in bank 2\n\
+BS2 bits         Set GPIO in bank 2\n\
 \n\
 CF1 ...          Custom function 1\n\
 CF2 ...          Custom function 2\n\
@@ -251,11 +252,11 @@ CF2 ...          Custom function 2\n\
 CGI              Configuration get internals\n\
 CSI v            Configuration set internals\n\
 \n\
-FG g steady      Set glitch filter on gpio\n\
-FN g steady active | Set noise filter on gpio\n\
+FG g steady      Set glitch filter on GPIO\n\
+FN g steady active | Set noise filter on GPIO\n\
 \n\
-GDC g            Get PWM dutycycle for gpio\n\
-GPW g            Get servo pulsewidth for gpio\n\
+GDC g            Get PWM dutycycle for GPIO\n\
+GPW g            Get servo pulsewidth for GPIO\n\
 \n\
 H/HELP           Display command help\n\
 HC g f           Set hardware clock frequency\n\
@@ -281,8 +282,8 @@ I2CWS h b        SMBus Write Byte: write byte\n\
 I2CWW h r word   SMBus Write Word Data: write word to register\n\
 I2CZ  h ...      I2C multiple transactions\n\
 \n\
-M/MODES g mode   Set gpio mode\n\
-MG/MODEG g       Get gpio mode\n\
+M/MODES g mode   Set GPIO mode\n\
+MG/MODEG g       Get GPIO mode\n\
 MICS n           Delay for microseconds\n\
 MILS n           Delay for milliseconds\n\
 \n\
@@ -291,24 +292,24 @@ NC h             Close notification\n\
 NO               Request a notification\n\
 NP h             Pause notification\n\
 \n\
-P/PWM g v        Set gpio PWM value\n\
+P/PWM g v        Set GPIO PWM value\n\
 PARSE text       Validate script\n\
-PFG g            Get gpio PWM frequency\n\
-PFS g v          Set gpio PWM frequency\n\
+PFG g            Get GPIO PWM frequency\n\
+PFS g v          Set GPIO PWM frequency\n\
 PIGPV            Get pigpio library version\n\
-PRG g            Get gpio PWM range\n\
+PRG g            Get GPIO PWM range\n\
 PROC text        Store script\n\
 PROCD sid        Delete script\n\
 PROCP sid        Get script status and parameters\n\
 PROCR sid ...    Run script\n\
 PROCS sid        Stop script\n\
-PRRG g           Get gpio PWM real range\n\
-PRS g v          Set gpio PWM range\n\
-PUD g pud        Set gpio pull up/down\n\
+PRRG g           Get GPIO PWM real range\n\
+PRS g v          Set GPIO PWM range\n\
+PUD g pud        Set GPIO pull up/down\n\
 \n\
-R/READ g         Read gpio level\n\
+R/READ g         Read GPIO level\n\
 \n\
-S/SERVO g v      Set gpio servo pulsewidth\n\
+S/SERVO g v      Set GPIO servo pulsewidth\n\
 SERC h           Close serial handle\n\
 SERDA h          Check for serial data ready to read\n\
 SERO text baud flags | Open serial device at baud with flags\n\
@@ -316,9 +317,9 @@ SERR h n         Read bytes from serial handle\n\
 SERRB h          Read byte from serial handle\n\
 SERW h ...       Write bytes to serial handle\n\
 SERWB h byte        Write byte to serial handle\n\
-SLR g v          Read bit bang serial data from gpio\n\
-SLRC g           Close gpio for bit bang serial data\n\
-SLRO g baud bitlen | Open gpio for bit bang serial data\n\
+SLR g v          Read bit bang serial data from GPIO\n\
+SLRC g           Close GPIO for bit bang serial data\n\
+SLRO g baud bitlen | Open GPIO for bit bang serial data\n\
 SLRI g invert    Invert serial logic (1 invert, 0 normal)\n\
 SPIC h           SPI close handle\n\
 SPIO channel baud flags | SPI open channel at baud with flags\n\
@@ -327,10 +328,10 @@ SPIW h ...       SPI write bytes to handle\n\
 SPIX h ...       SPI transfer bytes to handle\n\
 \n\
 T/TICK           Get current tick\n\
-TRIG g micros l  Trigger level for micros on gpio\n\
+TRIG g micros l  Trigger level for micros on GPIO\n\
 \n\
-W/WRITE g l      Write level to gpio\n\
-WDOG g millis    Set millisecond watchdog on gpio\n\
+W/WRITE g l      Write level to GPIO\n\
+WDOG g millis    Set millisecond watchdog on GPIO\n\
 WVAG triplets    Wave add generic pulses\n\
 WVAS g baud bitlen stopbits offset ... | Wave add serial data\n\
 WVBSY            Check if wave busy\n\
@@ -345,6 +346,7 @@ WVNEW            Start a new empty wave\n\
 WVSC 0,1,2       Wave get DMA control block stats\n\
 WVSM 0,1,2       Wave get micros stats\n\
 WVSP 0,1,2       Wave get pulses stats\n\
+WVTAT            Returns the current transmitting wave\n\
 WVTX wid         Transmit wave as one-shot\n\
 WVTXM wid wmde   Transmit wave using mode\n\
 WVTXR wid        Transmit wave repeatedly\n\
@@ -364,8 +366,8 @@ typedef struct
 static errInfo_t errInfo[]=
 {
    {PI_INIT_FAILED      , "pigpio initialisation failed"},
-   {PI_BAD_USER_GPIO    , "gpio not 0-31"},
-   {PI_BAD_GPIO         , "gpio not 0-53"},
+   {PI_BAD_USER_GPIO    , "GPIO not 0-31"},
+   {PI_BAD_GPIO         , "GPIO not 0-53"},
    {PI_BAD_MODE         , "mode not 0-7"},
    {PI_BAD_LEVEL        , "level not 0-1"},
    {PI_BAD_PUD          , "pud not 0-2"},
@@ -400,11 +402,11 @@ static errInfo_t errInfo[]=
    {PI_BAD_WAVE_BAUD    , "baud rate not 50-250K(RX)/50-1M(TX)"},
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
-   {PI_NOT_SERIAL_GPIO  , "no bit bang serial read in progress on gpio"},
+   {PI_NOT_SERIAL_GPIO  , "no bit bang serial read in progress on GPIO"},
    {PI_BAD_SERIAL_STRUC , "bad (null) serial structure parameter"},
    {PI_BAD_SERIAL_BUF   , "bad (null) serial buf parameter"}, 
-   {PI_NOT_PERMITTED    , "no permission to update gpio"},
-   {PI_SOME_PERMITTED   , "no permission to update one or more gpios"},
+   {PI_NOT_PERMITTED    , "no permission to update GPIO"},
+   {PI_SOME_PERMITTED   , "no permission to update one or more GPIO"},
    {PI_BAD_WVSC_COMMND  , "bad WVSC subcommand"},
    {PI_BAD_WVSM_COMMND  , "bad WVSM subcommand"},
    {PI_BAD_WVSP_COMMND  , "bad WVSP subcommand"},
@@ -412,7 +414,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_SCRIPT       , "invalid script"},
    {PI_BAD_SCRIPT_ID    , "unknown script id"},
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},
-   {PI_GPIO_IN_USE      , "gpio already in use"},
+   {PI_GPIO_IN_USE      , "GPIO already in use"},
    {PI_BAD_SERIAL_COUNT , "must read at least a byte at a time"},
    {PI_BAD_PARAM_NUM    , "script parameter id not 0-9"},
    {PI_DUP_TAG          , "script has duplicate tag"},
@@ -454,10 +456,10 @@ static errInfo_t errInfo[]=
    {PI_SPI_XFER_FAILED  , "spi xfer/read/write failed"},
    {PI_BAD_POINTER      , "bad (NULL) pointer"},
    {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
-   {PI_NOT_PWM_GPIO     , "gpio is not in use for PWM"},
-   {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
-   {PI_NOT_HCLK_GPIO    , "gpio has no hardware clock"},
-   {PI_NOT_HPWM_GPIO    , "gpio has no hardware PWM"},
+   {PI_NOT_PWM_GPIO     , "GPIO is not in use for PWM"},
+   {PI_NOT_SERVO_GPIO   , "GPIO is not in use for servo pulses"},
+   {PI_NOT_HCLK_GPIO    , "GPIO has no hardware clock"},
+   {PI_NOT_HPWM_GPIO    , "GPIO has no hardware PWM"},
    {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 1-125M"},
    {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-1M"},
    {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-250M"},
@@ -470,7 +472,7 @@ static errInfo_t errInfo[]=
    {PI_TOO_MANY_SEGS    , "too many I2C transaction segments"},
    {PI_BAD_I2C_SEG      , "an I2C transaction segment failed"},
    {PI_BAD_SMBUS_CMD    , "SMBus command not supported by driver"},
-   {PI_NOT_I2C_GPIO     , "no bit bang I2C in progress on gpio"},
+   {PI_NOT_I2C_GPIO     , "no bit bang I2C in progress on GPIO"},
    {PI_BAD_I2C_WLEN     , "bad I2C write length"},
    {PI_BAD_I2C_RLEN     , "bad I2C read length"},
    {PI_BAD_I2C_CMD      , "bad I2C command"},

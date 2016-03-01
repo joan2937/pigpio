@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 3 */
+/* PIGPIOD_IF2_VERSION 5 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -873,6 +873,9 @@ int wave_chain(int pi, char *buf, unsigned bufSize)
    return pigpio_command_ext
       (pi, PI_CMD_WVCHA, 0, 0, bufSize, 1, ext, 1);
 }
+
+int wave_tx_at(int pi)
+   {return pigpio_command(pi, PI_CMD_WVTAT, 0, 0, 1);}
 
 int wave_tx_busy(int pi)
    {return pigpio_command(pi, PI_CMD_WVBSY, 0, 0, 1);}

@@ -35,7 +35,7 @@ DMA memory allocation mode
 default AUTO
 
 .IP "\fB-b value\fP"
-gpio sample buffer in milliseconds
+GPIO sample buffer in milliseconds
 100-10000
 default 120
 
@@ -90,9 +90,9 @@ display pigpio version and exit
 
 
 .IP "\fB-x mask\fP"
-gpios which may be updated
-A 54 bit mask with (1<<n) set if the user may update gpio #n.
-default is the set of user gpios for the board revision
+GPIO which may be updated
+A 54 bit mask with (1<<n) set if the user may update GPIO #n.
+default is the set of user GPIO for the board revision
 
 .br
 
@@ -125,12 +125,12 @@ pigpio provides a rudimentary permissions system for commands issued via the soc
 .br
 
 .br
-All gpios may be read.
+All GPIO may be read.
 
 .br
 
 .br
-Only the user gpios for the board type or those specified by the -x option may be updated.
+Only the user GPIO for the board type or those specified by the -x option may be updated.
 
 .br
 
@@ -154,21 +154,21 @@ In this context an update includes the following:
 .br
 
 .br
-gpio mode set
+GPIO mode set
 .br
-gpio pull/up down
+GPIO pull/up down
 .br
-gpio write
+GPIO write
 .br
-gpio set PWM (including range and frequency)
+GPIO set PWM (including range and frequency)
 .br
-gpio set servo
+GPIO set servo
 
 .br
 
 .br
 In addition the bank clear and set commands, and the wave commands will only
-affect updateable gpios.
+affect updateable GPIO.
 
 .br
 
@@ -178,18 +178,18 @@ There are several special cases.
 .br
 
 .br
-The activity LED (green) may be written (gpio 16 for type 1 and 2
-boards, gpio 47 for type 3 boards)
+The activity LED (green) may be written (GPIO 16 for type 1 and 2
+boards, GPIO 47 for type 3 boards)
 
 .br
 
 .br
-The power LED (red) may be written on type 3 boards (gpio 35).
+The power LED (red) may be written on type 3 boards (GPIO 35).
 
 .br
 
 .br
-The high USB power mode gpio may be written (gpio 38 for type 3 boards).
+The high USB power mode GPIO may be written (GPIO 38 for type 3 boards).
 
 .SH SEE ALSO
 
