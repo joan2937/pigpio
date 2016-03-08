@@ -270,7 +270,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.29"
+VERSION = "1.30"
 
 exceptions = True
 
@@ -458,7 +458,7 @@ _PI_CMD_FG   =97
 _PI_CMD_FN   =98
 
 _PI_CMD_WVTXM=100
-_PI_CMD_WVAT =101
+_PI_CMD_WVTAT=101
 
 # pigpio error numbers
 
@@ -622,7 +622,7 @@ _errors=[
    [_PI_BAD_CHANNEL      , "DMA channel not 0-14"],
    [_PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"],
    [_PI_BAD_FIFO_COMMAND , "unknown fifo command"],
-   [_PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-6"],
+   [_PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-14"],
    [_PI_NOT_INITIALISED  , "function called before gpioInitialise"],
    [_PI_INITIALISED      , "function called after gpioInitialise"],
    [_PI_BAD_WAVE_MODE    , "waveform mode not 0-1"],

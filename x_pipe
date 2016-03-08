@@ -18,7 +18,8 @@ GPIO=25
 # of tests indicate a problem.
 #
 
-echo "Testing pipe I/F"
+echo
+echo "Testing pigpio pipe I/F"
 
 echo "pigpv" >/dev/pigpio
 read -t 1 s </dev/pigout
@@ -347,7 +348,12 @@ read -t 1 w </dev/pigout
 if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
 echo "wvtx $w" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 433 ]]; then echo "WVTX ok"; else echo "WVTX fail ($s)"; fi
+
+if [[ ($s = 433) || ($s = 977) ]]
+then echo "WVTX ok"
+else echo "WVTX fail ($s)"
+fi
+
 echo "wvbsy" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
@@ -363,7 +369,12 @@ read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
 echo "wvtxr $w" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 433 ]]; then echo "WVTXR ok"; else echo "WVTXR fail ($s)"; fi
+
+if [[ ($s = 433) || ($s = 977) ]]
+then echo "WVTXR ok"
+else echo "WVTXR fail ($s)"
+fi
+
 echo "wvbsy" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
@@ -376,7 +387,12 @@ if [[ $s = 0 ]]; then echo "WVBSY-e ok"; else echo "WVBSY-e fail ($s)"; fi
 
 echo "wvsc 0" >/dev/pigpio
 read -t 1 s </dev/pigout
-if [[ $s = 432 ]]; then echo "WVSC-a ok"; else echo "WVSC-a fail ($s)"; fi
+
+if [[ ($s = 432) || ($s = 743) ]]
+then echo "WVSC-a ok"
+else echo "WVSC-a fail ($s)"
+fi
+
 echo "wvsc 1" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s -ge 432 ]]; then echo "WVSC-b ok"; else echo "WVSC-b fail ($s)"; fi

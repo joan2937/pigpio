@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 47+
+This version is for pigpio version 48+
 */
 
 #include <stdio.h>
@@ -394,7 +394,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_CHANNEL      , "DMA channel not 0-14"},
    {PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"},
    {PI_BAD_FIFO_COMMAND , "unknown fifo command"},
-   {PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-6"},
+   {PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-14"},
    {PI_NOT_INITIALISED  , "function called before gpioInitialise"},
    {PI_INITIALISED      , "function called after gpioInitialise"},
    {PI_BAD_WAVE_MODE    , "waveform mode not 0-1"},
@@ -455,7 +455,7 @@ static errInfo_t errInfo[]=
    {PI_UNKNOWN_COMMAND  , "unknown command"},
    {PI_SPI_XFER_FAILED  , "spi xfer/read/write failed"},
    {PI_BAD_POINTER      , "bad (NULL) pointer"},
-   {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
+   {PI_NO_AUX_SPI       , "no auxiliary SPI on Pi A or B"},
    {PI_NOT_PWM_GPIO     , "GPIO is not in use for PWM"},
    {PI_NOT_SERVO_GPIO   , "GPIO is not in use for servo pulses"},
    {PI_NOT_HCLK_GPIO    , "GPIO has no hardware clock"},

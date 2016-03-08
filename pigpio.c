@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 47 */
+/* pigpio version 48 */
 
 /* include ------------------------------------------------------- */
 
@@ -365,15 +365,20 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define DMA_BURST_LENGTH(x)       ((x)<<12)
 #define DMA_SRC_IGNORE              (1<<11)
 #define DMA_SRC_DREQ                (1<<10)
+#define DMA_SRC_WIDTH               (1<< 9)
 #define DMA_SRC_INC                 (1<< 8)
 #define DMA_DEST_IGNORE             (1<< 7)
 #define DMA_DEST_DREQ               (1<< 6)
+#define DMA_DEST_WIDTH              (1<< 5)
 #define DMA_DEST_INC                (1<< 4)
 #define DMA_WAIT_RESP               (1<< 3)
 
 #define DMA_DEBUG_READ_ERR           (1<<2)
 #define DMA_DEBUG_FIFO_ERR           (1<<1)
 #define DMA_DEBUG_RD_LST_NOT_SET_ERR (1<<0)
+
+#define DMA_LITE_FIRST 7
+#define DMA_LITE_MAX 0xfffc
 
 #define PWM_CTL      0
 #define PWM_STA      1
@@ -741,6 +746,8 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 #define PI_WFRX_I2C_CLK 3
 
 #define PI_WF_MICROS   1
+
+#define BPD 4
 
 #define MAX_REPORT 120
 #define MAX_SAMPLE 4000
@@ -1123,7 +1130,7 @@ typedef struct
 
 /* initialise once then preserve */
 
-static volatile uint32_t piModel      = 1;
+static volatile uint32_t piCores      = 0;
 static volatile uint32_t pi_peri_phys = 0x20000000;
 static volatile uint32_t pi_dram_bus  = 0x40000000;
 static volatile uint32_t pi_mem_flag  = 0x0C;
@@ -1655,7 +1662,7 @@ static void spinWhileStarting(void)
 {
    while (runState == PI_STARTING)
    {
-      if (piModel == 1) myGpioDelay(1000);
+      if (piCores == 1) myGpioDelay(1000);
       else flushMemory();
    }
 }
@@ -2603,6 +2610,17 @@ static void waveBitDelay
    bitDelay[i] = diff;
 }
 
+static int waveDelayCBs(uint32_t delay)
+{
+   uint32_t cbs;
+
+   if (!delay) return 0;
+   if (gpioCfg.DMAsecondaryChannel < DMA_LITE_FIRST) return 1;
+   cbs = BPD * delay / DMA_LITE_MAX;
+   if  ((BPD * delay) % DMA_LITE_MAX) cbs++;
+   return cbs;
+}
+
 /* ----------------------------------------------------------------------- */
 
 static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
@@ -2628,7 +2646,8 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
       if (waves[i].gpioOff)                {numCB++; numBOOL++;}
       if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
       if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
-      if (waves[i].usDelay)                {numCB++;           }
+
+      numCB += waveDelayCBs(waves[i].usDelay);
    }
 
    *numCBs   = numCB;
@@ -2646,16 +2665,18 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
 
    rawCbs_t *p=NULL;
 
-   unsigned i, half, repeatCB;
+   unsigned i, repeatCB;
 
    unsigned numWaves;
+
+   unsigned delayCBs, dcb;
+
+   uint32_t delayLeft;
 
    rawWave_t * waves;
 
    numWaves = wfc[wfcur];
    waves    = wf [wfcur];
-
-   half = PI_WF_MICROS/2;
 
    /* add delay cb at start of DMA */
 
@@ -2675,7 +2696,7 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
    }
 
    p->src    = (uint32_t) (&dmaOBus[0]->periphData);
-   p->length = 4 * 20 / PI_WF_MICROS; /* 20 micros delay */
+   p->length = BPD * 20 / PI_WF_MICROS; /* 20 micros delay */
    p->next   = waveCbPOadr(botCB);
 
    repeatCB = botCB;
@@ -2732,24 +2753,41 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
 
       if (waves[i].usDelay)
       {
-         p = rawWaveCBAdr(botCB++);
+         delayLeft = waves[i].usDelay;
 
-         /* use the secondary clock */
+         delayCBs = waveDelayCBs(delayLeft);
 
-         if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+         for (dcb=0; dcb<delayCBs; dcb++)
          {
-            p->info = NORMAL_DMA | TIMED_DMA(2);
-            p->dst  = PCM_TIMER;
-         }
-         else
-         {
-            p->info = NORMAL_DMA | TIMED_DMA(5);
-            p->dst  = PWM_TIMER;
-         }
+            p = rawWaveCBAdr(botCB++);
 
-         p->src    = (uint32_t) (&dmaOBus[0]->periphData);
-         p->length = 4 * ((waves[i].usDelay+half)/PI_WF_MICROS);
-         p->next   = waveCbPOadr(botCB);
+            /* use the secondary clock */
+
+            if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+            {
+               p->info = NORMAL_DMA | TIMED_DMA(2);
+               p->dst  = PCM_TIMER;
+            }
+            else
+            {
+               p->info = NORMAL_DMA | TIMED_DMA(5);
+               p->dst  = PWM_TIMER;
+            }
+
+            p->src = (uint32_t) (&dmaOBus[0]->periphData);
+
+            p->length = BPD * delayLeft / PI_WF_MICROS;
+
+            if ((gpioCfg.DMAsecondaryChannel >= DMA_LITE_FIRST) &&
+                (p->length > DMA_LITE_MAX))
+            {
+               p->length = DMA_LITE_MAX;
+            }
+
+            delayLeft -= (p->length / BPD);
+
+            p->next = waveCbPOadr(botCB);
+         }
       }
    }
 
@@ -2940,7 +2978,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
       out[outPos].usDelay = tDelay;
 
-      cbs++; /* one cb for delay */
+      cbs += waveDelayCBs(tDelay);
 
       if (out[outPos].gpioOn) cbs++; /* one cb if gpio on */
 
@@ -4301,7 +4339,7 @@ int spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags)
    if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags))
    {
       if (gpioHardwareRevision() < 16)
-         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI, need a A+/B+");
+         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
 
       i = PI_NUM_AUX_SPI_CHANNEL;
    }
@@ -5567,7 +5605,6 @@ static void alertEmit(
                      }
                      else
                      {
-                        gpioCfg.internals |= PI_CFG_STATS;
                         gpioStats.shortPipeWrite++;
                         DBG(DBG_ALWAYS, "emitted %d, asked for %d",
                            err/sizeof(gpioReport_t), max_emits);
@@ -5608,7 +5645,6 @@ static void alertEmit(
                      }
                      else
                      {
-                        gpioCfg.internals |= PI_CFG_STATS;
                         gpioStats.shortPipeWrite++;
                         DBG(DBG_ALWAYS, "emitted %d, asked for %d",
                            err/sizeof(gpioReport_t), emit);
@@ -7505,7 +7541,7 @@ static void initReleaseResources(void)
 
 int initInitialise(void)
 {
-   int rev, i;
+   int rev, i, model;
    struct sockaddr_in server;
    char * portStr;
    unsigned port;
@@ -7531,11 +7567,32 @@ int initInitialise(void)
 
    if (!gpioMaskSet)
    {
-      if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_R0;
+      if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
       else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-      else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_R1;
-      else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_R2;
-      else                gpioMask = PI_DEFAULT_UPDATE_MASK_R3;
+      else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_B1;
+      else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+      else
+      {
+         model = (rev >> 4) & 0xFF;
+
+         /* model
+         0=A 1=B
+         2=A+ 3=B+
+         4=Pi2B
+         5=Alpha
+         6=Compute Module
+         7=Unknown
+         8=Pi3B
+         9=Zero
+         */
+         if (model < 2)       gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+         else if (model < 4)  gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+         else if (model == 4) gpioMask = PI_DEFAULT_UPDATE_MASK_PI2B;
+         else if (model == 6) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+         else if (model == 8) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
+         else if (model == 9) gpioMask = PI_DEFAULT_UPDATE_MASK_ZERO;
+         else                 gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
+      }
 
       gpioMaskSet = 1;
    }
@@ -9118,7 +9175,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    int cb, chaincb;
    rawCbs_t *p;
    int i, wid, cmd, loop, counters;
-   unsigned cycles;
+   unsigned cycles, delayCBs, dcb, delayLeft;
    uint32_t repeat, next, *endPtr;
    int stk_pos[10], stk_lev=0;
 
@@ -9159,7 +9216,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
    }
 
    p->src    = (uint32_t) (&dmaOBus[0]->periphData);
-   p->length = 4 * 20 / PI_WF_MICROS; /* 20 micros delay */
+   p->length = BPD * 20 / PI_WF_MICROS; /* 20 micros delay */
    p->next   = waveCbPOadr(chainGetCB(cb));
 
    counters = 0;
@@ -9275,29 +9332,45 @@ int gpioWaveChain(char *buf, unsigned bufSize)
 
             if (cycles)
             {
-               chaincb = chainGetCB(cb++);
-
-               if (chaincb < 0)
-                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-               p = rawWaveCBAdr(chaincb);
-
-               /* use the secondary clock */
-
-               if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+               delayLeft = cycles;
+               delayCBs = waveDelayCBs(delayLeft);
+               for (dcb=0; dcb<delayCBs; dcb++)
                {
-                  p->info = NORMAL_DMA | TIMED_DMA(2);
-                  p->dst  = PCM_TIMER;
-               }
-               else
-               {
-                  p->info = NORMAL_DMA | TIMED_DMA(5);
-                  p->dst  = PWM_TIMER;
-               }
+                  chaincb = chainGetCB(cb++);
 
-               p->src    = (uint32_t) (&dmaOBus[0]->periphData);
-               p->length = 4 * cycles / PI_WF_MICROS;
-               p->next   = waveCbPOadr(chainGetCB(cb));
+                  if (chaincb < 0)
+                     SOFT_ERROR(
+                        PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
+
+                  p = rawWaveCBAdr(chaincb);
+
+                  /* use the secondary clock */
+
+                  if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
+                  {
+                     p->info = NORMAL_DMA | TIMED_DMA(2);
+                     p->dst  = PCM_TIMER;
+                  }
+                  else
+                  {
+                     p->info = NORMAL_DMA | TIMED_DMA(5);
+                     p->dst  = PWM_TIMER;
+                  }
+
+                  p->src = (uint32_t) (&dmaOBus[0]->periphData);
+
+                  p->length = BPD * delayLeft / PI_WF_MICROS;
+
+                  if ((gpioCfg.DMAsecondaryChannel >= DMA_LITE_FIRST) &&
+                      (p->length > DMA_LITE_MAX))
+                  {
+                     p->length = DMA_LITE_MAX;
+                  }
+
+                  delayLeft -= (p->length / BPD);
+
+                  p->next = waveCbPOadr(chainGetCB(cb));
+               }
             }
          }
          else if (cmd == 3) /* repeat loop forever */
@@ -11506,6 +11579,28 @@ unsigned gpioVersion(void)
 
 /* ----------------------------------------------------------------------- */
 
+/*
+2 2  2  2 2 2  1 1 1 1  1 1 1 1  1 1 0 0 0 0 0 0  0 0 0 0
+5 4  3  2 1 0  9 8 7 6  5 4 3 2  1 0 9 8 7 6 5 4  3 2 1 0
+
+W W  S  M M M  B B B B  P P P P  T T T T T T T T  R R R R
+
+W  warranty void if either bit is set
+
+S  0=old (bits 0-22 are revision number) 1=new (following fields apply)
+
+M  0=256 1=512 2=1024
+
+B  0=Sony 1=Egoman 2=Embest 3=Unknown 4=Embest
+
+P  0=2835, 1=2836, 2=2837
+
+T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=Compute Module 7=Unknown 8=Pi3B 9=Zero
+
+R  PCB board revision
+
+*/
+
 unsigned gpioHardwareRevision(void)
 {
    static unsigned rev = 0;
@@ -11513,13 +11608,12 @@ unsigned gpioHardwareRevision(void)
    FILE * filp;
    char buf[512];
    char term;
-   int chars=4; /* number of chars in revision string */
 
    DBG(DBG_USER, "");
 
    if (rev) return rev;
 
-   piModel = 0;
+   piCores = 0;
 
    filp = fopen ("/proc/cpuinfo", "r");
 
@@ -11527,22 +11621,27 @@ unsigned gpioHardwareRevision(void)
    {
       while (fgets(buf, sizeof(buf), filp) != NULL)
       {
-         if (piModel == 0)
+         if (piCores == 0)
          {
             if (!strncasecmp("model name", buf, 10))
             {
                if (strstr (buf, "ARMv6") != NULL)
                {
-                  piModel = 1;
-                  chars = 4;
+                  piCores = 1;
                   pi_peri_phys = 0x20000000;
                   pi_dram_bus  = 0x40000000;
                   pi_mem_flag  = 0x0C;
                }
                else if (strstr (buf, "ARMv7") != NULL)
                {
-                  piModel = 2;
-                  chars = 6;
+                  piCores = 4;
+                  pi_peri_phys = 0x3F000000;
+                  pi_dram_bus  = 0xC0000000;
+                  pi_mem_flag  = 0x04;
+               }
+               else if (strstr (buf, "ARMv8") != NULL)
+               {
+                  piCores = 4;
                   pi_peri_phys = 0x3F000000;
                   pi_dram_bus  = 0xC0000000;
                   pi_mem_flag  = 0x04;
@@ -11550,10 +11649,9 @@ unsigned gpioHardwareRevision(void)
             }
          }
 
-         if (!strncasecmp("revision", buf, 8))
+         if (!strncasecmp("revision\t:", buf, 10))
          {
-            if (sscanf(buf+strlen(buf)-(chars+1),
-               "%x%c", &rev, &term) == 2)
+            if (sscanf(buf+10, "%x%c", &rev, &term) == 2)
             {
                if (term != '\n') rev = 0;
             }
@@ -11633,11 +11731,12 @@ int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel)
 
    CHECK_NOT_INITED;
 
-   if (primaryChannel > PI_MAX_PRIMARY_CHANNEL)
+   if (primaryChannel > PI_MAX_DMA_CHANNEL)
       SOFT_ERROR(PI_BAD_PRIM_CHANNEL, "bad primary channel (%d)",
          primaryChannel);
 
-   if (secondaryChannel > PI_MAX_SECONDARY_CHANNEL)
+   if ((secondaryChannel > PI_MAX_DMA_CHANNEL) ||
+       (secondaryChannel == primaryChannel))
       SOFT_ERROR(PI_BAD_SECO_CHANNEL, "bad secondary channel (%d)",
          secondaryChannel);
 

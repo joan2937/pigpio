@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 43+
+This version is for pigpio version 48+
 */
 
 #include <sys/types.h>
@@ -90,7 +90,7 @@ void usage()
       "   -b value, gpio sample buffer in milliseconds, default 120\n" \
       "   -c value, library internal settings,          default 0\n" \
       "   -d value, primary DMA channel, 0-14,          default 14\n" \
-      "   -e value, secondary DMA channel, 0-6,         default 5\n" \
+      "   -e value, secondary DMA channel, 0-14,        default 6\n" \
       "   -f,       disable fifo interface,             default enabled\n" \
       "   -k,       disable socket interface,           default enabled\n" \
       "   -l,       localhost socket only               default all interfaces\n" \
@@ -149,14 +149,14 @@ static void initOpts(int argc, char *argv[])
 
          case 'd':
             i = getNum(optarg, &err);
-            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_PRIMARY_CHANNEL))
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_DMA_CHANNEL))
                DMAprimaryChannel = i;
             else fatal("invalid -d option (%d)", i);
             break;
 
          case 'e':
             i = getNum(optarg, &err);
-            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_SECONDARY_CHANNEL))
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_DMA_CHANNEL))
                DMAsecondaryChannel = i;
             else fatal("invalid -e option (%d)", i);
             break;

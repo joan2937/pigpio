@@ -51,8 +51,8 @@ default 14
 
 .IP "\fB-e value\fP"
 secondary DMA channel
-0-6
-default 5
+0-14
+default 6
 
 .IP "\fB-f\fP"
 disable fifo interface
@@ -137,11 +137,11 @@ Only the user GPIO for the board type or those specified by the -x option may be
 .br
 
 .EX
-Type 1 boards 0x03E6CF93
+Type 1 boards 0x03E6CF93 (26 pin header)
 .br
-Type 2 boards 0xFBC6CF9C
+Type 2 boards 0xFBC6CF9C (26 pin + 8 pin header)
 .br
-Type 3 boards 0x0FFFFFFC
+Type 3 boards 0x0FFFFFFC (40 pin header)
 .br
 
 .EE
@@ -173,23 +173,78 @@ affect updateable GPIO.
 .br
 
 .br
-There are several special cases.
+.SS Exceptions
+.br
+
+.br
+The following exceptions are made for particular models.
 
 .br
 
 .br
-The activity LED (green) may be written (GPIO 16 for type 1 and 2
-boards, GPIO 47 for type 3 boards)
+.SS Models A and B
+.br
+
+.br
+The green activity LED (GPIO 16) may be written.
+.br
+.SS Models A+ and B+
+.br
+
+.br
+The green activity LED (GPIO 47) may be written.
+.br
+The red power LED (GPIO 35) may be written.
+.br
+The high USB power mode (GPIO 38) may be written.
+.br
+.SS Pi Zero
+.br
+
+.br
+The green activity LED (GPIO 47) may be written.
+.br
+.SS Pi2B
+.br
+
+.br
+The green activity LED (GPIO 47) may be written.
+.br
+The red power LED (GPIO 35) may be written.
+.br
+The high USB power mode (GPIO 38) may be written.
+.br
+.SS Pi3B
+.br
+
+.br
+The green activity LED and the red power LED are not writable.
+.br
+The USB power mode is fixed at 1.2 amps (high power).
+.br
+
+.br
+
+.br
+.SS DMA Channels
+.br
+
+.br
+The secondary channel is only used for the transmission of waves.
 
 .br
 
 .br
-The power LED (red) may be written on type 3 boards (GPIO 35).
+If possible use one of channels 0 to 6 for the secondary channel (a full channel).
 
 .br
 
 .br
-The high USB power mode GPIO may be written (GPIO 38 for type 3 boards).
+A full channel only requires one DMA control block regardless of the length of a pulse delay.  Channels 7 to 14 (lite channels) require one DMA control block for each 16383 microseconds of delay.  I.e. a 10 second pulse delay requires one control block on a full channel and 611 control blocks on a lite channel.
+
+.br
+
+.br
 
 .SH SEE ALSO
 

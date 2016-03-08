@@ -5260,7 +5260,7 @@ Configures pigpio to use the specified DMA channels.
 .EX
   primaryChannel: 0-14
 .br
-secondaryChannel: 0-6
+secondaryChannel: 0-14
 .br
 
 .EE
@@ -5269,7 +5269,27 @@ secondaryChannel: 0-6
 
 .br
 The default setting is to use channel 14 for the primary channel and
-channel 5 for the secondary channel.
+channel 6 for the secondary channel.
+
+.br
+
+.br
+The secondary channel is only used for the transmission of waves.
+
+.br
+
+.br
+If possible use one of channels 0 to 6 for the secondary channel
+(a full channel).
+
+.br
+
+.br
+A full channel only requires one DMA control block regardless of the
+length of a pulse delay.  Channels 7 to 14 (lite channels) require
+one DMA control block for each 16383 microseconds of delay.  I.e.
+a 10 second pulse delay requires one control block on a full channel
+and 611 control blocks on a lite channel.
 
 .IP "\fBint gpioCfgPermissions(uint64_t updateMask)\fP"
 .IP "" 4
@@ -5289,22 +5309,26 @@ updateMask: bit (1<<n) is set for each GPIO n which may be updated
 .br
 
 .br
-The default setting depends upon the board revision (Type 1, 2, or 3).
-The user GPIO are added to the mask.  If the board revision is not
-recognised then GPIO 0-31 are allowed.
+The default setting depends upon the Pi model. The user GPIO are
+added to the mask.
 
 .br
 
 .br
-Unknown board   PI_DEFAULT_UPDATE_MASK_R0   0xFFFFFFFF
+If the board revision is not recognised then GPIO 0-31 are allowed.
+
 .br
 
 .br
-Type 1 board    PI_DEFAULT_UPDATE_MASK_R1   0x03E6CF93
+Unknown board   PI_DEFAULT_UPDATE_MASK_UNKNOWN   0xFFFFFFFF
 .br
 
 .br
-Type 2 board    PI_DEFAULT_UPDATE_MASK_R2   0xFBC6CF9C
+Type 1 board    PI_DEFAULT_UPDATE_MASK_B1   0x03E6CF93
+.br
+
+.br
+Type 2 board    PI_DEFAULT_UPDATE_MASK_A_B2   0xFBC6CF9C
 
 .br
 Type 3 board    PI_DEFAULT_UPDATE_MASK_R3   0x0FFFFFFC
@@ -8153,37 +8177,43 @@ A 16-bit word value.
 .EX
 
 .br
-#define PI_DEFAULT_BUFFER_MILLIS         120
+#define PI_DEFAULT_BUFFER_MILLIS           120
 .br
-#define PI_DEFAULT_CLK_MICROS            5
+#define PI_DEFAULT_CLK_MICROS              5
 .br
-#define PI_DEFAULT_CLK_PERIPHERAL        PI_CLOCK_PCM
+#define PI_DEFAULT_CLK_PERIPHERAL          PI_CLOCK_PCM
 .br
-#define PI_DEFAULT_IF_FLAGS              0
+#define PI_DEFAULT_IF_FLAGS                0
 .br
-#define PI_DEFAULT_DMA_CHANNEL           14
+#define PI_DEFAULT_DMA_CHANNEL             14
 .br
-#define PI_DEFAULT_DMA_PRIMARY_CHANNEL   14
+#define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 .br
-#define PI_DEFAULT_DMA_SECONDARY_CHANNEL 5
+#define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
 .br
-#define PI_DEFAULT_SOCKET_PORT           8888
+#define PI_DEFAULT_SOCKET_PORT             8888
 .br
-#define PI_DEFAULT_SOCKET_PORT_STR       "8888"
+#define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 .br
-#define PI_DEFAULT_SOCKET_ADDR_STR       "127.0.0.1"
+#define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
 .br
-#define PI_DEFAULT_UPDATE_MASK_R0        0xFFFFFFFF
+#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0xFFFFFFFF
 .br
-#define PI_DEFAULT_UPDATE_MASK_R1        0x03E7CF93
+#define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 .br
-#define PI_DEFAULT_UPDATE_MASK_R2        0xFBC7CF9C
+#define PI_DEFAULT_UPDATE_MASK_A_B2        0xFBC7CF9C
 .br
-#define PI_DEFAULT_UPDATE_MASK_R3        0x0080480FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS 0x0080480FFFFFFCLL
 .br
-#define PI_DEFAULT_UPDATE_MASK_COMPUTE   0x00FFFFFFFFFFFFLL
+#define PI_DEFAULT_UPDATE_MASK_ZERO        0x0080000FFFFFFCLL
 .br
-#define PI_DEFAULT_MEM_ALLOC_MODE        PI_MEM_ALLOC_AUTO
+#define PI_DEFAULT_UPDATE_MASK_PI2B        0x0080480FFFFFFCLL
+.br
+#define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
+.br
+#define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
+.br
+#define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 .br
 
 .br
