@@ -1,5 +1,5 @@
 ################################################################################
-### Find the pigpio shared libraries.
+### Find the pigpio includes and shared libraries.
 ################################################################################
 
 # Find the path to the pigpio includes.
