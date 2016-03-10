@@ -1,0 +1,31 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:             pigpiod
+# Required-Start:
+# Required-Stop:
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6 
+# Short-Description:    pigpio daemon
+# Description:          pigpio daemon required to control GPIO pins via pigpio $
+### END INIT INFO
+
+# Actions
+case "$1" in
+  start)
+    pigpiod
+    ;;
+  stop)
+    pkill pigpiod
+    ;;
+  restart)
+    pkill pigpiod
+    pigpiod
+    ;;
+  *)
+    echo "Usage: $0 start" >&2
+    exit 3
+    ;;
+esac
+
+exit 0
+
