@@ -15,7 +15,7 @@ To automatically start pigpiod as a service, do the following:
 
 + Tell update-rc.d to automatically start the pigpiod service on system startup:
   ```
-  sudo update-rc.d skeleton defaults
+  sudo update-rc.d pigpiod defaults
   ```
   
 + Now, you can start, stop, and restart pigpiod using
