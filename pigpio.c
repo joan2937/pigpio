@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 48 */
+/* pigpio version 49 */
 
 /* include ------------------------------------------------------- */
 
@@ -7568,6 +7568,7 @@ int initInitialise(void)
    if (!gpioMaskSet)
    {
       if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
+      else if (rev == 16) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
       else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
       else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_B1;
       else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
