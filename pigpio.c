@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 49 */
+/* pigpio version 50 */
 
 /* include ------------------------------------------------------- */
 
@@ -7568,10 +7568,10 @@ int initInitialise(void)
    if (!gpioMaskSet)
    {
       if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
-      else if (rev == 16) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
-      else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
       else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_B1;
       else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+      else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+      else if (rev  < 20) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
       else
       {
          model = (rev >> 4) & 0xFF;
@@ -7586,8 +7586,8 @@ int initInitialise(void)
          8=Pi3B
          9=Zero
          */
-         if (model < 2)       gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
-         else if (model < 4)  gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+         if      (model <  2) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+         else if (model <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
          else if (model == 4) gpioMask = PI_DEFAULT_UPDATE_MASK_PI2B;
          else if (model == 6) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
          else if (model == 8) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
