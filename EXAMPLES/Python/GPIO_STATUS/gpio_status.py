@@ -3,6 +3,7 @@
 import time
 import curses
 import atexit
+import sys
 
 import pigpio 
 
@@ -17,6 +18,8 @@ def cleanup():
    pi.stop()
 
 pi = pigpio.pi()
+if not pi.connected:
+    sys.exit(1)
 
 stdscr = curses.initscr()
 curses.noecho()
@@ -43,7 +46,7 @@ while True:
       tally = cb[g].tally()
       mode = pi.get_mode(g)
 
-      col = (g / 11) * 25
+      col = (g // 11) * 25
       row = (g % 11) + 2
 
       stdscr.addstr(row, col, "{:2}".format(g), curses.A_BOLD)
