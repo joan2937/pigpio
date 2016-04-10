@@ -243,7 +243,7 @@ BI2CO sda scl baud | Open bit bang I2C\n\
 BI2CZ sda ...    I2C bit bang multiple transactions\n\
 BR1              Read bank 1 GPIO\n\
 BR2              Read bank 2 GPIO\n\
-BS1 bits         Set GPIO in bank 2\n\
+BS1 bits         Set GPIO in bank 1\n\
 BS2 bits         Set GPIO in bank 2\n\
 \n\
 CF1 ...          Custom function 1\n\
