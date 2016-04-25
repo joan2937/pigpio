@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 50
+#define PIGPIO_VERSION 51
 
 /*TEXT
 
@@ -93,11 +93,21 @@ For examples of usage see the C programs within the pigpio archive file.
 
 All the functions which return an int return < 0 on error.
 
-If the library is not initialised all but the [*gpioCfg**], [*gpioVersion*],
-and [*gpioHardwareRevision*] functions will return PI_NOT_INITIALISED.
+[*gpioInitialise*] must be called before all other library functions
+with the following exceptions:
 
-If the library is initialised the [*gpioCfg**] functions will
-return PI_INITIALISED.
+. .
+[*gpioCfg**]
+[*gpioVersion*]
+[*gpioHardwareRevision*]
+. .
+
+If the library is not initialised all but the [*gpioCfg**],
+[*gpioVersion*], and [*gpioHardwareRevision*] functions will
+return error PI_NOT_INITIALISED.
+
+If the library is initialised the [*gpioCfg**] functions will return
+error PI_INITIALISED.
 
 TEXT*/
 
@@ -294,7 +304,6 @@ gpioCfgSocketPort          Configure socket port
 gpioCfgMemAlloc            Configure DMA memory allocation mode
 
 gpioCfgInternals           Configure miscellaneous internals (DEPRECATED)
-
 gpioCfgGetInternals        Get internal configuration settings
 gpioCfgSetInternals        Set internal configuration settings
 
@@ -770,11 +779,16 @@ int gpioInitialise(void);
 /*D
 Initialises the library.
 
-Call before using the other library functions.
-
 Returns the pigpio version number if OK, otherwise PI_INIT_FAILED.
 
-The only exception is the optional [*gpioCfg**] functions, see later.
+gpioInitialise must be called before using the other library functions
+with the following exceptions:
+
+. .
+[*gpioCfg**]
+[*gpioVersion*]
+[*gpioHardwareRevision*]
+. .
 
 ...
 if (gpioInitialise() < 0)
@@ -3618,6 +3632,8 @@ int gpioCfgBufferSize(unsigned cfgMillis);
 /*D
 Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
 
+This function is only effective if called before [*gpioInitialise*].
+
 . .
 cfgMillis: 100-10000
 . .
@@ -3653,6 +3669,8 @@ int gpioCfgClock(
 Configures pigpio to use a particular sample rate timed by a specified
 peripheral.
 
+This function is only effective if called before [*gpioInitialise*].
+
 . .
     cfgMicros: 1, 2, 4, 5, 8, 10
 cfgPeripheral: 0 (PWM), 1 (PCM)
@@ -3686,6 +3704,8 @@ int gpioCfgDMAchannel(unsigned DMAchannel); /* DEPRECATED */
 /*D
 Configures pigpio to use the specified DMA channel.
 
+This function is only effective if called before [*gpioInitialise*].
+
 . .
 DMAchannel: 0-14
 . .
@@ -3699,6 +3719,8 @@ int gpioCfgDMAchannels(
    unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
+
+This function is only effective if called before [*gpioInitialise*].
 
 . .
   primaryChannel: 0-14
@@ -3727,6 +3749,8 @@ int gpioCfgPermissions(uint64_t updateMask);
 Configures pigpio to only allow updates (writes or mode changes) for the
 GPIO specified by the mask.
 
+This function is only effective if called before [*gpioInitialise*].
+
 . .
 updateMask: bit (1<<n) is set for each GPIO n which may be updated
 . .
@@ -3748,6 +3772,8 @@ int gpioCfgSocketPort(unsigned port);
 /*D
 Configures pigpio to use the specified socket port.
 
+This function is only effective if called before [*gpioInitialise*].
+
 . .
 port: 1024-32000
 . .
@@ -3760,6 +3786,8 @@ D*/
 int gpioCfgInterfaces(unsigned ifFlags);
 /*D
 Configures pigpio support of the fifo and socket interfaces.
+
+This function is only effective if called before [*gpioInitialise*].
 
 . .
 ifFlags: 0-7
@@ -3781,6 +3809,8 @@ D*/
 int gpioCfgMemAlloc(unsigned memAllocMode);
 /*D
 Selects the method of DMA memory allocation.
+
+This function is only effective if called before [*gpioInitialise*].
 
 . .
 memAllocMode: 0-2
@@ -4280,7 +4310,7 @@ typedef void (*gpioAlertFuncEx_t)
 
 gpioCfg*::
 
-One of
+These functions are only effective if called before [*gpioInitialise*].
 
 [*gpioCfgBufferSize*] 
 [*gpioCfgClock*] 
@@ -4288,7 +4318,6 @@ One of
 [*gpioCfgDMAchannels*] 
 [*gpioCfgPermissions*] 
 [*gpioCfgInterfaces*] 
-[*gpioCfgInternals*] 
 [*gpioCfgSocketPort*] 
 [*gpioCfgMemAlloc*]
 

@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 50 */
+/* pigpio version 51 */
 
 /* include ------------------------------------------------------- */
 
@@ -7572,6 +7572,8 @@ int initInitialise(void)
       else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
       else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
       else if (rev  < 20) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+      else if (rev == 20) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+      else if (rev == 21) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
       else
       {
          model = (rev >> 4) & 0xFF;
@@ -11872,5 +11874,4 @@ int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)
 /* include any user customisations */
 
 #include "custom.cext"
-
 

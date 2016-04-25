@@ -157,14 +157,35 @@ All the functions which return an int return < 0 on error.
 .br
 
 .br
-If the library is not initialised all but the \fBgpioCfg*\fP, \fBgpioVersion\fP,
-and \fBgpioHardwareRevision\fP functions will return PI_NOT_INITIALISED.
+\fBgpioInitialise\fP must be called before all other library functions
+with the following exceptions:
 
 .br
 
 .br
-If the library is initialised the \fBgpioCfg*\fP functions will
-return PI_INITIALISED.
+
+.EX
+\fBgpioCfg*\fP
+.br
+\fBgpioVersion\fP
+.br
+\fBgpioHardwareRevision\fP
+.br
+
+.EE
+
+.br
+
+.br
+If the library is not initialised all but the \fBgpioCfg*\fP,
+\fBgpioVersion\fP, and \fBgpioHardwareRevision\fP functions will
+return error PI_NOT_INITIALISED.
+
+.br
+
+.br
+If the library is initialised the \fBgpioCfg*\fP functions will return
+error PI_INITIALISED.
 
 .br
 
@@ -178,17 +199,27 @@ Initialises the library.
 .br
 
 .br
-Call before using the other library functions.
-
-.br
-
-.br
 Returns the pigpio version number if OK, otherwise PI_INIT_FAILED.
 
 .br
 
 .br
-The only exception is the optional \fBgpioCfg*\fP functions, see later.
+gpioInitialise must be called before using the other library functions
+with the following exceptions:
+
+.br
+
+.br
+
+.EX
+\fBgpioCfg*\fP
+.br
+\fBgpioVersion\fP
+.br
+\fBgpioHardwareRevision\fP
+.br
+
+.EE
 
 .br
 
@@ -5110,6 +5141,11 @@ Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
 .br
 
 .br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
 
 .EX
 cfgMillis: 100-10000
@@ -5169,6 +5205,11 @@ sample   4       8  12  18   31   55  107  ---
 .IP "" 4
 Configures pigpio to use a particular sample rate timed by a specified
 peripheral.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
 
 .br
 
@@ -5237,6 +5278,11 @@ Configures pigpio to use the specified DMA channel.
 .br
 
 .br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
 
 .EX
 DMAchannel: 0-14
@@ -5252,6 +5298,11 @@ The default setting is to use channel 14.
 .IP "\fBint gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel)\fP"
 .IP "" 4
 Configures pigpio to use the specified DMA channels.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
 
 .br
 
@@ -5299,6 +5350,11 @@ GPIO specified by the mask.
 .br
 
 .br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
 
 .EX
 updateMask: bit (1<<n) is set for each GPIO n which may be updated
@@ -5342,6 +5398,11 @@ Configures pigpio to use the specified socket port.
 .br
 
 .br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
 
 .EX
 port: 1024-32000
@@ -5357,6 +5418,11 @@ The default setting is to use port 8888.
 .IP "\fBint gpioCfgInterfaces(unsigned ifFlags)\fP"
 .IP "" 4
 Configures pigpio support of the fifo and socket interfaces.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
 
 .br
 
@@ -5393,6 +5459,11 @@ usable from the local Pi).
 .IP "\fBint gpioCfgMemAlloc(unsigned memAllocMode)\fP"
 .IP "" 4
 Selects the method of DMA memory allocation.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
 
 .br
 
@@ -6306,7 +6377,7 @@ typedef void (*gpioAlertFuncEx_t)
 .br
 
 .br
-One of
+These functions are only effective if called before \fBgpioInitialise\fP.
 
 .br
 
@@ -6322,8 +6393,6 @@ One of
 \fBgpioCfgPermissions\fP
 .br
 \fBgpioCfgInterfaces\fP
-.br
-\fBgpioCfgInternals\fP
 .br
 \fBgpioCfgSocketPort\fP
 .br
