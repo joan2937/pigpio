@@ -108,7 +108,7 @@ class sensor:
             self.bit = 40
 
          elif self.bit >= 32:  # In checksum byte.
-            self.CS  = (self.CS<<1)  + val
+            self.CS  = (self.CS << 1)  + val
 
             if self.bit == 39:
 
@@ -122,7 +122,7 @@ class sensor:
 
                if (total & 255) == self.CS:  # Is checksum ok?
 
-                  self.rhum = ((self.hH<<8) + self.hL) * 0.1
+                  self.rhum = ((self.hH << 8) + self.hL) * 0.1
 
                   if self.tH & 128:  # Negative temperature.
                      mult = -0.1
@@ -130,7 +130,7 @@ class sensor:
                   else:
                      mult = 0.1
 
-                  self.temp = ((self.tH<<8) + self.tL) * mult
+                  self.temp = ((self.tH << 8) + self.tL) * mult
 
                   self.tov = time.time()
 
@@ -141,17 +141,17 @@ class sensor:
 
                   self.bad_CS += 1
 
-         elif self.bit >=24:  # in temp low byte
-            self.tL = (self.tL<<1) + val
+         elif self.bit >= 24:  # in temp low byte
+            self.tL = (self.tL << 1) + val
 
-         elif self.bit >=16:  # in temp high byte
-            self.tH = (self.tH<<1) + val
+         elif self.bit >= 16:  # in temp high byte
+            self.tH = (self.tH << 1) + val
 
          elif self.bit >= 8:  # in humidity low byte
-            self.hL = (self.hL<<1) + val
+            self.hL = (self.hL << 1) + val
 
          elif self.bit >= 0:  # in humidity high byte
-            self.hH = (self.hH<<1) + val
+            self.hH = (self.hH << 1) + val
 
          else:               # header bits
             pass
@@ -250,7 +250,7 @@ if __name__ == "__main__":
    import DHT22
 
    # Intervals of about 2 seconds or less will eventually hang the DHT22.
-   INTERVAL=3
+   INTERVAL = 3
 
    pi = pigpio.pi()
 
