@@ -237,7 +237,7 @@ class sensor:
 
       self.pi.set_watchdog(self.gpio, 0)
 
-      if self.cb != None:
+      if self.cb is not None:
          self.cb.cancel()
          self.cb = None
 
