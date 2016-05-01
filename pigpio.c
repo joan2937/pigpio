@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 51 */
+/* pigpio version 52 */
 
 /* include ------------------------------------------------------- */
 
@@ -1144,6 +1144,7 @@ static struct timespec libStarted;
 static uint32_t reportedLevel = 0;
 
 static int waveClockInited = 0;
+static int PWMClockInited = 0;
 
 static volatile gpioStats_t gpioStats;
 
@@ -7551,6 +7552,7 @@ int initInitialise(void)
    DBG(DBG_STARTUP, "");
 
    waveClockInited = 0;
+   PWMClockInited = 0;
 
    clock_gettime(CLOCK_REALTIME, &libStarted);
 
@@ -8958,6 +8960,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
       stopHardwarePWM();
       initClock(0); /* initialise secondary clock */
       waveClockInited = 1;
+      PWMClockInited = 0;
    }
 
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
@@ -9194,6 +9197,7 @@ int gpioWaveChain(char *buf, unsigned bufSize)
       stopHardwarePWM();
       initClock(0); /* initialise secondary clock */
       waveClockInited = 1;
+      PWMClockInited = 0;
    }
 
    dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
@@ -11413,11 +11417,16 @@ int gpioHardwarePWM(
       old_PWM_CTL = pwmReg[PWM_CTL] &
          (PWM_CTL_PWEN1 | PWM_CTL_MSEN1 | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
 
-      pwmReg[PWM_CTL] = 0;
+      if (!PWMClockInited)
+      {
+         pwmReg[PWM_CTL] = 0;
 
-      myGpioDelay(10);
+         myGpioDelay(10);
 
-      initHWClk(CLK_PWMCTL, CLK_PWMDIV, CLK_CTL_SRC_PLLD, 2, 0, 0);
+         initHWClk(CLK_PWMCTL, CLK_PWMDIV, CLK_CTL_SRC_PLLD, 2, 0, 0);
+
+         PWMClockInited = 1;
+      }
 
       if (pwm == 0)
       {
@@ -11657,6 +11666,7 @@ unsigned gpioHardwareRevision(void)
             if (sscanf(buf+10, "%x%c", &rev, &term) == 2)
             {
                if (term != '\n') rev = 0;
+               else rev &= 0xFFFFFF; /* mask out warranty bit */
             }
          }
       }
