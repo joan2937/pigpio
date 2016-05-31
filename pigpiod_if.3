@@ -615,7 +615,7 @@ Set the frequency (in Hz) of the PWM to be used on the GPIO.
 .EX
 user_gpio: 0-31.
 .br
-frequency: 0- (Hz).
+frequency: >=0 (Hz).
 .br
 
 .EE
@@ -629,9 +629,8 @@ PI_BAD_USER_GPIO or PI_NOT_PERMITTED.
 .br
 
 .br
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
-sample rate is set when the C pigpio library is started.
+If PWM is currently active on the GPIO it will be switched
+off and then back on at the new frequency.
 
 .br
 
@@ -642,47 +641,59 @@ PWM frequencies.
 .br
 
 .br
-If PWM is currently active on the GPIO it will be switched
-off and then back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
+
+.br
+
+.br
+The frequencies for each sample rate are:
 
 .br
 
 .br
 
 .EX
-1us 40000, 20000, 10000, 8000, 5000, 4000, 2500, 2000, 1600,
-.br
-     1250,  1000,   800,  500,  400,  250,  200,  100,   50
+                       Hertz
 .br
 
 .br
-2us 20000, 10000,  5000, 4000, 2500, 2000, 1250, 1000,  800,
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
 .br
-      625,   500,   400,  250,  200,  125,  100,   50 ,  25
-.br
-
-.br
-4us 10000,  5000,  2500, 2000, 1250, 1000,  625,  500,  400,
-.br
-      313,   250,   200,  125,  100,   63,   50,   25,   13
+           1250  1000   800  500  400  250  200  100   50
 .br
 
 .br
-5us  8000,  4000,  2000, 1600, 1000,  800,  500,  400,  320,
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
 .br
-      250,   200,   160,  100  , 80,   50,   40,   20,   10
-.br
-
-.br
-8us  5000,  2500,  1250, 1000,  625,  500,  313,  250,  200,
-.br
-      156,   125,   100,   63,   50,   31,   25,   13,    6
+            625   500   400  250  200  125  100   50   25
 .br
 
 .br
-10us 4000,  2000,  1000,  800,  500,  400,  250,  200,  160,
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
 .br
-      125,   100,    80,   50,   40,   25,   20,   10,    5
+            313   250   200  125  100   63   50   25   13
+.br
+sample
+.br
+ rate
+.br
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+.br
+            250   200   160  100   80   50   40   20   10
+.br
+
+.br
+       8:  5000  2500  1250 1000  625  500  313  250  200
+.br
+            156   125   100   63   50   31   25   13    6
+.br
+
+.br
+      10:  4000  2000  1000  800  500  400  250  200  160
+.br
+            125   100    80   50   40   25   20   10    5
 .br
 
 .EE
@@ -1519,9 +1530,9 @@ data_bits: number of data bits (1-32)
 .br
 stop_bits: number of stop half bits (2-8)
 .br
-   offset: 0-
+   offset: >=0
 .br
- numBytes: 1-
+ numBytes: >=1
 .br
       str: an array of chars.
 .br
@@ -2050,6 +2061,11 @@ This function stores a script for later execution.
 .br
 
 .br
+See \fBhttp://abyz.co.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
+
+.br
+
+.br
 
 .EX
 script: the text of the script.
@@ -2232,7 +2248,7 @@ user_gpio: 0-31, previously opened with \fBbb_serial_read_open\fP.
 .br
       buf: an array to receive the read bytes.
 .br
-  bufSize: 0-
+  bufSize: >=0
 .br
 
 .EE
@@ -2307,9 +2323,9 @@ This returns a handle for the device at address i2c_addr on bus i2c_bus.
 .br
 
 .EX
-  i2c_bus: 0-1.
+  i2c_bus: >=0.
 .br
- i2c_addr: 0x00-0x7F.
+ i2c_addr: 0-0x7F.
 .br
 i2c_flags: 0.
 .br
@@ -2320,6 +2336,12 @@ i2c_flags: 0.
 
 .br
 No flags are currently defined.  This parameter should be set to zero.
+
+.br
+
+.br
+Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
+will be available if a kernel supported bus multiplexor is being used.
 
 .br
 
@@ -4076,7 +4098,7 @@ A function.
 
 .br
 
-.IP "\fBfrequency\fP: 0-" 0
+.IP "\fBfrequency\fP: >=0" 0
 The number of times a GPIO is swiched on and off per second.  This
 can be set per GPIO and may be as little as 5Hz or as much as
 40KHz.  The GPIO will be on for a proportion of the time as defined
@@ -4186,7 +4208,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 .br
 
-.IP "\fBhandle\fP: 0-" 0
+.IP "\fBhandle\fP: >=0" 0
 A number referencing an object opened by one of \fBi2c_open\fP, \fBnotify_open\fP,
 \fBserial_open\fP, and \fBspi_open\fP.
 
@@ -4194,15 +4216,15 @@ A number referencing an object opened by one of \fBi2c_open\fP, \fBnotify_open\f
 
 .br
 
-.IP "\fBi2c_addr\fP" 0
+.IP "\fBi2c_addr\fP: 0-0x7F" 0
 The address of a device on the I2C bus.
 
 .br
 
 .br
 
-.IP "\fBi2c_bus\fP: 0-1" 0
-An I2C bus, 0 or 1.
+.IP "\fBi2c_bus\fP: >=0" 0
+An I2C bus number.
 
 .br
 

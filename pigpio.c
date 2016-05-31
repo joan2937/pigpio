@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 52 */
+/* pigpio version 53 */
 
 /* include ------------------------------------------------------- */
 
@@ -3645,9 +3645,6 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
 
    CHECK_INITED;
 
-   if (i2cBus >= PI_NUM_I2C_BUS)
-      SOFT_ERROR(PI_BAD_I2C_BUS, "bad I2C bus (%d)", i2cBus);
-
    if (i2cAddr > PI_MAX_I2C_ADDR)
       SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (%d)", i2cAddr);
 
@@ -3683,7 +3680,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
       if ((fd = open(dev, O_RDWR)) < 0)
       {
          i2cInfo[slot].state = PI_I2C_CLOSED;
-         return PI_I2C_OPEN_FAILED;
+         return PI_BAD_I2C_BUS;
       }
    }
 
@@ -11026,7 +11023,7 @@ int gpioRunScript(unsigned script_id, unsigned numParam, uint32_t *param)
    {
       pthread_mutex_lock(&gpioScript[script_id].pthMutex);
 
-      if (gpioScript[script_id].run_state == PI_SCRIPT_HALTED)
+      if (gpioScript[script_id].run_state != PI_SCRIPT_INITING)
       {
          if ((numParam > 0) && (param != 0))
          {
@@ -11040,7 +11037,7 @@ int gpioRunScript(unsigned script_id, unsigned numParam, uint32_t *param)
       }
       else
       {
-         status = PI_NOT_HALTED;
+         status = PI_SCRIPT_NOT_READY;
       }
 
       pthread_mutex_unlock(&gpioScript[script_id].pthMutex);

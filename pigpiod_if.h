@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 22
+#define PIGPIOD_IF_VERSION 23
 
 /*TEXT
 
@@ -565,40 +565,45 @@ Set the frequency (in Hz) of the PWM to be used on the GPIO.
 
 . .
 user_gpio: 0-31.
-frequency: 0- (Hz).
+frequency: >=0 (Hz).
 . .
 
 Returns the numerically closest frequency if OK, otherwise
 PI_BAD_USER_GPIO or PI_NOT_PERMITTED.
 
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
-sample rate is set when the C pigpio library is started.
+If PWM is currently active on the GPIO it will be switched
+off and then back on at the new frequency.
 
 Each GPIO can be independently set to one of 18 different
 PWM frequencies.
 
-If PWM is currently active on the GPIO it will be switched
-off and then back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
+
+The frequencies for each sample rate are:
 
 . .
-1us 40000, 20000, 10000, 8000, 5000, 4000, 2500, 2000, 1600,
-     1250,  1000,   800,  500,  400,  250,  200,  100,   50
+                       Hertz
 
-2us 20000, 10000,  5000, 4000, 2500, 2000, 1250, 1000,  800,
-      625,   500,   400,  250,  200,  125,  100,   50 ,  25
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+           1250  1000   800  500  400  250  200  100   50
 
-4us 10000,  5000,  2500, 2000, 1250, 1000,  625,  500,  400,
-      313,   250,   200,  125,  100,   63,   50,   25,   13
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+            625   500   400  250  200  125  100   50   25
 
-5us  8000,  4000,  2000, 1600, 1000,  800,  500,  400,  320,
-      250,   200,   160,  100  , 80,   50,   40,   20,   10
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+            313   250   200  125  100   63   50   25   13
+sample
+ rate
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+            250   200   160  100   80   50   40   20   10
 
-8us  5000,  2500,  1250, 1000,  625,  500,  313,  250,  200,
-      156,   125,   100,   63,   50,   31,   25,   13,    6
+       8:  5000  2500  1250 1000  625  500  313  250  200
+            156   125   100   63   50   31   25   13    6
 
-10us 4000,  2000,  1000,  800,  500,  400,  250,  200,  160,
-      125,   100,    80,   50,   40,   25,   20,   10,    5
+      10:  4000  2000  1000  800  500  400  250  200  160
+            125   100    80   50   40   25   20   10    5
 . .
 D*/
 
@@ -1097,8 +1102,8 @@ user_gpio: 0-31.
      baud: 50-1000000
 data_bits: number of data bits (1-32)
 stop_bits: number of stop half bits (2-8)
-   offset: 0-
- numBytes: 1-
+   offset: >=0
+ numBytes: >=1
       str: an array of chars.
 . .
 
@@ -1421,6 +1426,8 @@ int store_script(char *script);
 /*D
 This function stores a script for later execution.
 
+See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+
 . .
 script: the text of the script.
 . .
@@ -1528,7 +1535,7 @@ bit bang serial cyclic buffer to the buffer starting at buf.
 . .
 user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
       buf: an array to receive the read bytes.
-  bufSize: 0-
+  bufSize: >=0
 . .
 
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
@@ -1573,12 +1580,15 @@ int i2c_open(unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags);
 This returns a handle for the device at address i2c_addr on bus i2c_bus.
 
 . .
-  i2c_bus: 0-1.
- i2c_addr: 0x00-0x7F.
+  i2c_bus: >=0.
+ i2c_addr: 0-0x7F.
 i2c_flags: 0.
 . .
 
 No flags are currently defined.  This parameter should be set to zero.
+
+Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
+will be available if a kernel supported bus multiplexor is being used.
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
@@ -2560,7 +2570,7 @@ of the error.
 f::
 A function.
 
-frequency::0-
+frequency::>=0
 The number of times a GPIO is swiched on and off per second.  This
 can be set per GPIO and may be as little as 5Hz or as much as
 40KHz.  The GPIO will be on for a proportion of the time as defined
@@ -2611,15 +2621,15 @@ gpioThreadFunc_t::
 typedef void *(gpioThreadFunc_t) (void *);
 . .
 
-handle::0-
+handle::>=0
 A number referencing an object opened by one of [*i2c_open*], [*notify_open*],
 [*serial_open*], and [*spi_open*].
 
-i2c_addr::
+i2c_addr:: 0-0x7F
 The address of a device on the I2C bus.
 
-i2c_bus::0-1
-An I2C bus, 0 or 1.
+i2c_bus::>=0
+An I2C bus number.
 
 i2c_flags::0
 Flags which modify an I2C open command.  None are currently defined.

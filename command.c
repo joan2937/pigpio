@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 48+
+This version is for pigpio version 53+
 */
 
 #include <stdio.h>
@@ -426,7 +426,7 @@ static errInfo_t errInfo[]=
    {PI_SOCK_READ_FAILED , "socket read failed"},
    {PI_SOCK_WRIT_FAILED , "socket write failed"},
    {PI_TOO_MANY_PARAM   , "too many script parameters (> 10)"},
-   {PI_NOT_HALTED       , "script already running or failed"},
+   {PI_SCRIPT_NOT_READY , "script initialising"},
    {PI_BAD_TAG          , "script has unresolved tag"},
    {PI_BAD_MICS_DELAY   , "bad MICS delay (too large)"},
    {PI_BAD_MILS_DELAY   , "bad MILS delay (too large)"},

@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 52
+#define PIGPIO_VERSION 53
 
 /*TEXT
 
@@ -73,7 +73,7 @@ The PWM and servo pulses are timed using the DMA and PWM peripherals.
 
 This use was inspired by Richard Hirst's servoblaster kernel module.
 
-[https://github.com/richardghirst/PiBits/tree/master/ServoBlaster]
+See [[https://github.com/richardghirst/PiBits/tree/master/ServoBlaster]]
 
 *Usage*
 
@@ -623,7 +623,6 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_SPI_SLOTS 16
 #define PI_SER_SLOTS 8
 
-#define PI_NUM_I2C_BUS 2
 #define PI_MAX_I2C_ADDR 0x7F
 
 #define PI_NUM_AUX_SPI_CHANNEL 3
@@ -913,7 +912,7 @@ Sets the GPIO level, on or off.
 
 . .
  gpio: 0-53
-level: 0,1
+level: 0-1
 . .
 
 Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_LEVEL.
@@ -1073,14 +1072,14 @@ frequency: >=0
 Returns the numerically closest frequency if OK, otherwise
 PI_BAD_USER_GPIO.
 
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
 
 Each GPIO can be independently set to one of 18 different PWM
 frequencies.
 
-If PWM is currently active on the GPIO it will be
-switched off and then back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
 
 The frequencies for each sample rate are:
 
@@ -1210,7 +1209,7 @@ Returns the servo pulsewidth setting for the GPIO.
 user_gpio: 0-31
 . .
 
-Returns , 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
+Returns 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 D*/
 
@@ -1271,7 +1270,7 @@ void aFunction(int gpio, int level, uint32_t tick)
 
 // call aFunction whenever GPIO 4 changes state
 
-gpioSetAlertFunc(4F, aFunction);
+gpioSetAlertFunc(4, aFunction);
 ...
 D*/
 
@@ -1645,8 +1644,8 @@ user_gpio: 0-31
      baud: 50-1000000
 data_bits: 1-32
 stop_bits: 2-8
-   offset: 0-
- numBytes: 1-
+   offset: >=0
+ numBytes: >=1
       str: an array of chars (which may contain nulls)
 . .
 
@@ -2017,7 +2016,7 @@ normal logic.  Default is PI_BB_SER_NORMAL.
 
 . .
 user_gpio: 0-31
-invert: 0-1
+   invert: 0-1
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
@@ -2037,7 +2036,7 @@ bit bang serial cyclic buffer to the buffer starting at buf.
 . .
 user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
       buf: an array to receive the read bytes
-  bufSize: 0-
+  bufSize: >=0
 . .
 
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
@@ -2070,12 +2069,15 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 This returns a handle for the device at the address on the I2C bus.
 
 . .
-  i2cBus: 0-1
- i2cAddr: 0x00-0x7F
+  i2cBus: >=0
+ i2cAddr: 0-0x7F
 i2cFlags: 0
 . .
 
 No flags are currently defined.  This parameter should be set to zero.
+
+Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
+will be available if a kernel supported bus multiplexor is being used.
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
@@ -3189,6 +3191,8 @@ int gpioStoreScript(char *script);
 /*D
 This function stores a null terminated script for later execution.
 
+See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+
 . .
 script: the text of the script
 . .
@@ -4260,7 +4264,7 @@ f::
 
 A function.
 
-frequency::0-
+frequency::>=0
 
 The number of times a GPIO is swiched on and off per second.  This
 can be set per GPIO and may be as little as 5Hz or as much as
@@ -4397,7 +4401,7 @@ One of
 [*gpioWaveAddGeneric*] 
 [*gpioWaveAddSerial*]
 
-handle::0-
+handle::>=0
 
 A number referencing an object opened by one of
 
@@ -4406,12 +4410,12 @@ A number referencing an object opened by one of
 [*serOpen*] 
 [*spiOpen*]
 
-i2cAddr::
+i2cAddr:: 0-0x7F
 The address of a device on the I2C bus.
 
-i2cBus::0-1
+i2cBus::>=0
 
-An I2C bus, 0 or 1.
+An I2C bus number.
 
 i2cFlags::0
 
@@ -5119,7 +5123,8 @@ after this command is issued.
 #define PI_SOCK_READ_FAILED -59 // socket read failed
 #define PI_SOCK_WRIT_FAILED -60 // socket write failed
 #define PI_TOO_MANY_PARAM   -61 // too many script parameters (> 10)
-#define PI_NOT_HALTED       -62 // script already running or failed
+#define PI_NOT_HALTED       -62 // DEPRECATED
+#define PI_SCRIPT_NOT_READY -62 // script initialising
 #define PI_BAD_TAG          -63 // script has unresolved tag
 #define PI_BAD_MICS_DELAY   -64 // bad MICS delay (too large)
 #define PI_BAD_MILS_DELAY   -65 // bad MILS delay (too large)
@@ -5214,7 +5219,7 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
 #define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 
-#define PI_DEFAULT_CFG_INTERNALS         0
+#define PI_DEFAULT_CFG_INTERNALS           0
 
 /*DEF_E*/
 

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 5
+#define PIGPIOD_IF2_VERSION 6
 
 /*TEXT
 
@@ -387,7 +387,7 @@ Terminates the connection to a pigpio daemon and releases
 resources used by the library.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -397,7 +397,7 @@ int set_mode(int pi, unsigned gpio, unsigned mode);
 Set the GPIO mode.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 gpio: 0-53.
 mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
       PI_ALT2, PI_ALT3, PI_ALT4, PI_ALT5.
@@ -413,7 +413,7 @@ int get_mode(int pi, unsigned gpio);
 Get the GPIO mode.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 gpio: 0-53.
 . .
 
@@ -426,7 +426,7 @@ int set_pull_up_down(int pi, unsigned gpio, unsigned pud);
 Set or clear the GPIO pull-up/down resistor.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 gpio: 0-53.
  pud: PI_PUD_UP, PI_PUD_DOWN, PI_PUD_OFF.
 . .
@@ -441,7 +441,7 @@ int gpio_read(int pi, unsigned gpio);
 Read the GPIO level.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 gpio:0-53.
 . .
 
@@ -454,7 +454,7 @@ int gpio_write(int pi, unsigned gpio, unsigned level);
 Write the GPIO level.
 
 . .
-   pi: 0- (as returned by [*pigpio_start*]).
+   pi: >=0 (as returned by [*pigpio_start*]).
  gpio: 0-53.
 level: 0, 1.
 . .
@@ -473,7 +473,7 @@ int set_PWM_dutycycle(int pi, unsigned user_gpio, unsigned dutycycle);
 Start (non-zero dutycycle) or stop (0) PWM pulses on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 dutycycle: 0-range (range defaults to 255).
 . .
@@ -492,7 +492,7 @@ int get_PWM_dutycycle(int pi, unsigned user_gpio);
 Return the PWM dutycycle in use on a GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 . .
 
@@ -514,7 +514,7 @@ int set_PWM_range(int pi, unsigned user_gpio, unsigned range);
 Set the range of PWM values to be used on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
     range: 25-40000.
 . .
@@ -545,7 +545,7 @@ int get_PWM_range(int pi, unsigned user_gpio);
 Get the range of PWM values being used on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 . .
 
@@ -562,7 +562,7 @@ int get_PWM_real_range(int pi, unsigned user_gpio);
 Get the real underlying range of PWM values being used on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 . .
 
@@ -583,42 +583,47 @@ int set_PWM_frequency(int pi, unsigned user_gpio, unsigned frequency);
 Set the frequency (in Hz) of the PWM to be used on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
-frequency: 0- (Hz).
+frequency: >=0 (Hz).
 . .
 
 Returns the numerically closest frequency if OK, otherwise
 PI_BAD_USER_GPIO or PI_NOT_PERMITTED.
 
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
-sample rate is set when the C pigpio library is started.
+If PWM is currently active on the GPIO it will be switched
+off and then back on at the new frequency.
 
 Each GPIO can be independently set to one of 18 different
 PWM frequencies.
 
-If PWM is currently active on the GPIO it will be switched
-off and then back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
+
+The frequencies for each sample rate are:
 
 . .
-1us 40000, 20000, 10000, 8000, 5000, 4000, 2500, 2000, 1600,
-     1250,  1000,   800,  500,  400,  250,  200,  100,   50
+                       Hertz
 
-2us 20000, 10000,  5000, 4000, 2500, 2000, 1250, 1000,  800,
-      625,   500,   400,  250,  200,  125,  100,   50 ,  25
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+           1250  1000   800  500  400  250  200  100   50
 
-4us 10000,  5000,  2500, 2000, 1250, 1000,  625,  500,  400,
-      313,   250,   200,  125,  100,   63,   50,   25,   13
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+            625   500   400  250  200  125  100   50   25
 
-5us  8000,  4000,  2000, 1600, 1000,  800,  500,  400,  320,
-      250,   200,   160,  100  , 80,   50,   40,   20,   10
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+            313   250   200  125  100   63   50   25   13
+sample
+ rate
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+            250   200   160  100   80   50   40   20   10
 
-8us  5000,  2500,  1250, 1000,  625,  500,  313,  250,  200,
-      156,   125,   100,   63,   50,   31,   25,   13,    6
+       8:  5000  2500  1250 1000  625  500  313  250  200
+            156   125   100   63   50   31   25   13    6
 
-10us 4000,  2000,  1000,  800,  500,  400,  250,  200,  160,
-      125,   100,    80,   50,   40,   25,   20,   10,    5
+      10:  4000  2000  1000  800  500  400  250  200  160
+            125   100    80   50   40   25   20   10    5
 . .
 D*/
 
@@ -628,7 +633,7 @@ int get_PWM_frequency(int pi, unsigned user_gpio);
 Get the frequency of PWM being used on the GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 . .
 
@@ -651,7 +656,7 @@ int set_servo_pulsewidth(int pi, unsigned user_gpio, unsigned pulsewidth);
 Start (500-2500) or stop (0) servo pulses on the GPIO.
 
 . .
-        pi: 0- (as returned by [*pigpio_start*]).
+        pi: >=0 (as returned by [*pigpio_start*]).
  user_gpio: 0-31.
 pulsewidth: 0 (off), 500 (anti-clockwise) - 2500 (clockwise).
 . .
@@ -701,7 +706,7 @@ int get_servo_pulsewidth(int pi, unsigned user_gpio);
 Return the servo pulsewidth in use on a GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
 . .
 
@@ -714,7 +719,7 @@ int notify_open(int pi);
 Get a free notification handle.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns a handle greater than or equal to zero if OK,
@@ -740,7 +745,7 @@ int notify_begin(int pi, unsigned handle, uint32_t bits);
 Start notifications on a previously opened handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: 0-31 (as returned by [*notify_open*])
   bits: a mask indicating the GPIO to be notified.
 . .
@@ -768,7 +773,7 @@ int notify_pause(int pi, unsigned handle);
 Pause notifications on a previously opened handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: 0-31 (as returned by [*notify_open*])
 . .
 
@@ -785,7 +790,7 @@ Stop notifications on a previously opened handle and
 release the handle for reuse.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: 0-31 (as returned by [*notify_open*])
 . .
 
@@ -798,7 +803,7 @@ int set_watchdog(int pi, unsigned user_gpio, unsigned timeout);
 Sets a watchdog for a GPIO.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
   timeout: 0-60000.
 . .
@@ -831,7 +836,7 @@ level is then reported.  Level changes of less than
 [*steady*] microseconds are ignored.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31
    steady: 0-300000
 . .
@@ -854,7 +859,7 @@ on the GPIO are then reported for [*active*] microseconds after
 which the process repeats.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31
    steady: 0-300000
    active: 0-1000000
@@ -873,7 +878,7 @@ uint32_t read_bank_1(int pi);
 Read the levels of the bank 1 GPIO (GPIO 0-31).
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 The returned 32 bit integer has a bit set if the corresponding
@@ -886,7 +891,7 @@ uint32_t read_bank_2(int pi);
 Read the levels of the bank 2 GPIO (GPIO 32-53).
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 The returned 32 bit integer has a bit set if the corresponding
@@ -899,7 +904,7 @@ int clear_bank_1(int pi, uint32_t bits);
 Clears GPIO 0-31 if the corresponding bit in bits is set.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 bits: a bit mask with 1 set if the corresponding GPIO is
       to be cleared.
 . .
@@ -916,7 +921,7 @@ int clear_bank_2(int pi, uint32_t bits);
 Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 bits: a bit mask with 1 set if the corresponding GPIO is
       to be cleared.
 . .
@@ -933,7 +938,7 @@ int set_bank_1(int pi, uint32_t bits);
 Sets GPIO 0-31 if the corresponding bit in bits is set.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 bits: a bit mask with 1 set if the corresponding GPIO is
       to be set.
 . .
@@ -950,7 +955,7 @@ int set_bank_2(int pi, uint32_t bits);
 Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 bits: a bit mask with 1 set if the corresponding GPIO is
       to be set.
 . .
@@ -969,7 +974,7 @@ Starts a hardware clock on a GPIO at the specified frequency.
 Frequencies above 30MHz are unlikely to work.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
      gpio: see description
 frequency: 0 (off) or 4689-250000000 (250M)
 . .
@@ -1016,7 +1021,7 @@ main clock defaults to PCM but may be overridden when the pigpio
 daemon is started (option -t).
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
    gpio: see descripton
 PWMfreq: 0 (off) or 1-125000000 (125M)
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
@@ -1063,7 +1068,7 @@ uint32_t get_current_tick(int pi);
 Gets the current system tick.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Tick is the number of microseconds since system boot.
@@ -1079,7 +1084,7 @@ uint32_t get_hardware_revision(int pi);
 Get the Pi's hardware revision number.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 The hardware revision is the last few characters on the Revision line
@@ -1106,7 +1111,7 @@ uint32_t get_pigpio_version(int pi);
 Returns the pigpio version.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1118,7 +1123,7 @@ This function clears all waveforms and any data added by calls to the
 [*wave_add_**] functions.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns 0 if OK.
@@ -1132,7 +1137,7 @@ to call this function as it is automatically called after a waveform is
 created with the [*wave_create*] function.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns 0 if OK.
@@ -1144,7 +1149,7 @@ int wave_add_generic(int pi, unsigned numPulses, gpioPulse_t *pulses);
 This function adds a number of pulses to the current waveform.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 numPulses: the number of pulses.
    pulses: an array of pulses.
 . .
@@ -1172,13 +1177,13 @@ existing waveform (if any).  The serial data starts offset
 microseconds from the start of the waveform.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
      baud: 50-1000000
 data_bits: number of data bits (1-32)
 stop_bits: number of stop half bits (2-8)
-   offset: 0-
- numBytes: 1-
+   offset: >=0
+ numBytes: >=1
       str: an array of chars.
 . .
 
@@ -1213,7 +1218,7 @@ greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
 PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 The data provided by the [*wave_add_**] functions is consumed by this
@@ -1269,7 +1274,7 @@ int wave_delete(int pi, unsigned wave_id);
 This function deletes the waveform with id wave_id.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
 . .
 
@@ -1288,7 +1293,7 @@ is sent once.
 NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
 . .
 
@@ -1307,7 +1312,7 @@ by [*wave_tx_stop*]).
 NOTE: Any hardware PWM started by [*hardware_PWM*] will be cancelled.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
 . .
 
@@ -1322,7 +1327,7 @@ int wave_send_using_mode(int pi, unsigned wave_id, unsigned mode);
 Transmits the waveform with id wave_id using mode mode.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
 wave_id: >=0, as returned by [*wave_create*].
    mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
          PI_WAVE_MODE_ONE_SHOT_SYNC, or PI_WAVE_MODE_REPEAT_SYNC.
@@ -1359,7 +1364,7 @@ which contains an ordered list of [*wave_id*]s and optional command
 codes and related data.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
     buf: pointer to the wave_ids and optional command codes
 bufSize: the number of bytes in buf
 . .
@@ -1450,7 +1455,7 @@ This function returns the id of the waveform currently being
 transmitted.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns the waveform id or one of the following special values:
@@ -1466,7 +1471,7 @@ This function checks to see if a waveform is currently being
 transmitted.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns 1 if a waveform is currently being transmitted, otherwise 0.
@@ -1478,7 +1483,7 @@ int wave_tx_stop(int pi);
 This function stops the transmission of the current waveform.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 
 Returns 0 if OK.
@@ -1493,7 +1498,7 @@ This function returns the length in microseconds of the current
 waveform.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1504,7 +1509,7 @@ This function returns the length in microseconds of the longest waveform
 created since the pigpio daemon was started.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1515,7 +1520,7 @@ This function returns the maximum possible size of a waveform in
 microseconds.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1525,7 +1530,7 @@ int wave_get_pulses(int pi);
 This function returns the length in pulses of the current waveform.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1536,7 +1541,7 @@ This function returns the length in pulses of the longest waveform
 created since the pigpio daemon was started.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1546,7 +1551,7 @@ int wave_get_max_pulses(int pi);
 This function returns the maximum possible size of a waveform in pulses.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1557,7 +1562,7 @@ This function returns the length in DMA control blocks of the current
 waveform.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1568,7 +1573,7 @@ This function returns the length in DMA control blocks of the longest
 waveform created since the pigpio daemon was started.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1579,7 +1584,7 @@ This function returns the maximum possible size of a waveform in DMA
 control blocks.
 
 . .
-pi: 0- (as returned by [*pigpio_start*]).
+pi: >=0 (as returned by [*pigpio_start*]).
 . .
 D*/
 
@@ -1590,7 +1595,7 @@ This function sends a trigger pulse to a GPIO.  The GPIO is set to
 level for pulseLen microseconds and then reset to not level.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
  pulseLen: 1-100.
     level: 0,1.
@@ -1605,8 +1610,10 @@ int store_script(int pi, char *script);
 /*D
 This function stores a script for later execution.
 
+See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 script: the text of the script.
 . .
 
@@ -1620,7 +1627,7 @@ int run_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param);
 This function runs a stored script.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 script_id: >=0, as returned by [*store_script*].
    numPar: 0-10, the number of parameters.
     param: an array of parameters.
@@ -1640,7 +1647,7 @@ This function returns the run status of a stored script as well
 as the current values of parameters 0 to 9.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 script_id: >=0, as returned by [*store_script*].
     param: an array to hold the returned 10 parameters.
 . .
@@ -1667,7 +1674,7 @@ int stop_script(int pi, unsigned script_id);
 This function stops a running script.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 script_id: >=0, as returned by [*store_script*].
 . .
 
@@ -1680,7 +1687,7 @@ int delete_script(int pi, unsigned script_id);
 This function deletes a stored script.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 script_id: >=0, as returned by [*store_script*].
 . .
 
@@ -1693,7 +1700,7 @@ int bb_serial_read_open(int pi, unsigned user_gpio, unsigned baud, unsigned data
 This function opens a GPIO for bit bang reading of serial data.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
      baud: 50-250000
 data_bits: 1-32
@@ -1716,10 +1723,10 @@ This function copies up to bufSize bytes of data read from the
 bit bang serial cyclic buffer to the buffer starting at buf.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
       buf: an array to receive the read bytes.
-  bufSize: 0-
+  bufSize: >=0
 . .
 
 Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
@@ -1739,7 +1746,7 @@ int bb_serial_read_close(int pi, unsigned user_gpio);
 This function closes a GPIO for bit bang reading of serial data.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
 . .
 
@@ -1752,7 +1759,7 @@ int bb_serial_invert(int pi, unsigned user_gpio, unsigned invert);
 This function inverts serial logic for big bang serial reads.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31, previously opened with [*bb_serial_read_open*].
    invert: 0-1, 1 invert, 0 normal.
 . .
@@ -1766,13 +1773,16 @@ int i2c_open(int pi, unsigned i2c_bus, unsigned i2c_addr, unsigned i2c_flags);
 This returns a handle for the device at address i2c_addr on bus i2c_bus.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
-  i2c_bus: 0-1.
- i2c_addr: 0x00-0x7F.
+       pi: >=0 (as returned by [*pigpio_start*]).
+  i2c_bus: >=0.
+ i2c_addr: 0-0x7F.
 i2c_flags: 0.
 . .
 
 No flags are currently defined.  This parameter should be set to zero.
+
+Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
+will be available if a kernel supported bus multiplexor is being used.
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
@@ -1800,7 +1810,7 @@ int i2c_close(int pi, unsigned handle);
 This closes the I2C device associated with the handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
 . .
 
@@ -1814,7 +1824,7 @@ This sends a single bit (in the Rd/Wr bit) to the device associated
 with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
    bit: 0-1, the value to write.
 . .
@@ -1834,7 +1844,7 @@ int i2c_write_byte(int pi, unsigned handle, unsigned bVal);
 This sends a single byte to the device associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
   bVal: 0-0xFF, the value to write.
 . .
@@ -1854,7 +1864,7 @@ int i2c_read_byte(int pi, unsigned handle);
 This reads a single byte from the device associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
 . .
 
@@ -1875,7 +1885,7 @@ This writes a single byte to the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write.
    bVal: 0-0xFF, the value to write.
@@ -1898,7 +1908,7 @@ This writes a single 16 bit word to the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write.
    wVal: 0-0xFFFF, the value to write.
@@ -1920,7 +1930,7 @@ This reads a single byte from the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to read.
 . .
@@ -1941,7 +1951,7 @@ This reads a single 16 bit word from the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to read.
 . .
@@ -1963,7 +1973,7 @@ This writes 16 bits of data to the specified register of the device
 associated with handle and and reads 16 bits of data in return.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write/read.
    wVal: 0-0xFFFF, the value to write.
@@ -1987,7 +1997,7 @@ This writes up to 32 bytes to the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write.
     buf: an array with the data to send.
@@ -2011,7 +2021,7 @@ This reads a block of up to 32 bytes from the specified register of
 the device associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to read.
     buf: an array to receive the read data.
@@ -2038,7 +2048,7 @@ associated with handle and reads a device specified number
 of bytes of data in return.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write/read.
     buf: an array with the data to send and to receive the read data.
@@ -2068,7 +2078,7 @@ This reads count bytes from the specified register of the device
 associated with handle .  The count may be 1-32.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to read.
     buf: an array to receive the read data.
@@ -2093,7 +2103,7 @@ This writes 1 to 32 bytes to the specified register of the device
 associated with handle.
 
 . .
-     pi: 0- (as returned by [*pigpio_start*]).
+     pi: >=0 (as returned by [*pigpio_start*]).
  handle: >=0, as returned by a call to [*i2c_open*].
 i2c_reg: 0-255, the register to write.
     buf: the data to write.
@@ -2114,7 +2124,7 @@ int i2c_read_device(int pi, unsigned handle, char *buf, unsigned count);
 This reads count bytes from the raw device into buf.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
    buf: an array to receive the read data bytes.
  count: >0, the number of bytes to read.
@@ -2134,7 +2144,7 @@ int i2c_write_device(int pi, unsigned handle, char *buf, unsigned count);
 This writes count bytes from buf to the raw device.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2c_open*].
    buf: an array containing the data bytes to write.
  count: >0, the number of bytes to write.
@@ -2162,7 +2172,7 @@ operations to be performed are specified by the contents of inBuf
 which contains the concatenated command codes and associated data.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*i2cOpen*]
  inBuf: pointer to the concatenated I2C commands, see below
  inLen: size of command buffer
@@ -2226,7 +2236,7 @@ o clock stretching
 o I2C on any pair of spare GPIO
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
  SDA: 0-31
  SCL: 0-31
 baud: 50-500000
@@ -2248,7 +2258,7 @@ This function stops bit banging I2C on a pair of GPIO previously
 opened with [*bb_i2c_open*].
 
 . .
- pi: 0- (as returned by [*pigpio_start*]).
+ pi: >=0 (as returned by [*pigpio_start*]).
 SDA: 0-31, the SDA GPIO used in a prior call to [*bb_i2c_open*]
 . .
 
@@ -2269,7 +2279,7 @@ operations to be performed are specified by the contents of inBuf
 which contains the concatenated command codes and associated data.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
    SDA: 0-31 (as used in a prior call to [*bb_i2c_open*])
  inBuf: pointer to the concatenated I2C commands, see below
  inLen: size of command buffer
@@ -2342,7 +2352,7 @@ flags.  The auxiliary device has 3 chip selects and a
 selectable word size in bits.
 
 . .
-         pi: 0- (as returned by [*pigpio_start*]).
+         pi: >=0 (as returned by [*pigpio_start*]).
 spi_channel: 0-1 (0-2 for the auxiliary device).
        baud: 32K-125M (values above 30M are unlikely to work).
   spi_flags: see below.
@@ -2414,7 +2424,7 @@ int spi_close(int pi, unsigned handle);
 This functions closes the SPI device identified by the handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*spi_open*].
 . .
 
@@ -2428,7 +2438,7 @@ This function reads count bytes of data from the SPI
 device associated with the handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*spi_open*].
    buf: an array to receive the read data bytes.
  count: the number of bytes to read.
@@ -2445,7 +2455,7 @@ This function writes count bytes of data from buf to the SPI
 device associated with the handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*spi_open*].
    buf: the data bytes to write.
  count: the number of bytes to write.
@@ -2464,7 +2474,7 @@ device associated with the handle.  Simultaneously count bytes of
 data are read from the device and placed in rxBuf.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*spi_open*].
  txBuf: the data bytes to write.
  rxBuf: the received data bytes.
@@ -2482,7 +2492,7 @@ This function opens a serial device at a specified baud rate
 with specified flags.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
   ser_tty: the serial device to open, /dev/tty*.
      baud: the baud rate in bits per second, see below.
 ser_flags: 0.
@@ -2504,7 +2514,7 @@ int serial_close(int pi, unsigned handle);
 This function closes the serial device associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
 . .
 
@@ -2517,7 +2527,7 @@ int serial_write_byte(int pi, unsigned handle, unsigned bVal);
 This function writes bVal to the serial port associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
 . .
 
@@ -2531,7 +2541,7 @@ int serial_read_byte(int pi, unsigned handle);
 This function reads a byte from the serial port associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
 . .
 
@@ -2546,7 +2556,7 @@ This function writes count bytes from buf to the the serial port
 associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
    buf: the array of bytes to write.
  count: the number of bytes to write.
@@ -2563,7 +2573,7 @@ This function reads up to count bytes from the the serial port
 associated with handle and writes them to buf.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
    buf: an array to receive the read data.
  count: the maximum number of bytes to read.
@@ -2580,7 +2590,7 @@ Returns the number of bytes available to be read from the
 device associated with handle.
 
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
 handle: >=0, as returned by a call to [*serial_open*].
 . .
 
@@ -2596,7 +2606,7 @@ This function is available for user customisation.
 It returns a single integer value.
 
 . .
-  pi: 0- (as returned by [*pigpio_start*]).
+  pi: >=0 (as returned by [*pigpio_start*]).
 arg1: >=0
 arg2: >=0
 argx: extra (byte) arguments
@@ -2618,7 +2628,7 @@ rather than just an integer.
 
 The return value is an integer indicating the number of returned bytes.
 . .
-    pi: 0- (as returned by [*pigpio_start*]).
+    pi: >=0 (as returned by [*pigpio_start*]).
   arg1: >=0
   argc: extra (byte) arguments
  count: number of extra arguments
@@ -2638,7 +2648,7 @@ int callback(int pi, unsigned user_gpio, unsigned edge, CBFunc_t f);
 This function initialises a new callback.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
         f: the callback function.
@@ -2658,7 +2668,7 @@ int callback_ex
 This function initialises a new callback.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
         f: the callback function.
@@ -2691,7 +2701,7 @@ This function waits for edge on the GPIO for up to timeout
 seconds.
 
 . .
-       pi: 0- (as returned by [*pigpio_start*]).
+       pi: >=0 (as returned by [*pigpio_start*]).
 user_gpio: 0-31.
      edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE.
   timeout: >=0.
@@ -2821,7 +2831,7 @@ of the error.
 f::
 A function.
 
-frequency::0-
+frequency::>=0
 The number of times a GPIO is swiched on and off per second.  This
 can be set per GPIO and may be as little as 5Hz or as much as
 40KHz.  The GPIO will be on for a proportion of the time as defined
@@ -2872,15 +2882,15 @@ gpioThreadFunc_t::
 typedef void *(gpioThreadFunc_t) (void *);
 . .
 
-handle::0-
+handle::>=0
 A number referencing an object opened by one of [*i2c_open*], [*notify_open*],
 [*serial_open*], and [*spi_open*].
 
-i2c_addr::
+i2c_addr::0-0x7F
 The address of a device on the I2C bus.
 
-i2c_bus::0-1
-An I2C bus, 0 or 1.
+i2c_bus::>=0
+An I2C bus number.
 
 i2c_flags::0
 Flags which modify an I2C open command.  None are currently defined.

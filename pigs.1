@@ -882,6 +882,11 @@ This command returns a handle to access device \fBid\fP on I2C bus \fBib\fP.
 The device is opened with flags \fBif\fP.
 
 .br
+Physically buses 0 and 1 are available on the Pi.  Higher
+numbered buses will be available if a kernel supported bus
+multiplexor is being used.
+
+.br
 No flags are currently defined.  The parameter \fBif\fP should be 0.
 
 .br
@@ -3388,7 +3393,7 @@ pigs wvcha \
 .br
 
 .br
-while [[ $(pigs wvbsy) -eq 1 ]]; do sleep 0.1; done
+while \fB $(pigs wvbsy) -eq 1 \fP; do sleep 0.1; done
 .br
 
 .br
@@ -3953,12 +3958,12 @@ A handle is a number referencing an object opened by one of \fBI2CO\fP, \fBNO\fP
 
 .br
 
-.IP "\fBib\fP - I2C bus (0-1)" 0
-The command expects an I2C bus.
+.IP "\fBib\fP - I2C bus (>=0)" 0
+The command expects an I2C bus number.
 
 .br
 
-.IP "\fBid\fP - I2C device (0x08-0x77)" 0
+.IP "\fBid\fP - I2C device (0-0x7F)" 0
 The command expects the address of an I2C device.
 
 .br
@@ -4309,7 +4314,7 @@ Again, ignore the details for now.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); \fB ${a::1} -eq 2 \fP;\
 .br
  do sleep 0.2; done)
 .br
@@ -4349,7 +4354,7 @@ jp 999 jumps to tag 999 if the result is positive.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); \fB ${a::1} -eq 2 \fP;\
 .br
  do sleep 0.2; done)
 .br

@@ -112,7 +112,8 @@ This use was inspired by Richard Hirst's servoblaster kernel module.
 .br
 
 .br
-https://github.com/richardghirst/PiBits/tree/master/ServoBlaster
+See \fBhttps://github.com/richardghirst/PiBits/tree/master/ServoBlaster\fP
+
 .br
 
 .br
@@ -450,7 +451,7 @@ Sets the GPIO level, on or off.
 .EX
  gpio: 0-53
 .br
-level: 0,1
+level: 0-1
 .br
 
 .EE
@@ -749,8 +750,8 @@ PI_BAD_USER_GPIO.
 .br
 
 .br
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
 
 .br
 
@@ -761,8 +762,8 @@ frequencies.
 .br
 
 .br
-If PWM is currently active on the GPIO it will be
-switched off and then back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
 
 .br
 
@@ -1016,7 +1017,7 @@ user_gpio: 0-31
 .br
 
 .br
-Returns , 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
+Returns 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 
 .IP "\fBint gpioSetAlertFunc(unsigned user_gpio, gpioAlertFunc_t f)\fP"
@@ -1138,7 +1139,7 @@ void aFunction(int gpio, int level, uint32_t tick)
 .br
 
 .br
-gpioSetAlertFunc(4F, aFunction);
+gpioSetAlertFunc(4, aFunction);
 .br
 
 .EE
@@ -1773,9 +1774,9 @@ data_bits: 1-32
 .br
 stop_bits: 2-8
 .br
-   offset: 0-
+   offset: >=0
 .br
- numBytes: 1-
+ numBytes: >=1
 .br
       str: an array of chars (which may contain nulls)
 .br
@@ -2371,7 +2372,7 @@ normal logic.  Default is PI_BB_SER_NORMAL.
 .EX
 user_gpio: 0-31
 .br
-invert: 0-1
+   invert: 0-1
 .br
 
 .EE
@@ -2402,7 +2403,7 @@ user_gpio: 0-31, previously opened with \fBgpioSerialReadOpen\fP
 .br
       buf: an array to receive the read bytes
 .br
-  bufSize: 0-
+  bufSize: >=0
 .br
 
 .EE
@@ -2456,9 +2457,9 @@ This returns a handle for the device at the address on the I2C bus.
 .br
 
 .EX
-  i2cBus: 0-1
+  i2cBus: >=0
 .br
- i2cAddr: 0x00-0x7F
+ i2cAddr: 0-0x7F
 .br
 i2cFlags: 0
 .br
@@ -2469,6 +2470,12 @@ i2cFlags: 0
 
 .br
 No flags are currently defined.  This parameter should be set to zero.
+
+.br
+
+.br
+Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
+will be available if a kernel supported bus multiplexor is being used.
 
 .br
 
@@ -4387,6 +4394,11 @@ This function stores a null terminated script for later execution.
 .br
 
 .br
+See \fBhttp://abyz.co.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
+
+.br
+
+.br
 
 .EX
 script: the text of the script
@@ -6266,7 +6278,7 @@ A function.
 
 .br
 
-.IP "\fBfrequency\fP: 0-" 0
+.IP "\fBfrequency\fP: >=0" 0
 
 .br
 
@@ -6580,7 +6592,7 @@ One of
 
 .br
 
-.IP "\fBhandle\fP: 0-" 0
+.IP "\fBhandle\fP: >=0" 0
 
 .br
 
@@ -6602,19 +6614,19 @@ A number referencing an object opened by one of
 
 .br
 
-.IP "\fBi2cAddr\fP" 0
+.IP "\fBi2cAddr\fP: 0-0x7F" 0
 The address of a device on the I2C bus.
 
 .br
 
 .br
 
-.IP "\fBi2cBus\fP: 0-1" 0
+.IP "\fBi2cBus\fP: >=0" 0
 
 .br
 
 .br
-An I2C bus, 0 or 1.
+An I2C bus number.
 
 .br
 
@@ -8097,7 +8109,9 @@ A 16-bit word value.
 .br
 #define PI_TOO_MANY_PARAM   -61 // too many script parameters (> 10)
 .br
-#define PI_NOT_HALTED       -62 // script already running or failed
+#define PI_NOT_HALTED       -62 // DEPRECATED
+.br
+#define PI_SCRIPT_NOT_READY -62 // script initialising
 .br
 #define PI_BAD_TAG          -63 // script has unresolved tag
 .br
@@ -8286,7 +8300,7 @@ A 16-bit word value.
 .br
 
 .br
-#define PI_DEFAULT_CFG_INTERNALS         0
+#define PI_DEFAULT_CFG_INTERNALS           0
 .br
 
 .br

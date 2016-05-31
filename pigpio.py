@@ -176,7 +176,7 @@ wave_add_generic          Adds a series of pulses to the waveform
 wave_add_serial           Adds serial data to the waveform
 
 wave_create               Creates a waveform from added data
-wave_delete               Deletes one or more waveforms
+wave_delete               Deletes a waveform
 
 wave_send_once            Transmits a waveform once
 wave_send_repeat          Transmits a waveform repeatedly
@@ -270,7 +270,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.30"
+VERSION = "1.31"
 
 exceptions = True
 
@@ -524,7 +524,7 @@ PI_NO_MEMORY        =-58
 PI_SOCK_READ_FAILED =-59
 PI_SOCK_WRIT_FAILED =-60
 PI_TOO_MANY_PARAM   =-61
-PI_NOT_HALTED       =-62
+PI_SCRIPT_NOT_READY =-62
 PI_BAD_TAG          =-63
 PI_BAD_MICS_DELAY   =-64
 PI_BAD_MILS_DELAY   =-65
@@ -652,7 +652,7 @@ _errors=[
    [PI_SOCK_READ_FAILED  , "socket read failed"],
    [PI_SOCK_WRIT_FAILED  , "socket write failed"],
    [PI_TOO_MANY_PARAM    , "too many script parameters (> 10)"],
-   [PI_NOT_HALTED        , "script already running or failed"],
+   [PI_SCRIPT_NOT_READY  , "script initialising"],
    [PI_BAD_TAG           , "script has unresolved tag"],
    [PI_BAD_MICS_DELAY    , "bad MICS delay (too large)"],
    [PI_BAD_MILS_DELAY    , "bad MILS delay (too large)"],
@@ -1247,7 +1247,43 @@ class pi():
       user_gpio:= 0-31.
       frequency:= >=0 Hz
 
-      Returns the frequency actually set.
+      Returns the numerically closest frequency if OK, otherwise
+      PI_BAD_USER_GPIO or PI_NOT_PERMITTED.
+
+      If PWM is currently active on the GPIO it will be switched
+      off and then back on at the new frequency.
+
+      Each GPIO can be independently set to one of 18 different
+      PWM frequencies.
+
+      The selectable frequencies depend upon the sample rate which
+      may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+      sample rate is set when the pigpio daemon is started.
+
+      The frequencies for each sample rate are:
+
+      . .
+                             Hertz
+
+             1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+                 1250  1000   800  500  400  250  200  100   50
+
+             2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+                  625   500   400  250  200  125  100   50   25
+
+             4: 10000  5000  2500 2000 1250 1000  625  500  400
+                  313   250   200  125  100   63   50   25   13
+      sample
+       rate
+       (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+                  250   200   160  100   80   50   40   20   10
+
+             8:  5000  2500  1250 1000  625  500  313  250  200
+                  156   125   100   63   50   31   25   13    6
+
+            10:  4000  2000  1000  800  500  400  250  200  160
+                  125   100    80   50   40   25   20   10    5
+      . .
 
       ...
       pi.set_PWM_frequency(4,0)
@@ -2256,14 +2292,18 @@ class pi():
       """
       Returns a handle (>=0) for the device at the I2C bus address.
 
-          i2c_bus:= 0-1.
-      i2c_address:= 0x00-0x7F.
+          i2c_bus:= >=0.
+      i2c_address:= 0-0x7F.
         i2c_flags:= 0, no flags are currently defined.
 
       Normally you would only use the [*i2c_**] functions if
       you are or will be connecting to the Pi over a network.  If
       you will always run on the local Pi use the standard SMBus
       module instead.
+
+      Physically buses 0 and 1 are available on the Pi.  Higher
+      numbered buses will be available if a kernel supported bus
+      multiplexor is being used.
 
       For the SMBus commands the low level transactions are shown
       at the end of the function description.  The following
@@ -3399,6 +3439,9 @@ class pi():
       """
       Store a script for later execution.
 
+      See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for
+      details.
+
       script:= the script text as a series of bytes.
 
       Returns a >=0 script id if OK.
@@ -3595,7 +3638,7 @@ class pi():
       Invert serial logic.
 
       user_gpio:= 0-31 (opened in a prior call to [*bb_serial_read_open*])
-      invert:= 0-1 (1 invert, 0 normal)
+          invert:= 0-1 (1 invert, 0 normal)
 
       ...
       status = pi.bb_serial_invert(17, 1)
@@ -3726,7 +3769,7 @@ class pi():
          user_gpio:= 0-31.
               edge:= EITHER_EDGE, RISING_EDGE (default), or
                      FALLING_EDGE.
-      wait_timeout:= 0.0- (default 60.0).
+      wait_timeout:= >=0.0 (default 60.0).
 
       The function returns when the edge is detected or after
       the number of seconds specified by timeout has expired.
@@ -3772,10 +3815,18 @@ class pi():
       This connects to the pigpio daemon and reserves resources
       to be used for sending commands and receiving notifications.
 
+      An instance attribute [*connected*] may be used to check the
+      success of the connection.  If the connection is established
+      successfully [*connected*] will be True, otherwise False.
+
       ...
       pi = pigio.pi()              # use defaults
       pi = pigpio.pi('mypi')       # specify host, default port
       pi = pigpio.pi('mypi', 7777) # specify host and port
+
+      pi = pigpio.pi()             # exit script if no connection
+      if not pi.connected:
+         exit()
       ...
       """
       self.connected = True
@@ -3892,13 +3943,16 @@ def xref():
    clkfreq: 4689-250M
    The hardware clock frequency.
 
+   connected:
+   True if a connection was established, False otherwise.
+
    count:
    The number of bytes of data to be transferred.
 
    data:
    Data to be transmitted, a series of bytes.
 
-   delay: 1-
+   delay: >=1
    The length of a pulse in microseconds.
 
    dutycycle: 0-range_
@@ -3958,7 +4012,7 @@ def xref():
    PI_SOCK_READ_FAILED = -59
    PI_SOCK_WRIT_FAILED = -60
    PI_TOO_MANY_PARAM = -61
-   PI_NOT_HALTED = -62
+   PI_SCRIPT_NOT_READY = -62
    PI_BAD_TAG = -63
    PI_BAD_MICS_DELAY = -64
    PI_BAD_MILS_DELAY = -65
@@ -4029,11 +4083,11 @@ def xref():
    gpio: 0-53
    A Broadcom numbered GPIO.  All the user GPIO are in the range 0-31.
 
-   There  are 54 General Purpose Input Outputs (GPIO) named gpio0
-   through gpio53.
+   There  are 54 General Purpose Input Outputs (GPIO) named GPIO0
+   through GPIO53.
 
-   They are split into two  banks.   Bank  1  consists  of  gpio0
-   through gpio31.  Bank 2 consists of gpio32 through gpio53.
+   They are split into two  banks.   Bank  1  consists  of  GPIO0
+   through GPIO31.  Bank 2 consists of GPIO32 through GPIO53.
 
    All the GPIO which are safe for the user to read and write are in
    bank 1.  Not all GPIO in bank 1 are safe though.  Type 1 boards
@@ -4067,7 +4121,7 @@ def xref():
    This mask selects the GPIO to be switched on at the start
    of a pulse.
 
-   handle: 0-
+   handle: >=0
    A number referencing an object opened by one of [*i2c_open*],
    [*notify_open*], [*serial_open*], [*spi_open*].
 
@@ -4077,13 +4131,13 @@ def xref():
    i2c_*:
    One of the i2c_ functions.
 
-   i2c_address:
+   i2c_address: 0-0x7F
    The address of a device on the I2C bus.
 
-   i2c_bus: 0-1
+   i2c_bus: >=0
    An I2C bus number.
 
-   i2c_flags: 32 bit
+   i2c_flags: 0
    No I2C flags are currently defined.
 
    invert: 0-1
@@ -4119,7 +4173,7 @@ def xref():
    WAVE_MODE_ONE_SHOT_SYNC = 2 
    WAVE_MODE_REPEAT_SYNC = 3
 
-   offset: 0-
+   offset: >=0
    The offset wave data starts from the beginning of the waveform
    being currently defined.
 
@@ -4170,7 +4224,7 @@ def xref():
    script:
    The text of a script to store on the pigpio daemon.
 
-   script_id: 0-
+   script_id: >=0
    A number referencing a script created by [*store_script*].
 
    SDA:
@@ -4226,7 +4280,7 @@ def xref():
    wave_add_*:
    One of [*wave_add_new*] , [*wave_add_generic*], [*wave_add_serial*].
 
-   wave_id: 0-
+   wave_id: >=0
    A number referencing a wave created by [*wave_create*].
 
    wave_send_*:
