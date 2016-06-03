@@ -1808,16 +1808,17 @@ Upon success the new frequency is returned.  On error a negative status code
 will be returned.
 
 .br
-The selectable frequencies depend upon the sample rate with which the
-pigpiod daemon was started.  The sample rate is one of 1, 2, 4, 5, 8,
-or 10 microseconds (default 5).
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
 
 .br
-Each GPIO can be independently set to one of 18 different PWM frequencies.
+Each GPIO can be independently set to one of 18 different PWM
+frequencies.
 
 .br
-If PWM is currently active on the GPIO it will be switched off and then
-back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
 
 .br
 The frequencies for each sample rate are:
@@ -1825,21 +1826,46 @@ The frequencies for each sample rate are:
 .br
 
 .EX
-        #1    #2    #3   #4   #5   #6   #7   #8   #9
- 1us 40000 20000 10000 8000 5000 4000 2500 2000 1600
- 2us 20000 10000  5000 4000 2500 2000 1250 1000  800
- 4us 10000  5000  2500 2000 1250 1000  625  500  400
- 5us  8000  4000  2000 1600 1000  800  500  400  320
- 8us  5000  2500  1250 1000  625  500  313  250  200
-10us  4000  2000  1000  800  500  400  250  200  160
-                                                
-       #10   #11   #12  #13  #14  #15  #16  #17  #18
- 1us  1250  1000   800  500  400  250  200  100   50
- 2us   625   500   400  250  200  125  100   50   25
- 4us   313   250   200  125  100   63   50   25   13
- 5us   250   200   160  100   80   50   40   20   10
- 8us   156   125   100   63   50   31   25   13    6
-10us   125   100    80   50   40   25   20   10    5
+                       Hertz
+.br
+
+.br
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+.br
+           1250  1000   800  500  400  250  200  100   50
+.br
+
+.br
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+.br
+            625   500   400  250  200  125  100   50   25
+.br
+
+.br
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+.br
+            313   250   200  125  100   63   50   25   13
+.br
+sample
+.br
+ rate
+.br
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+.br
+            250   200   160  100   80   50   40   20   10
+.br
+
+.br
+       8:  5000  2500  1250 1000  625  500  313  250  200
+.br
+            156   125   100   63   50   31   25   13    6
+.br
+
+.br
+      10:  4000  2000  1000  800  500  400  250  200  160
+.br
+            125   100    80   50   40   25   20   10    5
+.br
 
 .EE
 
@@ -3393,7 +3419,7 @@ pigs wvcha \
 .br
 
 .br
-while \fB $(pigs wvbsy) -eq 1 \fP; do sleep 0.1; done
+while [[ $(pigs wvbsy) -eq 1 ]]; do sleep 0.1; done
 .br
 
 .br
@@ -4314,7 +4340,7 @@ Again, ignore the details for now.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); \fB ${a::1} -eq 2 \fP;\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
 .br
  do sleep 0.2; done)
 .br
@@ -4354,7 +4380,7 @@ jp 999 jumps to tag 999 if the result is positive.
 .br
 
 .EX
-time (pigs procr 0 10000000; while a=$(pigs procp 0); \fB ${a::1} -eq 2 \fP;\
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
 .br
  do sleep 0.2; done)
 .br

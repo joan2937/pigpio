@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 53 */
+/* pigpio version 54 */
 
 /* include ------------------------------------------------------- */
 
@@ -4238,27 +4238,27 @@ static void spiInit(uint32_t flags)
 
       if (!(resvd&1))
       {
-         gpioSetMode(PI_ASPI_CE0,  PI_OUTPUT);
+         myGpioSetMode(PI_ASPI_CE0,  PI_OUTPUT);
          myGpioWrite(PI_ASPI_CE0, !(cspols&1));
       }
 
       if (!(resvd&2))
       {
-         gpioSetMode(PI_ASPI_CE1,  PI_OUTPUT);
+         myGpioSetMode(PI_ASPI_CE1,  PI_OUTPUT);
          myGpioWrite(PI_ASPI_CE1, !(cspols&2));
       }
 
       if (!(resvd&4))
       {
-         gpioSetMode(PI_ASPI_CE2,  PI_OUTPUT);
+         myGpioSetMode(PI_ASPI_CE2,  PI_OUTPUT);
          myGpioWrite(PI_ASPI_CE2, !(cspols&4));
       }
 
       /* set gpios to SPI mode */
 
-      gpioSetMode(PI_ASPI_SCLK, PI_ALT4);
-      gpioSetMode(PI_ASPI_MISO, PI_ALT4);
-      gpioSetMode(PI_ASPI_MOSI, PI_ALT4);
+      myGpioSetMode(PI_ASPI_SCLK, PI_ALT4);
+      myGpioSetMode(PI_ASPI_MISO, PI_ALT4);
+      myGpioSetMode(PI_ASPI_MOSI, PI_ALT4);
    }
    else
    {
@@ -4275,12 +4275,12 @@ static void spiInit(uint32_t flags)
 
       /* set gpios to SPI mode */
 
-      if (!(resvd&1)) gpioSetMode(PI_SPI_CE0,  PI_ALT0);
-      if (!(resvd&2)) gpioSetMode(PI_SPI_CE1,  PI_ALT0);
+      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  PI_ALT0);
+      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  PI_ALT0);
 
-      gpioSetMode(PI_SPI_SCLK, PI_ALT0);
-      gpioSetMode(PI_SPI_MISO, PI_ALT0);
-      gpioSetMode(PI_SPI_MOSI, PI_ALT0);
+      myGpioSetMode(PI_SPI_SCLK, PI_ALT0);
+      myGpioSetMode(PI_SPI_MISO, PI_ALT0);
+      myGpioSetMode(PI_SPI_MOSI, PI_ALT0);
    }
 }
 
@@ -4298,13 +4298,13 @@ static void spiTerm(uint32_t flags)
 
       /* restore original state */
 
-      if (!(resvd&1)) gpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
-      if (!(resvd&2)) gpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
-      if (!(resvd&4)) gpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
+      if (!(resvd&1)) myGpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
+      if (!(resvd&2)) myGpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
+      if (!(resvd&4)) myGpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
 
-      gpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
-      gpioSetMode(PI_ASPI_MISO, old_mode_amiso);
-      gpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
+      myGpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
+      myGpioSetMode(PI_ASPI_MISO, old_mode_amiso);
+      myGpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
 
       auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
       auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
@@ -4313,12 +4313,12 @@ static void spiTerm(uint32_t flags)
    {
       /* restore original state */
 
-      if (!(resvd&1)) gpioSetMode(PI_SPI_CE0,  old_mode_ce0);
-      if (!(resvd&2)) gpioSetMode(PI_SPI_CE1,  old_mode_ce1);
+      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  old_mode_ce0);
+      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  old_mode_ce1);
 
-      gpioSetMode(PI_SPI_SCLK, old_mode_sclk);
-      gpioSetMode(PI_SPI_MISO, old_mode_miso);
-      gpioSetMode(PI_SPI_MOSI, old_mode_mosi);
+      myGpioSetMode(PI_SPI_SCLK, old_mode_sclk);
+      myGpioSetMode(PI_SPI_MISO, old_mode_miso);
+      myGpioSetMode(PI_SPI_MOSI, old_mode_mosi);
 
       spiReg[SPI_CS]  = old_spi_cs;
       spiReg[SPI_CLK] = old_spi_clk;
@@ -8049,9 +8049,9 @@ int gpioSetMode(unsigned gpio, unsigned mode)
       switchFunctionOff(gpio);
 
       gpioInfo[gpio].is = GPIO_UNDEFINED;
-
-      gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
    }
+
+   gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
 
    return 0;
 }
@@ -8147,11 +8147,11 @@ int gpioWrite(unsigned gpio, unsigned level)
 
          switchFunctionOff(gpio);
 
-         gpioSetMode(gpio, PI_OUTPUT);
-
          gpioInfo[gpio].is = GPIO_WRITE;
       }
    }
+
+   myGpioSetMode(gpio, PI_OUTPUT);
 
    if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
    else                 *(gpioReg + GPSET0 + BANK) = BIT;
@@ -8178,10 +8178,10 @@ int gpioPWM(unsigned gpio, unsigned val)
    {
       switchFunctionOff(gpio);
 
-      gpioSetMode(gpio, PI_OUTPUT);
-
       gpioInfo[gpio].is = GPIO_PWM;
    }
+
+   myGpioSetMode(gpio, PI_OUTPUT);
 
    myGpioSetPwm(gpio, gpioInfo[gpio].width, val);
 
@@ -8415,10 +8415,10 @@ int gpioServo(unsigned gpio, unsigned val)
    {
       switchFunctionOff(gpio);
 
-      gpioSetMode(gpio, PI_OUTPUT);
-
       gpioInfo[gpio].is = GPIO_SERVO;
    }
+
+   myGpioSetMode(gpio, PI_OUTPUT);
 
    myGpioSetServo(gpio, gpioInfo[gpio].width, val);
 
@@ -9795,8 +9795,8 @@ int bbI2CClose(unsigned SDA)
    {
       case PI_WFRX_I2C:
 
-         gpioSetMode(wfRx[SDA].I.SDA, wfRx[SDA].I.SDAMode);
-         gpioSetMode(wfRx[SDA].I.SCL, wfRx[SDA].I.SCLMode);
+         myGpioSetMode(wfRx[SDA].I.SDA, wfRx[SDA].I.SDAMode);
+         myGpioSetMode(wfRx[SDA].I.SCL, wfRx[SDA].I.SCLMode);
 
          wfRx[wfRx[SDA].I.SDA].mode = PI_WFRX_NONE;
          wfRx[wfRx[SDA].I.SCL].mode = PI_WFRX_NONE;
@@ -11324,7 +11324,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
          initHWClk(cctl[clock], cdiv[clock],
             csrc[clkInf.clock], clkInf.div, clkInf.frac, mash);
 
-         gpioSetMode(gpio, mode);
+         myGpioSetMode(gpio, mode);
 
          gpioInfo[gpio].is = GPIO_HW_CLK;
 
@@ -11448,7 +11448,7 @@ int gpioHardwarePWM(
       {
          switchFunctionOff(gpio);
 
-         gpioSetMode(gpio, mode);
+         myGpioSetMode(gpio, mode);
 
          gpioInfo[gpio].is = GPIO_HW_PWM;
       }
