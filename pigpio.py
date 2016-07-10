@@ -11,9 +11,9 @@ o the pigpio Python module can run on Windows, Macs, or Linux
 
 o controls one or more Pi's
 
-o independent PWM on any of GPIO 0-31 simultaneously
+o hardware timed PWM on any of GPIO 0-31
 
-o independent servo pulses on any of GPIO 0-31 simultaneously
+o hardware timed servo pulses on any of GPIO 0-31
 
 o callbacks when any of GPIO 0-31 change state
 
@@ -159,6 +159,11 @@ hardware_PWM              Start hardware PWM on supported GPIO
 set_glitch_filter         Set a glitch filter on a GPIO
 set_noise_filter          Set a noise filter on a GPIO
 
+get_pad_strength          Gets a pads drive strength
+set_pad_strength          Sets a pads drive strength
+
+shell                     Executes a shell command
+
 Scripts
 
 store_script              Store a script
@@ -235,7 +240,7 @@ spi_xfer                  Transfers bytes with a SPI device
 
 Serial
 
-serial_open               Opens a serial device (/dev/tty*)
+serial_open               Opens a serial device
 serial_close              Closes a serial device
 
 serial_read               Reads bytes from a serial device
@@ -246,7 +251,16 @@ serial_write_byte         Writes a byte to a serial device
 
 serial_data_available     Returns number of bytes ready to be read
 
-CUSTOM
+Files
+
+file_open                 Opens a file
+file_close                Closes a file
+file_read                 Reads bytes from a file
+file_write                Writes bytes to a file
+file_seek                 Seeks to a position within a file
+file_list                 List files which match a pattern
+
+Custom
 
 custom_1                  User custom function 1
 custom_2                  User custom function 2
@@ -270,7 +284,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.31"
+VERSION = "1.32"
 
 exceptions = True
 
@@ -332,6 +346,18 @@ WAVE_MODE_REPEAT_SYNC  =3
 
 WAVE_NOT_FOUND = 9998 # Transmitted wave not found.
 NO_TX_WAVE     = 9999 # No wave being transmitted.
+
+FILE_READ=1
+FILE_WRITE=2
+FILE_RW=3
+
+FILE_APPEND=4
+FILE_CREATE=8
+FILE_TRUNC=16
+
+FROM_START=0
+FROM_CURRENT=1
+FROM_END=2
 
 # pigpio command numbers
 
@@ -459,6 +485,17 @@ _PI_CMD_FN   =98
 
 _PI_CMD_WVTXM=100
 _PI_CMD_WVTAT=101
+
+_PI_CMD_PADS =102
+_PI_CMD_PADG =103
+
+_PI_CMD_FO   =104
+_PI_CMD_FC   =105
+_PI_CMD_FR   =106
+_PI_CMD_FW   =107
+_PI_CMD_FS   =108
+_PI_CMD_FL   =109
+_PI_CMD_SHELL=110
 
 # pigpio error numbers
 
@@ -588,7 +625,21 @@ _PI_BAD_EDGE        =-122
 _PI_BAD_ISR_INIT    =-123
 PI_BAD_FOREVER      =-124
 PI_BAD_FILTER       =-125
-
+PI_BAD_PAD          =-126
+PI_BAD_STRENGTH     =-127
+PI_FIL_OPEN_FAILED  =-128
+PI_BAD_FILE_MODE    =-129
+PI_BAD_FILE_FLAG    =-130
+PI_BAD_FILE_READ    =-131
+PI_BAD_FILE_WRITE   =-132
+PI_FILE_NOT_ROPEN   =-133
+PI_FILE_NOT_WOPEN   =-134
+PI_BAD_FILE_SEEK    =-135
+PI_NO_FILE_MATCH    =-136
+PI_NO_FILE_ACCESS   =-137
+PI_FILE_IS_A_DIR    =-138
+PI_BAD_SHELL_STATUS =-139
+PI_BAD_SCRIPT_NAME  =-140
 
 # pigpio error text
 
@@ -716,6 +767,21 @@ _errors=[
    [_PI_BAD_ISR_INIT     , "bad ISR initialisation"],
    [PI_BAD_FOREVER       , "loop forever must be last chain command"],
    [PI_BAD_FILTER        , "bad filter parameter"],
+   [PI_BAD_PAD           , "bad pad number"],
+   [PI_BAD_STRENGTH      , "bad pad drive strength"],
+   [PI_FIL_OPEN_FAILED   , "file open failed"],
+   [PI_BAD_FILE_MODE     , "bad file mode"],
+   [PI_BAD_FILE_FLAG     , "bad file flag"],
+   [PI_BAD_FILE_READ     , "bad file read"],
+   [PI_BAD_FILE_WRITE    , "bad file write"],
+   [PI_FILE_NOT_ROPEN    , "file not open for read"],
+   [PI_FILE_NOT_WOPEN    , "file not open for write"],
+   [PI_BAD_FILE_SEEK     , "bad file seek"],
+   [PI_NO_FILE_MATCH     , "no files match pattern"],
+   [PI_NO_FILE_ACCESS    , "no permission to access file"],
+   [PI_FILE_IS_A_DIR     , "file is a directory"],
+   [PI_BAD_SHELL_STATUS  , "bad shell return status"],
+   [PI_BAD_SCRIPT_NAME   , "bad script name"],
 
 ]
 
@@ -1396,8 +1462,8 @@ class pi():
       Notifications have the following structure.
 
       . .
-      I seqno
-      I flags
+      H seqno
+      H flags
       I tick
       I level
       . .
@@ -1406,11 +1472,14 @@ class pi():
       increments by one for each report.
 
       flags: two flags are defined, PI_NTFY_FLAGS_WDOG and
-      PI_NTFY_FLAGS_ALIVE.  If bit 5 is set (PI_NTFY_FLAGS_WDOG)
-      then bits 0-4 of the flags indicate a GPIO which has had a
-      watchdog timeout; if bit 6 is set (PI_NTFY_FLAGS_ALIVE) this
-      indicates a keep alive signal on the pipe/socket and is sent
-      once a minute in the absence of other notification activity.
+      PI_NTFY_FLAGS_ALIVE.
+
+      PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the
+      flags indicate a GPIO which has had a watchdog timeout.
+
+      PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep
+      alive signal on the pipe/socket and is sent once a minute
+      in the absence of other notification activity.
 
       tick: the number of microseconds since system boot.  It wraps
       around after 1h12m.
@@ -3215,7 +3284,8 @@ class pi():
    def serial_open(self, tty, baud, ser_flags=0):
       """
       Returns a handle for the serial tty device opened
-      at baud bits per second.
+      at baud bits per second.  The device name must start
+      with /dev/tty or /dev/serial.
 
             tty:= the serial device to open.
            baud:= baud rate in bits per second, see below.
@@ -3234,6 +3304,8 @@ class pi():
       h1 = pi.serial_open("/dev/ttyAMA0", 300)
 
       h2 = pi.serial_open("/dev/ttyUSB1", 19200, 0)
+
+      h3 = pi.serial_open("/dev/serial0", 9600)
       ...
       """
       # I p1 baud
@@ -3646,6 +3718,7 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_SLRI, user_gpio, invert))
 
+
    def custom_1(self, arg1=0, arg2=0, argx=[]):
       """
       Calls a pigpio function customised by the user.
@@ -3720,6 +3793,360 @@ class pi():
          data = ""
       self.sl.l.release()
       return bytes, data
+
+   def get_pad_strength(self, pad):
+      """
+      This function returns the pad drive strength in mA.
+
+      pad:= 0-2, the pad to get.
+
+      Returns the pad drive strength if OK, otherwise PI_BAD_PAD.
+
+      Pad @ GPIO
+      0   @ 0-27
+      1   @ 28-45
+      2   @ 46-53
+
+      ...
+      strength = pi.get_pad_strength(0) # Get pad 0 strength.
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PADG, pad, 0))
+
+   def set_pad_strength(self, pad, pad_strength):
+      """
+      This function sets the pad drive strength in mA.
+
+
+               pad:= 0-2, the pad to set.
+      pad_strength:= 1-16 mA.
+
+      Returns 0 if OK, otherwise PI_BAD_PAD, or PI_BAD_STRENGTH.
+
+      Pad @ GPIO
+      0   @ 0-27
+      1   @ 28-45
+      2   @ 46-53
+
+      ...
+      pi.set_pad_strength(2, 14) # Set pad 2 to 14 mA.
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_PADS, pad, pad_strength))
+
+
+   def file_open(self, file_name, file_mode):
+      """
+      This function returns a handle to a file opened in a specified mode.
+
+      file_name:= the file to open.
+      file_mode:= the file open mode.
+
+      Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
+      PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+
+      ...
+      h = pi.file_open("/home/pi/shared/dir_3/file.txt",
+              pigpio.FILE_WRITE | pigpio.FILE_CREATE)
+
+      pi.file_write(h, "Hello world")
+
+      pi.file_close(h)
+      ...
+
+      File
+
+      A file may only be opened if permission is granted by an entry in
+      /opt/pigpio/access.  This is intended to allow remote access to files
+      in a more or less controlled manner.
+
+      Each entry in /opt/pigpio/access takes the form of a file path
+      which may contain wildcards followed by a single letter permission.
+      The permission may be R for read, W for write, U for read/write,
+      and N for no access.
+
+      Where more than one entry matches a file the most specific rule
+      applies.  If no entry matches a file then access is denied.
+
+      Suppose /opt/pigpio/access contains the following entries
+
+      . .
+      /home/* n
+      /home/pi/shared/dir_1/* w
+      /home/pi/shared/dir_2/* r
+      /home/pi/shared/dir_3/* u
+      /home/pi/shared/dir_1/file.txt n
+      . .
+
+      Files may be written in directory dir_1 with the exception
+      of file.txt.
+
+      Files may be read in directory dir_2.
+
+      Files may be read and written in directory dir_3.
+
+      If a directory allows read, write, or read/write access then files
+      may be created in that directory.
+
+      In an attempt to prevent risky permissions the following paths are
+      ignored in /opt/pigpio/access.
+
+      . .
+      a path containing ..
+      a path containing only wildcards (*?)
+      a path containing less than two non-wildcard parts
+      . .
+
+      Mode
+
+      The mode may have the following values.
+
+      Constant   @ Value @ Meaning
+      FILE_READ  @   1   @ open file for reading
+      FILE_WRITE @   2   @ open file for writing
+      FILE_RW    @   3   @ open file for reading and writing
+
+      The following values may be or'd into the mode.
+
+      Name        @ Value @ Meaning
+      FILE_APPEND @ 4     @ All writes append data to the end of the file
+      FILE_CREATE @ 8     @ The file is created if it doesn't exist
+      FILE_TRUNC  @ 16    @ The file is truncated
+
+      Newly created files are owned by root with permissions owner
+      read and write.
+
+      ...
+      #!/usr/bin/env python
+
+      import pigpio
+
+      pi = pigpio.pi()
+
+      if not pi.connected:
+         exit()
+
+      # Assumes /opt/pigpio/access contains the following line.
+      # /ram/*.c r
+
+      handle = pi.file_open("/ram/pigpio.c", pigpio.FILE_READ)
+
+      done = False
+
+      while not done:
+         c, d = pi.file_read(handle, 60000)
+         if c > 0:
+            print(d)
+         else:
+            done = True
+
+      pi.file_close(handle)
+
+      pi.stop()
+      ...
+      """
+      # I p1 file_mode
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_FO, file_mode, 0, len(file_name), [file_name]))
+
+   def file_close(self, handle):
+      """
+      Closes the file associated with handle.
+
+      handle:= >=0 (as returned by a prior call to [*file_open*]).
+
+      ...
+      pi.file_close(handle)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_FC, handle, 0))
+
+   def file_read(self, handle, count):
+      """
+      Reads up to count bytes from the file associated with handle.
+
+      handle:= >=0 (as returned by a prior call to [*file_open*]).
+       count:= >0, the number of bytes to read.
+
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code).
+
+      ...
+      (b, d) = pi.file_read(h2, 100)
+      if b > 0:
+         # process read data
+      ...
+      """
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(
+         _pigpio_command(self.sl, _PI_CMD_FR, handle, count, False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+   def file_write(self, handle, data):
+      """
+      Writes the data bytes to the file associated with handle.
+
+      handle:= >=0 (as returned by a prior call to [*file_open*]).
+        data:= the bytes to write.
+
+      ...
+      pi.file_write(h1, b'\\x02\\x03\\x04')
+
+      pi.file_write(h2, b'help')
+
+      pi.file_write(h2, "hello")
+
+      pi.file_write(h1, [2, 3, 4])
+      ...
+      """
+      # I p1 handle
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_FW, handle, 0, len(data), [data]))
+
+   def file_seek(self, handle, seek_offset, seek_from):
+      """
+      Seeks to a position relative to the start, current position,
+      or end of the file.  Returns the new position.
+
+           handle:= >=0 (as returned by a prior call to [*file_open*]).
+      seek_offset:= byte offset.
+        seek_from:= FROM_START, FROM_CURRENT, or FROM_END.
+
+      ...
+      new_pos = pi.file_seek(h, 100, pigpio.FROM_START)
+
+      cur_pos = pi.file_seek(h, 0, pigpio.FROM_CURRENT)
+
+      file_size = pi.file_seek(h, 0, pigpio.FROM_END)
+      ...
+      """
+      # I p1 handle
+      # I p2 seek_offset
+      # I p3 4
+      ## extension ##
+      # I seek_from
+      extents = [struct.pack("I", seek_from)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_FS, handle, seek_offset, 4, extents))
+
+   def file_list(self, fpattern):
+      """
+      Returns a list of files which match a pattern.
+
+      fpattern:= file pattern to match.
+
+      Returns the number of returned bytes if OK, otherwise
+      PI_NO_FILE_ACCESS, or PI_NO_FILE_MATCH.
+
+      The pattern must match an entry in /opt/pigpio/access.  The
+      pattern may contain wildcards.  See [*file_open*].
+
+      NOTE
+
+      The returned value is not the number of files, it is the number
+      of bytes in the buffer.  The file names are separated by newline
+      characters.
+
+      ...
+      #!/usr/bin/env python
+
+      import pigpio
+
+      pi = pigpio.pi()
+
+      if not pi.connected:
+         exit()
+
+      # Assumes /opt/pigpio/access contains the following line.
+      # /ram/*.c r
+
+      c, d = pi.file_list("/ram/p*.c")
+      if c > 0:
+         print(d)
+
+      pi.stop()
+      ...
+      """
+      # I p1 60000
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_FL, 60000, 0, len(fpattern), [fpattern], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+   def shell(self, shellscr, pstring=""):
+      """
+      This function uses the system call to execute a shell script
+      with the given string as its parameter.
+
+      shellscr:= the name of the script, only alphanumerics,
+                    '-' and '_' are allowed in the name
+      pstring := the parameter string to pass to the script
+
+      The exit status of the system call is returned if OK,
+      otherwise PI_BAD_SHELL_STATUS.
+
+      [*shellscr*] must exist in /opt/pigpio/cgi and must be executable.
+
+      The returned exit status is normally 256 times that set by
+      the shell script exit function.  If the script can't be
+      found 32512 will be returned.
+
+      The following table gives some example returned statuses.
+
+      Script exit status @ Returned system call status
+      1                  @ 256
+      5                  @ 1280
+      10                 @ 2560
+      200                @ 51200
+      script not found   @ 32512
+
+      ...
+      // pass two parameters, hello and world
+      status = pi.shell("scr1", "hello world");
+
+      // pass three parameters, hello, string with spaces, and world
+      status = pi.shell("scr1", "hello 'string with spaces' world");
+
+      // pass one parameter, hello string with spaces world
+      status = pi.shell("scr1", "\\"hello string with spaces world\\"");
+      ...
+      """
+      # I p1 len(shellscr)
+      # I p2 0
+      # I p3 len(shellscr)+len(pstring)+1
+      ## extension ##
+      # s len data bytes
+
+      ls = len(shellscr)
+      lp = len(pstring)
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_SHELL, ls, 0, ls+lp+1, [shellscr+'\x00'+pstring]))
 
    def callback(self, user_gpio, edge=RISING_EDGE, func=None):
       """
@@ -4071,7 +4498,47 @@ def xref():
    PI_BAD_SER_INVERT = -121
    PI_BAD_FOREVER = -124
    PI_BAD_FILTER = -125
+   PI_BAD_PAD = -126
+   PI_BAD_STRENGTH = -127
+   PI_FIL_OPEN_FAILED = -128
+   PI_BAD_FILE_MODE = -129
+   PI_BAD_FILE_FLAG = -130
+   PI_BAD_FILE_READ = -131
+   PI_BAD_FILE_WRITE = -132
+   PI_FILE_NOT_ROPEN = -133
+   PI_FILE_NOT_WOPEN = -134
+   PI_BAD_FILE_SEEK = -135
+   PI_NO_FILE_MATCH = -136
+   PI_NO_FILE_ACCESS = -137
+   PI_FILE_IS_A_DIR = -138
+   PI_BAD_SHELL_STATUS = -139
+   PI_BAD_SCRIPT_NAME = -140
    . .
+
+   file_mode:
+   The mode may have the following values.
+
+   . .
+   FILE_READ   1
+   FILE_WRITE  2
+   FILE_RW     3
+   . .
+
+   The following values can be or'd into the file open mode.
+
+   . .
+   FILE_APPEND 4
+   FILE_CREATE 8
+   FILE_TRUNC  16
+   . .
+
+   file_name:
+   A full file path.  To be accessible the path must match
+   an entry in /opt/pigpio/access.
+
+   fpattern:
+   A file path which may contain wildcards.  To be accessible the path
+   must match an entry in /opt/pigpio/access.
 
    frequency: 0-40000
    Defines the frequency to be used for PWM on a GPIO.
@@ -4122,8 +4589,8 @@ def xref():
    of a pulse.
 
    handle: >=0
-   A number referencing an object opened by one of [*i2c_open*],
-   [*notify_open*], [*serial_open*], [*spi_open*].
+   A number referencing an object opened by one of [*file_open*],
+   [*i2c_open*], [*notify_open*], [*serial_open*], [*spi_open*].
 
    host:
    The name or IP address of the Pi running the pigpio daemon.
@@ -4177,12 +4644,27 @@ def xref():
    The offset wave data starts from the beginning of the waveform
    being currently defined.
 
+   pad: 0-2
+   A set of GPIO which share common drivers.
+
+   Pad @  GPIO
+   0   @  0-27
+   1   @  28-45
+   2   @  46-53
+
+   pad_strength: 1-16
+   The mA which may be drawn from each GPIO whilst still guaranteeing the
+   high and low levels.
+
    params: 32 bit number
    When scripts are started they can receive up to 10 parameters
    to define their operation.
 
    port: 
    The port used by the pigpio daemon, defaults to 8888.
+
+   pstring:
+   The string to be passed to a [*shell*] script to be executed.
 
    pud: 0-2
    PUD_DOWN = 1 
@@ -4230,11 +4712,26 @@ def xref():
    SDA:
    The user GPIO to use for data when bit banging I2C.
 
+   seek_from: 0-2
+   Direction to seek for [*file_seek*].
+
+   FROM_START=0 
+   FROM_CURRENT=1 
+   FROM_END=2 
+
+   seek_offset:
+   The number of bytes to move forward (positive) or backwards
+   (negative) from the seek position (start, current, or end of file).
+
    ser_flags: 32 bit
    No serial flags are currently defined.
 
    serial_*:
    One of the serial_ functions.
+
+   shellscr:
+   The name of a shell script.  The script must exist
+   in /opt/pigpio/cgi and must be executable.
 
    spi_*:
    One of the spi_ functions.

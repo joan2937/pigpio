@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 54 */
+/* pigpio version 55 */
 
 /* include ------------------------------------------------------- */
 
@@ -58,10 +58,13 @@ For more information, please refer to <http://unlicense.org/>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+#include <fnmatch.h>
+#include <glob.h>
 
 #include "pigpio.h"
 
 #include "command.h"
+
 
 /* --------------------------------------------------------------- */
 
@@ -299,6 +302,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define DMA_BASE   (pi_peri_phys + 0x00007000)
 #define DMA15_BASE (pi_peri_phys + 0x00E05000)
 #define GPIO_BASE  (pi_peri_phys + 0x00200000)
+#define PADS_BASE  (pi_peri_phys + 0x00100000)
 #define PCM_BASE   (pi_peri_phys + 0x00203000)
 #define PWM_BASE   (pi_peri_phys + 0x0020C000)
 #define SPI_BASE   (pi_peri_phys + 0x00204000)
@@ -308,6 +312,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define CLK_LEN   0xA8
 #define DMA_LEN   0x1000 /* allow access to all channels */
 #define GPIO_LEN  0xB4
+#define PADS_LEN  0x38
 #define PCM_LEN   0x24
 #define PWM_LEN   0x28
 #define SPI_LEN   0x18
@@ -474,7 +479,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define PCM_GRAY_CLR   (1<<1)
 #define PCM_GRAY_EN    (1<<0)
 
-#define CLK_PASSWD  (0x5A<<24)
+#define BCM_PASSWD  (0x5A<<24)
 
 #define CLK_CTL_MASH(x)((x)<<9)
 #define CLK_CTL_BUSY    (1 <<7)
@@ -734,6 +739,9 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 #define PI_SER_CLOSED 0
 #define PI_SER_OPENED 1
 
+#define PI_FILE_CLOSED 0
+#define PI_FILE_OPENED 1
+
 #define PI_NOTIFY_CLOSED  0
 #define PI_NOTIFY_CLOSING 1
 #define PI_NOTIFY_OPENED  2
@@ -842,6 +850,8 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 #define PI_STARTING 0
 #define PI_RUNNING  1
 #define PI_ENDING   2
+
+#define PI_MAX_PATH 512
 
 /* typedef ------------------------------------------------------- */
 
@@ -974,6 +984,13 @@ typedef struct
    int      pipe;
    int      max_emits;
 } gpioNotify_t;
+
+typedef struct
+{
+   uint16_t state;
+   int16_t  fd;
+   uint32_t mode;
+} fileInfo_t;
 
 typedef struct
 {
@@ -1202,6 +1219,7 @@ static gpioInfo_t       gpioInfo   [PI_MAX_GPIO+1];
 
 static gpioNotify_t     gpioNotify [PI_NOTIFY_SLOTS];
 
+static fileInfo_t       fileInfo   [PI_FILE_SLOTS];
 static i2cInfo_t        i2cInfo    [PI_I2C_SLOTS];
 static serInfo_t        serInfo    [PI_SER_SLOTS];
 static spiInfo_t        spiInfo    [PI_SPI_SLOTS];
@@ -1242,6 +1260,7 @@ static volatile uint32_t * auxReg  = MAP_FAILED;
 static volatile uint32_t * clkReg  = MAP_FAILED;
 static volatile uint32_t * dmaReg  = MAP_FAILED;
 static volatile uint32_t * gpioReg = MAP_FAILED;
+static volatile uint32_t * padsReg = MAP_FAILED;
 static volatile uint32_t * pcmReg  = MAP_FAILED;
 static volatile uint32_t * pwmReg  = MAP_FAILED;
 static volatile uint32_t * spiReg  = MAP_FAILED;
@@ -1408,6 +1427,29 @@ static void closeOrphanedNotifications(int slot, int fd);
 
 /* ======================================================================= */
 
+int myScriptNameValid(char *name)
+{
+   int i, c, len, valid;
+
+   len = strlen(name);
+
+   valid = 1;
+
+   for (i=0; i<len; i++)
+   {
+      c = name[i];
+
+      if ((!isalnum(c)) && (c != '_') && (c != '-'))
+      {
+         valid = 0;
+         break;
+      }
+   }
+   return valid;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static char * myTimeStamp()
 {
    static struct timeval last;
@@ -1426,6 +1468,47 @@ static char * myTimeStamp()
    }
 
    return buf;
+}
+
+/* ----------------------------------------------------------------------- */
+
+int myPathBad(char *name)
+{
+   int i, c, len, in_part, parts, last_char_dot;
+   char *bad="/*?.";
+
+   parts = 0;
+   in_part = 0;
+   last_char_dot = 0;
+
+   len = strlen(name);
+
+   for (i=0; i<len; i++)
+   {
+      c = name[i];
+
+      if (memchr(bad, c, 4)) /* wildcard or directory character */
+      {
+         if (c == '.')
+         {
+            if (last_char_dot) return 1;
+            last_char_dot = 1;
+         }
+         else last_char_dot = 0;
+
+         in_part = 0;
+      }
+      else /* normal character */
+      {
+         last_char_dot = 0;
+
+         if (!in_part) parts++;
+
+         in_part = 1;
+      }
+   }
+
+   if (parts < 2) return 1; else return 0;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1774,14 +1857,35 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_CSI: res = gpioCfgSetInternals(p[1]); break;
 
+      case PI_CMD_FC: res = fileClose(p[1]); break;
+
       case PI_CMD_FG:
          res = gpioGlitchFilter(p[1], p[2]);
+         break;
+
+      case PI_CMD_FL:
+         if (p[1] > bufSize) p[1] = bufSize;
+         res = fileList(buf, buf, p[1]);
          break;
 
       case PI_CMD_FN:
          memcpy(&p[4], buf, 4);
          res = gpioNoiseFilter(p[1], p[2], p[4]);
          break;
+
+      case PI_CMD_FO: res = fileOpen(buf, p[1]); break;
+
+      case PI_CMD_FR:
+         if (p[2] > bufSize) p[2] = bufSize;
+         res = fileRead(p[1], buf, p[2]);
+         break;
+
+      case PI_CMD_FS:
+         memcpy(&p[4], buf, 4);
+         res = fileSeek(p[1], p[2], p[4]);
+         break;
+
+      case PI_CMD_FW: res = fileWrite(p[1], buf, p[3]); break;
 
       case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
 
@@ -1923,6 +2027,10 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_NP: res = gpioNotifyPause(p[1]); break;
 
+      case PI_CMD_PADG: res = gpioGetPad(p[1]); break;
+
+      case PI_CMD_PADS: res = gpioSetPad(p[1], p[2]); break;
+
       case PI_CMD_PFG: res = gpioGetPWMfrequency(p[1]); break;
 
       case PI_CMD_PFS:
@@ -2017,6 +2125,10 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_SERW: res = serWrite(p[1], buf, p[3]); break;
 
+
+      case PI_CMD_SHELL:
+          res = shell(buf, buf+p[1]+1);
+          break;
 
 
       case PI_CMD_SLR:
@@ -4477,7 +4589,7 @@ int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
 
    SER_CHECK_INITED;
 
-   if (strncmp("/dev/tty", tty, 8))
+   if (strncmp("/dev/tty", tty, 8) && strncmp("/dev/serial", tty, 11))
       SOFT_ERROR(PI_BAD_SER_DEVICE, "bad device (%s)", tty);
 
    switch (serBaud)
@@ -6022,17 +6134,21 @@ static int scrWait(gpioScript_t *s, uint32_t bits)
 
 static int scrSys(char *cmd, uint32_t p1, uint32_t p2)
 {
-   char buf[256];
-   char pars[40];
+   char buf[1024];
+   int status;
 
-   sprintf(pars, " %u %u", p1, p2);
-   strcpy(buf, "/opt/pigpio/cgi/");
-   strncat(buf, cmd, 200);
-   strcat(buf, pars);
+   if (!myScriptNameValid(cmd))
+      SOFT_ERROR(PI_BAD_SCRIPT_NAME, "bad script name (%s)", cmd);
 
-   DBG(DBG_USER, "sys %s", buf);
+   snprintf(buf, sizeof(buf), "/opt/pigpio/cgi/%s %u %u", cmd, p1, p2);
 
-   return system(buf);
+   DBG(DBG_USER, "%s", buf);
+
+   status = system(buf);
+
+   if (status < 0) status = PI_BAD_SHELL_STATUS;
+
+   return status;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -6523,6 +6639,8 @@ static void *pthSocketThreadHandler(void *fdC)
 
          case PI_CMD_BI2CZ:
          case PI_CMD_CF2:
+         case PI_CMD_FL:
+         case PI_CMD_FR:
          case PI_CMD_I2CPK:
          case PI_CMD_I2CRD:
          case PI_CMD_I2CRI:
@@ -6768,6 +6886,11 @@ static int initPeripherals(void)
 
    if (auxReg == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap aux failed (%m)");
+
+   padsReg  = initMapMem(fdMem, PADS_BASE,  PADS_LEN);
+
+   if (padsReg == MAP_FAILED)
+      SOFT_ERROR(PI_INIT_FAILED, "mmap pads failed (%m)");
 
    return 0;
 }
@@ -7170,20 +7293,20 @@ static void initHWClk
    {
       do
       {
-         clkReg[clkCtl] = CLK_PASSWD | CLK_CTL_KILL;
+         clkReg[clkCtl] = BCM_PASSWD | CLK_CTL_KILL;
       }
       while (clkReg[clkCtl] & CLK_CTL_BUSY);
    }
 
-   clkReg[clkDiv] = (CLK_PASSWD | CLK_DIV_DIVI(divI) | CLK_DIV_DIVF(divF));
+   clkReg[clkDiv] = (BCM_PASSWD | CLK_DIV_DIVI(divI) | CLK_DIV_DIVF(divF));
 
    usleep(10);
 
-   clkReg[clkCtl] = (CLK_PASSWD | CLK_CTL_MASH(MASH) | CLK_CTL_SRC(clkSrc));
+   clkReg[clkCtl] = (BCM_PASSWD | CLK_CTL_MASH(MASH) | CLK_CTL_SRC(clkSrc));
 
    usleep(10);
 
-   clkReg[clkCtl] |= (CLK_PASSWD | CLK_CTL_ENAB);
+   clkReg[clkCtl] |= (BCM_PASSWD | CLK_CTL_ENAB);
 }
 
 static void initClock(int mainClock)
@@ -11345,7 +11468,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    else
    {
       /* frequency 0, stop clock */
-      clkReg[cctl[clock]] = CLK_PASSWD | CLK_CTL_KILL;
+      clkReg[cctl[clock]] = BCM_PASSWD | CLK_CTL_KILL;
 
       if (gpioInfo[gpio].is == GPIO_HW_CLK)
          gpioInfo[gpio].is = GPIO_UNDEFINED;
@@ -11468,6 +11591,403 @@ int gpioHardwarePWM(
 
    return 0;
 }
+
+
+int gpioSetPad(unsigned pad, unsigned padStrength)
+{
+   DBG(DBG_USER, "pad=%d  padStrength=%d", pad, padStrength);
+
+   CHECK_INITED;
+
+   if (pad > PI_MAX_PAD)
+      SOFT_ERROR(PI_BAD_PAD, "bad pad number (%d)", pad);
+
+   if ((padStrength < PI_MIN_PAD_STRENGTH) ||
+       (padStrength > PI_MAX_PAD_STRENGTH))
+      SOFT_ERROR(PI_BAD_STRENGTH, "bad pad drive strength (%d)", pad);
+
+   /* 1-16 -> 0-7 */
+
+   padStrength += 1;
+   padStrength /= 2;
+   padStrength -= 1;
+
+   padsReg[11+pad] = BCM_PASSWD | 0x18 | (padStrength & 7) ;
+
+   return 0;
+}
+
+int gpioGetPad(unsigned pad)
+{
+   int strength;
+
+   DBG(DBG_USER, "pad=%d", pad);
+
+   CHECK_INITED;
+
+   if (pad > PI_MAX_PAD)
+      SOFT_ERROR(PI_BAD_PAD, "bad pad (%d)", pad);
+
+   strength = padsReg[11+pad] & 7;
+
+   strength *= 2;
+   strength += 2;
+
+   return strength;
+}
+
+int shell(char *scriptName, char *scriptString)
+{
+   int status;
+   char buf[4096];
+
+   DBG(DBG_USER, "name=%s string=%s", scriptName, scriptString);
+
+   CHECK_INITED;
+
+   if (!myScriptNameValid(scriptName))
+      SOFT_ERROR(PI_BAD_SCRIPT_NAME, "bad script name (%s)", scriptName);
+
+   snprintf(buf, sizeof(buf),
+      "/opt/pigpio/cgi/%s %s", scriptName, scriptString);
+
+   DBG(DBG_USER, "%s", buf);
+
+   status = system(buf);
+
+   if (status < 0) status = PI_BAD_SHELL_STATUS;
+
+   return status;
+}
+
+
+int fileApprove(char *filename)
+{
+   char match[PI_MAX_PATH];
+   char buffer[PI_MAX_PATH];
+   char line[PI_MAX_PATH];
+   char mperm;
+   char perm;
+   char term;
+   FILE *f;
+
+   buffer[0] = 0;
+   match[0] = 0;
+
+   f = fopen("/opt/pigpio/access", "r");
+
+   if (!f) return PI_FILE_NONE;
+
+   while (!feof(f))
+   {
+      buffer[0] = 0;
+      perm = 0;
+      term = 0;
+      if (fgets(line, sizeof(line), f))
+      {
+         sscanf(line, " %511s %c%c", buffer, &perm, &term);
+         if (term == 10)
+         {
+            if (myPathBad(buffer)) continue; /* disallow risky lines */
+
+            if (fnmatch(buffer, filename, 0) == 0)
+            {
+               if (match[0])
+               {
+                  if (fnmatch(match, buffer, 0) == 0)
+                  {
+                     strcpy(match, buffer);
+                     mperm = perm;
+                  }
+               }
+               else
+               {
+                  strcpy(match, buffer);
+                  mperm = perm;
+               }
+            }
+         }
+      }
+   }
+
+   fclose(f);
+
+   if (match[0])
+   {
+      switch (toupper(mperm))
+      {
+         case 'R': return PI_FILE_READ;
+         case 'W': return PI_FILE_WRITE;
+         case 'U': return PI_FILE_RW;
+         default : return PI_FILE_NONE;
+      }
+   }
+
+   return PI_FILE_NONE;
+}
+
+int fileOpen(char *file, unsigned mode)
+{
+   int fd=-1;
+   int i, slot, oflag, omode;
+   struct stat statbuf;
+
+   DBG(DBG_USER, "file=%s mode=%d", file, mode);
+
+   CHECK_INITED;
+
+   if ( (mode < PI_FILE_MIN) ||
+        (mode > PI_FILE_MAX) ||
+        ((mode & PI_FILE_RW) == 0) )
+      SOFT_ERROR(PI_BAD_FILE_MODE, "bad mode (%d)", mode);
+
+   if ((fileApprove(file) & mode) == PI_FILE_NONE)
+      SOFT_ERROR(PI_NO_FILE_ACCESS, "no permission to access file (%s)", file);
+
+   slot = -1;
+
+   for (i=0; i<PI_FILE_SLOTS; i++)
+   {
+      if (fileInfo[i].state == PI_FILE_CLOSED)
+      {
+         fileInfo[i].state = PI_FILE_OPENED;
+         slot = i;
+         break;
+      }
+   }
+
+   if (slot < 0)
+      SOFT_ERROR(PI_NO_HANDLE, "no file handles");
+
+   omode = 0;
+   oflag = 0;
+
+   if (mode & PI_FILE_APPEND)
+   {
+      mode |= PI_FILE_WRITE;
+      oflag |= O_APPEND;
+   }
+
+   if (mode & PI_FILE_CREATE)
+   {
+      oflag |= O_CREAT;
+      omode |= (S_IRUSR|S_IWUSR);
+   }
+
+   if (mode & PI_FILE_TRUNC)
+   {
+      mode |= PI_FILE_WRITE;
+      oflag |= O_TRUNC;
+   }
+
+   switch(mode&PI_FILE_RW)
+   {
+      case PI_FILE_READ:
+         fd = open(file, O_RDONLY|oflag, omode);
+         break;
+
+      case PI_FILE_WRITE:
+         fd = open(file, O_WRONLY|oflag, omode);
+         break;
+
+      case PI_FILE_RW:
+         fd = open(file, O_RDWR|oflag, omode);
+         break;
+   }
+
+   if (fd == -1)
+   {
+      fileInfo[slot].state = PI_FILE_CLOSED;
+      return PI_FIL_OPEN_FAILED;
+   }
+   else
+   {
+      if (stat(file, &statbuf) == 0)
+      {
+         if (S_ISDIR(statbuf.st_mode))
+         {
+            close(fd);
+            fileInfo[slot].state = PI_FILE_CLOSED;
+            SOFT_ERROR(PI_FILE_IS_A_DIR, "file is a directory (%s)", file);
+         }
+      }
+   }
+
+   fileInfo[slot].fd = fd;
+   fileInfo[slot].mode = mode;
+
+   return slot;
+}
+
+int fileClose(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_FILE_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (fileInfo[handle].state != PI_FILE_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (fileInfo[handle].fd >= 0) close(fileInfo[handle].fd);
+
+   fileInfo[handle].fd = -1;
+   fileInfo[handle].state = PI_FILE_CLOSED;
+
+   return 0;
+}
+
+int fileWrite(unsigned handle, char *buf, unsigned count)
+{
+   int w;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_FILE_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (fileInfo[handle].state != PI_FILE_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   if (!(fileInfo[handle].mode & PI_FILE_WRITE))
+      SOFT_ERROR(PI_FILE_NOT_WOPEN, "file not opened for write");
+
+   w = write(fileInfo[handle].fd, buf, count);
+
+   if (w != count)
+   {
+      if (w == -1) DBG(DBG_USER, "write failed with errno %d", errno);
+
+      return PI_BAD_FILE_WRITE;
+   }
+   return 0;
+}
+
+int fileRead(unsigned handle, char *buf, unsigned count)
+{
+   int r;
+
+   DBG(DBG_USER, "handle=%d count=%d buf=0x%X", handle, count, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_FILE_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (fileInfo[handle].state != PI_FILE_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   if (!(fileInfo[handle].mode & PI_FILE_READ))
+      SOFT_ERROR(PI_FILE_NOT_ROPEN, "file not opened for read");
+
+   r = read(fileInfo[handle].fd, buf, count);
+
+   if (r == -1)
+   {
+      DBG(DBG_USER, "read failed with errno %d", errno);
+      return PI_BAD_FILE_READ;
+   }
+   else
+   {
+      buf[r] = 0;
+      return r;
+   }
+}
+
+
+int fileSeek(unsigned handle, int32_t seekOffset, int seekFrom)
+{
+   int whence, s;
+
+   DBG(DBG_USER, "handle=%d offset=%d from=%d",
+      handle, seekOffset, seekFrom);
+
+   CHECK_INITED;
+
+   if (handle >= PI_FILE_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (fileInfo[handle].state != PI_FILE_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   switch (seekFrom)
+   {
+      case PI_FROM_START:
+         whence = SEEK_SET;
+         break;
+
+      case PI_FROM_CURRENT:
+         whence = SEEK_CUR;
+         break;
+
+      case PI_FROM_END:
+         whence = SEEK_END;
+         break;
+
+      default:
+         SOFT_ERROR(PI_BAD_FILE_SEEK, "bad seek from (%d)", seekFrom);
+   }
+
+   s = lseek(fileInfo[handle].fd, seekOffset, whence);
+
+   if (s == -1)
+   {
+      DBG(DBG_USER, "seek failed with errno %d", errno);
+      return PI_BAD_FILE_SEEK;
+   }
+
+   return s;
+}
+
+int fileList(char *fpat,  char *buf, unsigned count)
+{
+   int len, bufpos;
+   glob_t pglob;
+   int i;
+
+   DBG(DBG_USER, "fpat=%s count=%d buf=%x", fpat, count, (unsigned)buf);
+
+   CHECK_INITED;
+
+   if (fileApprove(fpat) == PI_FILE_NONE)
+      SOFT_ERROR(PI_NO_FILE_ACCESS, "no permission to access file (%s)", fpat);
+
+   bufpos = 0;
+
+   if (glob(fpat, GLOB_MARK, NULL, &pglob) == 0)
+   {
+      for (i=0; i<pglob.gl_pathc; i++)
+      {
+         len = strlen(pglob.gl_pathv[i]);
+         if ((bufpos + len + 1) < count)
+         {
+            strcpy(buf+bufpos, pglob.gl_pathv[i]);
+            bufpos += len;
+            buf[bufpos++] = '\n';
+         }
+      }
+   }
+   else
+   {
+      bufpos = PI_NO_FILE_MATCH;
+   }
+
+   globfree(&pglob);
+
+   return bufpos;
+}
+
 
 
 /* ----------------------------------------------------------------------- */

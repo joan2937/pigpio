@@ -22,6 +22,10 @@ or
 
 .SH DESCRIPTION
 
+.ad l
+
+.nh
+
 
 .br
 The socket and pipe interfaces allow control of the GPIO by passing
@@ -45,10 +49,10 @@ whereas /dev/pigpio uses the pipe interface.
 .br
 .SS Features
 .br
-o PWM on any of GPIO 0-31
+o hardware timed PWM on any of GPIO 0-31
 
 .br
-o servo pulses on any of GPIO 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 .br
 o reading/writing all of the GPIO in a bank as one operation
@@ -514,11 +518,40 @@ configuration settings to \fBv\fP.
 
 .br
 
+.IP "\fBFC h\fP - Close file handle"
+.IP "" 4
+This command closes a file handle \fBh\fP previously opened with \fBFO\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fc 0 # First close okay.
+.br
+
+.br
+$ pigs fc 0 # Second fails.
+.br
+-25
+.br
+ERROR: unknown handle
+.br
+
+.EE
+
+.br
+
 .IP "\fBFG u stdy\fP - Set a glitch filter on a GPIO"
 .IP "" 4
 
 .br
-Level changes on the GPIO are not reported unless the level
+Level changes on the GPIO \fBu\fP are not reported unless the level
 has been stable for at least \fBstdy\fP microseconds.  The
 level is then reported.  Level changes of less than \fBstdy\fP
 microseconds are ignored.
@@ -529,11 +562,77 @@ after it was first detected.
 
 .br
 
+\fBExample\fP
+.br
+
+.EX
+$ pigs fg 4 250
+.br
+
+.br
+$ pigs fg 4 1000000
+.br
+-125
+.br
+ERROR: bad filter parameter
+.br
+
+.EE
+
+.br
+
+.IP "\fBFL pat num\fP - List files which match pattern"
+.IP "" 4
+This command returns a list of the files matching \fBpat\fP. Up
+to \fBnum\fP bytes may be returned.
+
+.br
+Upon success the count of returned bytes followed by the matching
+files is returned.  On error a negative status code will be returned.
+
+.br
+A newline (0x0a) character separates each file name.
+
+.br
+Only files which have a matching entry in /opt/pigpio/access may
+be listed.
+
+.br
+Suppose /opt/pigpio/access contains
+
+.br
+/sys/bus/w1/devices/28*/w1_slave r
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs -a fl "/sys/bus/w1/devices/28*/w1_slave" 5000
+.br
+90 /sys/bus/w1/devices/28-000005d34cd2/w1_slave
+.br
+/sys/bus/w1/devices/28-001414abbeff/w1_slave
+.br
+
+.br
+$ pigs -a fl "/sys/bus/*" 5000
+.br
+ERROR: no permission to access file
+.br
+-137
+.br
+
+.EE
+
+.br
+
 .IP "\fBFN u stdy actv\fP - Set a noise filter on a GPIO"
 .IP "" 4
 
 .br
-Level changes on the GPIO are ignored until a level which has
+Level changes on the GPIO \fBu\fP are ignored until a level which has
 been stable for \fBstdy\fP microseconds is detected.  Level
 changes on the GPIO are then reported for \fBactv\fP microseconds
 after which the process repeats.
@@ -542,6 +641,311 @@ after which the process repeats.
 Note, level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fn 7 250 1000
+.br
+
+.br
+$ pigs fn 7 2500000 1000
+.br
+-125
+.br
+ERROR: bad filter parameter
+.br
+
+.EE
+
+.br
+
+.IP "\fBFO file mode\fP - Open a file in mode"
+.IP "" 4
+This function returns a handle to a file \fBfile\fP opened
+in a specified mode \fBmode\fP.
+
+.br
+Upon success a handle (>=0) is returned.  On error a negative status code
+will be returned.
+
+.br
+File
+
+.br
+A file may only be opened if permission is granted by an entry in
+/opt/pigpio/access.  This is intended to allow remote access to files
+in a more or less controlled manner.
+
+.br
+Each entry in /opt/pigpio/access takes the form of a file path
+which may contain wildcards followed by a single letter permission.
+The permission may be R for read, W for write, U for read/write,
+and N for no access.
+
+.br
+Where more than one entry matches a file the most specific rule
+applies.  If no entry matches a file then access is denied.
+
+.br
+Suppose /opt/pigpio/access contains the following entries
+
+.br
+
+.EX
+/home/* n
+.br
+/home/pi/shared/dir_1/* w
+.br
+/home/pi/shared/dir_2/* r
+.br
+/home/pi/shared/dir_3/* u
+.br
+/home/pi/shared/dir_1/file.txt n
+.br
+
+.EE
+
+.br
+Files may be written in directory dir_1 with the exception
+of file.txt.
+
+.br
+Files may be read in directory dir_2.
+
+.br
+Files may be read and written in directory dir_3.
+
+.br
+If a directory allows read, write, or read/write access then files may
+be created in that directory.
+
+.br
+In an attempt to prevent risky permissions the following paths are
+ignored in /opt/pigpio/access.
+
+.br
+
+.EX
+a path containing ..
+.br
+a path containing only wildcards (*?)
+.br
+a path containing less than two non-wildcard parts
+.br
+
+.EE
+
+.br
+Mode
+
+.br
+The mode may have the following values.
+
+.br
+
+.EX
+        Value   Meaning
+READ      1     open file for reading
+WRITE     2     open file for writing
+RW        3     open file for reading and writing
+
+.EE
+
+.br
+The following values may be or'd into the mode.
+
+.br
+
+.EX
+         Value   Meaning
+APPEND     4     All writes append data to the end of the file
+CREATE     8     The file is created if it doesn't exist
+TRUNC     16     The file is truncated
+
+.EE
+
+.br
+Newly created files are owned by root with permissions owner read and write.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ ls /ram/*.c
+.br
+/ram/command.c      /ram/pigpiod.c  /ram/pigs.c
+.br
+/ram/x_pigpiod_if.c /ram/pig2vcd.c  /ram/pigpiod_if2.c
+.br
+/ram/x_pigpio.c     /ram/x_repeat.c /ram/pigpio.c
+.br
+/ram/pigpiod_if.c   /ram/x_pigpiod_if2.c
+.br
+
+.br
+# assumes /opt/pigpio/access contains the following line
+.br
+# /ram/*.c r
+.br
+
+.br
+$ pigs fo /ram/pigpio.c 1
+.br
+0
+.br
+
+.br
+$ pigs fo /ram/new.c 1
+.br
+-128
+.br
+ERROR: file open failed
+.br
+
+.br
+$ pigs fo /ram/new.c 9
+.br
+1
+.br
+
+.br
+$ ls /ram/*.c -l
+.br
+-rw-r--r-- 1 joan joan  42923 Jul 10 11:22 /ram/command.c
+.br
+-rw------- 1 root root      0 Jul 10 16:54 /ram/new.c
+.br
+-rw-r--r-- 1 joan joan   2971 Jul 10 11:22 /ram/pig2vcd.c
+.br
+-rw------- 1 joan joan 296235 Jul 10 11:22 /ram/pigpio.c
+.br
+-rw-r--r-- 1 joan joan   9266 Jul 10 11:22 /ram/pigpiod.c
+.br
+-rw-r--r-- 1 joan joan  37331 Jul 10 11:22 /ram/pigpiod_if2.c
+.br
+-rw-r--r-- 1 joan joan  33088 Jul 10 11:22 /ram/pigpiod_if.c
+.br
+-rw-r--r-- 1 joan joan   7990 Jul 10 11:22 /ram/pigs.c
+.br
+-rw-r--r-- 1 joan joan  19970 Jul 10 11:22 /ram/x_pigpio.c
+.br
+-rw-r--r-- 1 joan joan  20804 Jul 10 11:22 /ram/x_pigpiod_if2.c
+.br
+-rw-r--r-- 1 joan joan  19844 Jul 10 11:22 /ram/x_pigpiod_if.c
+.br
+-rw-r--r-- 1 joan joan  19907 Jul 10 11:22 /ram/x_repeat.c
+.br
+
+.EE
+
+.br
+
+.IP "\fBFR h num\fP - Read bytes from file handle"
+.IP "" 4
+This command returns up to \fBnum\fP bytes of data read from the
+file associated with handle \fBh\fP.
+
+.br
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fr 0 10
+.br
+5 48 49 128 144 255
+.br
+
+.br
+$ pigs fr 0 10
+.br
+0
+.br
+
+.EE
+
+.br
+
+.IP "\fBFS h num from\fP - Seek to file handle position"
+.IP "" 4
+This command seeks to a position within the file associated
+with handle \fBh\fP.
+
+.br
+The number of bytes to move is \fBnum\fP.  Positive offsets
+move forward, negative offsets backwards.  The move start
+position is determined by \fBfrom\fP as follows.
+
+.br
+
+.EX
+    From
+0   start
+1   current position
+2   end
+
+.EE
+
+.br
+Upon success the new byte position within the file (>=0) is
+returned.  On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fs 0 0 0 # Seek to start of file plus 200
+.br
+200
+.br
+
+.br
+$ pigs fs 0 0 1 # Return current position
+.br
+200
+.br
+
+.br
+$ pigs fs 0 0 2 # Seek to end of file, return size
+.br
+296235
+.br
+
+.EE
+
+.br
+
+.IP "\fBFW h bvs\fP - Write bytes to file handle"
+.IP "" 4
+This command writes bytes \fBbvs\fP to the file
+associated with handle \fBh\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fw 0 23 45 67 89
+.br
+
+.EE
 
 .br
 
@@ -1710,6 +2114,96 @@ $ pigs p 4 255 # 100%
 
 .br
 
+.IP "\fBPADG pad\fP - Get pad drive strength"
+.IP "" 4
+
+.br
+This command gets the \fBpad\fP drive strength \fBpadma\fP in mA.
+
+.br
+Returns the pad drive strength if OK.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs padg 0
+.br
+8
+.br
+$ pigs pads 0 16
+.br
+$ pigs padg 0
+.br
+16
+.br
+pigs padg 3
+.br
+-126
+.br
+ERROR: bad pad number
+.br
+
+.EE
+
+.br
+
+.IP "\fBPADS pad padma\fP - Set pad drive strength"
+.IP "" 4
+
+.br
+This command sets the \fBpad\fP drive strength \fBpadma\fP in mA.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs pads 0 16
+.br
+$ pigs padg 0
+.br
+16
+.br
+$ pigs pads 0 17
+.br
+-127
+.br
+ERROR: bad pad drive strength
+.br
+
+.EE
+
+.br
+
 .IP "\fBPARSE t\fP - Validate script"
 .IP "" 4
 
@@ -2447,8 +2941,9 @@ Upon success a handle (>=0) is returned.  On error a negative status code
 will be returned.
 
 .br
-The UART is /dev/ttyAMA0.  The consoles are /dev/ttyx.  The USB
-devices are /dev/ttyUSBx.
+The device name must start with /dev/tty or /dev/serial.
+
+.br
 
 .br
 The baud rate must be one of 50, 75, 110, 134, 150,
@@ -2582,6 +3077,81 @@ will be returned.
 $ pigs serwb 0 23
 .br
 $ pigs serwb 0 0xf0
+.br
+
+.EE
+
+.br
+
+.IP "\fBSHELL name str\fP - Execute a shell command"
+.IP "" 4
+
+.br
+This command uses the system call to execute a shell script \fBname\fP
+with the given string \fBstr\fP as its parameter.
+
+.br
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+.br
+\fBname\fP must exist in /opt/pigpio/cgi and must be executable.
+
+.br
+The returned exit status is normally 256 times that set
+by the shell script exit function.  If the script can't
+be found 32512 will be returned.
+
+.br
+The following table gives some example returned statuses.
+
+.br
+
+.EX
+Script exit status   Returned system call status
+1                    256
+5                    1280
+10                   2560
+200                  51200
+script not found     32512
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+# pass two parameters, hello and world
+.br
+$ pigs shell scr1 hello world
+.br
+256
+.br
+
+.br
+# pass three parameters, hello, string with spaces, and world
+.br
+$ pigs shell scr1 "hello 'string with spaces' world"
+.br
+256
+.br
+
+.br
+# pass one parameter, hello string with spaces world
+.br
+$ pigs shell scr1 "\"hello string with spaces world\""
+.br
+256
+.br
+
+.br
+# non-existent script
+.br
+$ pigs shell scr78 par1
+.br
+32512
 .br
 
 .EE
@@ -3916,7 +4486,7 @@ The command expects the number of data bits per serial character.
 
 .br
 
-.IP "\fBdev\fP - a tty serial device (/dev/tty*)" 0
+.IP "\fBdev\fP - a tty serial device (/dev/tty* or /dev/serial*)" 0
 The command expects the name of a tty serial device, e.g.
 
 .br
@@ -3928,6 +4498,28 @@ The command expects the name of a tty serial device, e.g.
 .br
 /dev/tty0
 .br
+/dev/serial0
+.br
+
+.EE
+
+.br
+
+.IP "\fBfile\fP - a file name" 0
+The file name must match an entry in /opt/pigpio/access.
+
+.br
+
+.IP "\fBfrom\fP - 0-2" 0
+Position to seek from \fBFS\fP.
+
+.br
+
+.EX
+    From
+0   start
+1   current position
+2   end
 
 .EE
 
@@ -3979,8 +4571,8 @@ of doing so range from no effect, to a crash, or corrupted data.
 The command expects a handle.
 
 .br
-A handle is a number referencing an object opened by one of \fBI2CO\fP, \fBNO\fP,
-\fBSERO\fP, \fBSPIO\fP.
+A handle is a number referencing an object opened by one of \fBFO\fP,
+\fBI2CO\fP, \fBNO\fP, \fBSERO\fP, \fBSPIO\fP.
 
 .br
 
@@ -4020,24 +4612,58 @@ The value is returned by the mode get command.
 .br
 
 .EX
-Mode   Input Output ALT0 ALT1 ALT2 ALT3 ALT4 ALT5
-Code       R      W    0    1    2    3    4    5
-Value      0      1    4    5    6    7    3    2
+Mode    Input   Output   ALT0   ALT1   ALT2   ALT3   ALT4   ALT5
+Code      R        W       0      1      2      3      4      5
+Value     0        1       4      5      6      7      3      2
 
 .EE
 
 .br
 
-.IP "\fBnum\fP - number of bytes to read (1-)" 0
-The command expects the number of bytes to read.
+.IP "\fBmode\fP - file open mode" 0
+One of the following values.
+
+.br
+
+.EX
+        Value   Meaning
+READ      1     open file for reading
+WRITE     2     open file for writing
+RW        3     open file for reading and writing
+
+.EE
+
+.br
+The following values can be or'd into the mode.
+
+.br
+
+.EX
+         Value   Meaning
+APPEND   4       All writes append data to the end of the file
+CREATE   8       The file is created if it doesn't exist
+TRUNC    16      The file is truncated
+
+.EE
+
+.br
+
+.IP "\fBname\fP - the name of a script" 0
+Only alphanumeric characters, '-' and '_' are allowed in the name.
+
+.br
+
+.IP "\fBnum\fP - maximum number of bytes to return (1-)" 0
+The command expects the maximum number of bytes to return.
 
 .br
 For the I2C and SPI commands the requested number of bytes will always
 be returned.
 
 .br
-For the serial commands the smaller of the number of bytes available to be
-read (which may be zero) and \fBnum\fP bytes will be returned.
+For the serial and file commands the smaller of the number of
+bytes available to be read (which may be zero) and \fBnum\fP bytes
+will be returned.
 
 .br
 
@@ -4075,8 +4701,35 @@ There is no mechanism to read the pull up down state.
 
 .br
 
+.IP "\fBpad\fP - 0-2" 0
+A set of GPIO which share common drivers.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+.IP "\fBpadma\fP - 1-16" 0
+The mA which may be drawn from each GPIO whilst still guaranteeing the
+high and low levels.
+
+.br
+
 .IP "\fBpars\fP - script parameters" 0
 The command expects 0 to 10 numbers as parameters to be passed to the script.
+
+.br
+
+.IP "\fBpat\fP - a file name pattern" 0
+A file path which may contain wildcards.  To be accessible the path
+must match an entry in /opt/pigpio/access.
 
 .br
 
@@ -4141,8 +4794,13 @@ the active part of a noise filter (\fBFN\fP).
 
 .br
 
-.IP "\fBt\fP - text (a string of text)" 0
-The command expects a text string.
+.IP "\fBstr\fP - a string" 0
+The command expects a string.
+
+.br
+
+.IP "\fBt\fP - a string" 0
+The command expects a string.
 
 .br
 

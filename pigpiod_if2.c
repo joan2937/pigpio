@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 6 */
+/* PIGPIOD_IF2_VERSION 8 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1597,6 +1597,148 @@ int custom_2(int pi, unsigned arg1, char *argx, unsigned count,
    if (bytes > 0)
    {
       bytes = recvMax(pi, retBuf, retMax, bytes);
+   }
+
+   _pmu(pi);
+
+   return bytes;
+}
+
+int get_pad_strength(int pi, unsigned pad)
+   {return pigpio_command(pi, PI_CMD_PADG, pad, 0, 1);}
+
+int set_pad_strength(int pi, unsigned pad, unsigned padStrength)
+   {return pigpio_command(pi, PI_CMD_PADS, pad, padStrength, 1);}
+
+int shell_(int pi, char *scriptName, char *scriptString)
+{
+   int ln, ls;
+   gpioExtent_t ext[2];
+
+   ln = strlen(scriptName);
+   ls = strlen(scriptString);
+   /*
+   p1=len(scriptName)
+   p2=0
+   p3=len(scriptName) + len(scriptString) + 1
+   ## extension ##
+   char[]
+   */
+
+   ext[0].size = ln + 1; /* include null byte */
+   ext[0].ptr = scriptName;
+
+   ext[1].size = ls;
+   ext[1].ptr = scriptString;
+
+   return pigpio_command_ext
+      (pi, PI_CMD_SHELL, ln, 0, ln+ls+1, 2, ext, 1);
+}
+
+int file_open(int pi, char *file, unsigned mode)
+{
+   int len;
+   gpioExtent_t ext[1];
+
+   len = strlen(file);
+
+   /*
+   p1=mode
+   p2=0
+   p3=len
+   ## extension ##
+   char file[len]
+   */
+
+   ext[0].size = len;
+   ext[0].ptr = file;
+
+   return pigpio_command_ext
+      (pi, PI_CMD_FO, mode, 0, len, 1, ext, 1);
+}
+
+int file_close(int pi, unsigned handle)
+   {return pigpio_command(pi, PI_CMD_FC, handle, 0, 1);}
+
+int file_write(int pi, unsigned handle, char *buf, unsigned count)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=0
+   p3=count
+   ## extension ##
+   char buf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = buf;
+
+   return pigpio_command_ext
+      (pi, PI_CMD_FW, handle, 0, count, 1, ext, 1);
+}
+
+int file_read(int pi, unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   bytes = pigpio_command
+      (pi, PI_CMD_FR, handle, count, 0);
+
+   if (bytes > 0)
+   {
+      bytes = recvMax(pi, buf, count, bytes);
+   }
+
+   _pmu(pi);
+
+   return bytes;
+}
+
+int file_seek(int pi, unsigned handle, int32_t seekOffset, int seekFrom)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=handle
+   p2=seekOffset
+   p3=4
+   ## extension ##
+   uint32_t seekFrom
+   */
+
+   ext[0].size = sizeof(uint32_t);
+   ext[0].ptr = &seekFrom;
+
+   return pigpio_command_ext
+      (pi, PI_CMD_FS, handle, seekOffset, 4, 1, ext, 1);
+}
+
+int file_list(int pi, char *fpat,  char *buf, unsigned count)
+{
+   int len;
+   int bytes;
+   gpioExtent_t ext[1];
+
+   len = strlen(fpat);
+
+   /*
+   p1=60000
+   p2=0
+   p3=len
+   ## extension ##
+   char fpat[len]
+   */
+
+   ext[0].size = len;
+   ext[0].ptr = fpat;
+
+   bytes = pigpio_command_ext(pi, PI_CMD_FL, 60000, 0, len, 1, ext, 0);
+
+   if (bytes > 0)
+   {
+      bytes = recvMax(pi, buf, count, bytes);
    }
 
    _pmu(pi);

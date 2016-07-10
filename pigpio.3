@@ -17,6 +17,10 @@ sudo ./prog
 .SH DESCRIPTION
 
 
+.ad l
+
+.nh
+
 .br
 
 .br
@@ -29,12 +33,12 @@ pigpio is a C library for the Raspberry which allows control of the GPIO.
 .br
 
 .br
-o PWM on any of GPIO 0-31
+o hardware timed PWM on any of GPIO 0-31
 
 .br
 
 .br
-o servo pulses on any of GPIO 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 .br
 
@@ -313,15 +317,15 @@ Arduino style: pinMode.
 .br
 
 .EX
-gpioSetMode(17, PI_INPUT);  // Set gpio17 as input.
+gpioSetMode(17, PI_INPUT);  // Set GPIO17 as input.
 .br
 
 .br
-gpioSetMode(18, PI_OUTPUT); // Set gpio18 as output.
+gpioSetMode(18, PI_OUTPUT); // Set GPIO18 as output.
 .br
 
 .br
-gpioSetMode(22,PI_ALT0);    // Set gpio22 to alternative mode 0.
+gpioSetMode(22,PI_ALT0);    // Set GPIO22 to alternative mode 0.
 .br
 
 .EE
@@ -356,7 +360,7 @@ if (gpioGetMode(17) != PI_ALT0)
 .br
 {
 .br
-   gpioSetMode(17, PI_ALT0);  // set gpio17 to ALT0
+   gpioSetMode(17, PI_ALT0);  // set GPIO17 to ALT0
 .br
 }
 .br
@@ -435,7 +439,7 @@ Arduino style: digitalRead.
 .br
 
 .EX
-printf("gpio24 is level %d", gpioRead(24));
+printf("GPIO24 is level %d", gpioRead(24));
 .br
 
 .EE
@@ -478,7 +482,7 @@ Arduino style: digitalWrite
 .br
 
 .EX
-gpioWrite(24, 1); // Set gpio24 high.
+gpioWrite(24, 1); // Set GPIO24 high.
 .br
 
 .EE
@@ -529,15 +533,15 @@ range of 255.
 .br
 
 .EX
-gpioPWM(17, 255); // Sets gpio17 full on.
+gpioPWM(17, 255); // Sets GPIO17 full on.
 .br
 
 .br
-gpioPWM(18, 128); // Sets gpio18 half on.
+gpioPWM(18, 128); // Sets GPIO18 half on.
 .br
 
 .br
-gpioPWM(23, 0);   // Sets gpio23 full off.
+gpioPWM(23, 0);   // Sets GPIO23 full off.
 .br
 
 .EE
@@ -825,15 +829,15 @@ sample
 .br
 
 .EX
-gpioSetPWMfrequency(23, 0); // Set gpio23 to lowest frequency.
+gpioSetPWMfrequency(23, 0); // Set GPIO23 to lowest frequency.
 .br
 
 .br
-gpioSetPWMfrequency(24, 500); // Set gpio24 to 500Hz.
+gpioSetPWMfrequency(24, 500); // Set GPIO24 to 500Hz.
 .br
 
 .br
-gpioSetPWMfrequency(25, 100000); // Set gpio25 to highest frequency.
+gpioSetPWMfrequency(25, 100000); // Set GPIO25 to highest frequency.
 .br
 
 .EE
@@ -878,7 +882,7 @@ will be that set by \fBgpioHardwarePWM\fP.
 .br
 
 .EX
-f = gpioGetPWMfrequency(23); // Get frequency used for gpio23.
+f = gpioGetPWMfrequency(23); // Get frequency used for GPIO23.
 .br
 
 .EE
@@ -978,7 +982,7 @@ the servo pulsewidth.
 .br
 
 .br
-E.g. If you want to update a servo connected to gpio25 at 400Hz
+E.g. If you want to update a servo connected to GPIO25 at 400Hz
 
 .br
 
@@ -1481,11 +1485,19 @@ by one for each report.
 
 .br
 flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
-If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags
-indicate a GPIO which has had a watchdog timeout; if bit 6 is set
-(PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the
-pipe/socket and is sent once a minute in the absence of other
-notification activity.
+
+.br
+
+.br
+PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the flags
+indicate a GPIO which has had a watchdog timeout.
+
+.br
+
+.br
+PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep alive
+signal on the pipe/socket and is sent once a minute in the absence
+of other notification activity.
 
 .br
 
@@ -2095,19 +2107,14 @@ The following command codes are supported:
 
 .br
 Name           Cmd & Data   Meaning
-
 .br
 Loop Start     255 0        Identify start of a wave block
-
 .br
 Loop Repeat    255 1 x y    loop x + y*256 times
-
 .br
 Delay          255 2 x y    delay x + y*256 microseconds
-
 .br
 Loop Forever   255 3        loop forever
-
 .br
 
 .br
@@ -2362,7 +2369,7 @@ This function configures the level logic for bit bang serial reads.
 .br
 
 .br
-Pass PI_BB_SER_INVERT to invert the serial logic.  Pass PI_BB_SER_NORMAL for
+Use PI_BB_SER_INVERT to invert the serial logic and PI_BB_SER_NORMAL for
 normal logic.  Default is PI_BB_SER_NORMAL.
 
 .br
@@ -3178,31 +3185,22 @@ The following command codes are supported:
 
 .br
 Name      Cmd & Data   Meaning
-
 .br
 End       0            No more commands
-
 .br
 Escape    1            Next P is two bytes
-
 .br
 On        2            Switch combined flag on
-
 .br
 Off       3            Switch combined flag off
-
 .br
 Address   4 P          Set I2C address to P
-
 .br
 Flags     5 lsb msb    Set I2C flags to lsb + (msb << 8)
-
 .br
 Read      6 P          Read P bytes of data
-
 .br
 Write     7 P ...      Write P bytes of data
-
 .br
 
 .br
@@ -3367,31 +3365,22 @@ The following command codes are supported:
 
 .br
 Name      Cmd & Data     Meaning
-
 .br
 End       0              No more commands
-
 .br
 Escape    1              Next P is two bytes
-
 .br
 Start     2              Start condition
-
 .br
 Stop      3              Stop condition
-
 .br
 Address   4 P            Set I2C address to P
-
 .br
 Flags     5 lsb msb      Set I2C flags to lsb + (msb << 8)
-
 .br
 Read      6 P            Read P bytes of data
-
 .br
 Write     7 P ...        Write P bytes of data
-
 .br
 
 .br
@@ -3719,14 +3708,15 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 .IP "\fBint serOpen(char *sertty, unsigned baud, unsigned serFlags)\fP"
 .IP "" 4
 This function opens a serial device at a specified baud rate
-with specified flags.
+and with specified flags.  The device name must start with
+/dev/tty or /dev/serial.
 
 .br
 
 .br
 
 .EX
-  sertty: the serial device to open, /dev/tty*
+  sertty: the serial device to open
 .br
     baud: the baud rate in bits per second, see below
 .br
@@ -3847,7 +3837,7 @@ associated with handle and writes them to buf.
 .br
 
 .EX
-handle: >=0, as returned by a call to serial_open
+handle: >=0, as returned by a call to \fBserOpen\fP
 .br
    buf: an array to receive the read data
 .br
@@ -3860,7 +3850,7 @@ handle: >=0, as returned by a call to serial_open
 
 .br
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
-PI_BAD_PARAM, PI_SER_READ_NO_DATA, or PI_SER_WRITE_FAILED.
+PI_BAD_PARAM, or PI_SER_READ_NO_DATA.
 
 .IP "\fBint serDataAvailable(unsigned handle)\fP"
 .IP "" 4
@@ -5146,6 +5136,676 @@ for "Revision       : 000g" the function returns 0.
 .IP "" 4
 Returns the pigpio version.
 
+.IP "\fBint gpioGetPad(unsigned pad)\fP"
+.IP "" 4
+This function returns the pad drive strength in mA.
+
+.br
+
+.br
+
+.EX
+pad: 0-2, the pad to get
+.br
+
+.EE
+
+.br
+
+.br
+Returns the pad drive strength if OK, otherwise PI_BAD_PAD.
+
+.br
+
+.br
+Pad   GPIO
+.br
+0     0-27
+.br
+1     28-45
+.br
+2     46-53
+.br
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+strength = gpioGetPad(1); // get pad 1 strength
+.br
+
+.EE
+
+.IP "\fBint gpioSetPad(unsigned pad, unsigned padStrength)\fP"
+.IP "" 4
+This function sets the pad drive strength in mA.
+
+.br
+
+.br
+
+.EX
+        pad: 0-2, the pad to set
+.br
+padStrength: 1-16 mA
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_PAD, or PI_BAD_STRENGTH.
+
+.br
+
+.br
+Pad   GPIO
+.br
+0     0-27
+.br
+1     28-45
+.br
+2     46-53
+.br
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+gpioSetPad(0, 16); // set pad 0 strength to 16 mA
+.br
+
+.EE
+
+.IP "\fBint shell(char *scriptName, char *scriptString)\fP"
+.IP "" 4
+This function uses the system call to execute a shell script
+with the given string as its parameter.
+
+.br
+
+.br
+
+.EX
+  scriptName: the name of the script, only alphanumeric characters,
+.br
+              '-' and '_' are allowed in the name
+.br
+scriptString: the string to pass to the script
+.br
+
+.EE
+
+.br
+
+.br
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+.br
+
+.br
+scriptName must exist in /opt/pigpio/cgi and must be executable.
+
+.br
+
+.br
+The returned exit status is normally 256 times that set by the
+shell script exit function.  If the script can't be found 32512 will
+be returned.
+
+.br
+
+.br
+The following table gives some example returned statuses.
+
+.br
+
+.br
+Script exit status   Returned system call status
+.br
+1                    256
+.br
+5                    1280
+.br
+10                   2560
+.br
+200                  51200
+.br
+script not found     32512
+.br
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+// pass two parameters, hello and world
+.br
+status = shell("scr1", "hello world");
+.br
+
+.br
+// pass three parameters, hello, string with spaces, and world
+.br
+status = shell("scr1", "hello 'string with spaces' world");
+.br
+
+.br
+// pass one parameter, hello string with spaces world
+.br
+status = shell("scr1", "\"hello string with spaces world\"");
+.br
+
+.EE
+
+.IP "\fBint fileOpen(char *file, unsigned mode)\fP"
+.IP "" 4
+This function returns a handle to a file opened in a specified mode.
+
+.br
+
+.br
+
+.EX
+file: the file to open
+.br
+mode: the file open mode
+.br
+
+.EE
+
+.br
+
+.br
+Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
+PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+
+.br
+
+.br
+File
+
+.br
+
+.br
+A file may only be opened if permission is granted by an entry in
+/opt/pigpio/access.  This is intended to allow remote access to files
+in a more or less controlled manner.
+
+.br
+
+.br
+Each entry in /opt/pigpio/access takes the form of a file path
+which may contain wildcards followed by a single letter permission.
+The permission may be R for read, W for write, U for read/write,
+and N for no access.
+
+.br
+
+.br
+Where more than one entry matches a file the most specific rule
+applies.  If no entry matches a file then access is denied.
+
+.br
+
+.br
+Suppose /opt/pigpio/access contains the following entries
+
+.br
+
+.br
+
+.EX
+/home/* n
+.br
+/home/pi/shared/dir_1/* w
+.br
+/home/pi/shared/dir_2/* r
+.br
+/home/pi/shared/dir_3/* u
+.br
+/home/pi/shared/dir_1/file.txt n
+.br
+
+.EE
+
+.br
+
+.br
+Files may be written in directory dir_1 with the exception
+of file.txt.
+
+.br
+
+.br
+Files may be read in directory dir_2.
+
+.br
+
+.br
+Files may be read and written in directory dir_3.
+
+.br
+
+.br
+If a directory allows read, write, or read/write access then files may
+be created in that directory.
+
+.br
+
+.br
+In an attempt to prevent risky permissions the following paths are
+ignored in /opt/pigpio/access.
+
+.br
+
+.br
+
+.EX
+a path containing ..
+.br
+a path containing only wildcards (*?)
+.br
+a path containing less than two non-wildcard parts
+.br
+
+.EE
+
+.br
+
+.br
+Mode
+
+.br
+
+.br
+The mode may have the following values.
+
+.br
+
+.br
+Macro           Value   Meaning
+.br
+PI_FILE_READ      1     open file for reading
+.br
+PI_FILE_WRITE     2     open file for writing
+.br
+PI_FILE_RW        3     open file for reading and writing
+.br
+
+.br
+
+.br
+The following values may be or'd into the mode.
+
+.br
+
+.br
+Macro            Value   Meaning
+.br
+PI_FILE_APPEND   4       Writes append data to the end of the file
+.br
+PI_FILE_CREATE   8       The file is created if it doesn't exist
+.br
+PI_FILE_TRUNC    16      The file is truncated
+.br
+
+.br
+
+.br
+Newly created files are owned by root with permissions owner read and write.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+#include <stdio.h>
+.br
+#include <pigpio.h>
+.br
+
+.br
+int main(int argc, char *argv[])
+.br
+{
+.br
+   int handle, c;
+.br
+   char buf[60000];
+.br
+
+.br
+   if (gpioInitialise() < 0) return 1;
+.br
+
+.br
+   // assumes /opt/pigpio/access contains the following line
+.br
+   // /ram/*.c r
+.br
+
+.br
+   handle = fileOpen("/ram/pigpio.c", PI_FILE_READ);
+.br
+
+.br
+   if (handle >= 0)
+.br
+   {
+.br
+      while ((c=fileRead(handle, buf, sizeof(buf)-1)))
+.br
+      {
+.br
+         buf[c] = 0;
+.br
+         printf("%s", buf);
+.br
+      }
+.br
+
+.br
+      fileClose(handle);
+.br
+   }
+.br
+
+.br
+   gpioTerminate();
+.br
+}
+.br
+
+.EE
+
+.IP "\fBint fileClose(unsigned handle)\fP"
+.IP "" 4
+This function closes the file associated with handle.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBfileOpen\fP
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+fileClose(h);
+.br
+
+.EE
+
+.IP "\fBint fileWrite(unsigned handle, char *buf, unsigned count)\fP"
+.IP "" 4
+This function writes count bytes from buf to the the file
+associated with handle.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBfileOpen\fP
+.br
+   buf: the array of bytes to write
+.br
+ count: the number of bytes to write
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM,
+PI_FILE_NOT_WOPEN, or PI_BAD_FILE_WRITE.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+status = fileWrite(h, buf, count);
+.br
+if (status == 0)
+.br
+{
+.br
+   // okay
+.br
+}
+.br
+else
+.br
+{
+.br
+   // error
+.br
+}
+.br
+
+.EE
+
+.IP "\fBint fileRead(unsigned handle, char *buf, unsigned count)\fP"
+.IP "" 4
+This function reads up to count bytes from the the file
+associated with handle and writes them to buf.
+
+.br
+
+.br
+
+.EX
+handle: >=0, as returned by a call to \fBfileOpen\fP
+.br
+   buf: an array to receive the read data
+.br
+ count: the maximum number of bytes to read
+.br
+
+.EE
+
+.br
+
+.br
+Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, PI_FILE_NOT_ROPEN, or PI_BAD_FILE_WRITE.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+if (fileRead(h, buf, sizeof(buf)) > 0)
+.br
+{
+.br
+   // process read data
+.br
+}
+.br
+
+.EE
+
+.IP "\fBint fileSeek(unsigned handle, int32_t seekOffset, int seekFrom)\fP"
+.IP "" 4
+This function seeks to a position within the file associated
+with handle.
+
+.br
+
+.br
+
+.EX
+    handle: >=0, as returned by a call to \fBfileOpen\fP
+.br
+seekOffset: the number of bytes to move.  Positive offsets
+.br
+            move forward, negative offsets backwards.
+.br
+  seekFrom: one of PI_FROM_START (0), PI_FROM_CURRENT (1),
+.br
+            or PI_FROM_END (2)
+.br
+
+.EE
+
+.br
+
+.br
+Returns the new byte position within the file (>=0) if OK, otherwise PI_BAD_HANDLE, or PI_BAD_FILE_SEEK.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+fileSeek(0, 20, PI_FROM_START); // Seek to start plus 20
+.br
+
+.br
+size = fileSeek(0, 0, PI_FROM_END); // Seek to end, return size
+.br
+
+.br
+pos = fileSeek(0, 0, PI_FROM_CURRENT); // Return current position
+.br
+
+.EE
+
+.IP "\fBint fileList(char *fpat, char *buf, unsigned count)\fP"
+.IP "" 4
+This function returns a list of files which match a pattern.  The
+pattern may contain wildcards.
+
+.br
+
+.br
+
+.EX
+ fpat: file pattern to match
+.br
+  buf: an array to receive the matching file names
+.br
+count: the maximum number of bytes to read
+.br
+
+.EE
+
+.br
+
+.br
+Returns the number of returned bytes if OK, otherwise PI_NO_FILE_ACCESS,
+or PI_NO_FILE_MATCH.
+
+.br
+
+.br
+The pattern must match an entry in /opt/pigpio/access.  The pattern
+may contain wildcards.  See \fBfileOpen\fP.
+
+.br
+
+.br
+NOTE
+
+.br
+
+.br
+The returned value is not the number of files, it is the number
+of bytes in the buffer.  The file names are separated by newline
+characters.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+#include <stdio.h>
+.br
+#include <pigpio.h>
+.br
+
+.br
+int main(int argc, char *argv[])
+.br
+{
+.br
+   int c;
+.br
+   char buf[1000];
+.br
+
+.br
+   if (gpioInitialise() < 0) return 1;
+.br
+
+.br
+   // assumes /opt/pigpio/access contains the following line
+.br
+   // /ram/*.c r
+.br
+
+.br
+   c = fileList("/ram/p*.c", buf, sizeof(buf));
+.br
+
+.br
+   if (c >= 0)
+.br
+   {
+.br
+      // terminate string
+.br
+      buf[c] = 0;
+.br
+      printf("%s", buf);
+.br
+   }
+.br
+
+.br
+   gpioTerminate();
+.br
+}
+.br
+
+.EE
+
 .IP "\fBint gpioCfgBufferSize(unsigned cfgMillis)\fP"
 .IP "" 4
 Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
@@ -5390,17 +6050,13 @@ If the board revision is not recognised then GPIO 0-31 are allowed.
 .br
 Unknown board   PI_DEFAULT_UPDATE_MASK_UNKNOWN   0xFFFFFFFF
 .br
-
 .br
 Type 1 board    PI_DEFAULT_UPDATE_MASK_B1   0x03E6CF93
 .br
-
 .br
 Type 2 board    PI_DEFAULT_UPDATE_MASK_A_B2   0xFBC6CF9C
-
 .br
 Type 3 board    PI_DEFAULT_UPDATE_MASK_R3   0x0FFFFFFC
-
 .br
 
 .IP "\fBint gpioCfgSocketPort(unsigned port)\fP"
@@ -6168,10 +6824,6 @@ PI_HW_CLK_MAX_FREQ 250000000
 .br
 
 .IP "\fBcount\fP" 0
-
-.br
-
-.br
 The number of bytes to be transferred in an I2C, SPI, or Serial
 command.
 
@@ -6246,7 +6898,7 @@ The number may vary between 0 and range (default 255) where
 .br
 
 .IP "\fBedge\fP: 0-2" 0
-The type of GPIO edge to generate an intrrupt.  See\fBgpioSetISRFunc\fP,
+The type of GPIO edge to generate an intrrupt.  See \fBgpioSetISRFunc\fP,
 and \fBgpioSetISRFuncEx\fP.
 
 .br
@@ -6278,6 +6930,22 @@ A function.
 
 .br
 
+.IP "\fB*file\fP" 0
+A full file path.  To be accessible the path must match an entry in
+/opt/pigpio/access.
+
+.br
+
+.br
+
+.IP "\fB*fpat\fP" 0
+A file path which may contain wildcards.  To be accessible the path
+must match an entry in /opt/pigpio/access.
+
+.br
+
+.br
+
 .IP "\fBfrequency\fP: >=0" 0
 
 .br
@@ -6302,14 +6970,14 @@ A Broadcom numbered GPIO, in the range 0-53.
 .br
 
 .br
-There  are 54 General Purpose Input Outputs (GPIO) named gpio0 through
-gpio53.
+There  are 54 General Purpose Input Outputs (GPIO) named GPIO0 through
+GPIO53.
 
 .br
 
 .br
-They are split into two  banks.   Bank  1  consists  of  gpio0  through
-gpio31.  Bank 2 consists of gpio32 through gpio53.
+They are split into two  banks.   Bank  1  consists  of  GPIO0  through
+GPIO31.  Bank 2 consists of GPIO32 through GPIO53.
 
 .br
 
@@ -6597,18 +7265,8 @@ One of
 .br
 
 .br
-A number referencing an object opened by one of
-
-.br
-
-.br
-\fBi2cOpen\fP
-.br
-\fBgpioNotifyOpen\fP
-.br
-\fBserOpen\fP
-.br
-\fBspiOpen\fP
+A number referencing an object opened by one of \fBfileOpen\fP,
+\fBgpioNotifyOpen\fP, \fBi2cOpen\fP, \fBserOpen\fP, \fBspiOpen\fP.
 
 .br
 
@@ -6684,6 +7342,13 @@ The number of bytes of data in a buffer.
 
 .IP "\fBint\fP" 0
 A whole number, negative or positive.
+
+.br
+
+.br
+
+.IP "\fBint32_t\fP" 0
+A 32-bit signed value.
 
 .br
 
@@ -6816,12 +7481,12 @@ A value representing milliseconds.
 
 .br
 
-.IP "\fBmode\fP: 0-7" 0
+.IP "\fBmode\fP" 0
 
 .br
 
 .br
-The operational mode of a GPIO, normally INPUT or OUTPUT.
+1. The operational mode of a GPIO, normally INPUT or OUTPUT.
 
 .br
 
@@ -6843,6 +7508,44 @@ PI_ALT3 7
 PI_ALT4 3
 .br
 PI_ALT5 2
+.br
+
+.EE
+
+.br
+
+.br
+2. A file open mode.
+
+.br
+
+.br
+
+.EX
+PI_FILE_READ  1
+.br
+PI_FILE_WRITE 2
+.br
+PI_FILE_RW    3
+.br
+
+.EE
+
+.br
+
+.br
+The following values can be or'd into the mode.
+
+.br
+
+.br
+
+.EX
+PI_FILE_APPEND 4
+.br
+PI_FILE_CREATE 8
+.br
+PI_FILE_TRUNC  16
 .br
 
 .EE
@@ -6909,6 +7612,33 @@ A buffer used to return data from a function.
 
 .IP "\fBoutLen\fP" 0
 The size in bytes of an output buffer.
+
+.br
+
+.br
+
+.IP "\fBpad\fP: 0-2" 0
+A set of GPIO which share common drivers.
+
+.br
+
+.br
+Pad   GPIO
+.br
+0     0-27
+.br
+1     28-45
+.br
+2     46-53
+.br
+
+.br
+
+.br
+
+.IP "\fBpadStrength\fP: 1-16" 0
+The mA which may be drawn from each GPIO whilst still guaranteeing the
+high and low levels.
 
 .br
 
@@ -7251,10 +7981,6 @@ A pointer to a buffer to receive data.
 .br
 
 .IP "\fBSCL\fP" 0
-
-.br
-
-.br
 The user GPIO to use for the clock when bit banging I2C.
 
 .br
@@ -7262,10 +7988,6 @@ The user GPIO to use for the clock when bit banging I2C.
 .br
 
 .IP "\fB*script\fP" 0
-
-.br
-
-.br
 A pointer to the text of a script.
 
 .br
@@ -7273,21 +7995,28 @@ A pointer to the text of a script.
 .br
 
 .IP "\fBscript_id\fP" 0
-
-.br
-
-.br
 An id of a stored script as returned by \fBgpioStoreScript\fP.
 
 .br
 
 .br
 
+.IP "\fB*scriptName\fP" 0
+The name of a \fBshell\fP script to be executed.  The script must be present in
+/opt/pigpio/cgi and must have execute permission.
+
+.br
+
+.br
+
+.IP "\fB*scriptString\fP" 0
+The string to be passed to a \fBshell\fP script to be executed.
+
+.br
+
+.br
+
 .IP "\fBSDA\fP" 0
-
-.br
-
-.br
 The user GPIO to use for data when bit banging I2C.
 
 .br
@@ -7318,21 +8047,41 @@ a returned time.
 .br
 
 .IP "\fBseconds\fP" 0
-
-.br
-
-.br
 The number of seconds.
 
 .br
 
 .br
 
+.IP "\fBseekFrom\fP" 0
+
+.br
+
+.br
+
+.EX
+PI_FROM_START   0
+.br
+PI_FROM_CURRENT 1
+.br
+PI_FROM_END     2
+.br
+
+.EE
+
+.br
+
+.br
+
+.IP "\fBseekOffset\fP" 0
+The number of bytes to move forward (positive) or backwards (negative)
+from the seek position (start, current, or end of file).
+
+.br
+
+.br
+
 .IP "\fB*segs\fP" 0
-
-.br
-
-.br
 An array of segments which make up a combined I2C transaction.
 
 .br
@@ -7623,10 +8372,6 @@ See \fBgpio\fP.
 .br
 
 .IP "\fB*userdata\fP" 0
-
-.br
-
-.br
 A pointer to arbitrary user data.  This may be used to identify the instance.
 
 .br
@@ -7976,6 +8721,30 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_PADS  102
+.br
+#define PI_CMD_PADG  103
+.br
+
+.br
+#define PI_CMD_FO    104
+.br
+#define PI_CMD_FC    105
+.br
+#define PI_CMD_FR    106
+.br
+#define PI_CMD_FW    107
+.br
+#define PI_CMD_FS    108
+.br
+#define PI_CMD_FL    109
+.br
+
+.br
+#define PI_CMD_SHELL 110
+.br
+
+.br
 
 .EE
 .SH Error Codes
@@ -8061,7 +8830,7 @@ A 16-bit word value.
 .br
 #define PI_TOO_MANY_CHARS   -37 // waveform has too many chars
 .br
-#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read in progress on GPIO
+#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read on GPIO
 .br
 #define PI_BAD_SERIAL_STRUC -39 // bad (null) serial structure parameter
 .br
@@ -8235,9 +9004,39 @@ A 16-bit word value.
 .br
 #define PI_BAD_ISR_INIT    -123 // bad ISR initialisation
 .br
-#define PI_BAD_FOREVER     -124 // loop forever must be last chain command
+#define PI_BAD_FOREVER     -124 // loop forever must be last command
 .br
 #define PI_BAD_FILTER      -125 // bad filter parameter
+.br
+#define PI_BAD_PAD         -126 // bad pad number
+.br
+#define PI_BAD_STRENGTH    -127 // bad pad drive strength
+.br
+#define PI_FIL_OPEN_FAILED -128 // file open failed
+.br
+#define PI_BAD_FILE_MODE   -129 // bad file mode
+.br
+#define PI_BAD_FILE_FLAG   -130 // bad file flag
+.br
+#define PI_BAD_FILE_READ   -131 // bad file read
+.br
+#define PI_BAD_FILE_WRITE  -132 // bad file write
+.br
+#define PI_FILE_NOT_ROPEN  -133 // file not open for read
+.br
+#define PI_FILE_NOT_WOPEN  -134 // file not open for write
+.br
+#define PI_BAD_FILE_SEEK   -135 // bad file seek
+.br
+#define PI_NO_FILE_MATCH   -136 // no files match pattern
+.br
+#define PI_NO_FILE_ACCESS  -137 // no permission to access file
+.br
+#define PI_FILE_IS_A_DIR   -138 // file is a directory
+.br
+#define PI_BAD_SHELL_STATUS -139 // bad shell return status
+.br
+#define PI_BAD_SCRIPT_NAME -140 // bad script name
 .br
 
 .br

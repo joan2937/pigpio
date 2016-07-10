@@ -17,6 +17,10 @@ gcc -Wall -pthread -o prog prog.c -lpigpiod_if -lrt
 .SH DESCRIPTION
 
 
+.ad l
+
+.nh
+
 .br
 
 .br
@@ -37,12 +41,12 @@ of the GPIO via the socket interface to the pigpio daemon.
 .br
 
 .br
-o PWM on any of GPIO 0-31
+o hardware timed PWM on any of GPIO 0-31
 
 .br
 
 .br
-o servo pulses on any of GPIO 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 .br
 
@@ -313,7 +317,7 @@ Set the GPIO mode.
 .EX
 gpio: 0-53.
 .br
-mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
+mode: PI_INPUT, PI_OUTPUT, PI_ALT0, PI_ALT1,
 .br
       PI_ALT2, PI_ALT3, PI_ALT4, PI_ALT5.
 .br
@@ -916,11 +920,6 @@ corresponding bit in bits is set.
 .br
 
 .br
-Notes
-
-.br
-
-.br
 Each notification occupies 12 bytes in the fifo as follows:
 
 .br
@@ -928,16 +927,58 @@ Each notification occupies 12 bytes in the fifo as follows:
 .br
 
 .EX
-H (16 bit) seqno
+typedef struct
 .br
-H (16 bit) flags
+{
 .br
-I (32 bit) tick
+   uint16_t seqno;
 .br
-I (32 bit) level
+   uint16_t flags;
+.br
+   uint32_t tick;
+.br
+   uint32_t level;
+.br
+} gpioReport_t;
 .br
 
 .EE
+
+.br
+
+.br
+seqno: starts at 0 each time the handle is opened and then increments
+by one for each report.
+
+.br
+
+.br
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+
+.br
+
+.br
+PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the flags
+indicate a GPIO which has had a watchdog timeout.
+
+.br
+
+.br
+PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep alive
+signal on the pipe/socket and is sent once a minute in the absence
+of other notification activity.
+
+.br
+
+.br
+tick: the number of microseconds since system boot.  It wraps around
+after 1h12m.
+
+.br
+
+.br
+level: indicates the level of each GPIO.  If bit 1<<x is set then
+GPIO x is high.
 
 .IP "\fBint notify_pause(unsigned handle)\fP"
 .IP "" 4
@@ -1829,19 +1870,14 @@ The following command codes are supported:
 
 .br
 Name           Cmd & Data   Meaning
-
 .br
 Loop Start     255 0        Identify start of a wave block
-
 .br
 Loop Repeat    255 1 x y    loop x + y*256 times
-
 .br
 Delay          255 2 x y    delay x + y*256 microseconds
-
 .br
 Loop Forever   255 3        loop forever
-
 .br
 
 .br
@@ -2977,31 +3013,22 @@ The following command codes are supported:
 
 .br
 Name      Cmd & Data   Meaning
-
 .br
 End       0            No more commands
-
 .br
 Escape    1            Next P is two bytes
-
 .br
 On        2            Switch combined flag on
-
 .br
 Off       3            Switch combined flag off
-
 .br
 Address   4 P          Set I2C address to P
-
 .br
 Flags     5 lsb msb    Set I2C flags to lsb + (msb << 8)
-
 .br
 Read      6 P          Read P bytes of data
-
 .br
 Write     7 P ...      Write P bytes of data
-
 .br
 
 .br
@@ -3170,31 +3197,22 @@ The following command codes are supported:
 
 .br
 Name      Cmd & Data     Meaning
-
 .br
 End       0              No more commands
-
 .br
 Escape    1              Next P is two bytes
-
 .br
 Start     2              Start condition
-
 .br
 Stop      3              Stop condition
-
 .br
 Address   4 P            Set I2C address to P
-
 .br
 Flags     5 lsb msb      Set I2C flags to lsb + (msb << 8)
-
 .br
 Read      6 P            Read P bytes of data
-
 .br
 Write     7 P ...        Write P bytes of data
-
 .br
 
 .br
@@ -3500,14 +3518,15 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 .IP "\fBint serial_open(char *ser_tty, unsigned baud, unsigned ser_flags)\fP"
 .IP "" 4
 This function opens a serial device at a specified baud rate
-with specified flags.
+with specified flags.  The device name must start with
+/dev/tty or /dev/serial.
 
 .br
 
 .br
 
 .EX
-  ser_tty: the serial device to open, /dev/tty*.
+  ser_tty: the serial device to open.
 .br
      baud: the baud rate in bits per second, see below.
 .br

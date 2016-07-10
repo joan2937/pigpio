@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 53+
+This version is for pigpio version 55+
 */
 
 #include <stdio.h>
@@ -61,8 +61,18 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_CGI,   "CGI",   101, 4}, // gpioCfgGetInternals
    {PI_CMD_CSI,   "CSI",   111, 1}, // gpioCfgSetInternals
 
+   {PI_CMD_FC,    "FC",    112, 0}, // fileClose
+
    {PI_CMD_FG,    "FG",    121, 0}, // gpioGlitchFilter
+
+   {PI_CMD_FL,    "FL",    127, 6}, // fileList
+
    {PI_CMD_FN,    "FN",    131, 0}, // gpioNoiseFilter
+
+   {PI_CMD_FO,    "FO",    127, 2}, // fileOpen
+   {PI_CMD_FR,    "FR",    121, 6}, // fileRead
+   {PI_CMD_FS,    "FS",    133, 2}, // fileSeek
+   {PI_CMD_FW,    "FW",    193, 0}, // fileWrite
 
    {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
    {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
@@ -112,6 +122,9 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_NO,    "NO",    101, 2}, // gpioNotifyOpen
    {PI_CMD_NP,    "NP",    112, 0}, // gpioNotifyPause
 
+   {PI_CMD_PADG,  "PADG",  112, 2}, // gpioGetPad
+   {PI_CMD_PADS,  "PADS",  121, 0}, // gpioSetPad
+
    {PI_CMD_PARSE, "PARSE", 115, 0}, // cmdParseScript
 
    {PI_CMD_PFG,   "PFG",   112, 2}, // gpioGetPWMfrequency
@@ -148,6 +161,8 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_SERVO, "S",     121, 0}, // gpioServo
    {PI_CMD_SERVO, "SERVO", 121, 0}, // gpioServo
+
+   {PI_CMD_SHELL, "SHELL", 128, 2}, // shell
 
    {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
    {PI_CMD_SLRC,  "SLRC",  112, 0}, // gpioSerialReadClose
@@ -252,8 +267,14 @@ CF2 ...          Custom function 2\n\
 CGI              Configuration get internals\n\
 CSI v            Configuration set internals\n\
 \n\
+FC h             Close file handle\n\
 FG g steady      Set glitch filter on GPIO\n\
+FL pat n         List files which match pattern\n\
 FN g steady active | Set noise filter on GPIO\n\
+FO file mode     Open a file in mode\n\
+FR h n           Read bytes from file handle\n\
+FS h n from      Seek to file handle position\n\
+FW h ...         Write bytes to file handle\n\
 \n\
 GDC g            Get PWM dutycycle for GPIO\n\
 GPW g            Get servo pulsewidth for GPIO\n\
@@ -293,6 +314,8 @@ NO               Request a notification\n\
 NP h             Pause notification\n\
 \n\
 P/PWM g v        Set GPIO PWM value\n\
+PADG pad         Get pad drive strength\n\
+PADS pad v       Set pad drive strength\n\
 PARSE text       Validate script\n\
 PFG g            Get GPIO PWM frequency\n\
 PFS g v          Set GPIO PWM frequency\n\
@@ -316,7 +339,8 @@ SERO text baud flags | Open serial device at baud with flags\n\
 SERR h n         Read bytes from serial handle\n\
 SERRB h          Read byte from serial handle\n\
 SERW h ...       Write bytes to serial handle\n\
-SERWB h byte        Write byte to serial handle\n\
+SERWB h byte     Write byte to serial handle\n\
+SHELL name str   Execute a shell command\n\
 SLR g v          Read bit bang serial data from GPIO\n\
 SLRC g           Close GPIO for bit bang serial data\n\
 SLRO g baud bitlen | Open GPIO for bit bang serial data\n\
@@ -490,6 +514,21 @@ static errInfo_t errInfo[]=
    {PI_BAD_ISR_INIT     , "bad ISR initialisation"},
    {PI_BAD_FOREVER      , "loop forever must be last chain command"},
    {PI_BAD_FILTER       , "bad filter parameter"},
+   {PI_BAD_PAD          , "bad pad number"},
+   {PI_BAD_STRENGTH     , "bad pad drive strength"},
+   {PI_FIL_OPEN_FAILED  , "file open failed"},
+   {PI_BAD_FILE_MODE    , "bad file mode"},
+   {PI_BAD_FILE_FLAG    , "bad file flag"},
+   {PI_BAD_FILE_READ    , "bad file read"},
+   {PI_BAD_FILE_WRITE   , "bad file write"},
+   {PI_FILE_NOT_ROPEN   , "file not open for read"},
+   {PI_FILE_NOT_WOPEN   , "file not open for write"},
+   {PI_BAD_FILE_SEEK    , "bad file seek"},
+   {PI_NO_FILE_MATCH    , "no files match pattern"},
+   {PI_NO_FILE_ACCESS   , "no permission to access file"},
+   {PI_FILE_IS_A_DIR    , "file is a directory"},
+   {PI_BAD_SHELL_STATUS , "bad shell return status"},
+   {PI_BAD_SCRIPT_NAME  , "bad script name"},
 
 };
 
@@ -507,14 +546,14 @@ static int cmdMatch(char *str)
    return CMD_UNKNOWN_CMD;
 }
 
-static int getNum(char *str, unsigned *val, int8_t *opt)
+static int getNum(char *str, uint32_t *val, int8_t *opt)
 {
    int f, n;
-   unsigned v;
+   intmax_t v;
 
    *opt = 0;
 
-   f = sscanf(str, " %i %n", &v, &n);
+   f = sscanf(str, " %ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -523,7 +562,7 @@ static int getNum(char *str, unsigned *val, int8_t *opt)
       return n;
    }
 
-   f = sscanf(str, " v%i %n", &v, &n);
+   f = sscanf(str, " v%ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -533,7 +572,7 @@ static int getNum(char *str, unsigned *val, int8_t *opt)
       return n;
    }
 
-   f = sscanf(str, " p%i %n", &v, &n);
+   f = sscanf(str, " p%ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -556,7 +595,7 @@ char *cmdStr(void)
 int cmdParse(
    char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl)
 {
-   int f, valid, idx, val, pp, pars, n, n2, i;
+   int f, valid, idx, val, pp, pars, n, n2;
    char *p8;
    int32_t *p32;
    char c;
@@ -611,8 +650,8 @@ int cmdParse(
 
          break;
 
-      case 112: /* BI2CC GDC  GPW  I2CC
-                   I2CRB MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
+      case 112: /* BI2CC FC  GDC  GPW  I2CC  I2CRB
+                   MG  MICS  MILS  MODEG  NC  NP  PADG PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
                    WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR
 
@@ -656,37 +695,23 @@ int cmdParse(
 
       case 116: /* SYS
 
-                   One parameter, a string of letters, digits, '-' and '_'.
+                   One parameter, a string.
                 */
          f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
          if ((f >= 0) && n)
          {
+            p[3] = n;
+            ctl->opt[3] = CMD_NUMERIC;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n2;
             valid = 1;
-
-            for (i=0; i<n; i++)
-            {
-               c = buf[ctl->eaten+i];
-
-               if ((!isalnum(c)) && (c != '_') && (c != '-'))
-               {
-                  valid = 0;
-                  break;
-               }
-            }
-
-            if (valid)
-            {
-               p[3] = n;
-               ctl->opt[3] = CMD_NUMERIC;
-               memcpy(ext, buf+ctl->eaten, n);
-               ctl->eaten += n2;
-            }
          }
 
          break;
 
-      case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
-                   PWM  S  SERVO  SLR  SLRI  W  WDOG  WRITE WVTXM
+      case 121: /* HC  FR  I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P
+                   PADS  PFS  PRS  PWM  S  SERVO  SLR  SLRI  W
+                   WDOG  WRITE  WVTXM
 
                    Two positive parameters.
                 */
@@ -782,8 +807,53 @@ int cmdParse(
 
          break;
 
-      case 131: /* BI2CO HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SLRO
-                   SPIO  TRIG
+      case 127: /* FL  FO
+
+                   Two parameters, first a string, other positive.
+                */
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+         if ((f >= 0) && n)
+         {
+            p[3] = n;
+            ctl->opt[2] = CMD_NUMERIC;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n2;
+
+            ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+
+            if ((ctl->opt[1] > 0) && ((int)p[1] >= 0))
+               valid = 1;
+         }
+
+         break;
+
+      case 128: /* SHELL
+
+                   Two string parameters, the first space teminated.
+                   The second arbitrary.
+                */
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+
+         if ((f >= 0) && n)
+         {
+            valid = 1;
+
+            p[1] = n;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n;
+            ext[n] = 0; /* terminate first string */
+
+            n2 = strlen(buf+ctl->eaten+1);
+            memcpy(ext+n+1, buf+ctl->eaten+1, n2);
+            ctl->eaten += n2;
+            ctl->eaten ++;
+            p[3] = p[1] + n2 + 1;
+         }
+
+         break;
+
+      case 131: /* BI2CO  HP  I2CO  I2CPC  I2CRI  I2CWB  I2CWW
+                   SLRO  SPIO  TRIG
 
                    Three positive parameters.
                 */
@@ -820,6 +890,26 @@ int cmdParse(
             if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
                 (ctl->opt[2] > 0) && ((int)p[2] >= 0))
                valid = 1;
+         }
+
+         break;
+
+      case 133: /* FS
+
+                   Three parameters.  First and third positive.
+                   Second may be negative when interpreted as an int.
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] > 0) &&
+             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0))
+         {
+            p[3] = 4;
+            memcpy(ext, &tp1, 4);
+            valid = 1;
          }
 
          break;
@@ -880,7 +970,7 @@ int cmdParse(
 
          break;
 
-      case 193: /* BI2CZ  I2CWD  I2CZ  SERW  SPIW  SPIX
+      case 193: /* BI2CZ  FW  I2CWD  I2CZ  SERW  SPIW  SPIX
 
                    Two or more parameters, first >=0, rest 0-255.
                 */

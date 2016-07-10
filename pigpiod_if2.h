@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 6
+#define PIGPIOD_IF2_VERSION 8
 
 /*TEXT
 
@@ -39,9 +39,9 @@ of the GPIO via the socket interface to the pigpio daemon.
 
 *Features*
 
-o PWM on any of GPIO 0-31
+o hardware timed PWM on any of GPIO 0-31
 
-o servo pulses on any of GPIO 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 o callbacks when any of GPIO 0-31 change state
 
@@ -166,8 +166,13 @@ bb_serial_invert           Invert serial logic (1 invert, 0 normal)
 hardware_clock             Start hardware clock on supported GPIO
 hardware_PWM               Start hardware PWM on supported GPIO
 
-set_glitch_filter         Set a glitch filter on a GPIO
-set_noise_filter          Set a noise filter on a GPIO
+set_glitch_filter          Set a glitch filter on a GPIO
+set_noise_filter           Set a noise filter on a GPIO
+
+get_pad_strength           Gets a pads drive strength
+set_pad_strength           Sets a pads drive strength
+
+shell_                     Executes a shell command
 
 SCRIPTS
 
@@ -250,7 +255,7 @@ spi_xfer                   Transfers bytes with a SPI device
 
 SERIAL
 
-serial_open                Opens a serial device (/dev/tty*)
+serial_open                Opens a serial device
 serial_close               Closes a serial device
 
 serial_write_byte          Writes a byte to a serial device
@@ -259,6 +264,15 @@ serial_write               Writes bytes to a serial device
 serial_read                Reads bytes from a serial device
 
 serial_data_available      Returns number of bytes ready to be read
+
+FILES
+
+file_open                  Opens a file
+file_close                 Closes a file
+file_read                  Reads bytes from a file
+file_write                 Writes bytes to a file
+file_seek                  Seeks to a position within a file
+file_list                  List files which match a pattern
 
 CUSTOM
 
@@ -399,7 +413,7 @@ Set the GPIO mode.
 . .
   pi: >=0 (as returned by [*pigpio_start*]).
 gpio: 0-53.
-mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
+mode: PI_INPUT, PI_OUTPUT, PI_ALT0, PI_ALT1,
       PI_ALT2, PI_ALT3, PI_ALT4, PI_ALT5.
 . .
 
@@ -755,16 +769,35 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE.
 The notification sends state changes for each GPIO whose
 corresponding bit in bits is set.
 
-Notes
-
 Each notification occupies 12 bytes in the fifo as follows:
 
 . .
-H (16 bit) seqno
-H (16 bit) flags
-I (32 bit) tick
-I (32 bit) level
+typedef struct
+{
+   uint16_t seqno;
+   uint16_t flags;
+   uint32_t tick;
+   uint32_t level;
+} gpioReport_t;
 . .
+
+seqno: starts at 0 each time the handle is opened and then increments
+by one for each report.
+
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+
+PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the flags
+indicate a GPIO which has had a watchdog timeout.
+
+PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep alive
+signal on the pipe/socket and is sent once a minute in the absence
+of other notification activity.
+
+tick: the number of microseconds since system boot.  It wraps around
+after 1h12m.
+
+level: indicates the level of each GPIO.  If bit 1<<x is set then
+GPIO x is high.
 D*/
 
 /*F*/
@@ -2489,11 +2522,13 @@ D*/
 int serial_open(int pi, char *ser_tty, unsigned baud, unsigned ser_flags);
 /*D
 This function opens a serial device at a specified baud rate
-with specified flags.
+with specified flags.  The device name must start with
+/dev/tty or /dev/serial.
+
 
 . .
        pi: >=0 (as returned by [*pigpio_start*]).
-  ser_tty: the serial device to open, /dev/tty*.
+  ser_tty: the serial device to open.
      baud: the baud rate in bits per second, see below.
 ser_flags: 0.
 . .
@@ -2640,6 +2675,369 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 
 Note, the number of returned bytes will be retMax or less.
 D*/
+
+/*F*/
+int get_pad_strength(int pi, unsigned pad);
+/*D
+This function returns the pad drive strength in mA.
+
+. .
+ pi: >=0 (as returned by [*pigpio_start*]).
+pad: 0-2, the pad to get.
+. .
+
+Returns the pad drive strength if OK, otherwise PI_BAD_PAD.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+strength = get_pad_strength(pi, 0); //  get pad 0 strength
+...
+D*/
+
+
+/*F*/
+int set_pad_strength(int pi, unsigned pad, unsigned padStrength);
+/*D
+This function sets the pad drive strength in mA.
+
+. .
+         pi: >=0 (as returned by [*pigpio_start*]).
+        pad: 0-2, the pad to set.
+padStrength: 1-16 mA.
+. .
+
+Returns 0 if OK, otherwise PI_BAD_PAD, or PI_BAD_STRENGTH.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+set_pad_strength(pi, 0, 10); // set pad 0 strength to 10 mA
+...
+D*/
+
+
+/*F*/
+int shell_(int pi, char *scriptName, char *scriptString);
+/*D
+This function uses the system call to execute a shell script
+with the given string as its parameter.
+
+. .
+          pi: >=0 (as returned by [*pigpio_start*]).
+  scriptName: the name of the script, only alphanumeric characters,
+              '-' and '_' are allowed in the name.
+scriptString: the string to pass to the script.
+. .
+
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+scriptName must exist in /opt/pigpio/cgi and must be executable.
+
+The returned exit status is normally 256 times that set by the
+shell script exit function.  If the script can't be found 32512 will
+be returned.
+
+The following table gives some example returned statuses.
+
+Script exit status @ Returned system call status
+1                  @ 256
+5                  @ 1280
+10                 @ 2560
+200                @ 51200
+script not found   @ 32512
+
+...
+// pass two parameters, hello and world
+status = shell_(pi, "scr1", "hello world");
+
+// pass three parameters, hello, string with spaces, and world
+status = shell_(pi, "scr1", "hello 'string with spaces' world");
+
+// pass one parameter, hello string with spaces world
+status = shell_(pi, "scr1", "\"hello string with spaces world\"");
+...
+D*/
+
+#pragma GCC diagnostic push
+
+#pragma GCC diagnostic ignored "-Wcomment"
+
+/*F*/
+int file_open(int pi, char *file, unsigned mode);
+/*D
+This function returns a handle to a file opened in a specified mode.
+
+. .
+  pi: >=0 (as returned by [*pigpio_start*]).
+file: the file to open.
+mode: the file open mode.
+. .
+
+Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
+PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+
+File
+
+A file may only be opened if permission is granted by an entry in
+/opt/pigpio/access.  This is intended to allow remote access to files
+in a more or less controlled manner.
+
+Each entry in /opt/pigpio/access takes the form of a file path
+which may contain wildcards followed by a single letter permission.
+The permission may be R for read, W for write, U for read/write,
+and N for no access.
+
+Where more than one entry matches a file the most specific rule
+applies.  If no entry matches a file then access is denied.
+
+Suppose /opt/pigpio/access contains the following entries
+
+. .
+/home/* n
+/home/pi/shared/dir_1/* w
+/home/pi/shared/dir_2/* r
+/home/pi/shared/dir_3/* u
+/home/pi/shared/dir_1/file.txt n
+. .
+
+Files may be written in directory dir_1 with the exception
+of file.txt.
+
+Files may be read in directory dir_2.
+
+Files may be read and written in directory dir_3.
+
+If a directory allows read, write, or read/write access then files may
+be created in that directory.
+
+In an attempt to prevent risky permissions the following paths are
+ignored in /opt/pigpio/access.
+
+. .
+a path containing ..
+a path containing only wildcards (*?)
+a path containing less than two non-wildcard parts
+. .
+
+Mode
+
+The mode may have the following values.
+
+Macro         @ Value @ Meaning
+PI_FILE_READ  @   1   @ open file for reading
+PI_FILE_WRITE @   2   @ open file for writing
+PI_FILE_RW    @   3   @ open file for reading and writing
+
+The following values may be or'd into the mode.
+
+Macro          @ Value @ Meaning
+PI_FILE_APPEND @ 4     @ Writes append data to the end of the file
+PI_FILE_CREATE @ 8     @ The file is created if it doesn't exist
+PI_FILE_TRUNC  @ 16    @ The file is truncated
+
+Newly created files are owned by root with permissions owner read and write.
+
+...
+#include <stdio.h>
+#include <pigpiod_if2.h>
+
+int main(int argc, char *argv[])
+{
+   int pi, handle, c;
+   char buf[60000];
+
+   pi = pigpio_start(NULL, NULL);
+
+   if (pi < 0) return 1;
+
+   // assumes /opt/pigpio/access contains the following line
+   // /ram/*.c r
+
+   handle = file_open(pi, "/ram/pigpio.c", PI_FILE_READ);
+
+   if (handle >= 0)
+   {
+      while ((c=file_read(pi, handle, buf, sizeof(buf)-1)))
+      {
+         buf[c] = 0;
+         printf("%s", buf);
+      }
+
+      file_close(pi, handle);
+   }
+
+   pigpio_stop(pi);
+}
+...
+D*/
+
+#pragma GCC diagnostic pop
+
+/*F*/
+int file_close(int pi, unsigned handle);
+/*D
+This function closes the file associated with handle.
+
+. .
+    pi: >=0 (as returned by [*pigpio_start*]).
+handle: >=0 (as returned by [*file_open*]).
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+...
+file_close(pi, handle);
+...
+D*/
+
+
+/*F*/
+int file_write(int pi, unsigned handle, char *buf, unsigned count);
+/*D
+This function writes count bytes from buf to the the file
+associated with handle.
+
+. .
+    pi: >=0 (as returned by [*pigpio_start*]).
+handle: >=0 (as returned by [*file_open*]).
+   buf: the array of bytes to write.
+ count: the number of bytes to write.
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM,
+PI_FILE_NOT_WOPEN, or PI_BAD_FILE_WRITE.
+
+...
+if (file_write(pi, handle, buf, 100) == 0)
+{
+   // file written okay
+}
+else
+{
+   // error
+}
+...
+D*/
+
+
+/*F*/
+int file_read(int pi, unsigned handle, char *buf, unsigned count);
+/*D
+This function reads up to count bytes from the the file
+associated with handle and writes them to buf.
+
+. .
+    pi: >=0 (as returned by [*pigpio_start*]).
+handle: >=0 (as returned by [*file_open*]).
+   buf: an array to receive the read data.
+ count: the maximum number of bytes to read.
+. .
+
+Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, PI_FILE_NOT_ROPEN, or PI_BAD_FILE_WRITE.
+
+...
+   bytes = file_read(pi, handle, buf, sizeof(buf));
+
+   if (bytes >= 0)
+   {
+      // process read data
+   }
+...
+D*/
+
+
+/*F*/
+int file_seek(int pi, unsigned handle, int32_t seekOffset, int seekFrom);
+/*D
+This function seeks to a position within the file associated
+with handle.
+
+. .
+        pi: >=0 (as returned by [*pigpio_start*]).
+    handle: >=0 (as returned by [*file_open*]).
+seekOffset: the number of bytes to move.  Positive offsets
+            move forward, negative offsets backwards.
+  seekFrom: one of PI_FROM_START (0), PI_FROM_CURRENT (1),
+            or PI_FROM_END (2).
+. .
+
+Returns the new byte position within the file (>=0) if OK, otherwise PI_BAD_HANDLE, or PI_BAD_FILE_SEEK.
+
+...
+file_seek(pi, handle, 123, PI_FROM_START); // Start plus 123
+
+size = file_seek(pi, handle, 0, PI_FROM_END); // End, return size
+
+pos = file_seek(pi, handle, 0, PI_FROM_CURRENT); // Current position
+...
+D*/
+
+#pragma GCC diagnostic push
+
+#pragma GCC diagnostic ignored "-Wcomment"
+
+/*F*/
+int file_list(int pi, char *fpat,  char *buf, unsigned count);
+/*D
+This function returns a list of files which match a pattern.
+
+. .
+   pi: >=0 (as returned by [*pigpio_start*]).
+ fpat: file pattern to match.
+  buf: an array to receive the matching file names.
+count: the maximum number of bytes to read.
+. .
+
+Returns the number of returned bytes if OK, otherwise PI_NO_FILE_ACCESS,
+or PI_NO_FILE_MATCH.
+
+The pattern must match an entry in /opt/pigpio/access.  The pattern
+may contain wildcards.  See [*file_open*].
+
+NOTE
+
+The returned value is not the number of files, it is the number
+of bytes in the buffer.  The file names are separated by newline
+characters.
+
+...
+#include <stdio.h>
+#include <pigpiod_if2.h>
+
+int main(int argc, char *argv[])
+{
+   int pi, handle, c;
+   char buf[60000];
+
+   pi = pigpio_start(NULL, NULL);
+
+   if (pi < 0) return 1;
+
+   // assumes /opt/pigpio/access contains the following line
+   // /ram/*.c r
+
+   c = file_list(pi, "/ram/p*.c", buf, sizeof(buf));
+
+   if (c >= 0)
+   {
+      buf[c] = 0;
+      printf("%s", buf);
+   }
+
+   pigpio_stop(pi);
+}
+...
+D*/
+
+#pragma GCC diagnostic pop
 
 
 /*F*/
@@ -2794,7 +3192,7 @@ clkfreq::4689-250000000 (250M)
 The hardware clock frequency.
 
 count::
-The number of bytes to be transferred in an I2C, SPI, or Serial
+The number of bytes to be transferred in a file, I2C, SPI, or serial
 command.
 
 data_bits::1-32
@@ -2831,21 +3229,28 @@ of the error.
 f::
 A function.
 
+*file::
+A full file path.  To be accessible the path must match an entry in
+/opt/pigpio/access.
+
+*fpat::
+A file path which may contain wildcards.  To be accessible the path
+must match an entry in /opt/pigpio/access.
+
 frequency::>=0
 The number of times a GPIO is swiched on and off per second.  This
 can be set per GPIO and may be as little as 5Hz or as much as
 40KHz.  The GPIO will be on for a proportion of the time as defined
 by its dutycycle.
 
-
 gpio::
 A Broadcom numbered GPIO, in the range 0-53.
 
-There  are 54 General Purpose Input Outputs (GPIO) named gpio0 through
-gpio53.
+There  are 54 General Purpose Input Outputs (GPIO) named GPIO0 through
+GPIO53.
 
-They are split into two  banks.   Bank  1  consists  of  gpio0  through
-gpio31.  Bank 2 consists of gpio32 through gpio53.
+They are split into two  banks.   Bank  1  consists  of  GPIO0  through
+GPIO31.  Bank 2 consists of GPIO32 through GPIO53.
 
 All the GPIO which are safe for the user to read and write are in
 bank 1.  Not all GPIO in bank 1 are safe though.  Type 1 boards
@@ -2883,8 +3288,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 . .
 
 handle::>=0
-A number referencing an object opened by one of [*i2c_open*], [*notify_open*],
-[*serial_open*], and [*spi_open*].
+A number referencing an object opened by one of [*file_open*],
+[*i2c_open*], [*notify_open*], [*serial_open*], and [*spi_open*].
 
 i2c_addr::0-0x7F
 The address of a device on the I2C bus.
@@ -2906,6 +3311,9 @@ The number of bytes of data in a buffer.
 
 int::
 A whole number, negative or positive.
+
+int32_t::
+A 32-bit signed value.
 
 invert::
 A flag used to set normal or inverted bit bang serial data level logic.
@@ -2954,6 +3362,23 @@ PI_WAVE_MODE_ONE_SHOT_SYNC 2
 PI_WAVE_MODE_REPEAT_SYNC   3
 . .
 
+3. A file open mode.
+
+. .
+PI_FILE_READ  1
+PI_FILE_WRITE 2
+PI_FILE_RW    3
+. .
+
+The following values can be or'd into the mode.
+
+. .
+PI_FILE_APPEND 4
+PI_FILE_CREATE 8
+PI_FILE_TRUNC  16
+. .
+
+
 numBytes::
 The number of bytes used to store characters in a string.  Depending
 on the number of bits per character there may be 1, 2, or 4 bytes
@@ -2974,6 +3399,18 @@ A buffer used to return data from a function.
 
 outLen::
 The size in bytes of an output buffer.
+
+pad:: 0-2
+A set of GPIO which share common drivers.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+padStrength:: 1-16
+The mA which may be drawn from each GPIO whilst still guaranteeing the
+high and low levels.
 
 *param::
 An array of script parameters.
@@ -3058,11 +3495,30 @@ A pointer to the text of a script.
 script_id::
 An id of a stored script as returned by [*store_script*].
 
+*scriptName::
+The name of a [*shell_*] script to be executed.  The script must be present in
+/opt/pigpio/cgi and must have execute permission.
+
+*scriptString::
+The string to be passed to a [*shell_*] script to be executed.
+
 SDA::
 The user GPIO to use for data when bit banging I2C.
 
 seconds::
 The number of seconds.
+
+seekFrom::
+
+. .
+PI_FROM_START   0
+PI_FROM_CURRENT 1
+PI_FROM_END     2
+. .
+
+seekOffset::
+The number of bytes to move forward (positive) or backwards (negative)
+from the seek position (start, current, or end of file).
 
 ser_flags::
 Flags which modify a serial open command.  None are currently defined.

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 23
+#define PIGPIOD_IF_VERSION 25
 
 /*TEXT
 
@@ -42,9 +42,9 @@ of the GPIO via the socket interface to the pigpio daemon.
 
 *Features*
 
-o PWM on any of GPIO 0-31
+o hardware timed PWM on any of GPIO 0-31
 
-o servo pulses on any of GPIO 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 o callbacks when any of GPIO 0-31 change state
 
@@ -251,7 +251,7 @@ spi_xfer                   Transfers bytes with a SPI device
 
 SERIAL
 
-serial_open                Opens a serial device (/dev/tty*)
+serial_open                Opens a serial device
 serial_close               Closes a serial device
 
 serial_write_byte          Writes a byte to a serial device
@@ -389,7 +389,7 @@ Set the GPIO mode.
 
 . .
 gpio: 0-53.
-mode: PI_INPUT, PI_OUTPUT, PI_ALT0, _ALT1,
+mode: PI_INPUT, PI_OUTPUT, PI_ALT0, PI_ALT1,
       PI_ALT2, PI_ALT3, PI_ALT4, PI_ALT5.
 . .
 
@@ -727,16 +727,35 @@ Returns 0 if OK, otherwise PI_BAD_HANDLE.
 The notification sends state changes for each GPIO whose
 corresponding bit in bits is set.
 
-Notes
-
 Each notification occupies 12 bytes in the fifo as follows:
 
 . .
-H (16 bit) seqno
-H (16 bit) flags
-I (32 bit) tick
-I (32 bit) level
+typedef struct
+{
+   uint16_t seqno;
+   uint16_t flags;
+   uint32_t tick;
+   uint32_t level;
+} gpioReport_t;
 . .
+
+seqno: starts at 0 each time the handle is opened and then increments
+by one for each report.
+
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+
+PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the flags
+indicate a GPIO which has had a watchdog timeout.
+
+PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep alive
+signal on the pipe/socket and is sent once a minute in the absence
+of other notification activity.
+
+tick: the number of microseconds since system boot.  It wraps around
+after 1h12m.
+
+level: indicates the level of each GPIO.  If bit 1<<x is set then
+GPIO x is high.
 D*/
 
 /*F*/
@@ -2244,10 +2263,11 @@ D*/
 int serial_open(char *ser_tty, unsigned baud, unsigned ser_flags);
 /*D
 This function opens a serial device at a specified baud rate
-with specified flags.
+with specified flags.  The device name must start with
+/dev/tty or /dev/serial.
 
 . .
-  ser_tty: the serial device to open, /dev/tty*.
+  ser_tty: the serial device to open.
      baud: the baud rate in bits per second, see below.
 ser_flags: 0.
 . .
