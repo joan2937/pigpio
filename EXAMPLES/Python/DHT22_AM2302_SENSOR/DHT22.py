@@ -54,7 +54,7 @@ class sensor:
       self.power = power
 
       if power is not None:
-         pi.write(power, 1) # Switch sensor on.
+         pi.write(power, 1)  # Switch sensor on.
          time.sleep(2)
 
       self.powered = True
@@ -63,10 +63,10 @@ class sensor:
 
       atexit.register(self.cancel)
 
-      self.bad_CS = 0 # Bad checksum count.
-      self.bad_SM = 0 # Short message count.
-      self.bad_MM = 0 # Missing message count.
-      self.bad_SR = 0 # Sensor reset count.
+      self.bad_CS = 0  # Bad checksum count.
+      self.bad_SM = 0  # Short message count.
+      self.bad_MM = 0  # Missing message count.
+      self.bad_SR = 0  # Sensor reset count.
 
       # Power cycle if timeout > MAX_TIMEOUTS.
       self.no_response = 0
@@ -82,7 +82,7 @@ class sensor:
 
       pi.set_pull_up_down(gpio, pigpio.PUD_OFF)
 
-      pi.set_watchdog(gpio, 0) # Kill any watchdogs.
+      pi.set_watchdog(gpio, 0)  # Kill any watchdogs.
 
       self.cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
 
@@ -99,16 +99,16 @@ class sensor:
 
          if diff >= 50:
             val = 1
-            if diff >= 200: # Bad bit?
-               self.CS = 256 # Force bad checksum.
+            if diff >= 200:   # Bad bit?
+               self.CS = 256  # Force bad checksum.
          else:
             val = 0
 
-         if self.bit >= 40: # Message complete.
+         if self.bit >= 40:  # Message complete.
             self.bit = 40
 
-         elif self.bit >= 32: # In checksum byte.
-            self.CS  = (self.CS<<1)  + val
+         elif self.bit >= 32:  # In checksum byte.
+            self.CS  = (self.CS << 1)  + val
 
             if self.bit == 39:
 
@@ -120,17 +120,17 @@ class sensor:
 
                total = self.hH + self.hL + self.tH + self.tL
 
-               if (total & 255) == self.CS: # Is checksum ok?
+               if (total & 255) == self.CS:  # Is checksum ok?
 
-                  self.rhum = ((self.hH<<8) + self.hL) * 0.1
+                  self.rhum = ((self.hH << 8) + self.hL) * 0.1
 
-                  if self.tH & 128: # Negative temperature.
+                  if self.tH & 128:  # Negative temperature.
                      mult = -0.1
                      self.tH = self.tH & 127
                   else:
                      mult = 0.1
 
-                  self.temp = ((self.tH<<8) + self.tL) * mult
+                  self.temp = ((self.tH << 8) + self.tL) * mult
 
                   self.tov = time.time()
 
@@ -141,17 +141,17 @@ class sensor:
 
                   self.bad_CS += 1
 
-         elif self.bit >=24: # in temp low byte
-            self.tL = (self.tL<<1) + val
+         elif self.bit >= 24:  # in temp low byte
+            self.tL = (self.tL << 1) + val
 
-         elif self.bit >=16: # in temp high byte
-            self.tH = (self.tH<<1) + val
+         elif self.bit >= 16:  # in temp high byte
+            self.tH = (self.tH << 1) + val
 
-         elif self.bit >= 8: # in humidity low byte
-            self.hL = (self.hL<<1) + val
+         elif self.bit >= 8:  # in humidity low byte
+            self.hL = (self.hL << 1) + val
 
-         elif self.bit >= 0: # in humidity high byte
-            self.hH = (self.hH<<1) + val
+         elif self.bit >= 0:  # in humidity high byte
+            self.hH = (self.hH << 1) + val
 
          else:               # header bits
             pass
@@ -168,14 +168,14 @@ class sensor:
             self.tL = 0
             self.CS = 0
 
-      else: # level == pigpio.TIMEOUT:
+      else:  # level == pigpio.TIMEOUT:
          self.pi.set_watchdog(self.gpio, 0)
          if self.bit < 8:       # Too few data bits received.
             self.bad_MM += 1    # Bump missing message count.
             self.no_response += 1
             if self.no_response > self.MAX_NO_RESPONSE:
                self.no_response = 0
-               self.bad_SR += 1 # Bump sensor reset count.
+               self.bad_SR += 1  # Bump sensor reset count.
                if self.power is not None:
                   self.powered = False
                   self.pi.write(self.power, 0)
@@ -228,7 +228,7 @@ class sensor:
             self.pi.write(self.LED, 1)
 
          self.pi.write(self.gpio, pigpio.LOW)
-         time.sleep(0.017) # 17 ms
+         time.sleep(0.017)  # 17 ms
          self.pi.set_mode(self.gpio, pigpio.INPUT)
          self.pi.set_watchdog(self.gpio, 200)
 
@@ -237,7 +237,7 @@ class sensor:
 
       self.pi.set_watchdog(self.gpio, 0)
 
-      if self.cb != None:
+      if self.cb is not None:
          self.cb.cancel()
          self.cb = None
 
@@ -250,7 +250,7 @@ if __name__ == "__main__":
    import DHT22
 
    # Intervals of about 2 seconds or less will eventually hang the DHT22.
-   INTERVAL=3
+   INTERVAL = 3
 
    pi = pigpio.pi()
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
 
       next_reading += INTERVAL
 
-      time.sleep(next_reading-time.time()) # Overall INTERVAL second polling.
+      time.sleep(next_reading-time.time())  # Overall INTERVAL second polling.
 
    s.cancel()
 

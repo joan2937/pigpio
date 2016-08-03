@@ -22,9 +22,13 @@ or
 
 .SH DESCRIPTION
 
+.ad l
+
+.nh
+
 
 .br
-The socket and pipe interfaces allow control of the gpios by passing
+The socket and pipe interfaces allow control of the GPIO by passing
 messages to the running pigpio library.
 
 .br
@@ -45,19 +49,19 @@ whereas /dev/pigpio uses the pipe interface.
 .br
 .SS Features
 .br
-o PWM on any of gpios 0-31
+o hardware timed PWM on any of GPIO 0-31
 
 .br
-o servo pulses on any of gpios 0-31
+o hardware timed servo pulses on any of GPIO 0-31
 
 .br
-o reading/writing all of the gpios in a bank as one operation
+o reading/writing all of the GPIO in a bank as one operation
 
 .br
-o individually setting gpio modes, reading and writing
+o individually setting GPIO modes, reading and writing
 
 .br
-o notifications when any of gpios 0-31 change state
+o notifications when any of GPIO 0-31 change state
 
 .br
 o the construction of output waveforms with microsecond timing
@@ -69,9 +73,9 @@ o I2C, SPI, and serial link wrappers
 o creating and running scripts on the pigpio daemon
 
 .br
-.SS gpios
+.SS GPIO
 .br
-ALL gpios are identified by their Broadcom number.
+ALL GPIO are identified by their Broadcom number.
 
 .br
 .SS Usage
@@ -191,10 +195,10 @@ E.g. 23 is 23 decimal, 0x100 is 256 decimal, 070 is 56 decimal.
 
 .br
 
-.IP "\fBBC1 bits\fP - Clear specified gpios in bank 1"
+.IP "\fBBC1 bits\fP - Clear specified GPIO in bank 1"
 .IP "" 4
-This command clears (sets low) the gpios specified by \fBbits\fP in bank 1.
-Bank 1 consists of gpios 0-31.
+This command clears (sets low) the GPIO specified by \fBbits\fP in bank 1.
+Bank 1 consists of GPIO 0-31.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -206,25 +210,25 @@ will be returned.
 .br
 
 .EX
-$ pigs bc1 0x400010 # clear gpios 4 (1<<4) and 22 (1<<22)
+$ pigs bc1 0x400010 # clear GPIO 4 (1<<4) and 22 (1<<22)
 .br
 
 .br
-$ pigs bc1 32 # clear gpio 5 (1<<5)
+$ pigs bc1 32 # clear GPIO 5 (1<<5)
 .br
 -42
 .br
-ERROR: no permission to update one or more gpios
+ERROR: no permission to update one or more GPIO
 .br
 
 .EE
 
 .br
 
-.IP "\fBBC2 bits\fP - Clear specified gpios in bank 2"
+.IP "\fBBC2 bits\fP - Clear specified GPIO in bank 2"
 .IP "" 4
-This command clears (sets low) the gpios specified by \fBbits\fP in bank 2.
-Bank 2 consists of gpios 32-53.
+This command clears (sets low) the GPIO specified by \fBbits\fP in bank 2.
+Bank 2 consists of GPIO 32-53.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -236,15 +240,15 @@ will be returned.
 .br
 
 .EX
-$ pigs bc2 0x8000 # clear gpio 47 (activity LED on A+/B+/Pi2)
+$ pigs bc2 0x8000 # clear GPIO 47 (activity LED on A+/B+/Pi2/Pi3)
 .br
 
 .br
-$ pigs bc2 1 # clear gpio 32 (first in bank 2)
+$ pigs bc2 1 # clear GPIO 32 (first in bank 2)
 .br
 -42
 .br
-ERROR: no permission to update one or more gpios
+ERROR: no permission to update one or more GPIO
 .br
 
 .EE
@@ -271,7 +275,7 @@ $ pigs bi2cc 5
 
 .IP "\fBBI2CO sda scl b\fP - Open bit bang I2C"
 .IP "" 4
-This command signals that gpios \fBsda\fP and \fBscl\fP are to be used
+This command signals that GPIO \fBsda\fP and \fBscl\fP are to be used
 for bit banging I2C at \fBb\fP baud.
 
 .br
@@ -285,13 +289,13 @@ o repeated starts
 .br
 o clock stretching
 .br
-o I2C on any pair of spare gpios
+o I2C on any pair of spare GPIO
 
 .br
 The baud rate may be between 50 and 500000 bits per second.
 
 .br
-The gpios used for SDA and SCL must have pull-ups to 3V3 connected.  As
+The GPIO used for SDA and SCL must have pull-ups to 3V3 connected.  As
 a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
 
 .br
@@ -380,9 +384,9 @@ End
 
 .br
 
-.IP "\fBBR1 \fP - Read bank 1 gpios"
+.IP "\fBBR1 \fP - Read bank 1 GPIO"
 .IP "" 4
-This command read gpios 0-31 (bank 1) and returns the levels as a
+This command read GPIO 0-31 (bank 1) and returns the levels as a
 32-bit hexadecimal value.
 
 .br
@@ -400,9 +404,9 @@ $ pigs br1
 
 .br
 
-.IP "\fBBR2 \fP - Read bank 2 gpios"
+.IP "\fBBR2 \fP - Read bank 2 GPIO"
 .IP "" 4
-This command read gpios 32-53 (bank 2) and returns the levels as a
+This command read GPIO 32-53 (bank 2) and returns the levels as a
 32-bit hexadecimal value.
 
 .br
@@ -420,10 +424,10 @@ $ pigs br2
 
 .br
 
-.IP "\fBBS1 bits\fP - Set specified gpios in bank 1"
+.IP "\fBBS1 bits\fP - Set specified GPIO in bank 1"
 .IP "" 4
-This command sets (sets high) the gpios specified by \fBbits\fP in bank 1.
-Bank 1 consists of gpios 0-31.
+This command sets (sets high) the GPIO specified by \fBbits\fP in bank 1.
+Bank 1 consists of GPIO 0-31.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -435,25 +439,25 @@ will be returned.
 .br
 
 .EX
-$ pigs bs1 16 # set gpio 4 (1<<4)
+$ pigs bs1 16 # set GPIO 4 (1<<4)
 .br
 
 .br
-$ pigs bs1 1 # set gpio 1 (1<<0)
+$ pigs bs1 1 # set GPIO 1 (1<<0)
 .br
 -42
 .br
-ERROR: no permission to update one or more gpios
+ERROR: no permission to update one or more GPIO
 .br
 
 .EE
 
 .br
 
-.IP "\fBBS2 bits\fP - Set specified gpios in bank 2"
+.IP "\fBBS2 bits\fP - Set specified GPIO in bank 2"
 .IP "" 4
-This command sets (sets high) the gpios specified by \fBbits\fP in bank 2.
-Bank 2 consists of gpios 32-53.
+This command sets (sets high) the GPIO specified by \fBbits\fP in bank 2.
+Bank 2 consists of GPIO 32-53.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -465,15 +469,15 @@ will be returned.
 .br
 
 .EX
-$ pigs bs2 0x40 # set gpio 38 (enable high current mode A+/B+/Pi2)
+$ pigs bs2 0x40 # set GPIO 38 (enable high current mode A+/B+/Pi2/Pi3)
 .br
 
 .br
-$ pigs bs2 1 # set gpio 32 (first in bank 2)
+$ pigs bs2 1 # set GPIO 32 (first in bank 2)
 .br
 -42
 .br
-ERROR: no permission to update one or more gpios
+ERROR: no permission to update one or more GPIO
 .br
 
 .EE
@@ -514,11 +518,40 @@ configuration settings to \fBv\fP.
 
 .br
 
-.IP "\fBFG u stdy\fP - Set a glitch filter on a gpio"
+.IP "\fBFC h\fP - Close file handle"
+.IP "" 4
+This command closes a file handle \fBh\fP previously opened with \fBFO\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fc 0 # First close okay.
+.br
+
+.br
+$ pigs fc 0 # Second fails.
+.br
+-25
+.br
+ERROR: unknown handle
+.br
+
+.EE
+
+.br
+
+.IP "\fBFG u stdy\fP - Set a glitch filter on a GPIO"
 .IP "" 4
 
 .br
-Level changes on the gpio are not reported unless the level
+Level changes on the GPIO \fBu\fP are not reported unless the level
 has been stable for at least \fBstdy\fP microseconds.  The
 level is then reported.  Level changes of less than \fBstdy\fP
 microseconds are ignored.
@@ -529,13 +562,79 @@ after it was first detected.
 
 .br
 
-.IP "\fBFN u stdy actv\fP - Set a noise filter on a gpio"
+\fBExample\fP
+.br
+
+.EX
+$ pigs fg 4 250
+.br
+
+.br
+$ pigs fg 4 1000000
+.br
+-125
+.br
+ERROR: bad filter parameter
+.br
+
+.EE
+
+.br
+
+.IP "\fBFL pat num\fP - List files which match pattern"
+.IP "" 4
+This command returns a list of the files matching \fBpat\fP. Up
+to \fBnum\fP bytes may be returned.
+
+.br
+Upon success the count of returned bytes followed by the matching
+files is returned.  On error a negative status code will be returned.
+
+.br
+A newline (0x0a) character separates each file name.
+
+.br
+Only files which have a matching entry in /opt/pigpio/access may
+be listed.
+
+.br
+Suppose /opt/pigpio/access contains
+
+.br
+/sys/bus/w1/devices/28*/w1_slave r
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs -a fl "/sys/bus/w1/devices/28*/w1_slave" 5000
+.br
+90 /sys/bus/w1/devices/28-000005d34cd2/w1_slave
+.br
+/sys/bus/w1/devices/28-001414abbeff/w1_slave
+.br
+
+.br
+$ pigs -a fl "/sys/bus/*" 5000
+.br
+ERROR: no permission to access file
+.br
+-137
+.br
+
+.EE
+
+.br
+
+.IP "\fBFN u stdy actv\fP - Set a noise filter on a GPIO"
 .IP "" 4
 
 .br
-Level changes on the gpio are ignored until a level which has
+Level changes on the GPIO \fBu\fP are ignored until a level which has
 been stable for \fBstdy\fP microseconds is detected.  Level
-changes on the gpio are then reported for \fBactv\fP microseconds
+changes on the GPIO are then reported for \fBactv\fP microseconds
 after which the process repeats.
 
 .br
@@ -545,11 +644,316 @@ such reports.
 
 .br
 
-.IP "\fBGDC u\fP - Get gpio PWM dutycycle"
+\fBExample\fP
+.br
+
+.EX
+$ pigs fn 7 250 1000
+.br
+
+.br
+$ pigs fn 7 2500000 1000
+.br
+-125
+.br
+ERROR: bad filter parameter
+.br
+
+.EE
+
+.br
+
+.IP "\fBFO file mode\fP - Open a file in mode"
+.IP "" 4
+This function returns a handle to a file \fBfile\fP opened
+in a specified mode \fBmode\fP.
+
+.br
+Upon success a handle (>=0) is returned.  On error a negative status code
+will be returned.
+
+.br
+File
+
+.br
+A file may only be opened if permission is granted by an entry in
+/opt/pigpio/access.  This is intended to allow remote access to files
+in a more or less controlled manner.
+
+.br
+Each entry in /opt/pigpio/access takes the form of a file path
+which may contain wildcards followed by a single letter permission.
+The permission may be R for read, W for write, U for read/write,
+and N for no access.
+
+.br
+Where more than one entry matches a file the most specific rule
+applies.  If no entry matches a file then access is denied.
+
+.br
+Suppose /opt/pigpio/access contains the following entries
+
+.br
+
+.EX
+/home/* n
+.br
+/home/pi/shared/dir_1/* w
+.br
+/home/pi/shared/dir_2/* r
+.br
+/home/pi/shared/dir_3/* u
+.br
+/home/pi/shared/dir_1/file.txt n
+.br
+
+.EE
+
+.br
+Files may be written in directory dir_1 with the exception
+of file.txt.
+
+.br
+Files may be read in directory dir_2.
+
+.br
+Files may be read and written in directory dir_3.
+
+.br
+If a directory allows read, write, or read/write access then files may
+be created in that directory.
+
+.br
+In an attempt to prevent risky permissions the following paths are
+ignored in /opt/pigpio/access.
+
+.br
+
+.EX
+a path containing ..
+.br
+a path containing only wildcards (*?)
+.br
+a path containing less than two non-wildcard parts
+.br
+
+.EE
+
+.br
+Mode
+
+.br
+The mode may have the following values.
+
+.br
+
+.EX
+        Value   Meaning
+READ      1     open file for reading
+WRITE     2     open file for writing
+RW        3     open file for reading and writing
+
+.EE
+
+.br
+The following values may be or'd into the mode.
+
+.br
+
+.EX
+         Value   Meaning
+APPEND     4     All writes append data to the end of the file
+CREATE     8     The file is created if it doesn't exist
+TRUNC     16     The file is truncated
+
+.EE
+
+.br
+Newly created files are owned by root with permissions owner read and write.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ ls /ram/*.c
+.br
+/ram/command.c      /ram/pigpiod.c  /ram/pigs.c
+.br
+/ram/x_pigpiod_if.c /ram/pig2vcd.c  /ram/pigpiod_if2.c
+.br
+/ram/x_pigpio.c     /ram/x_repeat.c /ram/pigpio.c
+.br
+/ram/pigpiod_if.c   /ram/x_pigpiod_if2.c
+.br
+
+.br
+# assumes /opt/pigpio/access contains the following line
+.br
+# /ram/*.c r
+.br
+
+.br
+$ pigs fo /ram/pigpio.c 1
+.br
+0
+.br
+
+.br
+$ pigs fo /ram/new.c 1
+.br
+-128
+.br
+ERROR: file open failed
+.br
+
+.br
+$ pigs fo /ram/new.c 9
+.br
+1
+.br
+
+.br
+$ ls /ram/*.c -l
+.br
+-rw-r--r-- 1 joan joan  42923 Jul 10 11:22 /ram/command.c
+.br
+-rw------- 1 root root      0 Jul 10 16:54 /ram/new.c
+.br
+-rw-r--r-- 1 joan joan   2971 Jul 10 11:22 /ram/pig2vcd.c
+.br
+-rw------- 1 joan joan 296235 Jul 10 11:22 /ram/pigpio.c
+.br
+-rw-r--r-- 1 joan joan   9266 Jul 10 11:22 /ram/pigpiod.c
+.br
+-rw-r--r-- 1 joan joan  37331 Jul 10 11:22 /ram/pigpiod_if2.c
+.br
+-rw-r--r-- 1 joan joan  33088 Jul 10 11:22 /ram/pigpiod_if.c
+.br
+-rw-r--r-- 1 joan joan   7990 Jul 10 11:22 /ram/pigs.c
+.br
+-rw-r--r-- 1 joan joan  19970 Jul 10 11:22 /ram/x_pigpio.c
+.br
+-rw-r--r-- 1 joan joan  20804 Jul 10 11:22 /ram/x_pigpiod_if2.c
+.br
+-rw-r--r-- 1 joan joan  19844 Jul 10 11:22 /ram/x_pigpiod_if.c
+.br
+-rw-r--r-- 1 joan joan  19907 Jul 10 11:22 /ram/x_repeat.c
+.br
+
+.EE
+
+.br
+
+.IP "\fBFR h num\fP - Read bytes from file handle"
+.IP "" 4
+This command returns up to \fBnum\fP bytes of data read from the
+file associated with handle \fBh\fP.
+
+.br
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fr 0 10
+.br
+5 48 49 128 144 255
+.br
+
+.br
+$ pigs fr 0 10
+.br
+0
+.br
+
+.EE
+
+.br
+
+.IP "\fBFS h num from\fP - Seek to file handle position"
+.IP "" 4
+This command seeks to a position within the file associated
+with handle \fBh\fP.
+
+.br
+The number of bytes to move is \fBnum\fP.  Positive offsets
+move forward, negative offsets backwards.  The move start
+position is determined by \fBfrom\fP as follows.
+
+.br
+
+.EX
+    From
+0   start
+1   current position
+2   end
+
+.EE
+
+.br
+Upon success the new byte position within the file (>=0) is
+returned.  On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fs 0 0 0 # Seek to start of file plus 200
+.br
+200
+.br
+
+.br
+$ pigs fs 0 0 1 # Return current position
+.br
+200
+.br
+
+.br
+$ pigs fs 0 0 2 # Seek to end of file, return size
+.br
+296235
+.br
+
+.EE
+
+.br
+
+.IP "\fBFW h bvs\fP - Write bytes to file handle"
+.IP "" 4
+This command writes bytes \fBbvs\fP to the file
+associated with handle \fBh\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs fw 0 23 45 67 89
+.br
+
+.EE
+
+.br
+
+.IP "\fBGDC u\fP - Get GPIO PWM dutycycle"
 .IP "" 4
 
 .br
-This command returns the PWM dutycycle in use on gpio \fBu\fP.
+This command returns the PWM dutycycle in use on GPIO \fBu\fP.
 
 .br
 Upon success the dutycycle is returned.  On error a negative
@@ -557,14 +961,14 @@ status code will be returned.
 
 .br
 For normal PWM the dutycycle will be out of the defined range
-for the gpio (see \fBPRG\fP).
+for the GPIO (see \fBPRG\fP).
 
 .br
-If a hardware clock is active on the gpio the reported
+If a hardware clock is active on the GPIO the reported
 dutycycle will be 500000 (500k) out of 1000000 (1M).
 
 .br
-If hardware PWM is active on the gpio the reported dutycycle
+If hardware PWM is active on the GPIO the reported dutycycle
 will be out of a 1000000 (1M).
 
 .br
@@ -585,18 +989,18 @@ pigs gdc 5
 .br
 -92
 .br
-ERROR: gpio is not in use for PWM
+ERROR: GPIO is not in use for PWM
 .br
 
 .EE
 
 .br
 
-.IP "\fBGPW u\fP - Get gpio servo pulsewidth"
+.IP "\fBGPW u\fP - Get GPIO servo pulsewidth"
 .IP "" 4
 
 .br
-This command returns the servo pulsewidth in use on gpio \fBu\fP.
+This command returns the servo pulsewidth in use on GPIO \fBu\fP.
 
 .br
 Upon success the servo pulsewidth is returned.  On error a negative
@@ -620,7 +1024,7 @@ $ pigs gpw 9
 .br
 -93
 .br
-ERROR: gpio is not in use for servo pulses
+ERROR: GPIO is not in use for servo pulses
 .br
 
 .EE
@@ -650,7 +1054,7 @@ $ pigs help
 
 .IP "\fBHC g cf\fP - Set hardware clock frequency"
 .IP "" 4
-This command sets the hardware clock associated with gpio \fBg\fP to
+This command sets the hardware clock associated with GPIO \fBg\fP to
 frequency \fBcf\fP. Frequencies above 30MHz are unlikely to work.
 
 .br
@@ -663,11 +1067,11 @@ will be returned.
 .br
 
 .EX
-$ pigs hc 4 5000 # start a 5 KHz clock on gpio 4 (clock 0)
+$ pigs hc 4 5000 # start a 5 KHz clock on GPIO 4 (clock 0)
 .br
 
 .br
-$ pigs hc 5 5000000 # start a 5 MHz clcok on gpio 5 (clock 1)
+$ pigs hc 5 5000000 # start a 5 MHz clcok on GPIO 5 (clock 1)
 .br
 -99
 .br
@@ -677,20 +1081,20 @@ ERROR: need password to use hardware clock 1
 .EE
 
 .br
-The same clock is available on multiple gpios.  The latest
-frequency setting will be used by all gpios which share a clock.
+The same clock is available on multiple GPIO.  The latest
+frequency setting will be used by all GPIO which share a clock.
 
 .br
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 .br
 
 .EX
 4   clock 0  All models
-5   clock 1  A+/B+/Pi2/Zero and compute module only (reserved for system use)
-6   clock 2  A+/B+/Pi2/Zero and compute module only
-20  clock 0  A+/B+/Pi2/Zero and compute module only
-21  clock 1  All models but Type 2 (reserved for system use)
+5   clock 1  All models but A and B (reserved for system use)
+6   clock 2  All models but A and B
+20  clock 0  All models but A and B
+21  clock 1  All models but A and B (Rev. 2) (reserved for system use)
 
 .EE
 
@@ -708,13 +1112,13 @@ The gpio must be one of the following.
 .br
 Access to clock 1 is protected by a password as its use will
 likely crash the Pi.  The password is given by or'ing 0x5A000000
-with the gpio number.
+with the GPIO number.
 
 .br
 
 .IP "\fBHP g pf pdc\fP - Set hardware PWM frequency and dutycycle"
 .IP "" 4
-This command sets the hardware PWM associated with gpio \fBg\fP to
+This command sets the hardware PWM associated with GPIO \fBg\fP to
 frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
 are unlikely to work.
 
@@ -752,20 +1156,20 @@ ERROR: hardware PWM frequency not 1-125M
 .EE
 
 .br
-The same PWM channel is available on multiple gpios.  The latest
-frequency and dutycycle setting will be used by all gpios which
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
 share a PWM channel.
 
 .br
-The gpio must be one of the following.
+The GPIO must be one of the following.
 
 .br
 
 .EX
-12  PWM channel 0  A+/B+/Pi2/Zero and compute module only
-13  PWM channel 1  A+/B+/Pi2/Zero and compute module only
+12  PWM channel 0  All models but A and B
+13  PWM channel 1  All models but A and B
 18  PWM channel 0  All models
-19  PWM channel 1  A+/B+/Pi2/Zero and compute module only
+19  PWM channel 1  All models but A and B
 
 .EE
 
@@ -808,7 +1212,7 @@ If the hardware revision can not be found or is not a valid hexadecimal
 number the command returns 0.
 
 .br
-The revision number can be used to determine the assignment of gpios
+The revision number can be used to determine the assignment of GPIO
 to pins (see \fBg\fP).
 
 .br
@@ -880,6 +1284,11 @@ ERROR: unknown handle
 .IP "" 4
 This command returns a handle to access device \fBid\fP on I2C bus \fBib\fP.
 The device is opened with flags \fBif\fP.
+
+.br
+Physically buses 0 and 1 are available on the Pi.  Higher
+numbered buses will be available if a kernel supported bus
+multiplexor is being used.
 
 .br
 No flags are currently defined.  The parameter \fBif\fP should be 0.
@@ -1392,11 +1801,11 @@ End
 
 .br
 
-.IP "\fBM/MODES g m\fP - Set gpio mode"
+.IP "\fBM/MODES g m\fP - Set GPIO mode"
 .IP "" 4
 
 .br
-This command sets gpio \fBg\fP to mode \fBm\fP, typically input (read)
+This command sets GPIO \fBg\fP to mode \fBm\fP, typically input (read)
 or output (write).
 
 .br
@@ -1404,7 +1813,7 @@ Upon success nothing is returned.  On error a negative status code
 will be returned.
 
 .br
-Each gpio can be configured to be in one of 8 different modes. The modes
+Each GPIO can be configured to be in one of 8 different modes. The modes
 are named Input, Output, ALT0, ALT1, ALT2, ALT3, ALT4, and ALT5.
 
 .br
@@ -1437,14 +1846,14 @@ $ pigs m 4 5 # ALT 5
 
 .br
 
-.IP "\fBMG/MODEG g\fP - Get gpio mode"
+.IP "\fBMG/MODEG g\fP - Get GPIO mode"
 .IP "" 4
 
 .br
-This command returns the current mode of gpio \fBg\fP.
+This command returns the current mode of GPIO \fBg\fP.
 
 .br
-Upon success the value of the gpio mode is returned.
+Upon success the value of the GPIO mode is returned.
 On error a negative status code will be returned.
 
 .br
@@ -1547,7 +1956,7 @@ Upon success nothing is returned.  On error a negative status code
 will be returned.
 
 .br
-The notification gets state changes for each gpio specified by \fBbits\fP.
+The notification gets state changes for each GPIO specified by \fBbits\fP.
 
 .br
 
@@ -1555,9 +1964,9 @@ The notification gets state changes for each gpio specified by \fBbits\fP.
 .br
 
 .EX
-$ pigs nb 0 -1 # Shorthand for gpios 0-31.
+$ pigs nb 0 -1 # Shorthand for GPIO 0-31.
 .br
-$ pigs nb 0 0xf0 # Get notifications for gpios 4-7.
+$ pigs nb 0 0xf0 # Get notifications for GPIO 4-7.
 .br
 
 .br
@@ -1611,7 +2020,7 @@ ERROR: unknown handle
 This command requests a free notification handle.
 
 .br
-A notification is a method for being notified of gpio state changes via a pipe.
+A notification is a method for being notified of GPIO state changes via a pipe.
 
 .br
 Upon success the command returns a handle greater than or equal to zero.
@@ -1668,11 +2077,11 @@ $ pigs np 0
 
 .br
 
-.IP "\fBP/PWM u v\fP - Set gpio PWM value"
+.IP "\fBP/PWM u v\fP - Set GPIO PWM value"
 .IP "" 4
 
 .br
-This command starts PWM on gpio \fBu\fP with dutycycle \fBv\fP.  The dutycycle
+This command starts PWM on GPIO \fBu\fP with dutycycle \fBv\fP.  The dutycycle
 varies from 0 (off) to range (fully on).  The range defaults to 255.
 
 .br
@@ -1692,13 +2101,103 @@ The \fBPRS\fP command may be used to change the default range of 255.
 .br
 
 .EX
-$ pigs p 4 64  # Start PWM on gpio 4 with 25% dutycycle
+$ pigs p 4 64  # Start PWM on GPIO 4 with 25% dutycycle
 .br
 $ pigs p 4 128 # 50%
 .br
 $ pigs p 4 192 # 75%
 .br
 $ pigs p 4 255 # 100%
+.br
+
+.EE
+
+.br
+
+.IP "\fBPADG pad\fP - Get pad drive strength"
+.IP "" 4
+
+.br
+This command gets the \fBpad\fP drive strength \fBpadma\fP in mA.
+
+.br
+Returns the pad drive strength if OK.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs padg 0
+.br
+8
+.br
+$ pigs pads 0 16
+.br
+$ pigs padg 0
+.br
+16
+.br
+pigs padg 3
+.br
+-126
+.br
+ERROR: bad pad number
+.br
+
+.EE
+
+.br
+
+.IP "\fBPADS pad padma\fP - Set pad drive strength"
+.IP "" 4
+
+.br
+This command sets the \fBpad\fP drive strength \fBpadma\fP in mA.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs pads 0 16
+.br
+$ pigs padg 0
+.br
+16
+.br
+$ pigs pads 0 17
+.br
+-127
+.br
+ERROR: bad pad drive strength
 .br
 
 .EE
@@ -1746,26 +2245,26 @@ Can't resolve tag 99
 
 .br
 
-.IP "\fBPFG u\fP - Get gpio PWM frequency"
+.IP "\fBPFG u\fP - Get GPIO PWM frequency"
 .IP "" 4
 
 .br
-This command returns the PWM frequency in Hz used for gpio \fBu\fP.
+This command returns the PWM frequency in Hz used for GPIO \fBu\fP.
 
 .br
 Upon success the PWM frequency is returned.  On error a negative
 status code will be returned.
 
 .br
-For normal PWM the frequency will be that defined for the gpio
+For normal PWM the frequency will be that defined for the GPIO
 by \fBPFS\fP.
 
 .br
-If a hardware clock is active on the gpio the reported frequency
+If a hardware clock is active on the GPIO the reported frequency
 will be that set by \fBHC\fP.
 
 .br
-If hardware PWM is active on the gpio the reported frequency
+If hardware PWM is active on the GPIO the reported frequency
 will be that set by \fBHP\fP.
 
 .br
@@ -1782,7 +2281,7 @@ $ pigs pfg 4
 .br
 $ pigs pfg 34
 .br
-ERROR: gpio not 0-31
+ERROR: GPIO not 0-31
 .br
 -2
 .br
@@ -1791,9 +2290,9 @@ ERROR: gpio not 0-31
 
 .br
 
-.IP "\fBPFS u v\fP - Set gpio PWM frequency"
+.IP "\fBPFS u v\fP - Set GPIO PWM frequency"
 .IP "" 4
-This command sets the PWM frequency \fBv\fP to be used for gpio \fBu\fP.
+This command sets the PWM frequency \fBv\fP to be used for GPIO \fBu\fP.
 
 .br
 The numerically closest frequency to \fBv\fP will be selected.
@@ -1803,16 +2302,17 @@ Upon success the new frequency is returned.  On error a negative status code
 will be returned.
 
 .br
-The selectable frequencies depend upon the sample rate with which the
-pigpiod daemon was started.  The sample rate is one of 1, 2, 4, 5, 8,
-or 10 microseconds (default 5).
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
 
 .br
-Each gpio can be independently set to one of 18 different PWM frequencies.
+Each GPIO can be independently set to one of 18 different PWM
+frequencies.
 
 .br
-If PWM is currently active on the gpio it will be switched off and then
-back on at the new frequency.
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
 
 .br
 The frequencies for each sample rate are:
@@ -1820,21 +2320,46 @@ The frequencies for each sample rate are:
 .br
 
 .EX
-        #1    #2    #3   #4   #5   #6   #7   #8   #9
- 1us 40000 20000 10000 8000 5000 4000 2500 2000 1600
- 2us 20000 10000  5000 4000 2500 2000 1250 1000  800
- 4us 10000  5000  2500 2000 1250 1000  625  500  400
- 5us  8000  4000  2000 1600 1000  800  500  400  320
- 8us  5000  2500  1250 1000  625  500  313  250  200
-10us  4000  2000  1000  800  500  400  250  200  160
-                                                
-       #10   #11   #12  #13  #14  #15  #16  #17  #18
- 1us  1250  1000   800  500  400  250  200  100   50
- 2us   625   500   400  250  200  125  100   50   25
- 4us   313   250   200  125  100   63   50   25   13
- 5us   250   200   160  100   80   50   40   20   10
- 8us   156   125   100   63   50   31   25   13    6
-10us   125   100    80   50   40   25   20   10    5
+                       Hertz
+.br
+
+.br
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+.br
+           1250  1000   800  500  400  250  200  100   50
+.br
+
+.br
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+.br
+            625   500   400  250  200  125  100   50   25
+.br
+
+.br
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+.br
+            313   250   200  125  100   63   50   25   13
+.br
+sample
+.br
+ rate
+.br
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+.br
+            250   200   160  100   80   50   40   20   10
+.br
+
+.br
+       8:  5000  2500  1250 1000  625  500  313  250  200
+.br
+            156   125   100   63   50   31   25   13    6
+.br
+
+.br
+      10:  4000  2000  1000  800  500  400  250  200  160
+.br
+            125   100    80   50   40   25   20   10    5
+.br
 
 .EE
 
@@ -1886,18 +2411,18 @@ $ pigs pigpv
 
 .br
 
-.IP "\fBPRG u\fP - Get gpio PWM range"
+.IP "\fBPRG u\fP - Get GPIO PWM range"
 .IP "" 4
 
 .br
-This command returns the dutycycle range for gpio \fBu\fP.
+This command returns the dutycycle range for GPIO \fBu\fP.
 
 .br
 Upon success the range is returned.  On error a negative status code
 will be returned.
 
 .br
-If a hardware clock or hardware PWM is active on the gpio the reported
+If a hardware clock or hardware PWM is active on the GPIO the reported
 range will be 1000000 (1M).
 
 .br
@@ -2122,18 +2647,18 @@ ERROR: unknown script id
 
 .br
 
-.IP "\fBPRRG u\fP - Get gpio PWM real range"
+.IP "\fBPRRG u\fP - Get GPIO PWM real range"
 .IP "" 4
 
 .br
-This command returns the real underlying range used by gpio \fBu\fP.
+This command returns the real underlying range used by GPIO \fBu\fP.
 
 .br
-If a hardware clock is active on the gpio the reported
+If a hardware clock is active on the GPIO the reported
 real range will be 1000000 (1M).
 
 .br
-If hardware PWM is active on the gpio the reported real range
+If hardware PWM is active on the GPIO the reported real range
 will be approximately 250M divided by the set PWM frequency.
 
 .br
@@ -2177,20 +2702,20 @@ $ pigs prrg 17
 
 .br
 
-.IP "\fBPRS u v\fP - Set gpio PWM range"
+.IP "\fBPRS u v\fP - Set GPIO PWM range"
 .IP "" 4
 
 .br
-This command sets the dutycycle range \fBv\fP to be used for gpio \fBu\fP.
+This command sets the dutycycle range \fBv\fP to be used for GPIO \fBu\fP.
 Subsequent uses of command \fBP/PWM\fP will use a dutycycle between 0 (off)
 and \fBv\fP (fully on).
 
 .br
-Upon success the real underlying range used by the gpio is returned.
+Upon success the real underlying range used by the GPIO is returned.
 On error a negative status code will be returned.
 
 .br
-If PWM is currently active on the gpio its dutycycle will be scaled to
+If PWM is currently active on the GPIO its dutycycle will be scaled to
 reflect the new range.
 
 .br
@@ -2229,11 +2754,11 @@ $ pigs prs 18 1000
 
 .br
 
-.IP "\fBPUD g p\fP - Set gpio pull up/down"
+.IP "\fBPUD g p\fP - Set GPIO pull up/down"
 .IP "" 4
 
 .br
-This command sets the internal pull/up down for gpio \fBg\fP to mode \fBp\fP.
+This command sets the internal pull/up down for GPIO \fBg\fP to mode \fBp\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -2248,22 +2773,22 @@ The mode may be pull-down (D), pull-up (U), or off (O).
 .br
 
 .EX
-$ pigs pud 4 d # Set pull-down on gpio 4.
+$ pigs pud 4 d # Set pull-down on GPIO 4.
 .br
-$ pigs pud 4 u # Set pull-up on gpio 4.
+$ pigs pud 4 u # Set pull-up on GPIO 4.
 .br
-$ pigs pud 4 o # No pull-up/down on gpio 4.
+$ pigs pud 4 o # No pull-up/down on GPIO 4.
 .br
 
 .EE
 
 .br
 
-.IP "\fBR/READ g\fP - Read gpio level"
+.IP "\fBR/READ g\fP - Read GPIO level"
 .IP "" 4
 
 .br
-This reads the current level of gpio \fBg\fP.
+This reads the current level of GPIO \fBg\fP.
 
 .br
 Upon success the current level is returned.  On error a negative status code
@@ -2275,13 +2800,13 @@ will be returned.
 .br
 
 .EX
-$ pigs r 17 # Get level of gpio 17.
+$ pigs r 17 # Get level of GPIO 17.
 .br
 0
 .br
 
 .br
-$ pigs r 4 # Get level of gpio 4.
+$ pigs r 4 # Get level of GPIO 4.
 .br
 1
 .br
@@ -2290,11 +2815,11 @@ $ pigs r 4 # Get level of gpio 4.
 
 .br
 
-.IP "\fBS/SERVO u v\fP - Set gpio servo pulsewidth"
+.IP "\fBS/SERVO u v\fP - Set GPIO servo pulsewidth"
 .IP "" 4
 
 .br
-This command starts servo pulses of \fBv\fP microseconds on gpio \fBu\fP.
+This command starts servo pulses of \fBv\fP microseconds on GPIO \fBu\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -2326,10 +2851,10 @@ $ pigs SERVO 17 1500
 
 .br
 This example causes an on pulse of 1500 microseconds duration to be
-transmitted on gpio 17 at a rate of 50 times per second.
+transmitted on GPIO 17 at a rate of 50 times per second.
 
 .br
-This will command a servo connected to gpio 17 to rotate to its mid-point.
+This will command a servo connected to GPIO 17 to rotate to its mid-point.
 
 .br
 
@@ -2416,8 +2941,9 @@ Upon success a handle (>=0) is returned.  On error a negative status code
 will be returned.
 
 .br
-The UART is /dev/ttyAMA0.  The consoles are /dev/ttyx.  The USB
-devices are /dev/ttyUSBx.
+The device name must start with /dev/tty or /dev/serial.
+
+.br
 
 .br
 The baud rate must be one of 50, 75, 110, 134, 150,
@@ -2557,19 +3083,94 @@ $ pigs serwb 0 0xf0
 
 .br
 
-.IP "\fBSLR u num\fP - Read bit bang serial data from gpio"
+.IP "\fBSHELL name str\fP - Execute a shell command"
+.IP "" 4
+
+.br
+This command uses the system call to execute a shell script \fBname\fP
+with the given string \fBstr\fP as its parameter.
+
+.br
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+.br
+\fBname\fP must exist in /opt/pigpio/cgi and must be executable.
+
+.br
+The returned exit status is normally 256 times that set
+by the shell script exit function.  If the script can't
+be found 32512 will be returned.
+
+.br
+The following table gives some example returned statuses.
+
+.br
+
+.EX
+Script exit status   Returned system call status
+1                    256
+5                    1280
+10                   2560
+200                  51200
+script not found     32512
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+# pass two parameters, hello and world
+.br
+$ pigs shell scr1 hello world
+.br
+256
+.br
+
+.br
+# pass three parameters, hello, string with spaces, and world
+.br
+$ pigs shell scr1 "hello 'string with spaces' world"
+.br
+256
+.br
+
+.br
+# pass one parameter, hello string with spaces world
+.br
+$ pigs shell scr1 "\"hello string with spaces world\""
+.br
+256
+.br
+
+.br
+# non-existent script
+.br
+$ pigs shell scr78 par1
+.br
+32512
+.br
+
+.EE
+
+.br
+
+.IP "\fBSLR u num\fP - Read bit bang serial data from GPIO"
 .IP "" 4
 
 .br
 This command returns up to \fBnum\fP bytes of bit bang serial data
-read from gpio \fBu\fP.
+read from GPIO \fBu\fP.
 
 .br
 Upon success the count of returned bytes followed by the bytes themselves
 is returned.  On error a negative status code will be returned.
 
 .br
-The gpio \fBu\fP should have been initialised with the \fBSLRO\fP command.
+The GPIO \fBu\fP should have been initialised with the \fBSLRO\fP command.
 
 .br
 The bytes returned for each character depend upon the number of
@@ -2597,11 +3198,11 @@ $ pigs slr 15 20
 
 .br
 
-.IP "\fBSLRC u\fP - Close gpio for bit bang serial data"
+.IP "\fBSLRC u\fP - Close GPIO for bit bang serial data"
 .IP "" 4
 
 .br
-This command closes gpio \fBu\fP for reading bit bang serial data.
+This command closes GPIO \fBu\fP for reading bit bang serial data.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -2621,7 +3222,7 @@ $ pigs slrc 23
 .br
 -38
 .br
-ERROR: no serial read in progress on gpio
+ERROR: no serial read in progress on GPIO
 .br
 
 .EE
@@ -2633,7 +3234,7 @@ ERROR: no serial read in progress on gpio
 
 .br
 This command sets the logic level for reading bit bang serial data
-on gpio \fBu\fP.
+on GPIO \fBu\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -2648,22 +3249,22 @@ The invert parameter \fBv\fP is 1 for inverted signal, 0 for normal.
 .br
 
 .EX
-$ pigs slri 17 1 # invert logic on gpio 17
+$ pigs slri 17 1 # invert logic on GPIO 17
 .br
 
 .br
-$ pigs slri 23 0 # use normal logic on gpio 23
+$ pigs slri 23 0 # use normal logic on GPIO 23
 .br
 
 .EE
 
 .br
 
-.IP "\fBSLRO u b db\fP - Open gpio for bit bang serial data"
+.IP "\fBSLRO u b db\fP - Open GPIO for bit bang serial data"
 .IP "" 4
 
 .br
-This command opens gpio \fBu\fP for reading bit bang serial data
+This command opens GPIO \fBu\fP for reading bit bang serial data
 at \fBb\fP baud and \fBdb\fP data bits.
 
 .br
@@ -2694,7 +3295,7 @@ $ pigs slro 23 19200 8
 .br
 -50
 .br
-ERROR: gpio already in use
+ERROR: GPIO already in use
 .br
 
 .EE
@@ -2749,9 +3350,10 @@ Speeds between 32kbps and 125Mbps are allowed.  Speeds above 30Mbps
 are unlikely to work.
 
 .br
-An auxiliary SPI device is available on the A+/B+/Pi2/Zero and may be
-selected by setting the A bit in the flags.  The auxiliary
-device has 3 chip selects and a selectable word size in bits.
+An auxiliary SPI device is available on all models but the
+A and B and may be selected by setting the A bit in the
+flags.  The auxiliary device has 3 chip selects and a
+selectable word size in bits.
 
 .br
 The flags consists of the least significant 22 bits.
@@ -2792,11 +3394,10 @@ Mode POL PHA
 px is 0 if CEx is active low (default) and 1 for active high.
 
 .br
-ux is 0 if the CEx gpio is reserved for SPI (default) and 1 otherwise.
+ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
 .br
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.  The
-auxiliary device is only present on the A+/B+/Pi2/Zero.
+A is 0 for the standard SPI device, 1 for the auxiliary SPI.
 
 .br
 W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
@@ -2820,6 +3421,20 @@ device only.
 .br
 bbbbbb defines the word size in bits (0-32).  The default (0)
 sets 8 bits per word.  Auxiliary SPI device only.
+
+.br
+The \fBSPIR\fP, \fBSPIW\fP, and \fBSPIX\fP commands transfer data
+packed into 1, 2, or 4 bytes according to the word size in bits.
+
+.br
+For bits 1-8 there will be one byte per character.
+.br
+For bits 9-16 there will be two bytes per character.
+.br
+For bits 17-32 there will be four bytes per character.
+
+.br
+E.g. 32 12-bit words will be transferred in 64 bytes.
 
 .br
 The other bits in flags should be set to zero.
@@ -2961,14 +3576,14 @@ $ pigs t mils 1000 t
 
 .br
 This command sends a trigger pulse of \fBpl\fP microseconds at level \fBL\fP
-to gpio \fBu\fP.
+to GPIO \fBu\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
 will be returned.
 
 .br
-The gpio is set to not level at the end of the pulse.
+The GPIO is set to not level at the end of the pulse.
 
 .br
 
@@ -2991,11 +3606,11 @@ ERROR: trigger pulse > 50 microseconds
 
 .br
 
-.IP "\fBW/WRITE g L\fP - Write gpio level"
+.IP "\fBW/WRITE g L\fP - Write GPIO level"
 .IP "" 4
 
 .br
-This command sets gpio \fBg\fP to level \fBL\fP.  The level may be 0
+This command sets GPIO \fBg\fP to level \fBL\fP.  The level may be 0
 (low, off, clear) or 1 (high, on, set).
 
 .br
@@ -3025,11 +3640,11 @@ ERROR: level not 0-1
 
 .br
 
-.IP "\fBWDOG u v\fP - Set gpio watchdog"
+.IP "\fBWDOG u v\fP - Set GPIO watchdog"
 .IP "" 4
 
 .br
-This command sets a watchdog of \fBv\fP milliseconds on gpio \fBu\fP.
+This command sets a watchdog of \fBv\fP milliseconds on GPIO \fBu\fP.
 
 .br
 Upon success nothing is returned.  On error a negative status code
@@ -3039,16 +3654,16 @@ will be returned.
 The watchdog is nominally in milliseconds.
 
 .br
-One watchdog may be registered per gpio.
+One watchdog may be registered per GPIO.
 
 .br
 The watchdog may be cancelled by setting timeout to 0.
 
 .br
-If no level change has been detected for the gpio for timeout milliseconds:-
+If no level change has been detected for the GPIO for timeout milliseconds:-
 
 .br
-any notification for the gpio has a report written to the fifo with
+any notification for the GPIO has a report written to the fifo with
 the flags set to indicate a watchdog timeout.
 
 .br
@@ -3072,7 +3687,7 @@ $ pigs wdog 23 9000
 
 .br
 This example causes a report to be written to any notification pipes
-listening on gpio 23 whenever gpio 23 changes state or approximately
+listening on GPIO 23 whenever GPIO 23 changes state or approximately
 every 9000 ms.
 
 .br
@@ -3081,7 +3696,7 @@ every 9000 ms.
 .IP "" 4
 
 .br
-This command adds 1 one or more triplets \fBtrips\fP of gpios on, gpios off,
+This command adds 1 one or more triplets \fBtrips\fP of GPIO on, GPIO off,
 delay to the existing waveform (if any).
 
 .br
@@ -3119,7 +3734,7 @@ $ pigs wvag 0 0 10000 0x10 0x80 1000 0x80 0x10 9000
 
 .br
 This command adds a waveform representing serial data \fBbvs\fP to
-gpio \fBu\fP at \fBb\fP baud to the existing waveform (if any).
+GPIO \fBu\fP at \fBb\fP baud to the existing waveform (if any).
 The serial data starts \fBo\fP microseconds from the start of the
 waveform.
 
@@ -3163,6 +3778,37 @@ $ pigs wvas 4 9600 8 2 0 0x30 0x31 0x32 0x33
 $ pigs wvas 7 38400 8 2 0 0x41 0x42
 .br
 35
+.br
+
+.EE
+
+.br
+
+.IP "\fBWVTAT \fP - Returns the current transmitting waveform"
+.IP "" 4
+
+.br
+This command returns the id of the waveform currently
+being transmitted.
+
+.br
+Returns the waveform id or one of the following special
+values:
+
+.br
+9998 - transmitted wave not found
+.br
+9999 - no wave being transmitted
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs wvtat
+.br
+9999
 .br
 
 .EE
@@ -3421,9 +4067,9 @@ A waveform comprises of one or more pulses.
 A pulse specifies
 
 .br
-1) the gpios to be switched on at the start of the pulse.
+1) the GPIO to be switched on at the start of the pulse.
 .br
-2) the gpios to be switched off at the start of the pulse.
+2) the GPIO to be switched off at the start of the pulse.
 .br
 3) the delay in microseconds before the next pulse.
 
@@ -3806,12 +4452,12 @@ The command expects 0 or 1.
 .br
 
 .IP "\fBbits\fP - a bit mask" 0
-A mask is used to select one or more gpios.  A gpio is selected
-if bit (1<<gpio) is set in the mask.
+A mask is used to select one or more GPIO.  A GPIO is selected
+if bit (1<<GPIO) is set in the mask.
 
 .br
-E.g. a mask of 6 (binary 110) select gpios 1 and 2, a mask of
-0x103 (binary 100000011) selects gpios 0, 1, and 8.
+E.g. a mask of 6 (binary 110) select GPIO 1 and 2, a mask of
+0x103 (binary 100000011) selects GPIO 0, 1, and 8.
 
 .br
 
@@ -3840,7 +4486,7 @@ The command expects the number of data bits per serial character.
 
 .br
 
-.IP "\fBdev\fP - a tty serial device (/dev/tty*)" 0
+.IP "\fBdev\fP - a tty serial device (/dev/tty* or /dev/serial*)" 0
 The command expects the name of a tty serial device, e.g.
 
 .br
@@ -3852,31 +4498,53 @@ The command expects the name of a tty serial device, e.g.
 .br
 /dev/tty0
 .br
+/dev/serial0
+.br
 
 .EE
 
 .br
 
-.IP "\fBg\fP - gpio (0-53)" 0
-The command expects a gpio.
+.IP "\fBfile\fP - a file name" 0
+The file name must match an entry in /opt/pigpio/access.
 
 .br
-There are 54 General Purpose Input Outputs (gpios) named gpio0 through gpio53.
+
+.IP "\fBfrom\fP - 0-2" 0
+Position to seek from \fBFS\fP.
+
+.br
+
+.EX
+    From
+0   start
+1   current position
+2   end
+
+.EE
+
+.br
+
+.IP "\fBg\fP - GPIO (0-53)" 0
+The command expects a GPIO.
+
+.br
+There are 54 General Purpose Input Outputs (GPIO) named gpio0 through gpio53.
 
 .br
 They are split into two banks.  Bank 1 consists of gpio0 through gpio31.
 Bank 2 consists of gpio32 through gpio53.
 
 .br
-All the gpios which are safe for the user to read and write are in bank 1.
-Not all gpios in bank 1 are safe though. Type 1 boards have 17 safe gpios.
+All the GPIO which are safe for the user to read and write are in bank 1.
+Not all GPIO in bank 1 are safe though. Type 1 boards have 17 safe GPIO.
 Type 2 boards have 21. Type 3 boards have 26.
 
 .br
 See \fBHWVER\fP.
 
 .br
-The user gpios are marked with an X in the following table.
+The user GPIO are marked with an X in the following table.
 
 .br
 
@@ -3894,7 +4562,7 @@ Type 3    X  X  X  X  X  X  X  X  X  X  X  X  -  -  -  -
 .EE
 
 .br
-You are not prevented from writing to unsafe gpios.  The consequences
+You are not prevented from writing to unsafe GPIO.  The consequences
 of doing so range from no effect, to a crash, or corrupted data.
 
 .br
@@ -3903,17 +4571,17 @@ of doing so range from no effect, to a crash, or corrupted data.
 The command expects a handle.
 
 .br
-A handle is a number referencing an object opened by one of \fBI2CO\fP, \fBNO\fP,
-\fBSERO\fP, \fBSPIO\fP.
+A handle is a number referencing an object opened by one of \fBFO\fP,
+\fBI2CO\fP, \fBNO\fP, \fBSERO\fP, \fBSPIO\fP.
 
 .br
 
-.IP "\fBib\fP - I2C bus (0-1)" 0
-The command expects an I2C bus.
+.IP "\fBib\fP - I2C bus (>=0)" 0
+The command expects an I2C bus number.
 
 .br
 
-.IP "\fBid\fP - I2C device (0x08-0x77)" 0
+.IP "\fBid\fP - I2C device (0-0x7F)" 0
 The command expects the address of an I2C device.
 
 .br
@@ -3924,7 +4592,7 @@ The command expects an I2C flags value.  No flags are currently defined.
 .br
 
 .IP "\fBL\fP - level (0-1)" 0
-The command expects a gpio level.
+The command expects a GPIO level.
 
 .br
 
@@ -3932,7 +4600,7 @@ The command expects a gpio level.
 The command expects a mode character.
 
 .br
-Each gpio can be configured to be in one of 8 different modes. The modes
+Each GPIO can be configured to be in one of 8 different modes. The modes
 are named Input, Output, ALT0, ALT1, ALT2, ALT3, ALT4, and ALT5.
 
 .br
@@ -3944,24 +4612,58 @@ The value is returned by the mode get command.
 .br
 
 .EX
-Mode   Input Output ALT0 ALT1 ALT2 ALT3 ALT4 ALT5
-Code       R      W    0    1    2    3    4    5
-Value      0      1    4    5    6    7    3    2
+Mode    Input   Output   ALT0   ALT1   ALT2   ALT3   ALT4   ALT5
+Code      R        W       0      1      2      3      4      5
+Value     0        1       4      5      6      7      3      2
 
 .EE
 
 .br
 
-.IP "\fBnum\fP - number of bytes to read (1-)" 0
-The command expects the number of bytes to read.
+.IP "\fBmode\fP - file open mode" 0
+One of the following values.
+
+.br
+
+.EX
+        Value   Meaning
+READ      1     open file for reading
+WRITE     2     open file for writing
+RW        3     open file for reading and writing
+
+.EE
+
+.br
+The following values can be or'd into the mode.
+
+.br
+
+.EX
+         Value   Meaning
+APPEND   4       All writes append data to the end of the file
+CREATE   8       The file is created if it doesn't exist
+TRUNC    16      The file is truncated
+
+.EE
+
+.br
+
+.IP "\fBname\fP - the name of a script" 0
+Only alphanumeric characters, '-' and '_' are allowed in the name.
+
+.br
+
+.IP "\fBnum\fP - maximum number of bytes to return (1-)" 0
+The command expects the maximum number of bytes to return.
 
 .br
 For the I2C and SPI commands the requested number of bytes will always
 be returned.
 
 .br
-For the serial commands the smaller of the number of bytes available to be
-read (which may be zero) and \fBnum\fP bytes will be returned.
+For the serial and file commands the smaller of the number of
+bytes available to be read (which may be zero) and \fBnum\fP bytes
+will be returned.
 
 .br
 
@@ -3974,7 +4676,7 @@ Serial data is stored offset microseconds from the start of the waveform.
 The command expects a PUD character.
 
 .br
-Each gpio can be configured to use or not use an internal pull up or
+Each GPIO can be configured to use or not use an internal pull up or
 pull down resistor.  This is useful to provide a default state for inputs.
 
 .br
@@ -3999,8 +4701,35 @@ There is no mechanism to read the pull up down state.
 
 .br
 
+.IP "\fBpad\fP - 0-2" 0
+A set of GPIO which share common drivers.
+
+.br
+
+.EX
+Pad   GPIO
+0     0-27
+1     28-45
+2     46-53
+
+.EE
+
+.br
+
+.IP "\fBpadma\fP - 1-16" 0
+The mA which may be drawn from each GPIO whilst still guaranteeing the
+high and low levels.
+
+.br
+
 .IP "\fBpars\fP - script parameters" 0
 The command expects 0 to 10 numbers as parameters to be passed to the script.
+
+.br
+
+.IP "\fBpat\fP - a file name pattern" 0
+A file path which may contain wildcards.  To be accessible the path
+must match an entry in /opt/pigpio/access.
 
 .br
 
@@ -4029,14 +4758,14 @@ The command expects the number of stop (half) bits per serial character.
 
 .br
 
-.IP "\fBscl\fP - user gpio (0-31)" 0
-The command expects the number of the gpio to be used for SCL
+.IP "\fBscl\fP - user GPIO (0-31)" 0
+The command expects the number of the GPIO to be used for SCL
 when bit banging I2C.
 
 .br
 
-.IP "\fBsda\fP - user gpio (0-31)" 0
-The command expects the number of the gpio to be used for SDA
+.IP "\fBsda\fP - user GPIO (0-31)" 0
+The command expects the number of the GPIO to be used for SDA
 when bit banging I2C.
 
 .br
@@ -4065,13 +4794,18 @@ the active part of a noise filter (\fBFN\fP).
 
 .br
 
-.IP "\fBt\fP - text (a string of text)" 0
-The command expects a text string.
+.IP "\fBstr\fP - a string" 0
+The command expects a string.
+
+.br
+
+.IP "\fBt\fP - a string" 0
+The command expects a string.
 
 .br
 
 .IP "\fBtrips\fP - triplets" 0
-The command expects 1 or more triplets of gpios on, gpios off, delay.
+The command expects 1 or more triplets of GPIO on, GPIO off, delay.
 
 .br
 E.g. 0x400000 0 100000 0 0x400000 900000 defines two pulses as follows
@@ -4079,25 +4813,25 @@ E.g. 0x400000 0 100000 0 0x400000 900000 defines two pulses as follows
 .br
 
 .EX
-     gpios on          gpios off          delay
-0x400000 (gpio 22)           0 (None) 100000 (1/10th s)
-          0 (None) 0x400000 (gpio 22) 900000 (9/10th s)
+     GPIO on           GPIO off           delay
+0x400000 (GPIO 22)           0 (None) 100000 (1/10th s)
+          0 (None) 0x400000 (GPIO 22) 900000 (9/10th s)
 
 .EE
 
 .br
 
-.IP "\fBu\fP - user gpio (0-31)" 0
-The command expects the number of a user gpio.
+.IP "\fBu\fP - user GPIO (0-31)" 0
+The command expects the number of a user GPIO.
 
 .br
-A number of commands are restricted to gpios in bank 1,
+A number of commands are restricted to GPIO in bank 1,
 in particular the PWM commands, the servo command,
 the watchdog command, and the notification command.
 
 .br
 It is your responsibility to ensure that the PWM and servo commands
-are only used on safe gpios.
+are only used on safe GPIO.
 
 .br
 See \fBg\fP
@@ -4165,7 +4899,7 @@ the pigpio daemon server/client model.
 .br
 .SS Example
 .br
-A trivial example might be useful.  Suppose you want to toggle a gpio
+A trivial example might be useful.  Suppose you want to toggle a GPIO
 on and off as fast as possible.
 
 .br
@@ -4293,9 +5027,9 @@ proc introduces a script.  Everything after proc is part of the script.
 .br
 tag 999 names the current position in the script.
 .br
-w 22 1 writes 1 to gpio 22.
+w 22 1 writes 1 to GPIO 22.
 .br
-w 22 0 writes 0 to gpio 22.
+w 22 0 writes 0 to GPIO 22.
 .br
 dcr p0 decrements parameter 0.
 .br
@@ -4389,7 +5123,7 @@ STA y   Store accumulator in register                 y=A
 SUB x   Subtract x from accumulator                   A-=x; F=A
 SYS str Run external script (/opt/pigpio/cgi/str)     system(str); F=A
 TAG L   Label the current script position             N/A
-WAIT x  Wait for a gpio in x to change state          A=wait(x); F=A
+WAIT x  Wait for a GPIO in x to change state          A=wait(x); F=A
 X y1 y2 Exchange contents of registers y1 and y2      t=*y1;*y1=*y2;*y2=t
 XA y    Exchange contents of accumulator and register t=A;A=*y;*y=t
 XOR x   Xor x with accumulator                        A^=x; F=A
@@ -4404,11 +5138,11 @@ y may be a parameter (p0-p9), or a variable (v0-v149).  If p or v isn't
 specified y is assumed to be a variable.
 
 .br
-The WAIT command parameter is a bit-mask with 1 set for gpios of interest.
+The WAIT command parameter is a bit-mask with 1 set for GPIO of interest.
 
 .br
 The SYS script receives two unsigned parameters: the accumulator A and
-the current gpio levels.
+the current GPIO levels.
 
 .br
 

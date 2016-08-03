@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 34+
+This version is for pigpio version 55+
 */
 
 #include <stdio.h>
@@ -48,8 +48,8 @@ This program provides a socket interface to some of
 the commands available from pigpio.
 */
 
-char command_buf[8192];
-char response_buf[8192];
+char command_buf[CMD_MAX_EXTENSION];
+char response_buf[CMD_MAX_EXTENSION];
 
 int printFlags = 0;
 
@@ -171,7 +171,10 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          printf("%s", cmdUsage);
          break;
 
-      case 6: /* BI2CZ CF2 I2CPK I2CRD I2CRI I2CRK I2CZ SERR SLR SPIX SPIR */
+      case 6: /*
+                 BI2CZ  CF2  FL  FR  I2CPK  I2CRD  I2CRI  I2CRK  I2CZ
+                 SERR  SLR  SPIX  SPIR
+              */
          printf("%d", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
          if (r > 0)
@@ -186,7 +189,8 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
 
                else if (printFlags & PRINT_ASCII)
                {
-                  if ((ch > 31) && (ch < 127)) printf("%c", ch);
+                  if (isprint(ch) || (ch == '\n') || (ch == '\r'))
+                     printf("%c", ch);
                   else printf("\\x%02hhx", ch);
                }
                else printf(" %hhu", response_buf[i]);
@@ -221,6 +225,8 @@ void get_extensions(int sock, int command, int res)
    {
       case PI_CMD_BI2CZ:
       case PI_CMD_CF2:
+      case PI_CMD_FL:
+      case PI_CMD_FR:
       case PI_CMD_I2CPK:
       case PI_CMD_I2CRD:
       case PI_CMD_I2CRI:
