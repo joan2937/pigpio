@@ -10044,7 +10044,7 @@ int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
    wfRx[SDA].I.started = 0;
    wfRx[SDA].I.SDA = SDA;
    wfRx[SDA].I.SCL = SCL;
-   wfRx[SDA].I.delay = (500000 / baud) - 1;
+   wfRx[SDA].I.delay = 500000 / baud;
    wfRx[SDA].I.SDAMode = gpioGetMode(SDA);
    wfRx[SDA].I.SCLMode = gpioGetMode(SCL);
 
@@ -10109,7 +10109,7 @@ int bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned
    wfRx[CS].S.MOSI = MOSI;
    wfRx[CS].S.CS = CS;
    wfRx[CS].S.SCLK = SCLK;
-   wfRx[CS].S.delay = 500000 / baud;
+   wfRx[CS].S.delay = (500000 / baud) - 1;
    wfRx[CS].S.spiFlags = spiFlags;
    wfRx[CS].S.MISOMode = gpioGetMode(MISO);
    wfRx[CS].S.MOSIMode = gpioGetMode(MOSI);

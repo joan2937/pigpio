@@ -597,7 +597,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_BB_I2C_MAX_BAUD 500000
 
 #define PI_BB_SPI_MIN_BAUD     50
-#define PI_BB_SPI_MAX_BAUD 500000
+#define PI_BB_SPI_MAX_BAUD 250000
 
 #define PI_BB_SER_MIN_BAUD     50
 #define PI_BB_SER_MAX_BAUD 250000
@@ -2640,7 +2640,7 @@ for the hardware SPI ports.
  MISO: 0-31
  MOSI: 0-31
  SCLK: 0-31
-baud: 50-500000
+baud: 50-250000
 spiFlags: see below
 . .
 spiFlags consists of the least significant 22 bits.
@@ -2661,6 +2661,12 @@ Mode POL PHA
 . .
 
 p0 is 0 if CEx is active low (default) and 1 for active high.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
 
 The other bits in flags should be set to zero.
 
