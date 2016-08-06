@@ -238,6 +238,10 @@ spi_read                  Reads bytes from a SPI device
 spi_write                 Writes bytes to a SPI device
 spi_xfer                  Transfers bytes with a SPI device
 
+bb_spi_open               Opens GPIO for bit banging SPI
+bb_spi_close              Closes GPIO for bit banging SPI
+bb_spi_xfer               Transfers bytes with bit banging SPI
+
 Serial
 
 serial_open               Opens a serial device
@@ -497,6 +501,10 @@ _PI_CMD_FS   =108
 _PI_CMD_FL   =109
 _PI_CMD_SHELL=110
 
+_PI_CMD_BSPIC=111
+_PI_CMD_BSPIO=112
+_PI_CMD_BSPIX=113
+
 # pigpio error numbers
 
 _PI_INIT_FAILED     =-1
@@ -640,6 +648,8 @@ PI_NO_FILE_ACCESS   =-137
 PI_FILE_IS_A_DIR    =-138
 PI_BAD_SHELL_STATUS =-139
 PI_BAD_SCRIPT_NAME  =-140
+PI_BAD_SPI_BAUD     =-141
+PI_NOT_SPI_GPIO     =-142
 
 # pigpio error text
 
@@ -782,7 +792,8 @@ _errors=[
    [PI_FILE_IS_A_DIR     , "file is a directory"],
    [PI_BAD_SHELL_STATUS  , "bad shell return status"],
    [PI_BAD_SCRIPT_NAME   , "bad script name"],
-
+   [PI_BAD_SPI_BAUD      , "bad SPI baud rate, not 50-500k"],
+   [PI_NOT_SPI_GPIO      , "no bit bang SPI in progress on GPIO"],
 ]
 
 class _socklock:
@@ -2938,6 +2949,62 @@ class pi():
       # Don't raise exception.  Must release lock.
       bytes = u2i(_pigpio_command_ext(
          self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+
+   def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=1):
+      """
+###
+      """
+      # I p1 CS
+      # I p2 0
+      # I p3 20
+      ## extension ##
+      # I MISO
+      # I MOSI
+      # I SCLK
+      # I baud
+      # I spi_flags
+      
+      extents = [struct.pack("IIIII", MISO, MOSI, SCLK, baud, spi_flags)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BSPIO, CS, 0, 20, extents))
+
+
+   def bb_spi_close(self, CS):
+      """
+      This function stops bit banging SPI on a set of GPIO
+      previously opened with [*bb_spi_open*].
+
+      CS:= 0-31, the CS GPIO used in a prior call to [*bb_ispi_open*]
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+
+      ...
+      pi.bb_spi_close(CS)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BSPIC, CS, 0))
+
+
+   def bb_spi_xfer(self, CS, data):
+      """
+###
+      """
+      # I p1 SDA
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data], False))
       if bytes > 0:
          data = self._rxbuf(bytes)
       else:

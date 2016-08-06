@@ -285,6 +285,10 @@ spiRead                    Reads bytes from a SPI device
 spiWrite                   Writes bytes to a SPI device
 spiXfer                    Transfers bytes with a SPI device
 
+bbSPIOpen                  Opens GPIO for bit banging SPI
+bbSPIClose                 Closes GPIO for bit banging SPI
+bbSPIXfer                  Performs multiple bit banged SPI transactions
+
 SERIAL
 
 serOpen                    Opens a serial device
@@ -591,6 +595,9 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_BB_I2C_MIN_BAUD     50
 #define PI_BB_I2C_MAX_BAUD 500000
+
+#define PI_BB_SPI_MIN_BAUD     50
+#define PI_BB_SPI_MAX_BAUD 500000
 
 #define PI_BB_SER_MIN_BAUD     50
 #define PI_BB_SER_MAX_BAUD 250000
@@ -2617,6 +2624,86 @@ SDA: 0-31, the SDA GPIO used in a prior call to [*bbI2COpen*]
 . .
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
+D*/
+
+/*F*/
+int bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
+/*D
+This function selects a set of GPIO for bit banging SPI at a
+specified baud rate.
+
+Bit banging SPI allows the use of different GPIO for SPI than
+for the hardware SPI ports.
+
+. .
+ CS:   0-31
+ MISO: 0-31
+ MOSI: 0-31
+ SCLK: 0-31
+baud: 50-500000
+spiFlags: see below
+. .
+spiFlags consists of the least significant 22 bits.
+
+. .
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+. .
+
+mm defines the SPI mode.
+
+. .
+Mode POL PHA
+ 0    0   0
+ 1    0   1
+ 2    1   0
+ 3    1   1
+. .
+
+p0 is 0 if CEx is active low (default) and 1 for active high.
+
+The other bits in flags should be set to zero.
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+PI_GPIO_IN_USE.
+D*/
+
+/*F*/
+int bbSPIClose(unsigned CS);
+/*D
+This function stops bit banging SPI on a set of GPIO previously
+opened with [*bbSPIOpen*].
+
+. .
+CS: 0-31, the CS GPIO used in a prior call to [*bbSPIOpen*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+D*/
+
+/*F*/
+int bbSPIXfer(
+   unsigned CS,
+   char    *inBuf,
+   char    *outBuf,
+   unsigned len);
+/*D
+This function executes an bit banged SPI transfer. The data
+to be sent is specified by the contents of inBuf, received data
+is stored into outBuf.
+len specifies the amount of bytes to be transferred.
+
+. .
+   CS: 0-31 (as used in a prior call to [*bbSPIOpen*])
+ inBuf: pointer to buffer to hold data to be sent
+outBuf: pointer to buffer to hold returned data
+outLen: size of output buffer
+. .
+
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+
+The returned I2C data is stored in consecutive locations of outBuf.
 D*/
 
 /*F*/
@@ -5450,6 +5537,10 @@ PARAMS*/
 
 #define PI_CMD_SHELL 110
 
+#define PI_CMD_BSPIC 111
+#define PI_CMD_BSPIO 112
+#define PI_CMD_BSPIX 113
+
 /*DEF_E*/
 
 /*
@@ -5654,6 +5745,8 @@ after this command is issued.
 #define PI_FILE_IS_A_DIR   -138 // file is a directory
 #define PI_BAD_SHELL_STATUS -139 // bad shell return status
 #define PI_BAD_SCRIPT_NAME -140 // bad script name
+#define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
+#define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
