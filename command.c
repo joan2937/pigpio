@@ -49,6 +49,10 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_BI2CO, "BI2CO", 131, 0}, // bbI2COpen
    {PI_CMD_BI2CZ, "BI2CZ", 193, 6}, // bbI2CZip
 
+   {PI_CMD_BSPIC, "BSPIC", 112, 0}, // bbSPIClose
+   {PI_CMD_BSPIO, "BSPIO", 134, 0}, // bbSPIOpen
+   {PI_CMD_BSPIX, "BSPIX", 193, 6}, // bbSPIXfer
+
    {PI_CMD_BR1,   "BR1",   101, 3}, // gpioRead_Bits_0_31
    {PI_CMD_BR2,   "BR2",   101, 3}, // gpioRead_Bits_32_53
 
@@ -256,6 +260,11 @@ BC2 bits         Clear GPIO in bank 2\n\
 BI2CC sda        Close bit bang I2C\n\
 BI2CO sda scl baud | Open bit bang I2C\n\
 BI2CZ sda ...    I2C bit bang multiple transactions\n\
+\n\
+BSPIC cs        Close bit bang SPI\n\
+BSPIO cs miso mosi sclk baud flag | Open bit bang SPI\n\
+BSPIX cs ...    SPI bit bang transfer\n\
+\n\
 BR1              Read bank 1 GPIO\n\
 BR2              Read bank 2 GPIO\n\
 BS1 bits         Set GPIO in bank 1\n\
@@ -529,6 +538,8 @@ static errInfo_t errInfo[]=
    {PI_FILE_IS_A_DIR    , "file is a directory"},
    {PI_BAD_SHELL_STATUS , "bad shell return status"},
    {PI_BAD_SCRIPT_NAME  , "bad script name"},
+   {PI_BAD_SPI_BAUD     , "bad SPI baud rate, not 50-500k"},
+   {PI_NOT_SPI_GPIO     , "no bit bang SPI in progress on GPIO"},
 
 };
 
@@ -599,8 +610,8 @@ int cmdParse(
    char *p8;
    int32_t *p32;
    char c;
-   uint32_t tp1=0, tp2=0, tp3=0;
-   int8_t to1, to2, to3;
+   uint32_t tp1=0, tp2=0, tp3=0, tp4=0, tp5=0;
+   int8_t to1, to2, to3, to4, to5;
    int eaten;
 
    /* Check that ext is big enough for the largest message. */
@@ -653,7 +664,7 @@ int cmdParse(
       case 112: /* BI2CC FC  GDC  GPW  I2CC  I2CRB
                    MG  MICS  MILS  MODEG  NC  NP  PADG PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
-                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR
+                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
 
                    One positive parameter.
                 */
@@ -914,6 +925,36 @@ int cmdParse(
 
          break;
 
+      case 134: /* BSPIO
+
+                   Six parameters.  First to Fifth positive.
+                   Sixth may be negative when interpreted as an int.
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp2, &to2);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp3, &to3);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp4, &to4);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp5, &to5);
+                                    
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0) &&
+             (to2 == CMD_NUMERIC) && ((int)tp2 >= 0) &&
+             (to3 == CMD_NUMERIC) && ((int)tp3 >= 0) &&
+             (to4 == CMD_NUMERIC) && ((int)tp4 >= 0) &&
+             (to5 == CMD_NUMERIC))
+         {
+            p[3] = 5 * 4;
+            memcpy(ext, &tp1, 4);
+            memcpy(ext, &tp2, 4);
+            memcpy(ext, &tp3, 4);
+            memcpy(ext, &tp4, 4);
+            memcpy(ext, &tp5, 4);
+            valid = 1;
+         }
+
+         break;
+
       case 191: /* PROCR
 
                    One to 11 parameters, first positive,
@@ -971,6 +1012,7 @@ int cmdParse(
          break;
 
       case 193: /* BI2CZ  FW  I2CWD  I2CZ  SERW  SPIW  SPIX
+                   BSPIX
 
                    Two or more parameters, first >=0, rest 0-255.
                 */
