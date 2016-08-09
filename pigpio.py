@@ -2957,7 +2957,7 @@ class pi():
       return bytes, data
 
 
-   def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=1):
+   def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=0):
       """
       This function selects a set of GPIO for bit banging SPI at a
       specified baud rate.
