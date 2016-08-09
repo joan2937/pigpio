@@ -2703,13 +2703,13 @@ len specifies the amount of bytes to be transferred.
    CS: 0-31 (as used in a prior call to [*bbSPIOpen*])
  inBuf: pointer to buffer to hold data to be sent
 outBuf: pointer to buffer to hold returned data
-outLen: size of output buffer
+len: size of data transfer
 . .
 
 Returns >= 0 if OK (the number of bytes read), otherwise
 PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
 
-The returned I2C data is stored in consecutive locations of outBuf.
+The returned SPI data is stored in consecutive locations of outBuf.
 D*/
 
 /*F*/

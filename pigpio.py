@@ -2959,7 +2959,51 @@ class pi():
 
    def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=1):
       """
-###
+      This function selects a set of GPIO for bit banging SPI at a
+      specified baud rate.
+      
+      Bit banging SPI allows the use of different GPIO for SPI than
+      for the hardware SPI ports.
+
+      CS :=  0-31
+      MISO := 0-31
+      MOSI := 0-31
+      SCLK := 0-31
+      baud := 50-250000
+      spiFlags := see below
+      
+      spiFlags consists of the least significant 22 bits.
+
+      ...
+      21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+       b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+      ...
+
+      mm defines the SPI mode.
+
+      ...
+      Mode POL PHA
+       0    0   0
+       1    0   1
+       2    1   0
+       3    1   1
+      ...
+      
+      p0 is 0 if CEx is active low (default) and 1 for active high.
+
+      T is 1 if the least significant bit is transmitted on MOSI first,
+      the default (0) shifts the most significant bit out first.
+
+      R is 1 if the least significant bit is received on MISO first, the
+      default (0) receives the most significant bit first.
+
+      The other bits in flags should be set to zero.
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+      PI_GPIO_IN_USE.
+      ...
+      pi.bb_spi_open(CS, MISO, MOSI, SCLK, baud=100000, spi_flags=1)
+      ...
       """
       # I p1 CS
       # I p2 0
@@ -2994,7 +3038,20 @@ class pi():
 
    def bb_spi_xfer(self, CS, data):
       """
-###
+      This function executes an bit banged SPI transfer. The data
+      to be sent is specified by the contents of data, received data
+      is returned as a bytestring.
+
+      CS:= 0-31 (as used in a prior call to [*bbSPIOpen*])
+      data:= data to be sent
+
+      Returns >= 0 if OK (the number of bytes read), otherwise
+      PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+
+      The received SPI data returned as ab bytearray
+      ...
+      pi.bb_spi_xfer(CS, data)
+      ...
       """
       # I p1 SDA
       # I p2 0
