@@ -363,6 +363,19 @@ FROM_START=0
 FROM_CURRENT=1
 FROM_END=2
 
+SPI_CS_HIGH_ACTIVE = 1 << 2
+SPI_CS0_HIGH_ACTIVE = 1 << 2
+SPI_CS1_HIGH_ACTIVE = 1 << 3
+SPI_CS2_HIGH_ACTIVE = 1 << 4
+SPI_RX_LSBFIRST = 1 << 15
+SPI_TX_LSBFIRST = 1 << 14
+SPI_MODE_0 = 0
+SPI_MODE_1 = 1
+SPI_MODE_2 = 2
+SPI_MODE_3 = 3
+SPI_CPOL = 2
+SPI_CPHA = 1
+
 # pigpio command numbers
 
 _PI_CMD_MODES= 0
@@ -2979,30 +2992,44 @@ class pi():
        b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
       ...
 
-      mm defines the SPI mode.
-
+      mm defines the SPI mode, defaults to 0
+      
       ...
-      Mode POL PHA
-       0    0   0
-       1    0   1
-       2    1   0
-       3    1   1
+      Mode CPOL CPHA
+       0     0    0
+       1     0    1
+       2     1    0
+       3     1    1
       ...
       
-      p0 is 0 if CEx is active low (default) and 1 for active high.
+      Use the following constants to set the Mode:
+      pigpio.SPI_MODE_0,
+      pigpio.SPI_MODE_1,
+      pigpio.SPI_MODE_2 or
+      pigpio.SPI_MODE_3
+      or use
+      pigpio.SPI_CPOL and/ or
+      pigpio.SPI_CPHA
+      
+      p0 is 0 if CS is active low (default) and 1 for active high.
+      Use pigpio.SPI_CS_HIGH_ACTIVE to set this flag.
 
       T is 1 if the least significant bit is transmitted on MOSI first,
       the default (0) shifts the most significant bit out first.
+      Use pigpio.SPI_TX_LSBFIRST to set this flag.
 
-      R is 1 if the least significant bit is received on MISO first, the
-      default (0) receives the most significant bit first.
+      R is 1 if the least significant bit is received on MISO first,
+      the default (0) receives the most significant bit first.
+      Use pigpio.SPI_RX_LSBFIRST to set this flag.
 
-      The other bits in flags should be set to zero.
+      The other bits in spiFlags should be set to zero.
 
       Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
       PI_GPIO_IN_USE.
       ...
-      pi.bb_spi_open(CS, MISO, MOSI, SCLK, baud=100000, spi_flags=1)
+      pi.bb_spi_open(CS, MISO, MOSI, SCLK,
+                     baud=100000,
+                     spi_flags=pigpio.SPI_MODE_1 | pigpio.SPI_CS_HIGH_ACTIVE)
       ...
       """
       # I p1 CS
