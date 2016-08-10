@@ -9968,6 +9968,7 @@ static uint8_t bbSPIXferByte(wfRx_t *w, char txByte)
             myGpioWrite(w->S.MOSI, txByte & 0x80);
             txByte <<= 1;
          }
+         
          set_SCLK(w);
          SPI_delay(w);
          
@@ -9997,6 +9998,7 @@ static uint8_t bbSPIXferByte(wfRx_t *w, char txByte)
             myGpioWrite(w->S.MOSI, txByte & 0x80);
             txByte <<= 1;
          }
+         
          if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
          {
             rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
@@ -10204,9 +10206,10 @@ int bbSPIXfer(
    unsigned len)
 {
    int pos, status;
+   char txByte, rxByte;
    wfRx_t *w;
 
-   DBG(DBG_USER, "gpio=%d inBuf=%s outBuf=%08X len=%d",
+   DBG(DBG_USER, "CS=%d inBuf=%s outBuf=%08X len=%d",
       CS, myBuf2Str(len, (char *)inBuf), (int)outBuf, len);
 
    CHECK_INITED;
@@ -10228,12 +10231,27 @@ int bbSPIXfer(
    status = 0;
 
    bbSPIStart(w);
+     
    for (pos=0; pos < len; pos++)
    {
-      DBG(DBG_INTERNAL, "pos=%d len=%d sent=%d",
-         pos, len, inBuf[pos]);
-      outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
-     DBG(DBG_INTERNAL, "recvd=%d", outBuf[pos]);
+      if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+      {
+         txByte = inBuf[pos];
+      }
+      else
+      {
+         txByte = inBuf[len - pos - 1];
+      }
+      rxByte = bbSPIXferByte(w, txByte);
+      if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+      {
+         outBuf[pos] = rxByte;
+      }
+      else
+      {
+         outBuf[len - pos - 1] = rxByte;
+      }
+      DBG(DBG_INTERNAL, "pos=%d len=%d sent=%d recvd=%d", pos, len, txByte, rxByte);
    }
    bbSPIStop(w);
 
