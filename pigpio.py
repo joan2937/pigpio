@@ -3067,15 +3067,16 @@ class pi():
       """
       This function executes an bit banged SPI transfer. The data
       to be sent is specified by the contents of data, received data
-      is returned as a bytestring.
+      is returned as a bytearray.
 
       CS:= 0-31 (as used in a prior call to [*bbSPIOpen*])
       data:= data to be sent
 
-      Returns >= 0 if OK (the number of bytes read), otherwise
-      PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code)
 
-      The received SPI data returned as ab bytearray
       ...
       pi.bb_spi_xfer(CS, data)
       ...
