@@ -238,6 +238,10 @@ spi_read                  Reads bytes from a SPI device
 spi_write                 Writes bytes to a SPI device
 spi_xfer                  Transfers bytes with a SPI device
 
+bb_spi_open               Opens GPIO for bit banging SPI
+bb_spi_close              Closes GPIO for bit banging SPI
+bb_spi_xfer               Transfers bytes with bit banging SPI
+
 Serial
 
 serial_open               Opens a serial device
@@ -358,6 +362,19 @@ FILE_TRUNC=16
 FROM_START=0
 FROM_CURRENT=1
 FROM_END=2
+
+SPI_CS_HIGH_ACTIVE = 1 << 2
+SPI_CS0_HIGH_ACTIVE = 1 << 2
+SPI_CS1_HIGH_ACTIVE = 1 << 3
+SPI_CS2_HIGH_ACTIVE = 1 << 4
+SPI_RX_LSBFIRST = 1 << 15
+SPI_TX_LSBFIRST = 1 << 14
+SPI_MODE_0 = 0
+SPI_MODE_1 = 1
+SPI_MODE_2 = 2
+SPI_MODE_3 = 3
+SPI_CPOL = 2
+SPI_CPHA = 1
 
 # pigpio command numbers
 
@@ -496,6 +513,10 @@ _PI_CMD_FW   =107
 _PI_CMD_FS   =108
 _PI_CMD_FL   =109
 _PI_CMD_SHELL=110
+
+_PI_CMD_BSPIC=111
+_PI_CMD_BSPIO=112
+_PI_CMD_BSPIX=113
 
 # pigpio error numbers
 
@@ -640,6 +661,8 @@ PI_NO_FILE_ACCESS   =-137
 PI_FILE_IS_A_DIR    =-138
 PI_BAD_SHELL_STATUS =-139
 PI_BAD_SCRIPT_NAME  =-140
+PI_BAD_SPI_BAUD     =-141
+PI_NOT_SPI_GPIO     =-142
 
 # pigpio error text
 
@@ -782,7 +805,8 @@ _errors=[
    [PI_FILE_IS_A_DIR     , "file is a directory"],
    [PI_BAD_SHELL_STATUS  , "bad shell return status"],
    [PI_BAD_SCRIPT_NAME   , "bad script name"],
-
+   [PI_BAD_SPI_BAUD      , "bad SPI baud rate, not 50-500k"],
+   [PI_NOT_SPI_GPIO      , "no bit bang SPI in progress on GPIO"],
 ]
 
 class _socklock:
@@ -2938,6 +2962,134 @@ class pi():
       # Don't raise exception.  Must release lock.
       bytes = u2i(_pigpio_command_ext(
          self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data], False))
+      if bytes > 0:
+         data = self._rxbuf(bytes)
+      else:
+         data = ""
+      self.sl.l.release()
+      return bytes, data
+
+
+   def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=0):
+      """
+      This function selects a set of GPIO for bit banging SPI at a
+      specified baud rate.
+      
+      Bit banging SPI allows the use of different GPIO for SPI than
+      for the hardware SPI ports.
+
+      CS :=  0-31
+      MISO := 0-31
+      MOSI := 0-31
+      SCLK := 0-31
+      baud := 50-250000
+      spiFlags := see below
+      
+      spiFlags consists of the least significant 22 bits.
+
+      ...
+      21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+       b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+      ...
+
+      mm defines the SPI mode, defaults to 0
+      
+      ...
+      Mode CPOL CPHA
+       0     0    0
+       1     0    1
+       2     1    0
+       3     1    1
+      ...
+      
+      Use the following constants to set the Mode:
+      pigpio.SPI_MODE_0,
+      pigpio.SPI_MODE_1,
+      pigpio.SPI_MODE_2 or
+      pigpio.SPI_MODE_3
+      or use
+      pigpio.SPI_CPOL and/ or
+      pigpio.SPI_CPHA
+      
+      p0 is 0 if CS is active low (default) and 1 for active high.
+      Use pigpio.SPI_CS_HIGH_ACTIVE to set this flag.
+
+      T is 1 if the least significant bit is transmitted on MOSI first,
+      the default (0) shifts the most significant bit out first.
+      Use pigpio.SPI_TX_LSBFIRST to set this flag.
+
+      R is 1 if the least significant bit is received on MISO first,
+      the default (0) receives the most significant bit first.
+      Use pigpio.SPI_RX_LSBFIRST to set this flag.
+
+      The other bits in spiFlags should be set to zero.
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+      PI_GPIO_IN_USE.
+      ...
+      pi.bb_spi_open(CS, MISO, MOSI, SCLK,
+                     baud=100000,
+                     spi_flags=pigpio.SPI_MODE_1 | pigpio.SPI_CS_HIGH_ACTIVE)
+      ...
+      """
+      # I p1 CS
+      # I p2 0
+      # I p3 20
+      ## extension ##
+      # I MISO
+      # I MOSI
+      # I SCLK
+      # I baud
+      # I spi_flags
+      
+      extents = [struct.pack("IIIII", MISO, MOSI, SCLK, baud, spi_flags)]
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BSPIO, CS, 0, 20, extents))
+
+
+   def bb_spi_close(self, CS):
+      """
+      This function stops bit banging SPI on a set of GPIO
+      previously opened with [*bb_spi_open*].
+
+      CS:= 0-31, the CS GPIO used in a prior call to [*bb_ispi_open*]
+
+      Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+
+      ...
+      pi.bb_spi_close(CS)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_BSPIC, CS, 0))
+
+
+   def bb_spi_xfer(self, CS, data):
+      """
+      This function executes an bit banged SPI transfer. The data
+      to be sent is specified by the contents of data, received data
+      is returned as a bytearray.
+
+      CS:= 0-31 (as used in a prior call to [*bbSPIOpen*])
+      data:= data to be sent
+
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code)
+
+      ...
+      pi.bb_spi_xfer(CS, data)
+      ...
+      """
+      # I p1 SDA
+      # I p2 0
+      # I p3 len
+      ## extension ##
+      # s len data bytes
+
+      # Don't raise exception.  Must release lock.
+      bytes = u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data], False))
       if bytes > 0:
          data = self._rxbuf(bytes)
       else:
