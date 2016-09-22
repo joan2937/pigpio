@@ -34,70 +34,75 @@ pigpiod accepts the following configuration options
 .SH OPTIONS
 
 .IP "\fB-a value\fP"
-DMA memory allocation mode
-0=AUTO, 1=PMAP, 2=MBOX
-default AUTO
-
+DMA memory allocation mode.
+0=AUTO, 1=PMAP, 2=MBOX.
+Default AUTO
+.
 .IP "\fB-b value\fP"
-GPIO sample buffer in milliseconds
-100-10000
-default 120
-
+GPIO sample buffer size in milliseconds.
+100-10000.
+Default 120
+.
 .IP "\fB-c value\fP"
-library internal settings
-
-default 0
-
+Library internal settings.
+.
+Default 0
+.
 .IP "\fB-d value\fP"
-primary DMA channel
-0-14
-default 14
-
+Primary DMA channel.
+0-14.
+Default 14
+.
 .IP "\fB-e value\fP"
-secondary DMA channel
-0-14
-default 6
-
+Secondary DMA channel.
+0-14.
+Default 6.  Preferably use one of DMA channels 0 to 6 for the secondary channel
+.
 .IP "\fB-f\fP"
-disable fifo interface
-
-default enabled
-
+Disable fifo interface.
+.
+Default enabled
+.
 .IP "\fB-k\fP"
-disable local and remote socket interface
-
-default enabled
-
+Disable local and remote socket interface.
+.
+Default enabled
+.
 .IP "\fB-l\fP"
-disable remote socket interface
-
-default enabled
-
+Disable remote socket interface.
+.
+Default enabled
+.
+.IP "\fB-n IP address\fP"
+Allow IP address to use the socket interface.
+Name (e.g. paul) or dotted quad (e.g. 192.168.1.66).
+If the -n option is not used all addresses are allowed (unless overridden by the -k or -l options).  Multiple -n options are allowed.  If -k has been used -n has no effect.  If -l has been used only -n localhost has any effect
+.
 .IP "\fB-p value\fP"
-socket port
-1024-32000
-default 8888
-
+Socket port.
+1024-32000.
+Default 8888
+.
 .IP "\fB-s value\fP"
-sample rate
-1, 2, 4, 5, 8, 10
-default 5
-
+Sample rate.
+1, 2, 4, 5, 8, or 10 microseconds.
+Default 5
+.
 .IP "\fB-t value\fP"
-clock peripheral
-0=PWM 1=PCM
-default PCM
-
+Clock peripheral.
+0=PWM 1=PCM.
+Default PCM.  pigpio uses one or both of PCM and PWM.  If PCM is used then PWM is available for audio.  If PWM is used then PCM is available for audio.  If waves or hardware PWM are used neither PWM nor PCM will be available for audio.
+.
 .IP "\fB-v -V\fP"
-display pigpio version and exit
+Display pigpio version and exit.
+.
 
-
-
+.
 .IP "\fB-x mask\fP"
-GPIO which may be updated
+GPIO which may be updated.
 A 54 bit mask with (1<<n) set if the user may update GPIO #n.
-default is the set of user GPIO for the board revision
-
+Default is the set of user GPIO for the board revision.  Use -x -1 to allow all GPIO
+.
 .br
 
 .br

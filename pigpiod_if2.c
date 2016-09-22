@@ -1397,6 +1397,76 @@ int bb_i2c_zip(
    return bytes;
 }
 
+int bb_spi_open(
+   int pi,
+   unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
+   unsigned baud, unsigned spiFlags)
+{
+   uint8_t buf[20];
+   gpioExtent_t ext[1];
+
+   /*
+   p1=CS
+   p2=0
+   p3=20
+   ## extension ##
+   uint32_t MISO
+   uint32_t MOSI
+   uint32_t SCLK
+   uint32_t baud
+   uint32_t spiFlags
+   */
+
+   ext[0].size = 20;
+   ext[0].ptr = &buf;
+
+   memcpy(buf +  0, &MISO, 4);
+   memcpy(buf +  4, &MOSI, 4);
+   memcpy(buf +  8, &SCLK, 4);
+   memcpy(buf + 12, &baud, 4);
+   memcpy(buf + 16, &spiFlags, 4);
+
+   return pigpio_command_ext
+      (pi, PI_CMD_BSPIO, CS, 0, 20, 1, ext, 1);
+}
+
+int bb_spi_close(int pi, unsigned CS)
+   {return pigpio_command(pi, PI_CMD_BSPIC, CS, 0, 1);}
+
+int bb_spi_xfer(
+   int pi,
+   unsigned CS,
+   char    *txBuf,
+   char    *rxBuf,
+   unsigned count)
+{
+   int bytes;
+   gpioExtent_t ext[1];
+
+   /*
+   p1=CS
+   p2=0
+   p3=count
+   ## extension ##
+   char txBuf[count]
+   */
+
+   ext[0].size = count;
+   ext[0].ptr = txBuf;
+
+   bytes = pigpio_command_ext
+      (pi, PI_CMD_BSPIX, CS, 0, count, 1, ext, 0);
+
+   if (bytes > 0)
+   {
+      bytes = recvMax(pi, rxBuf, count, bytes);
+   }
+
+   _pmu(pi);
+
+   return bytes;
+}
+
 int spi_open(int pi, unsigned channel, unsigned speed, uint32_t flags)
 {
    gpioExtent_t ext[1];

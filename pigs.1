@@ -484,6 +484,232 @@ ERROR: no permission to update one or more GPIO
 
 .br
 
+.IP "\fBBSPIC cs\fP - Close bit bang SPI"
+.IP "" 4
+
+.br
+This function stops bit banging SPI on a set of GPIO
+opened with \fBBSPIO\fP.
+
+.br
+The set of GPIO is specifed by \fBcs\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspic 10
+.br
+
+.br
+$ pigs bspic 10
+.br
+-142
+.br
+ERROR: no bit bang SPI in progress on GPIO
+.br
+
+.EE
+
+.br
+
+.IP "\fBBSPIO cs miso mosi sclk b spf\fP - Open bit bang SPI"
+.IP "" 4
+
+.br
+This command starts bit banging SPI on a group of GPIO with slave
+select \fBcs\fP, MISO \fBmiso\fP, MOSI \fBmosi\fP, and clock \fBsclk\fP.
+
+.br
+Data will be transferred at baud \fBb\fP bits per second (which may
+be set in the range 50-250000).
+
+.br
+The flags \fBspf\fP may be used to modify the default behaviour of
+mode 0, active low chip select.
+
+.br
+The flags consists of the least significant 22 bits.
+
+.br
+
+.EX
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+.br
+ 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+.br
+
+.EE
+
+.br
+mm defines the SPI mode.
+
+.br
+
+.EX
+Mode POL PHA
+.br
+ 0    0   0
+.br
+ 1    0   1
+.br
+ 2    1   0
+.br
+ 3    1   1
+.br
+
+.EE
+
+.br
+p is 0 if CS is active low (default) and 1 for active high.
+
+.br
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+.br
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
+
+.br
+The other bits in flags should be set to zero.
+
+.br
+Upon success 0 is returned.  On error a negative status code
+will be returned.
+
+.br
+If more than one device is connected to the SPI bus (defined by
+SCLK, MOSI, and MISO) each must have its own CS.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspio  9 11 12 13 50000 0
+.br
+
+.br
+$ pigs bspio 10 11 12 13 50000 0
+.br
+
+.br
+$ pigs bspio 29 19 20 21 50000 0 # GPIO 29 not avaialble on this Pi
+.br
+-41
+.br
+ERROR: no permission to update GPIO
+.br
+
+.EE
+
+.br
+
+.IP "\fBBSPIX cs bvs\fP - SPI bit bang transfer"
+.IP "" 4
+
+.br
+This command writes bytes \fBbvs\fP to the bit bang SPI device
+associated with slave select \fBcs\fP.  It returns the same
+number of bytes read from the device.
+
+.br
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspio 5 13 19 12 10000 0 # MCP4251 DAC
+.br
+$ pigs bspio 6 13 19 12 20000 3 # MCP3008 ADC
+.br
+
+.br
+$ pigs bspix 5 0 16             # set DAC to 16
+.br
+2 255 255
+.br
+
+.br
+$ pigs bspix 5 12 0             # read back DAC
+.br
+2 254 16
+.br
+
+.br
+$ pigs bspix 6 1 128 0          # read ADC input 0
+.br
+3 0 3 184                       # 952
+.br
+
+.br
+$ pigs bspix 5 0 240            # set DAC to 240
+.br
+2 255 255
+.br
+
+.br
+$ pigs bspix 5 12 0             # read back DAC
+.br
+2 254 240
+.br
+
+.br
+$ pigs bspix 6 1 128 0          # read ADC input 0
+.br
+3 0 0 63                        # 63
+.br
+
+.br
+$ pigs bspix 5 0 128            # set DAC to 128
+.br
+2 255 255
+.br
+
+.br
+$ pigs bspix 5 12 0             # read back DAC
+.br
+2 254 128
+.br
+
+.br
+$ pigs bspix 6 1 128 0          # read ADC input 0
+.br
+3 0 1 255                       # 511
+.br
+
+.br
+$ pigs bspic 5                  # close SPI CS 5
+.br
+$ pigs bspic 6                  # close SPI CS 6
+.br
+
+.br
+$ pigs bspic 5                  # try to close SPI CS 5 again
+.br
+-142
+.br
+ERROR: no bit bang SPI in progress on GPIO
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fBCF1 uvs\fP - Custom function 1"
 .IP "" 4
 
@@ -906,7 +1132,7 @@ returned.  On error a negative status code will be returned.
 .br
 
 .EX
-$ pigs fs 0 0 0 # Seek to start of file plus 200
+$ pigs fs 0 200 0 # Seek to start of file plus 200
 .br
 200
 .br
@@ -4481,6 +4707,11 @@ The command expects a frequency.
 
 .br
 
+.IP "\fBcs\fP - GPIO (0-31)" 0
+The GPIO used for the slave select signal when bit banging SPI.
+
+.br
+
 .IP "\fBdb\fP - serial data bits (1-32)" 0
 The command expects the number of data bits per serial character.
 
@@ -4620,6 +4851,11 @@ Value     0        1       4      5      6      7      3      2
 
 .br
 
+.IP "\fBmiso\fP - GPIO (0-31)" 0
+The GPIO used for the MISO signal when bit banging SPI.
+
+.br
+
 .IP "\fBmode\fP - file open mode" 0
 One of the following values.
 
@@ -4645,6 +4881,11 @@ CREATE   8       The file is created if it doesn't exist
 TRUNC    16      The file is truncated
 
 .EE
+
+.br
+
+.IP "\fBmosi\fP - GPIO (0-31)" 0
+The GPIO used for the MOSI signal when bit banging SPI.
 
 .br
 
@@ -4764,6 +5005,11 @@ when bit banging I2C.
 
 .br
 
+.IP "\fBsclk\fP - user GPIO (0-31)" 0
+The GPIO used for the SCLK signal when bit banging SPI.
+
+.br
+
 .IP "\fBsda\fP - user GPIO (0-31)" 0
 The command expects the number of the GPIO to be used for SDA
 when bit banging I2C.
@@ -4781,7 +5027,7 @@ The command expects a script id as returned by a call to \fBPROC\fP.
 .br
 
 .IP "\fBspf\fP - SPI flags (32 bits)" 0
-See \fBSPIO\fP.
+See \fBSPIO\fP and \fBBSPIO\fP.
 
 .br
 

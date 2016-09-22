@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 55
+#define PIGPIO_VERSION 56
 
 /*TEXT
 
@@ -320,6 +320,7 @@ gpioCfgPermissions         Configure the GPIO access permissions
 gpioCfgInterfaces          Configure user interfaces
 gpioCfgSocketPort          Configure socket port
 gpioCfgMemAlloc            Configure DMA memory allocation mode
+gpioCfgNetAddr             Configure allowed network addresses
 
 gpioCfgInternals           Configure miscellaneous internals (DEPRECATED)
 gpioCfgGetInternals        Get internal configuration settings
@@ -352,6 +353,8 @@ rawWaveAddSPI              Not intended for general use
 rawWaveAddGeneric          Not intended for general use
 rawWaveCB                  Not intended for general use
 rawWaveCBAdr               Not intended for general use
+rawWaveGetOOL              Not intended for general use
+rawWaveSetOOL              Not intended for general use
 rawWaveGetOut              Not intended for general use
 rawWaveSetOut              Not intended for general use
 rawWaveGetIn               Not intended for general use
@@ -440,7 +443,7 @@ typedef struct
    uint16_t botCB;  /* first CB used by wave  */
    uint16_t topCB;  /* last CB used by wave   */
    uint16_t botOOL; /* first bottom OOL used by wave  */
-                    /* botOOL to botOOL + numBOOL -1 are in use */
+                    /* botOOL to botOOL + numBOOL - 1 are in use */
    uint16_t topOOL; /* last top OOL used by wave */
                     /* topOOL - numTOOL to topOOL are in use.*/
    uint16_t deleted;
@@ -817,6 +820,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_FROM_START   0
 #define PI_FROM_CURRENT 1
 #define PI_FROM_END     2
+
+/* Allowed socket connect addresses */
+
+#define MAX_CONNECT_ADDRESSES 256
 
 /*F*/
 int gpioInitialise(void);
@@ -1456,7 +1463,7 @@ if (h >= 0)
 {
    sprintf(str, "/dev/pigpio%d", h);
 
-   fd = open(str, "r");
+   fd = open(str, O_RDONLY);
 
    if (fd >= 0)
    {
@@ -2627,92 +2634,6 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
 D*/
 
 /*F*/
-int bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
-/*D
-This function selects a set of GPIO for bit banging SPI at a
-specified baud rate.
-
-Bit banging SPI allows the use of different GPIO for SPI than
-for the hardware SPI ports.
-
-. .
- CS:   0-31
- MISO: 0-31
- MOSI: 0-31
- SCLK: 0-31
-baud: 50-250000
-spiFlags: see below
-. .
-spiFlags consists of the least significant 22 bits.
-
-. .
-21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
- b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
-. .
-
-mm defines the SPI mode.
-
-. .
-Mode POL PHA
- 0    0   0
- 1    0   1
- 2    1   0
- 3    1   1
-. .
-
-p0 is 0 if CEx is active low (default) and 1 for active high.
-
-T is 1 if the least significant bit is transmitted on MOSI first, the
-default (0) shifts the most significant bit out first.
-
-R is 1 if the least significant bit is received on MISO first, the
-default (0) receives the most significant bit first.
-
-The other bits in flags should be set to zero.
-
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
-PI_GPIO_IN_USE.
-D*/
-
-/*F*/
-int bbSPIClose(unsigned CS);
-/*D
-This function stops bit banging SPI on a set of GPIO previously
-opened with [*bbSPIOpen*].
-
-. .
-CS: 0-31, the CS GPIO used in a prior call to [*bbSPIOpen*]
-. .
-
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
-D*/
-
-/*F*/
-int bbSPIXfer(
-   unsigned CS,
-   char    *inBuf,
-   char    *outBuf,
-   unsigned len);
-/*D
-This function executes an bit banged SPI transfer. The data
-to be sent is specified by the contents of inBuf, received data
-is stored into outBuf.
-len specifies the amount of bytes to be transferred.
-
-. .
-   CS: 0-31 (as used in a prior call to [*bbSPIOpen*])
- inBuf: pointer to buffer to hold data to be sent
-outBuf: pointer to buffer to hold returned data
-len: size of data transfer
-. .
-
-Returns >= 0 if OK (the number of bytes read), otherwise
-PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
-
-The returned SPI data is stored in consecutive locations of outBuf.
-D*/
-
-/*F*/
 int bbI2CZip(
    unsigned SDA,
    char    *inBuf,
@@ -2780,6 +2701,161 @@ End
 0x02 0x07 0x01 0x1B   0x02 0x06 0x08 0x03
 
 0x00
+...
+D*/
+
+/*F*/
+int bbSPIOpen(
+   unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
+   unsigned baud, unsigned spiFlags);
+/*D
+This function selects a set of GPIO for bit banging SPI with
+a specified baud rate and mode.
+
+. .
+      CS: 0-31
+    MISO: 0-31
+    MOSI: 0-31
+    SCLK: 0-31
+    baud: 50-250000
+spiFlags: see below
+. .
+
+spiFlags consists of the least significant 22 bits.
+
+. .
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+. .
+
+mm defines the SPI mode, defaults to 0
+
+. .
+Mode CPOL CPHA
+ 0    0    0
+ 1    0    1
+ 2    1    0
+ 3    1    1
+. .
+
+p is 0 if CS is active low (default) and 1 for active high.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
+
+The other bits in flags should be set to zero.
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+PI_GPIO_IN_USE.
+
+If more than one device is connected to the SPI bus (defined by
+SCLK, MOSI, and MISO) each must have its own CS.
+
+...
+bbSPIOpen(10, MISO, MOSI, SCLK, 10000, 0); // device 1
+bbSPIOpen(11, MISO, MOSI, SCLK, 20000, 3); // device 2
+...
+D*/
+
+/*F*/
+int bbSPIClose(unsigned CS);
+/*D
+This function stops bit banging SPI on a set of GPIO
+opened with [*bbSPIOpen*].
+
+. .
+CS: 0-31, the CS GPIO used in a prior call to [*bbSPIOpen*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+D*/
+
+/*F*/
+int bbSPIXfer(
+   unsigned CS,
+   char    *inBuf,
+   char    *outBuf,
+   unsigned count);
+/*D
+This function executes a bit banged SPI transfer.
+
+. .
+    CS: 0-31 (as used in a prior call to [*bbSPIOpen*])
+ inBuf: pointer to buffer to hold data to be sent
+outBuf: pointer to buffer to hold returned data
+ count: size of data transfer
+. .
+
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+
+...
+// gcc -Wall -pthread -o bbSPIx_test bbSPIx_test.c -lpigpio
+// sudo ./bbSPIx_test
+
+
+#include <stdio.h>
+
+#include "pigpio.h"
+
+#define CE0 5
+#define CE1 6
+#define MISO 13
+#define MOSI 19
+#define SCLK 12
+
+int main(int argc, char *argv[])
+{
+   int i, count, set_val, read_val;
+   unsigned char inBuf[3];
+   char cmd1[] = {0, 0};
+   char cmd2[] = {12, 0};
+   char cmd3[] = {1, 128, 0};
+
+   if (gpioInitialise() < 0)
+   {
+      fprintf(stderr, "pigpio initialisation failed.\n");
+      return 1;
+   }
+
+   bbSPIOpen(CE0, MISO, MOSI, SCLK, 10000, 0); // MCP4251 DAC
+   bbSPIOpen(CE1, MISO, MOSI, SCLK, 20000, 3); // MCP3008 ADC
+
+   for (i=0; i<256; i++)
+   {
+      cmd1[1] = i;
+
+      count = bbSPIXfer(CE0, cmd1, (char *)inBuf, 2); // > DAC
+
+      if (count == 2)
+      {
+         count = bbSPIXfer(CE0, cmd2, (char *)inBuf, 2); // < DAC
+
+         if (count == 2)
+         {
+            set_val = inBuf[1];
+
+            count = bbSPIXfer(CE1, cmd3, (char *)inBuf, 3); // < ADC
+
+            if (count == 3)
+            {
+               read_val = ((inBuf[1]&3)<<8) | inBuf[2];
+               printf("%d %d\n", set_val, read_val);
+            }
+         }
+      }
+   }
+
+   bbSPIClose(CE0);
+   bbSPIClose(CE1);
+
+   gpioTerminate();
+
+   return 0;
+}
 ...
 D*/
 
@@ -4314,6 +4390,22 @@ Auto will use the mailbox method unless a larger than default buffer
 size is requested with [*gpioCfgBufferSize*].
 D*/
 
+
+/*F*/
+int gpioCfgNetAddr(int numSockAddr, uint32_t *sockAddr);
+/*D
+Sets the network addresses which are allowed to talk over the
+socket interface.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+numSockAddr: 0-256 (0 means all addresses allowed)
+   sockAddr: an array of permitted network addresses.
+. .
+D*/
+
+
 /*F*/
 int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal);
 /*D
@@ -4324,6 +4416,7 @@ cfgWhat: see source code
  cfgVal: see source code
 . .
 D*/
+
 
 /*F*/
 uint32_t gpioCfgGetInternals(void);
@@ -4456,7 +4549,7 @@ D*/
 /*F*/
 rawCbs_t *rawWaveCBAdr(int cbNum);
 /*D
-Return the Linux address of contol block cbNum.
+Return the (Linux) address of contol block cbNum.
 
 . .
 cbNum: the cb of interest
@@ -4466,9 +4559,37 @@ Not intended for general use.
 D*/
 
 /*F*/
+uint32_t rawWaveGetOOL(int pos);
+/*D
+Gets the OOL parameter stored at pos.
+
+. .
+pos: the position of interest.
+. .
+
+Not intended for general use.
+D*/
+
+
+/*F*/
+void rawWaveSetOOL(int pos, uint32_t lVal);
+/*D
+Sets the OOL parameter stored at pos to value.
+
+. .
+ pos: the position of interest
+lVal: the value to write
+. .
+
+Not intended for general use.
+D*/
+
+/*F*/
 uint32_t rawWaveGetOut(int pos);
 /*D
 Gets the wave output parameter stored at pos.
+
+DEPRECATED: use rawWaveGetOOL instead.
 
 . .
 pos: the position of interest.
@@ -4483,6 +4604,8 @@ void rawWaveSetOut(int pos, uint32_t lVal);
 /*D
 Sets the wave output parameter stored at pos to value.
 
+DEPRECATED: use rawWaveSetOOL instead.
+
 . .
  pos: the position of interest
 lVal: the value to write
@@ -4496,6 +4619,8 @@ uint32_t rawWaveGetIn(int pos);
 /*D
 Gets the wave input value parameter stored at pos.
 
+DEPRECATED: use rawWaveGetOOL instead.
+
 . .
 pos: the position of interest
 . .
@@ -4508,6 +4633,8 @@ D*/
 void rawWaveSetIn(int pos, uint32_t lVal);
 /*D
 Sets the wave input value stored at pos to value.
+
+DEPRECATED: use rawWaveSetOOL instead.
 
 . .
  pos: the position of interest
@@ -4707,6 +4834,9 @@ PI_HW_CLK_MAX_FREQ 250000000
 count::
 The number of bytes to be transferred in an I2C, SPI, or Serial
 command.
+
+CS::
+The GPIO used for the slave select signal when bit banging SPI.
 
 data_bits::1-32
 
@@ -4983,6 +5113,9 @@ millis::
 
 A value representing milliseconds.
 
+MISO::
+The GPIO used for the MISO signal when bit banging SPI.
+
 mode::
 
 1. The operational mode of a GPIO, normally INPUT or OUTPUT.
@@ -5014,6 +5147,9 @@ PI_FILE_CREATE 8
 PI_FILE_TRUNC  16
 . .
 
+MOSI::
+The GPIO used for the MOSI signal when bit banging SPI.
+
 numBits::
 
 The number of bits stored in a buffer.
@@ -5031,6 +5167,11 @@ The number of pulses to be added to a waveform.
 
 numSegs::
 The number of segments in a combined I2C transaction.
+
+numSockAddr::
+The number of network addresses allowed to use the socket interface.
+
+0 means all addresses allowed.
 
 offset::
 The associated data starts this number of microseconds from the start of
@@ -5202,6 +5343,9 @@ A pointer to a buffer to receive data.
 SCL::
 The user GPIO to use for the clock when bit banging I2C.
 
+SCLK::
+The GPIO used for the SCLK signal when bit banging SPI.
+
 *script::
 A pointer to the text of a script.
 
@@ -5264,6 +5408,12 @@ size_t::
 
 A standard type used to indicate the size of an object in bytes.
 
+*sockAddr::
+An array of network addresses allowed to use the socket interface encoded
+as 32 bit numbers.
+
+E.g. address 192.168.1.66 would be encoded as 0x4201a8c0.
+
 *spi::
 A pointer to a [*rawSPI_t*] structure.
 
@@ -5281,7 +5431,7 @@ spiChan::
 A SPI channel, 0-2.
 
 spiFlags::
-See [*spiOpen*].
+See [*spiOpen*] and [*bbSPIOpen*].
 
 spiSS::
 The SPI slave select GPIO in a raw SPI transaction.

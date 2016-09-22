@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 55+
+This version is for pigpio version 56+
 */
 
 #include <stdio.h>
@@ -49,15 +49,15 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_BI2CO, "BI2CO", 131, 0}, // bbI2COpen
    {PI_CMD_BI2CZ, "BI2CZ", 193, 6}, // bbI2CZip
 
-   {PI_CMD_BSPIC, "BSPIC", 112, 0}, // bbSPIClose
-   {PI_CMD_BSPIO, "BSPIO", 134, 0}, // bbSPIOpen
-   {PI_CMD_BSPIX, "BSPIX", 193, 6}, // bbSPIXfer
-
    {PI_CMD_BR1,   "BR1",   101, 3}, // gpioRead_Bits_0_31
    {PI_CMD_BR2,   "BR2",   101, 3}, // gpioRead_Bits_32_53
 
    {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
    {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
+
+   {PI_CMD_BSPIC, "BSPIC", 112, 0}, // bbSPIClose
+   {PI_CMD_BSPIO, "BSPIO", 134, 0}, // bbSPIOpen
+   {PI_CMD_BSPIX, "BSPIX", 193, 6}, // bbSPIXfer
 
    {PI_CMD_CF1,   "CF1",   195, 2}, // gpioCustom1
    {PI_CMD_CF2,   "CF2",   195, 6}, // gpioCustom2
@@ -384,11 +384,18 @@ WVTX wid         Transmit wave as one-shot\n\
 WVTXM wid wmde   Transmit wave using mode\n\
 WVTXR wid        Transmit wave repeatedly\n\
 \n\
-\n\
 Numbers may be entered as hex (prefix 0x), octal (prefix 0),\n\
 otherwise they are assumed to be decimal.\n\
 \n\
-man pigs for full details.\n\n";
+Examples\n\
+\n\
+pigs w 4 1         # set GPIO 4 high\n\
+pigs r 5           # read GPIO 5\n\
+pigs t             # get current tick\n\
+pigs i2co 1 0x20 0 # get handle to device 0x20 on I2C bus 1\n\
+\n\
+man pigs for full details.\n\
+\n";
 
 typedef struct
 {
@@ -945,11 +952,11 @@ int cmdParse(
              (to5 == CMD_NUMERIC))
          {
             p[3] = 5 * 4;
-            memcpy(ext, &tp1, 4);
-            memcpy(ext, &tp2, 4);
-            memcpy(ext, &tp3, 4);
-            memcpy(ext, &tp4, 4);
-            memcpy(ext, &tp5, 4);
+            memcpy(ext+ 0, &tp1, 4);
+            memcpy(ext+ 4, &tp2, 4);
+            memcpy(ext+ 8, &tp3, 4);
+            memcpy(ext+12, &tp4, 4);
+            memcpy(ext+16, &tp5, 4);
             valid = 1;
          }
 

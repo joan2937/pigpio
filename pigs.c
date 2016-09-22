@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 55+
+This version is for pigpio version 56+
 */
 
 #include <stdio.h>
@@ -224,6 +224,7 @@ void get_extensions(int sock, int command, int res)
    switch (command)
    {
       case PI_CMD_BI2CZ:
+      case PI_CMD_BSPIX:
       case PI_CMD_CF2:
       case PI_CMD_FL:
       case PI_CMD_FR:

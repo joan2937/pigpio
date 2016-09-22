@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 8
+#define PIGPIOD_IF2_VERSION 9
 
 /*TEXT
 
@@ -252,6 +252,10 @@ spi_close                  Closes a SPI device
 spi_read                   Reads bytes from a SPI device
 spi_write                  Writes bytes to a SPI device
 spi_xfer                   Transfers bytes with a SPI device
+
+bb_spi_open                Opens GPIO for bit banging SPI
+bb_spi_close               Closes GPIO for bit banging SPI
+bb_spi_xfer                Transfers bytes with bit banging SPI
 
 SERIAL
 
@@ -2372,6 +2376,163 @@ End
 D*/
 
 /*F*/
+int bb_spi_open(
+   int pi,
+   unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
+   unsigned baud, unsigned spi_flags);
+/*D
+This function selects a set of GPIO for bit banging SPI at a
+specified baud rate.
+
+. .
+       pi: >=0 (as returned by [*pigpio_start*]).
+       CS: 0-31
+     MISO: 0-31
+     MOSI: 0-31
+     SCLK: 0-31
+     baud: 50-250000
+spi_flags: see below
+. .
+
+spi_flags consists of the least significant 22 bits.
+
+. .
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+. .
+
+mm defines the SPI mode, defaults to 0
+
+. .
+Mode CPOL CPHA
+ 0    0    0
+ 1    0    1
+ 2    1    0
+ 3    1    1
+. .
+
+p is 0 if CS is active low (default) and 1 for active high.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
+
+The other bits in flags should be set to zero.
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+PI_GPIO_IN_USE.
+
+If more than one device is connected to the SPI bus (defined by
+SCLK, MOSI, and MISO) each must have its own CS.
+
+...
+bb_spi_open(pi,10, MISO, MOSI, SCLK, 10000, 0); // device 1
+bb_spi_open(pi,11, MISO, MOSI, SCLK, 20000, 3); // device 2
+...
+D*/
+
+/*F*/
+int bb_spi_close(int pi, unsigned CS);
+/*D
+This function stops bit banging SPI on a set of GPIO
+opened with [*bbSPIOpen*].
+
+. .
+pi: >=0 (as returned by [*pigpio_start*]).
+CS: 0-31, the CS GPIO used in a prior call to [*bb_spi_open*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+D*/
+
+/*F*/
+int bb_spi_xfer(
+   int pi,
+   unsigned CS,
+   char    *txBuf,
+   char    *rxBuf,
+   unsigned count);
+/*D
+This function executes a bit banged SPI transfer.
+
+. .
+   pi: >=0 (as returned by [*pigpio_start*]).
+   CS: 0-31 (as used in a prior call to [*bb_spi_open*])
+txBuf: pointer to buffer to hold data to be sent
+rxBuf: pointer to buffer to hold returned data
+count: size of data transfer
+. .
+
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+
+...
+// gcc -Wall -pthread -o bb_spi_x_test bb_spi_x_test.c -lpigpiod_if2
+// ./bb_spi_x_test
+
+#include <stdio.h>
+
+#include "pigpiod_if2.h"
+
+#define CE0 5
+#define CE1 6
+#define MISO 13
+#define MOSI 19
+#define SCLK 12
+
+int main(int argc, char *argv[])
+{
+   int i, pi, count, set_val, read_val;
+   unsigned char inBuf[3];
+   char cmd1[] = {0, 0};
+   char cmd2[] = {12, 0};
+   char cmd3[] = {1, 128, 0};
+
+   if ((pi = pigpio_start(0, 0)) < 0)
+   {
+      fprintf(stderr, "pigpio initialisation failed (%d).\n", pi);
+      return 1;
+   }
+
+   bb_spi_open(pi, CE0, MISO, MOSI, SCLK, 10000, 0); // MCP4251 DAC
+   bb_spi_open(pi, CE1, MISO, MOSI, SCLK, 20000, 3); // MCP3008 ADC
+
+   for (i=0; i<256; i++)
+   {
+      cmd1[1] = i;
+
+      count = bb_spi_xfer(pi, CE0, cmd1, (char *)inBuf, 2); // > DAC
+
+      if (count == 2)
+      {
+         count = bb_spi_xfer(pi, CE0, cmd2, (char *)inBuf, 2); // < DAC
+
+         if (count == 2)
+         {
+            set_val = inBuf[1];
+
+            count = bb_spi_xfer(pi, CE1, cmd3, (char *)inBuf, 3); // < ADC
+
+            if (count == 3)
+            {
+               read_val = ((inBuf[1]&3)<<8) | inBuf[2];
+               printf("%d %d\n", set_val, read_val);
+            }
+         }
+      }
+   }
+
+   bb_spi_close(pi, CE0);
+   bb_spi_close(pi, CE1);
+
+   pigpio_stop(pi);
+}
+...
+D*/
+
+/*F*/
 int spi_open(int pi, unsigned spi_channel, unsigned baud, unsigned spi_flags);
 /*D
 This function returns a handle for the SPI device on channel.
@@ -3195,6 +3356,9 @@ count::
 The number of bytes to be transferred in a file, I2C, SPI, or serial
 command.
 
+CS::
+The GPIO used for the slave select signal when bit banging SPI.
+
 data_bits::1-32
 The number of data bits in each character of serial data.
 
@@ -3339,6 +3503,9 @@ reported as PI_TIMEOUT.  See [*set_watchdog*].
 PI_TIMEOUT 2
 . .
 
+MISO::
+The GPIO used for the MISO signal when bit banging SPI.
+
 mode::
 1. The operational mode of a GPIO, normally INPUT or OUTPUT.
 
@@ -3378,6 +3545,8 @@ PI_FILE_CREATE 8
 PI_FILE_TRUNC  16
 . .
 
+MOSI::
+The GPIO used for the MOSI signal when bit banging SPI.
 
 numBytes::
 The number of bytes used to store characters in a string.  Depending
@@ -3489,6 +3658,9 @@ A pointer to a buffer to receive data.
 SCL::
 The user GPIO to use for the clock when bit banging I2C.
 
+SCLK::
+The GPIO used for the SCLK signal when bit banging SPI.
+
 *script::
 A pointer to the text of a script.
 
@@ -3533,7 +3705,7 @@ spi_channel::
 A SPI channel, 0-2.
 
 spi_flags::
-See [*spi_open*].
+See [*spi_open*] and [*bb_spi_open*].
 
 steady:: 0-300000
 

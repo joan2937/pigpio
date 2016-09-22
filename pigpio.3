@@ -1372,7 +1372,7 @@ if (h >= 0)
 .br
 
 .br
-   fd = open(str, "r");
+   fd = open(str, O_RDONLY);
 .br
 
 .br
@@ -3449,6 +3449,301 @@ End
 
 .br
 0x00
+.br
+
+.EE
+
+.IP "\fBint bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags)\fP"
+.IP "" 4
+This function selects a set of GPIO for bit banging SPI with
+a specified baud rate and mode.
+
+.br
+
+.br
+
+.EX
+      CS: 0-31
+.br
+    MISO: 0-31
+.br
+    MOSI: 0-31
+.br
+    SCLK: 0-31
+.br
+    baud: 50-250000
+.br
+spiFlags: see below
+.br
+
+.EE
+
+.br
+
+.br
+spiFlags consists of the least significant 22 bits.
+
+.br
+
+.br
+
+.EX
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+.br
+ 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+.br
+
+.EE
+
+.br
+
+.br
+mm defines the SPI mode, defaults to 0
+
+.br
+
+.br
+
+.EX
+Mode CPOL CPHA
+.br
+ 0    0    0
+.br
+ 1    0    1
+.br
+ 2    1    0
+.br
+ 3    1    1
+.br
+
+.EE
+
+.br
+
+.br
+p is 0 if CS is active low (default) and 1 for active high.
+
+.br
+
+.br
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+.br
+
+.br
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
+
+.br
+
+.br
+The other bits in flags should be set to zero.
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+PI_GPIO_IN_USE.
+
+.br
+
+.br
+If more than one device is connected to the SPI bus (defined by
+SCLK, MOSI, and MISO) each must have its own CS.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+bbSPIOpen(10, MISO, MOSI, SCLK, 10000, 0); // device 1
+.br
+bbSPIOpen(11, MISO, MOSI, SCLK, 20000, 3); // device 2
+.br
+
+.EE
+
+.IP "\fBint bbSPIClose(unsigned CS)\fP"
+.IP "" 4
+This function stops bit banging SPI on a set of GPIO
+opened with \fBbbSPIOpen\fP.
+
+.br
+
+.br
+
+.EX
+CS: 0-31, the CS GPIO used in a prior call to \fBbbSPIOpen\fP
+.br
+
+.EE
+
+.br
+
+.br
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
+
+.IP "\fBint bbSPIXfer(unsigned CS, char *inBuf, char *outBuf, unsigned count)\fP"
+.IP "" 4
+This function executes a bit banged SPI transfer.
+
+.br
+
+.br
+
+.EX
+    CS: 0-31 (as used in a prior call to \fBbbSPIOpen\fP)
+.br
+ inBuf: pointer to buffer to hold data to be sent
+.br
+outBuf: pointer to buffer to hold returned data
+.br
+ count: size of data transfer
+.br
+
+.EE
+
+.br
+
+.br
+Returns >= 0 if OK (the number of bytes read), otherwise
+PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+// gcc -Wall -pthread -o bbSPIx_test bbSPIx_test.c -lpigpio
+.br
+// sudo ./bbSPIx_test
+.br
+
+.br
+
+.br
+#include <stdio.h>
+.br
+
+.br
+#include "pigpio.h"
+.br
+
+.br
+#define CE0 5
+.br
+#define CE1 6
+.br
+#define MISO 13
+.br
+#define MOSI 19
+.br
+#define SCLK 12
+.br
+
+.br
+int main(int argc, char *argv[])
+.br
+{
+.br
+   int i, count, set_val, read_val;
+.br
+   unsigned char inBuf[3];
+.br
+   char cmd1[] = {0, 0};
+.br
+   char cmd2[] = {12, 0};
+.br
+   char cmd3[] = {1, 128, 0};
+.br
+
+.br
+   if (gpioInitialise() < 0)
+.br
+   {
+.br
+      fprintf(stderr, "pigpio initialisation failed.\n");
+.br
+      return 1;
+.br
+   }
+.br
+
+.br
+   bbSPIOpen(CE0, MISO, MOSI, SCLK, 10000, 0); // MCP4251 DAC
+.br
+   bbSPIOpen(CE1, MISO, MOSI, SCLK, 20000, 3); // MCP3008 ADC
+.br
+
+.br
+   for (i=0; i<256; i++)
+.br
+   {
+.br
+      cmd1[1] = i;
+.br
+
+.br
+      count = bbSPIXfer(CE0, cmd1, (char *)inBuf, 2); // > DAC
+.br
+
+.br
+      if (count == 2)
+.br
+      {
+.br
+         count = bbSPIXfer(CE0, cmd2, (char *)inBuf, 2); // < DAC
+.br
+
+.br
+         if (count == 2)
+.br
+         {
+.br
+            set_val = inBuf[1];
+.br
+
+.br
+            count = bbSPIXfer(CE1, cmd3, (char *)inBuf, 3); // < ADC
+.br
+
+.br
+            if (count == 3)
+.br
+            {
+.br
+               read_val = ((inBuf[1]&3)<<8) | inBuf[2];
+.br
+               printf("%d %d\n", set_val, read_val);
+.br
+            }
+.br
+         }
+.br
+      }
+.br
+   }
+.br
+
+.br
+   bbSPIClose(CE0);
+.br
+   bbSPIClose(CE1);
+.br
+
+.br
+   gpioTerminate();
+.br
+
+.br
+   return 0;
+.br
+}
 .br
 
 .EE
@@ -6156,6 +6451,28 @@ method uses the mailbox property interface to allocate bus memory.
 Auto will use the mailbox method unless a larger than default buffer
 size is requested with \fBgpioCfgBufferSize\fP.
 
+.IP "\fBint gpioCfgNetAddr(int numSockAddr, uint32_t *sockAddr)\fP"
+.IP "" 4
+Sets the network addresses which are allowed to talk over the
+socket interface.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
+
+.EX
+numSockAddr: 0-256 (0 means all addresses allowed)
+.br
+   sockAddr: an array of permitted network addresses.
+.br
+
+.EE
+
 .IP "\fBint gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)\fP"
 .IP "" 4
 Used to tune internal settings.
@@ -6363,7 +6680,7 @@ Not intended for general use.
 
 .IP "\fBrawCbs_t *rawWaveCBAdr(int cbNum)\fP"
 .IP "" 4
-Return the Linux address of contol block cbNum.
+Return the (Linux) address of contol block cbNum.
 
 .br
 
@@ -6380,9 +6697,54 @@ cbNum: the cb of interest
 .br
 Not intended for general use.
 
+.IP "\fBuint32_t rawWaveGetOOL(int pos)\fP"
+.IP "" 4
+Gets the OOL parameter stored at pos.
+
+.br
+
+.br
+
+.EX
+pos: the position of interest.
+.br
+
+.EE
+
+.br
+
+.br
+Not intended for general use.
+
+.IP "\fBvoid rawWaveSetOOL(int pos, uint32_t lVal)\fP"
+.IP "" 4
+Sets the OOL parameter stored at pos to value.
+
+.br
+
+.br
+
+.EX
+ pos: the position of interest
+.br
+lVal: the value to write
+.br
+
+.EE
+
+.br
+
+.br
+Not intended for general use.
+
 .IP "\fBuint32_t rawWaveGetOut(int pos)\fP"
 .IP "" 4
 Gets the wave output parameter stored at pos.
+
+.br
+
+.br
+DEPRECATED: use rawWaveGetOOL instead.
 
 .br
 
@@ -6402,6 +6764,11 @@ Not intended for general use.
 .IP "\fBvoid rawWaveSetOut(int pos, uint32_t lVal)\fP"
 .IP "" 4
 Sets the wave output parameter stored at pos to value.
+
+.br
+
+.br
+DEPRECATED: use rawWaveSetOOL instead.
 
 .br
 
@@ -6427,6 +6794,11 @@ Gets the wave input value parameter stored at pos.
 .br
 
 .br
+DEPRECATED: use rawWaveGetOOL instead.
+
+.br
+
+.br
 
 .EX
 pos: the position of interest
@@ -6442,6 +6814,11 @@ Not intended for general use.
 .IP "\fBvoid rawWaveSetIn(int pos, uint32_t lVal)\fP"
 .IP "" 4
 Sets the wave input value stored at pos to value.
+
+.br
+
+.br
+DEPRECATED: use rawWaveSetOOL instead.
 
 .br
 
@@ -6826,6 +7203,13 @@ PI_HW_CLK_MAX_FREQ 250000000
 .IP "\fBcount\fP" 0
 The number of bytes to be transferred in an I2C, SPI, or Serial
 command.
+
+.br
+
+.br
+
+.IP "\fBCS\fP" 0
+The GPIO used for the slave select signal when bit banging SPI.
 
 .br
 
@@ -7481,6 +7865,13 @@ A value representing milliseconds.
 
 .br
 
+.IP "\fBMISO\fP" 0
+The GPIO used for the MISO signal when bit banging SPI.
+
+.br
+
+.br
+
 .IP "\fBmode\fP" 0
 
 .br
@@ -7554,6 +7945,13 @@ PI_FILE_TRUNC  16
 
 .br
 
+.IP "\fBMOSI\fP" 0
+The GPIO used for the MOSI signal when bit banging SPI.
+
+.br
+
+.br
+
 .IP "\fBnumBits\fP" 0
 
 .br
@@ -7590,6 +7988,18 @@ The number of pulses to be added to a waveform.
 
 .IP "\fBnumSegs\fP" 0
 The number of segments in a combined I2C transaction.
+
+.br
+
+.br
+
+.IP "\fBnumSockAddr\fP" 0
+The number of network addresses allowed to use the socket interface.
+
+.br
+
+.br
+0 means all addresses allowed.
 
 .br
 
@@ -7987,6 +8397,13 @@ The user GPIO to use for the clock when bit banging I2C.
 
 .br
 
+.IP "\fBSCLK\fP" 0
+The GPIO used for the SCLK signal when bit banging SPI.
+
+.br
+
+.br
+
 .IP "\fB*script\fP" 0
 A pointer to the text of a script.
 
@@ -8134,6 +8551,19 @@ A standard type used to indicate the size of an object in bytes.
 
 .br
 
+.IP "\fB*sockAddr\fP" 0
+An array of network addresses allowed to use the socket interface encoded
+as 32 bit numbers.
+
+.br
+
+.br
+E.g. address 192.168.1.66 would be encoded as 0x4201a8c0.
+
+.br
+
+.br
+
 .IP "\fB*spi\fP" 0
 A pointer to a \fBrawSPI_t\fP structure.
 
@@ -8174,7 +8604,7 @@ A SPI channel, 0-2.
 .br
 
 .IP "\fBspiFlags\fP" 0
-See \fBspiOpen\fP.
+See \fBspiOpen\fP and \fBbbSPIOpen\fP.
 
 .br
 
@@ -8745,6 +9175,14 @@ A 16-bit word value.
 .br
 
 .br
+#define PI_CMD_BSPIC 111
+.br
+#define PI_CMD_BSPIO 112
+.br
+#define PI_CMD_BSPIX 113
+.br
+
+.br
 
 .EE
 .SH Error Codes
@@ -9037,6 +9475,10 @@ A 16-bit word value.
 #define PI_BAD_SHELL_STATUS -139 // bad shell return status
 .br
 #define PI_BAD_SCRIPT_NAME -140 // bad script name
+.br
+#define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
+.br
+#define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 .br
 
 .br

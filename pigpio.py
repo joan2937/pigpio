@@ -288,7 +288,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.32"
+VERSION = "1.33"
 
 exceptions = True
 
@@ -363,18 +363,18 @@ FROM_START=0
 FROM_CURRENT=1
 FROM_END=2
 
-SPI_CS_HIGH_ACTIVE = 1 << 2
-SPI_CS0_HIGH_ACTIVE = 1 << 2
-SPI_CS1_HIGH_ACTIVE = 1 << 3
-SPI_CS2_HIGH_ACTIVE = 1 << 4
-SPI_RX_LSBFIRST = 1 << 15
-SPI_TX_LSBFIRST = 1 << 14
 SPI_MODE_0 = 0
 SPI_MODE_1 = 1
 SPI_MODE_2 = 2
 SPI_MODE_3 = 3
-SPI_CPOL = 2
-SPI_CPHA = 1
+
+SPI_CPHA = 1 << 0
+SPI_CPOL = 1 << 1
+
+SPI_CS_HIGH_ACTIVE  = 1 << 2
+
+SPI_TX_LSBFIRST = 1 << 14
+SPI_RX_LSBFIRST = 1 << 15
 
 # pigpio command numbers
 
@@ -808,6 +808,24 @@ _errors=[
    [PI_BAD_SPI_BAUD      , "bad SPI baud rate, not 50-500k"],
    [PI_NOT_SPI_GPIO      , "no bit bang SPI in progress on GPIO"],
 ]
+
+except_a = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n{}"
+
+except_z = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+
+except1 = """
+Did you start the pigpio daemon? E.g. sudo pigpiod
+
+Did you specify the correct Pi host/port in the environment
+variables PIGPIO_ADDR/PIGPIO_PORT?
+E.g. export PIGPIO_ADDR=soft, export PIGPIO_PORT=8888
+
+Did you specify the correct Pi host/port in the
+pigpio.pi() function? E.g. pigpio.pi('soft', 8888)"""
+
+except2 = """
+Do you have permission to access the pigpio daemon?
+Perhaps it was started with sudo pigpiod -nlocalhost"""
 
 class _socklock:
    """
@@ -2974,62 +2992,65 @@ class pi():
       """
       This function selects a set of GPIO for bit banging SPI at a
       specified baud rate.
-      
-      Bit banging SPI allows the use of different GPIO for SPI than
-      for the hardware SPI ports.
 
-      CS :=  0-31
-      MISO := 0-31
-      MOSI := 0-31
-      SCLK := 0-31
-      baud := 50-250000
+            CS := 0-31
+          MISO := 0-31
+          MOSI := 0-31
+          SCLK := 0-31
+          baud := 50-250000
       spiFlags := see below
       
       spiFlags consists of the least significant 22 bits.
 
-      ...
+      . .
       21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
-       b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
-      ...
+       0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+      . .
 
       mm defines the SPI mode, defaults to 0
-      
-      ...
+
+      . .
       Mode CPOL CPHA
        0     0    0
        1     0    1
        2     1    0
        3     1    1
-      ...
-      
-      Use the following constants to set the Mode:
-      pigpio.SPI_MODE_0,
-      pigpio.SPI_MODE_1,
-      pigpio.SPI_MODE_2 or
+      . .
+
+      The following constants may be used to set the mode:
+
+      . .
+      pigpio.SPI_MODE_0
+      pigpio.SPI_MODE_1
+      pigpio.SPI_MODE_2
       pigpio.SPI_MODE_3
-      or use
-      pigpio.SPI_CPOL and/ or
-      pigpio.SPI_CPHA
-      
-      p0 is 0 if CS is active low (default) and 1 for active high.
-      Use pigpio.SPI_CS_HIGH_ACTIVE to set this flag.
+      . .
+
+      Alternatively pigpio.SPI_CPOL and/or pigpio.SPI_CPHA
+      may be used.
+
+      p is 0 if CS is active low (default) and 1 for active high.
+      pigpio.SPI_CS_HIGH_ACTIVE may be used to set this flag.
 
       T is 1 if the least significant bit is transmitted on MOSI first,
       the default (0) shifts the most significant bit out first.
-      Use pigpio.SPI_TX_LSBFIRST to set this flag.
+      pigpio.SPI_TX_LSBFIRST may be used to set this flag.
 
       R is 1 if the least significant bit is received on MISO first,
       the default (0) receives the most significant bit first.
-      Use pigpio.SPI_RX_LSBFIRST to set this flag.
+      pigpio.SPI_RX_LSBFIRST may be used to set this flag.
 
       The other bits in spiFlags should be set to zero.
 
       Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
       PI_GPIO_IN_USE.
+
+      If more than one device is connected to the SPI bus (defined by
+      SCLK, MOSI, and MISO) each must have its own CS.
+
       ...
-      pi.bb_spi_open(CS, MISO, MOSI, SCLK,
-                     baud=100000,
-                     spi_flags=pigpio.SPI_MODE_1 | pigpio.SPI_CS_HIGH_ACTIVE)
+      bb_spi_open(10, MISO, MOSI, SCLK, 10000, 0); // device 1
+      bb_spi_open(11, MISO, MOSI, SCLK, 20000, 3); // device 2
       ...
       """
       # I p1 CS
@@ -3050,9 +3071,9 @@ class pi():
    def bb_spi_close(self, CS):
       """
       This function stops bit banging SPI on a set of GPIO
-      previously opened with [*bb_spi_open*].
+      opened with [*bb_spi_open*].
 
-      CS:= 0-31, the CS GPIO used in a prior call to [*bb_ispi_open*]
+      CS:= 0-31, the CS GPIO used in a prior call to [*bb_spi_open*]
 
       Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
 
@@ -3065,22 +3086,61 @@ class pi():
 
    def bb_spi_xfer(self, CS, data):
       """
-      This function executes an bit banged SPI transfer. The data
-      to be sent is specified by the contents of data, received data
-      is returned as a bytestring.
+      This function executes a bit banged SPI transfer.
 
-      CS:= 0-31 (as used in a prior call to [*bbSPIOpen*])
+        CS:= 0-31 (as used in a prior call to [*bb_spi_open*])
       data:= data to be sent
 
-      Returns >= 0 if OK (the number of bytes read), otherwise
-      PI_BAD_USER_GPIO, PI_NOT_SPI_GPIO or PI_BAD_POINTER.
+      The returned value is a tuple of the number of bytes read and a
+      bytearray containing the bytes.  If there was an error the
+      number of bytes read will be less than zero (and will contain
+      the error code).
 
-      The received SPI data returned as ab bytearray
       ...
-      pi.bb_spi_xfer(CS, data)
+      #!/usr/bin/env python
+
+      import pigpio
+
+      CE0=5
+      CE1=6
+      MISO=13
+      MOSI=19
+      SCLK=12
+
+      pi = pigpio.pi()
+      if not pi.connected:
+         exit()
+
+      pi.bb_spi_open(CE0, MISO, MOSI, SCLK, 10000, 0) # MCP4251 DAC
+      pi.bb_spi_open(CE1, MISO, MOSI, SCLK, 20000, 3) # MCP3008 ADC
+
+      for i in range(256):
+
+         count, data = pi.bb_spi_xfer(CE0, [0, i]) # Set DAC value
+
+         if count == 2:
+
+            count, data = pi.bb_spi_xfer(CE0, [12, 0]) # Read back DAC
+
+            if count == 2:
+
+               set_val = data[1]
+
+               count, data = pi.bb_spi_xfer(CE1, [1, 128, 0]) # Read ADC
+
+               if count == 3:
+
+                  read_val = ((data[1]&3)<<8) | data[2]
+
+                  print("{} {}".format(set_val, read_val))
+
+      pi.bb_spi_close(CE0)
+      pi.bb_spi_close(CE1)
+
+      pi.stop()
       ...
       """
-      # I p1 SDA
+      # I p1 CS
       # I p2 0
       # I p3 len
       ## extension ##
@@ -4428,9 +4488,22 @@ class pi():
          self._notify = _callback_thread(self.sl, host, port)
 
       except socket.error:
+         exception = 1
+
+      except struct.error:
+         exception = 2
+
+      else:
+         exception = 0
+         atexit.register(self.stop)
+
+      if exception != 0:
+
          self.connected = False
+
          if self.sl.s is not None:
             self.sl.s = None
+
          if host == '':
             h = "localhost"
          else:
@@ -4438,20 +4511,12 @@ class pi():
 
          s = "Can't connect to pigpio at {}({})".format(str(h), str(port))
 
-         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-         print(s)
-         print("")
-         print("Did you start the pigpio daemon? E.g. sudo pigpiod")
-         print("")
-         print("Did you specify the correct Pi host/port in the environment")
-         print("variables PIGPIO_ADDR/PIGPIO_PORT?")
-         print("E.g. export PIGPIO_ADDR=soft, export PIGPIO_PORT=8888")
-         print("")
-         print("Did you specify the correct Pi host/port in the")
-         print("pigpio.pi() function? E.g. pigpio.pi('soft', 8888))")
-         print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-      else:
-         atexit.register(self.stop)
+         print(except_a.format(s))
+         if exception == 1:
+             print(except1)
+         else:
+             print(except2)
+         print(except_z)
 
    def stop(self):
       """Release pigpio resources.
@@ -4526,6 +4591,9 @@ def xref():
 
    count:
    The number of bytes of data to be transferred.
+
+   CS:
+   The GPIO used for the slave select signal when bit banging SPI.
 
    data:
    Data to be transmitted, a series of bytes.
@@ -4771,6 +4839,9 @@ def xref():
    SET = 1 
    TIMEOUT = 2 # only returned for a watchdog timeout
 
+   MISO:
+   The GPIO used for the MISO signal when bit banging SPI.
+
    mode:
 
    1.The operational mode of a GPIO, normally INPUT or OUTPUT.
@@ -4790,6 +4861,9 @@ def xref():
    WAVE_MODE_REPEAT = 1 
    WAVE_MODE_ONE_SHOT_SYNC = 2 
    WAVE_MODE_REPEAT_SYNC = 3
+
+   MOSI:
+   The GPIO used for the MOSI signal when bit banging SPI.
 
    offset: >=0
    The offset wave data starts from the beginning of the waveform
@@ -4853,6 +4927,9 @@ def xref():
 
    SCL:
    The user GPIO to use for the clock when bit banging I2C.
+
+   SCLK::
+   The GPIO used for the SCLK signal when bit banging SPI.
 
    script:
    The text of a script to store on the pigpio daemon.

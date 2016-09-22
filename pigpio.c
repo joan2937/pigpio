@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 55 */
+/* pigpio version 56 */
 
 /* include ------------------------------------------------------- */
 
@@ -750,12 +750,12 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define PI_WFRX_NONE     0
 #define PI_WFRX_SERIAL   1
-#define PI_WFRX_I2C      2
-#define PI_WFRX_I2C_CLK  3
-#define PI_WFRX_SPI_MISO 4
-#define PI_WFRX_SPI_MOSI 5
-#define PI_WFRX_SPI_CS   6
-#define PI_WFRX_SPI_SCLK  7
+#define PI_WFRX_I2C_SDA  2
+#define PI_WFRX_I2C_SCL  3
+#define PI_WFRX_SPI_SCLK 4
+#define PI_WFRX_SPI_MISO 5
+#define PI_WFRX_SPI_MOSI 6
+#define PI_WFRX_SPI_CS   7
 
 #define PI_WF_MICROS   1
 
@@ -850,8 +850,10 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 #define PI_SPI_FLAGS_GET_RESVD(x)   (((x)>>5)&7)
 #define PI_SPI_FLAGS_GET_CSPOLS(x)  (((x)>>2)&7)
 #define PI_SPI_FLAGS_GET_MODE(x)     ((x)&3)
-#define PI_SPI_FLAGS_GET_CPHA(x)     ((x)&1)
-#define PI_SPI_FLAGS_GET_CPOL(x)     ((x)&2)
+
+#define PI_SPI_FLAGS_GET_CPHA(x)  ((x)&1)
+#define PI_SPI_FLAGS_GET_CPOL(x)  ((x)&2)
+#define PI_SPI_FLAGS_GET_CSPOL(x) ((x)&4)
 
 #define PI_STARTING 0
 #define PI_RUNNING  1
@@ -1103,17 +1105,17 @@ typedef struct
 
 typedef struct
 {
+   int CS;
    int MISO;
    int MOSI;
-   int CS;
    int SCLK;
+   int usage;
    int delay;
    int spiFlags;
    int MISOMode;
    int MOSIMode;
    int CSMode;
    int SCLKMode;
-   int started;
 } wfRxSPI_t;
 
 typedef struct
@@ -1121,6 +1123,7 @@ typedef struct
    int      mode;
    int      gpio;
    uint32_t baud;
+   pthread_mutex_t mutex;
    union
    {
       wfRxSerial_t s;
@@ -1179,6 +1182,10 @@ static int libInitialised = 0;
 /* initialise every gpioInitialise */
 
 static struct timespec libStarted;
+
+static uint32_t sockNetAddr[MAX_CONNECT_ADDRESSES];
+
+static int numSockNetAddr = 0;
 
 static uint32_t reportedLevel = 0;
 
@@ -1253,6 +1260,9 @@ static gpioSignal_t     gpioSignal [PI_MAX_SIGNUM+1];
 static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 
 static int pwmFreq[PWM_FREQS];
+
+static pthread_mutex_t spi_main_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t spi_aux_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* reset after gpioTerminated */
 
@@ -1764,6 +1774,20 @@ static void flushMemory(void)
 
 /* ----------------------------------------------------------------------- */
 
+static void wfRx_lock(int i)
+{
+   pthread_mutex_lock(&wfRx[i].mutex);
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void wfRx_unlock(int i)
+{
+   pthread_mutex_unlock(&wfRx[i].mutex);
+}
+
+/* ----------------------------------------------------------------------- */
+
 static void spinWhileStarting(void)
 {
    while (runState == PI_STARTING)
@@ -1834,13 +1858,42 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
          break;
 
       case PI_CMD_BSPIO:
-         memcpy(&tmp1, buf, 4);   // MISO
-         memcpy(&tmp2, buf+4, 4); // MOSI
-         memcpy(&tmp3, buf+8, 4); // SCLK
-         memcpy(&tmp4, buf+12, 4);// baud
-         memcpy(&tmp5, buf+16, 4);// flags
-         
-         res = bbSPIOpen(p[1], tmp1, tmp2, tmp3, tmp4, tmp5);
+
+         memcpy(&tmp1, buf+ 0, 4); // MISO
+         memcpy(&tmp2, buf+ 4, 4); // MOSI
+         memcpy(&tmp3, buf+ 8, 4); // SCLK
+         memcpy(&tmp4, buf+12, 4); // baud
+         memcpy(&tmp5, buf+16, 4); // flags
+
+         if (!myPermit(p[1]))
+         {
+            DBG(DBG_USER,
+               "bbSPIOpen: gpio %d, no permission to update CS", p[1]);
+            res = PI_NOT_PERMITTED;
+         }
+
+         if (!myPermit(tmp1))
+         {
+            DBG(DBG_USER,
+               "bbSPIOpen: gpio %d, no permission to update MISO", tmp1);
+            res = PI_NOT_PERMITTED;
+         }
+
+         if (!myPermit(tmp2))
+         {
+            DBG(DBG_USER,
+               "bbSPIOpen: gpio %d, no permission to update MOSI", tmp2);
+            res = PI_NOT_PERMITTED;
+         }
+
+         if (!myPermit(tmp3))
+         {
+            DBG(DBG_USER,
+               "bbSPIOpen: gpio %d, no permission to update SCLK", tmp3);
+            res = PI_NOT_PERMITTED;
+         }
+
+         if (!res) res = bbSPIOpen(p[1], tmp1, tmp2, tmp3, tmp4, tmp5);
          break;
 
       case PI_CMD_BSPIC:
@@ -4339,11 +4392,15 @@ static void spiGo(
 {
    if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
    {
+      pthread_mutex_lock(&spi_aux_mutex);
       spiGoA(speed, flags, txBuf, rxBuf, count);
+      pthread_mutex_unlock(&spi_aux_mutex);
    }
    else
    {
+      pthread_mutex_lock(&spi_main_mutex);
       spiGoS(speed, flags, txBuf, rxBuf, count);
+      pthread_mutex_unlock(&spi_main_mutex);
    }
 }
 
@@ -6692,7 +6749,7 @@ static void *pthSocketThreadHandler(void *fdC)
          case PI_CMD_SLR:
          case PI_CMD_SPIX:
          case PI_CMD_SPIR:
-       case PI_CMD_BSPIX:
+         case PI_CMD_BSPIX:
 
             if (((int)p[3]) > 0)
             {
@@ -6712,11 +6769,24 @@ static void *pthSocketThreadHandler(void *fdC)
    return 0;
 }
 
+static int addrAllowed(uint32_t addr)
+{
+   int i;
+
+   if (!numSockNetAddr) return 1;
+
+   for (i=0; i<numSockNetAddr; i++)
+   {
+      if (addr == sockNetAddr[i]) return 1;
+   }
+   return 0;
+}
+
 /* ----------------------------------------------------------------------- */
 
 static void * pthSocketThread(void *x)
 {
-   int fdC, c, *sock;
+   int fdC=0, c, *sock;
    struct sockaddr_in client;
    pthread_attr_t attr;
 
@@ -6743,21 +6813,29 @@ static void * pthSocketThread(void *x)
 
    spinWhileStarting();
 
-   while ((fdC =
-      accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c)))
+   while (fdC >= 0)
    {
       pthread_t thr;
 
+      fdC = accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c);
+
       closeOrphanedNotifications(-1, fdC);
 
-      sock = malloc(sizeof(int));
+      if (addrAllowed(client.sin_addr.s_addr))
+      {
+         sock = malloc(sizeof(int));
 
-      *sock = fdC;
+         *sock = fdC;
 
-      if (pthread_create
-         (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
-         SOFT_ERROR((void*)PI_INIT_FAILED,
-            "socket pthread_create failed (%m)");
+         if (pthread_create
+            (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
+            SOFT_ERROR((void*)PI_INIT_FAILED,
+               "socket pthread_create failed (%m)");
+      }
+      else
+      {
+         close(fdC);
+      }
    }
 
    if (fdC < 0)
@@ -7466,9 +7544,9 @@ static void initClearGlobals(void)
 
    for (i=0; i<=PI_MAX_USER_GPIO; i++)
    {
-      wfRx[i].mode         = PI_WFRX_NONE;
-
-      gpioAlert[i].func    = NULL;
+      wfRx[i].mode      = PI_WFRX_NONE;
+      pthread_mutex_init(&wfRx[i].mutex, NULL);
+      gpioAlert[i].func = NULL;
    }
 
    for (i=0; i<=PI_MAX_GPIO; i++)
@@ -7700,6 +7778,8 @@ static void initReleaseResources(void)
 
    gpioStats.DMARestarts = 0;
    gpioStats.dmaInitCbsCount = 0;
+
+   numSockNetAddr = 0;
 }
 
 int initInitialise(void)
@@ -7884,6 +7964,35 @@ void putBitInBytes(int bitPos, char *buf, int bit)
 
 /* ----------------------------------------------------------------------- */
 
+uint32_t rawWaveGetOOL(int pos)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
+   {
+      waveOOLPageSlot(pos, &page, &slot);
+      return (dmaOVirt[page]->OOL[slot]);
+   }
+
+   return -1;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void rawWaveSetOOL(int pos, uint32_t value)
+{
+   int page, slot;
+
+   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
+   {
+      waveOOLPageSlot(pos, &page, &slot);
+      dmaOVirt[page]->OOL[slot] = value;
+   }
+}
+
+
+/* ----------------------------------------------------------------------- */
+
 uint32_t rawWaveGetOut(int pos)
 {
    int page, slot;
@@ -7943,7 +8052,7 @@ void rawWaveSetIn(int pos, uint32_t value)
 
 rawWaveInfo_t rawWaveInfo(int wave_id)
 {
-   rawWaveInfo_t dummy = {-1, -1, -1, -1};
+   rawWaveInfo_t dummy = {0, 0, 0, 0, 0, 0, 0, 0};
 
    if ((wave_id >=0) && (wave_id < PI_MAX_WAVES)) return waveInfo[wave_id];
    else                                           return dummy;
@@ -9042,7 +9151,7 @@ int gpioWaveCreate(void)
         (numBOOL != (BOOL-waveInfo[wid].botOOL)) ||
         (numTOOL != (waveInfo[wid].topOOL-TOOL)) )
    {
-      DBG(0, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
+      DBG(DBG_ALWAYS, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
          numCB,   CB-waveInfo[wid].botCB,
          numBOOL, BOOL-waveInfo[wid].botOOL,
          numTOOL, waveInfo[wid].topOOL-TOOL);
@@ -9780,30 +9889,12 @@ int gpioWaveGetMaxCbs(void)
    return wfStats.maxCbs;
 }
 
+/* ----------------------------------------------------------------------- */
+
 static int read_SDA(wfRx_t *w)
 {
    myGpioSetMode(w->I.SDA, PI_INPUT);
    return gpioRead(w->I.SDA);
-}
-
-static void set_CS(wfRx_t *w)
-{
-   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOLS(w->S.spiFlags));
-}
-
-static void clear_CS(wfRx_t *w)
-{
-   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOLS(w->S.spiFlags));
-}
-
-static void set_SCLK(wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
-
-static void clear_SCLK(wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
 }
 
 static void set_SDA(wfRx_t *w)
@@ -9828,11 +9919,6 @@ static void I2C_delay(wfRx_t *w)
    myGpioDelay(w->I.delay);
 }
 
-static void SPI_delay(wfRx_t *w)
-{
-   myGpioDelay(w->S.delay);
-}
-
 static void I2C_clock_stretch(wfRx_t *w)
 {
    uint32_t now, max_stretch=10000;
@@ -9840,30 +9926,6 @@ static void I2C_clock_stretch(wfRx_t *w)
    myGpioSetMode(w->I.SCL, PI_INPUT);
    now = gpioTick();
    while ((gpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
-}
-
-static void bbSPIStart(wfRx_t *w)
-{
-   if (w->S.started)
-   {
-      clear_SCLK(w);
-      clear_CS(w);
-      SPI_delay(w);
-   }
-
-   clear_SCLK(w);
-   set_CS(w);
-
-   w->S.started = 1;
-}
-
-static void bbSPIStop(wfRx_t *w)
-{
-   clear_CS(w);
-   clear_SCLK(w);
-   SPI_delay(w);
-   
-   w->S.started = 0;
 }
 
 static void I2CStart(wfRx_t *w)
@@ -9950,72 +10012,7 @@ static uint8_t I2CGetByte(wfRx_t *w, int nack)
    return byte;
 }
 
-static uint8_t bbSPIXferByte(wfRx_t *w, char txByte)
-{
-   uint8_t bit, rxByte=0;
-
-   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
-   {
-      for (bit=0; bit<8; bit++)
-      {
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-         
-         set_SCLK(w);
-         SPI_delay(w);
-         
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-         clear_SCLK(w);
-         SPI_delay(w);
-      }
-   }
-   else
-   {
-      for (bit=0; bit<8; bit++)
-      {
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-         
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-         set_SCLK(w);
-         SPI_delay(w);
-         clear_SCLK(w);
-         SPI_delay(w);
-      }
-   }
-   
-   return rxByte;
-}
+/*-------------------------------------------------------------------------*/
 
 int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
 {
@@ -10040,7 +10037,7 @@ int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
       SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used", SCL);
 
    wfRx[SDA].gpio = SDA;
-   wfRx[SDA].mode = PI_WFRX_I2C;
+   wfRx[SDA].mode = PI_WFRX_I2C_SDA;
    wfRx[SDA].baud = baud;
 
    wfRx[SDA].I.started = 0;
@@ -10051,7 +10048,7 @@ int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
    wfRx[SDA].I.SCLMode = gpioGetMode(SCL);
 
    wfRx[SCL].gpio = SCL;
-   wfRx[SCL].mode = PI_WFRX_I2C_CLK;
+   wfRx[SCL].mode = PI_WFRX_I2C_SCL;
 
    myGpioSetMode(SDA, PI_INPUT);
    myGpioSetMode(SCL, PI_INPUT);
@@ -10059,76 +10056,7 @@ int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud)
    return 0;
 }
 
-int bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags)
-{
-   DBG(DBG_USER, "MISO=%d MOSI=%d CS=%d SCLK=%d baud=%d", MISO, MOSI, CS, SCLK, baud);
-
-   CHECK_INITED;
-
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad CS (%d)", CS);
-
-   if (MISO > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MISO (%d)", MISO);
-
-   if (MOSI > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MOSI (%d)", MOSI);
-
-   if (SCLK > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad SCLK (%d)", SCLK);
-
-   if ((baud < PI_BB_SPI_MIN_BAUD) || (baud > PI_BB_SPI_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_SPI_BAUD,
-         "CS %d, bad baud rate (%d)", CS, baud);
-
-   if (wfRx[CS].mode != PI_WFRX_NONE)
-      SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used, mode %d", CS, wfRx[CS].mode);
-
-   if (!((wfRx[MISO].mode == PI_WFRX_NONE)  || (wfRx[MISO].mode == PI_WFRX_SPI_MISO)) || (MISO == CS))
-      SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used, mode %d", MISO, wfRx[MISO].mode);
-
-   if (!((wfRx[MOSI].mode == PI_WFRX_NONE)  || (wfRx[MOSI].mode == PI_WFRX_SPI_MOSI)) || (MOSI == CS) || (MOSI == MISO))
-      SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used, mode %d", MOSI, wfRx[MOSI].mode);
-
-   if (!((wfRx[SCLK].mode == PI_WFRX_NONE)  || (wfRx[SCLK].mode == PI_WFRX_SPI_SCLK)) || (SCLK == CS) || (SCLK == MISO) || (SCLK == MOSI))
-      SOFT_ERROR(PI_GPIO_IN_USE, "gpio %d is already being used, mode %d", SCLK, wfRx[SCLK].mode);
-
-   wfRx[MISO].gpio = MISO;
-   wfRx[MISO].mode = PI_WFRX_SPI_MISO;
-
-   wfRx[MOSI].gpio = MOSI;
-   wfRx[MOSI].mode = PI_WFRX_SPI_MOSI;
-
-   wfRx[SCLK].gpio = SCLK;
-   wfRx[SCLK].mode = PI_WFRX_SPI_SCLK;
-
-   wfRx[CS].gpio = CS;
-   wfRx[CS].mode = PI_WFRX_SPI_CS;
-   wfRx[CS].baud = baud;
-
-   wfRx[CS].S.started = 0;
-   wfRx[CS].S.MISO = MISO;
-   wfRx[CS].S.MOSI = MOSI;
-   wfRx[CS].S.CS = CS;
-   wfRx[CS].S.SCLK = SCLK;
-   wfRx[CS].S.delay = (500000 / baud) - 1;
-   wfRx[CS].S.spiFlags = spiFlags;
-   wfRx[CS].S.MISOMode = gpioGetMode(MISO);
-   wfRx[CS].S.MOSIMode = gpioGetMode(MOSI);
-   wfRx[CS].S.CSMode = gpioGetMode(CS);
-   wfRx[CS].S.SCLKMode = gpioGetMode(SCLK);
-
-   myGpioSetMode(MISO, PI_INPUT);
-   myGpioSetMode(MOSI, PI_OUTPUT);
-   myGpioSetMode(CS, PI_OUTPUT);
-   myGpioSetMode(SCLK, PI_OUTPUT);
-
-   return 0;
-}
-
-
 /* ----------------------------------------------------------------------- */
-
 
 int bbI2CClose(unsigned SDA)
 {
@@ -10141,7 +10069,7 @@ int bbI2CClose(unsigned SDA)
 
    switch(wfRx[SDA].mode)
    {
-      case PI_WFRX_I2C:
+      case PI_WFRX_I2C_SDA:
 
          myGpioSetMode(wfRx[SDA].I.SDA, wfRx[SDA].I.SDAMode);
          myGpioSetMode(wfRx[SDA].I.SCL, wfRx[SDA].I.SCLMode);
@@ -10162,103 +10090,6 @@ int bbI2CClose(unsigned SDA)
    return 0;
 }
 
-int bbSPIClose(unsigned CS)
-{
-   DBG(DBG_USER, "CS=%d", CS);
-
-   CHECK_INITED;
-
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
-
-   switch(wfRx[CS].mode)
-   {
-      case PI_WFRX_SPI_CS:
-
-         myGpioSetMode(wfRx[CS].S.MISO, wfRx[CS].S.MISOMode);
-         myGpioSetMode(wfRx[CS].S.MOSI, wfRx[CS].S.MOSIMode);
-         myGpioSetMode(wfRx[CS].S.CS, wfRx[CS].S.CSMode);
-         myGpioSetMode(wfRx[CS].S.SCLK, wfRx[CS].S.SCLKMode);
-
-         wfRx[wfRx[CS].S.MISO].mode = PI_WFRX_NONE;
-         wfRx[wfRx[CS].S.MOSI].mode = PI_WFRX_NONE;
-         wfRx[wfRx[CS].S.CS].mode = PI_WFRX_NONE;
-         wfRx[wfRx[CS].S.SCLK].mode = PI_WFRX_NONE;
-
-         break;
-
-      default:
-
-         SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
-
-         break;
-
-   }
-
-   return 0;
-}
-/*-------------------------------------------------------------------------*/
-
-int bbSPIXfer(
-   unsigned CS,
-   char *inBuf,
-   char *outBuf,
-   unsigned len)
-{
-   int pos, status;
-   char txByte, rxByte;
-   wfRx_t *w;
-
-   DBG(DBG_USER, "CS=%d inBuf=%s outBuf=%08X len=%d",
-      CS, myBuf2Str(len, (char *)inBuf), (int)outBuf, len);
-
-   CHECK_INITED;
-
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
-
-   if (wfRx[CS].mode != PI_WFRX_SPI_CS)
-      SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
-
-   if (!inBuf || !len)
-      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
-
-   if (!outBuf && len)
-      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
-
-   w = &wfRx[CS];
-
-   status = 0;
-
-   bbSPIStart(w);
-     
-   for (pos=0; pos < len; pos++)
-   {
-      if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-      {
-         txByte = inBuf[pos];
-      }
-      else
-      {
-         txByte = inBuf[len - pos - 1];
-      }
-      rxByte = bbSPIXferByte(w, txByte);
-      if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-      {
-         outBuf[pos] = rxByte;
-      }
-      else
-      {
-         outBuf[len - pos - 1] = rxByte;
-      }
-      DBG(DBG_INTERNAL, "pos=%d len=%d sent=%d recvd=%d", pos, len, txByte, rxByte);
-   }
-   bbSPIStop(w);
-
-   status = len;
-
-   return status;
-}
 /*-------------------------------------------------------------------------*/
 
 int bbI2CZip(
@@ -10280,7 +10111,7 @@ int bbI2CZip(
    if (SDA > PI_MAX_USER_GPIO)
       SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", SDA);
 
-   if (wfRx[SDA].mode != PI_WFRX_I2C)
+   if (wfRx[SDA].mode != PI_WFRX_I2C_SDA)
       SOFT_ERROR(PI_NOT_I2C_GPIO, "no I2C on gpio (%d)", SDA);
 
    if (!inBuf || !inLen)
@@ -10299,6 +10130,8 @@ int bbI2CZip(
    flags = 0;
    esc = 0;
    setesc = 0;
+
+   wfRx_lock(SDA);
 
    while (!status && (inPos < inLen))
    {
@@ -10394,11 +10227,362 @@ int bbI2CZip(
       setesc = 0;
    }
 
+   wfRx_unlock(SDA);
+
    if (status >= 0) status = outPos;
 
    return status;
 }
 
+/* ----------------------------------------------------------------------- */
+
+static void set_CS(wfRx_t *w)
+{
+   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+
+static void clear_CS(wfRx_t *w)
+{
+   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+
+static void set_SCLK(wfRx_t *w)
+{
+   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+
+static void clear_SCLK(wfRx_t *w)
+{
+   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+
+static void SPI_delay(wfRx_t *w)
+{
+   myGpioDelay(w->S.delay);
+}
+
+static void bbSPIStart(wfRx_t *w)
+{
+   clear_SCLK(w);
+
+   SPI_delay(w);
+
+   set_CS(w);
+
+   SPI_delay(w);
+}
+
+static void bbSPIStop(wfRx_t *w)
+{
+   SPI_delay(w);
+
+   clear_CS(w);
+
+   SPI_delay(w);
+
+   clear_SCLK(w);
+}
+
+static uint8_t bbSPIXferByte(wfRx_t *w, char txByte)
+{
+   uint8_t bit, rxByte=0;
+
+   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
+   {
+      /*
+      CPHA = 1
+      write on set clock
+      read on clear clock
+      */
+
+      for (bit=0; bit<8; bit++)
+      {
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+      }
+   }
+   else
+   {
+      /*
+      CPHA = 0
+      read on set clock
+      write on clear clock
+      */
+
+      for (bit=0; bit<8; bit++)
+      {
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
+      }
+   }
+
+   return rxByte;
+}
+
+/*-------------------------------------------------------------------------*/
+
+int bbSPIOpen(
+   unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
+   unsigned baud, unsigned spiFlags)
+{
+   int valid;
+   uint32_t bits;
+
+   DBG(DBG_USER, "CS=%d MISO=%d MOSI=%d SCLK=%d baud=%d flags=%d",
+      CS, MISO, MOSI, SCLK, baud, spiFlags);
+
+   CHECK_INITED;
+
+   if (CS > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad CS (%d)", CS);
+
+   if (MISO > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MISO (%d)", MISO);
+
+   if (MOSI > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MOSI (%d)", MOSI);
+
+   if (SCLK > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad SCLK (%d)", SCLK);
+
+   if ((baud < PI_BB_SPI_MIN_BAUD) || (baud > PI_BB_SPI_MAX_BAUD))
+      SOFT_ERROR(PI_BAD_SPI_BAUD, "CS %d, bad baud (%d)", CS, baud);
+
+   if (wfRx[CS].mode != PI_WFRX_NONE)
+      SOFT_ERROR(PI_GPIO_IN_USE,
+         "CS %d is already being used, mode %d", CS, wfRx[CS].mode);
+
+   valid = 0;
+
+   /* check all GPIO unique */
+
+   bits = (1<<CS) | (1<<MISO) | (1<<MOSI) | (1<<SCLK);
+
+   if (__builtin_popcount(bits) == 4)
+   {
+      if ((wfRx[MISO].mode == PI_WFRX_NONE) &&
+          (wfRx[MOSI].mode == PI_WFRX_NONE) &&
+          (wfRx[SCLK].mode == PI_WFRX_NONE))
+      {
+         valid = 1; /* first time GPIO used for SPI */
+      }
+      else
+      {
+         if ((wfRx[MISO].mode == PI_WFRX_SPI_MISO) &&
+             (wfRx[MOSI].mode == PI_WFRX_SPI_MOSI) &&
+             (wfRx[SCLK].mode == PI_WFRX_SPI_SCLK))
+         {
+            valid = 2; /* new CS for existing SPI GPIO */
+         }
+      }
+   }
+
+   if (!valid)
+   {
+      SOFT_ERROR(PI_GPIO_IN_USE,
+         "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
+          CS,   wfRx[CS].mode,
+          MISO, wfRx[MISO].mode,
+          MOSI, wfRx[MOSI].mode,
+          SCLK, wfRx[SCLK].mode);
+   }
+
+   wfRx[CS].mode = PI_WFRX_SPI_CS;
+   wfRx[CS].baud = baud;
+
+   wfRx[CS].S.CS = CS;
+   wfRx[CS].S.SCLK = SCLK;
+
+   wfRx[CS].S.CSMode = gpioGetMode(CS);
+   wfRx[CS].S.delay = (500000 / baud) - 1;
+   wfRx[CS].S.spiFlags = spiFlags;
+
+   /* preset CS to off */
+
+   if (PI_SPI_FLAGS_GET_CSPOL(spiFlags))
+      gpioWrite(CS, 0); /* active high */
+   else
+      gpioWrite(CS, 1); /* active low */
+
+   /* The SCLK entry is used to store full information */
+
+   if (valid == 1) /* first time GPIO for SPI */
+   {
+      wfRx[SCLK].S.usage = 1;
+
+      wfRx[SCLK].S.SCLKMode = gpioGetMode(SCLK);
+      wfRx[SCLK].S.MISOMode = gpioGetMode(MISO);
+      wfRx[SCLK].S.MOSIMode = gpioGetMode(MOSI);
+
+      wfRx[SCLK].mode = PI_WFRX_SPI_SCLK;
+      wfRx[MISO].mode = PI_WFRX_SPI_MISO;
+      wfRx[MOSI].mode = PI_WFRX_SPI_MOSI;
+
+      wfRx[SCLK].S.SCLK = SCLK;
+      wfRx[SCLK].S.MISO = MISO;
+      wfRx[SCLK].S.MOSI = MOSI;
+
+      myGpioSetMode(MISO, PI_INPUT);
+      myGpioSetMode(SCLK, PI_OUTPUT);
+      gpioWrite(MOSI, 0); /* low output */
+   }
+   else
+   {
+      wfRx[SCLK].S.usage++;
+   }
+
+   return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+
+int bbSPIClose(unsigned CS)
+{
+   int SCLK;
+
+   DBG(DBG_USER, "CS=%d", CS);
+
+   CHECK_INITED;
+
+   if (CS > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
+
+   switch(wfRx[CS].mode)
+   {
+      case PI_WFRX_SPI_CS:
+
+         myGpioSetMode(wfRx[CS].S.CS, wfRx[CS].S.CSMode);
+         wfRx[CS].mode = PI_WFRX_NONE;
+
+         SCLK = wfRx[CS].S.SCLK;
+
+         if (--wfRx[SCLK].S.usage <= 0)
+         {
+            myGpioSetMode(wfRx[SCLK].S.MISO, wfRx[SCLK].S.MISOMode);
+            myGpioSetMode(wfRx[SCLK].S.MOSI, wfRx[SCLK].S.MOSIMode);
+            myGpioSetMode(wfRx[SCLK].S.SCLK, wfRx[SCLK].S.SCLKMode);
+
+            wfRx[wfRx[SCLK].S.MISO].mode = PI_WFRX_NONE;
+            wfRx[wfRx[SCLK].S.MOSI].mode = PI_WFRX_NONE;
+            wfRx[wfRx[SCLK].S.SCLK].mode = PI_WFRX_NONE;
+         }
+
+         break;
+
+      default:
+
+         SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
+
+         break;
+
+   }
+
+   return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+
+int bbSPIXfer(
+   unsigned CS,
+   char *inBuf,
+   char *outBuf,
+   unsigned count)
+{
+   int SCLK;
+   int pos;
+   wfRx_t *w;
+
+   DBG(DBG_USER, "CS=%d inBuf=%s outBuf=%08X count=%d",
+      CS, myBuf2Str(count, (char *)inBuf), (int)outBuf, count);
+
+   CHECK_INITED;
+
+   if (CS > PI_MAX_USER_GPIO)
+      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
+
+   if (wfRx[CS].mode != PI_WFRX_SPI_CS)
+      SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
+
+   if (!inBuf || !count)
+      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
+
+   if (!outBuf && count)
+      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
+
+   SCLK = wfRx[CS].S.SCLK;
+
+   wfRx[SCLK].S.CS = CS;
+   wfRx[SCLK].baud = wfRx[CS].baud;
+   wfRx[SCLK].S.delay = wfRx[CS].S.delay;
+   wfRx[SCLK].S.spiFlags = wfRx[CS].S.spiFlags;
+
+   w = &wfRx[SCLK];
+
+   wfRx_lock(SCLK);
+
+   bbSPIStart(w);
+     
+   for (pos=0; pos < count; pos++)
+   {
+      outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
+   }
+
+   bbSPIStop(w);
+
+   wfRx_unlock(SCLK);
+
+   return count;
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -12662,6 +12846,30 @@ int gpioCfgMemAlloc(unsigned memAllocMode)
 
    gpioCfg.memAllocMode = memAllocMode;
 
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+int gpioCfgNetAddr(int numSockAddr, uint32_t *sockAddr)
+{
+   int i;
+
+   DBG(DBG_USER, "numSockAddr=%d sockAddr=%08X",
+      numSockAddr, (unsigned)sockAddr);
+
+   CHECK_NOT_INITED;
+
+   if (numSockAddr <= 0) numSockNetAddr = 0;
+   else
+   {
+      if (numSockAddr >= MAX_CONNECT_ADDRESSES)
+         numSockAddr = MAX_CONNECT_ADDRESSES;
+
+      for (i=0; i<numSockAddr; i++) sockNetAddr[i] = sockAddr[i];
+
+      numSockNetAddr = numSockAddr;
+   }
    return 0;
 }
 
