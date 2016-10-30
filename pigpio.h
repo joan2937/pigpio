@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 56
+#define PIGPIO_VERSION 57
 
 /*TEXT
 
@@ -289,6 +289,10 @@ bbSPIOpen                  Opens GPIO for bit banging SPI
 bbSPIClose                 Closes GPIO for bit banging SPI
 bbSPIXfer                  Performs multiple bit banged SPI transactions
 
+I2C/SPI_SLAVE
+
+bscXfer                    I2C/SPI as slave transfer
+
 SERIAL
 
 serOpen                    Opens a serial device
@@ -309,6 +313,13 @@ fileRead                   Reads bytes from a file
 fileWrite                  Writes bytes to a file
 fileSeek                   Seeks to a position within a file
 fileList                   List files which match a pattern
+
+EVENTS
+
+eventMonitor               Sets the events to monitor
+eventSetFunc               Request an event callback
+eventSetFuncEx             Request an event callback, extended
+eventTrigger               Trigger an event
 
 CONFIGURATION
 
@@ -482,12 +493,33 @@ typedef struct
    uint8_t  *buf;  /* pointer to msg data */
 } pi_i2c_msg_t;
 
+/* BSC FIFO size */
+
+#define BSC_FIFO_SIZE 16
+
+typedef struct
+{
+   uint32_t control;          /* Write */
+   int rxCnt;                 /* Read only */
+   char rxBuf[BSC_FIFO_SIZE]; /* Read only */
+   int txCnt;                 /* Write */
+   char txBuf[BSC_FIFO_SIZE]; /* Write */
+} bsc_xfer_t;
+
+
 typedef void (*gpioAlertFunc_t)    (int      gpio,
                                     int      level,
                                     uint32_t tick);
 
 typedef void (*gpioAlertFuncEx_t)  (int      gpio,
                                     int      level,
+                                    uint32_t tick,
+                                    void    *userdata);
+
+typedef void (*eventFunc_t)        (int      event,
+                                    uint32_t tick);
+
+typedef void (*eventFuncEx_t)      (int      event,
                                     uint32_t tick,
                                     void    *userdata);
 
@@ -588,6 +620,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_NOTIFY_SLOTS  32
 
+#define PI_NTFY_FLAGS_EVENT    (1 <<7)
 #define PI_NTFY_FLAGS_ALIVE    (1 <<6)
 #define PI_NTFY_FLAGS_WDOG     (1 <<5)
 #define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
@@ -695,6 +728,49 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_SPI_FLAGS_RESVD(x)   ((x&7)<<5)
 #define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
 #define PI_SPI_FLAGS_MODE(x)    ((x&3))
+
+/* BSC registers */
+
+#define BSC_DR         0
+#define BSC_RSR        1
+#define BSC_SLV        2
+#define BSC_CR         3
+#define BSC_FR         4
+#define BSC_IFLS       5
+#define BSC_IMSC       6
+#define BSC_RIS        7
+#define BSC_MIS        8
+#define BSC_ICR        9
+#define BSC_DMACR     10
+#define BSC_TDR       11
+#define BSC_GPUSTAT   12
+#define BSC_HCTRL     13
+#define BSC_DEBUG_I2C 14
+#define BSC_DEBUG_SPI 15
+
+#define BSC_CR_TESTFIFO 2048
+#define BSC_CR_RXE  512
+#define BSC_CR_TXE  256
+#define BSC_CR_BRK  128
+#define BSC_CR_CPOL  16
+#define BSC_CR_CPHA   8
+#define BSC_CR_I2C    4
+#define BSC_CR_SPI    2
+#define BSC_CR_EN     1
+
+#define BSC_FR_RXBUSY 32
+#define BSC_FR_TXFE   16
+#define BSC_FR_RXFF    8
+#define BSC_FR_TXFF    4
+#define BSC_FR_RXFE    2
+#define BSC_FR_TXBUSY  1
+
+/* BSC GPIO */
+
+#define BSC_SDA_MOSI 18
+#define BSC_SCL_SCLK 19
+#define BSC_MISO     20
+#define BSC_CE_N     21
 
 /* Longest busy delay */
 
@@ -824,6 +900,14 @@ typedef void *(gpioThreadFunc_t) (void *);
 /* Allowed socket connect addresses */
 
 #define MAX_CONNECT_ADDRESSES 256
+
+/* events */
+
+#define PI_MAX_EVENT 31
+
+/* Event auto generated on BSC slave activity */
+
+#define PI_EVENT_BSC 31
 
 /*F*/
 int gpioInitialise(void);
@@ -1525,14 +1609,18 @@ typedef struct
 seqno: starts at 0 each time the handle is opened and then increments
 by one for each report.
 
-flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE.
+flags: three flags are defined, PI_NTFY_FLAGS_WDOG,
+PI_NTFY_FLAGS_ALIVE, and PI_NTFY_FLAGS_EVENT.
 
-PI_NTFY_FLAGS_WDOG, if bit 5 is set then bits 0-4 of the flags
+If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags
 indicate a GPIO which has had a watchdog timeout.
 
-PI_NTFY_FLAGS_ALIVE, if bit 6 is set this indicates a keep alive
+If bit 6 is set (PI_NTFY_FLAGS_ALIVE) this indicates a keep alive
 signal on the pipe/socket and is sent once a minute in the absence
 of other notification activity.
+
+If bit 7 is set (PI_NTFY_FLAGS_EVENT) then bits 0-4 of the flags
+indicate an event which has been triggered.
 
 tick: the number of microseconds since system boot.  It wraps around
 after 1h12m.
@@ -2705,6 +2793,127 @@ End
 D*/
 
 /*F*/
+int bscXfer(bsc_xfer_t *bsc_xfer);
+/*D
+This function provides a low-level interface to the
+SPI/I2C Slave peripheral.  This peripheral allows the
+Pi to act as a slave device on an I2C or SPI bus.
+
+I can't get SPI to work properly.  I tried with a
+control word of 0x303 and swapped MISO and MOSI.
+
+The function sets the BSC mode, writes any data in
+the transmit buffer to the BSC transmit FIFO, and
+copies any data in the BSC receive FIFO to the
+receive buffer.
+
+. .
+bsc_xfer:= a structure defining the transfer
+
+typedef struct
+{
+   uint32_t control;          // Write
+   int rxCnt;                 // Read only
+   char rxBuf[BSC_FIFO_SIZE]; // Read only
+   int txCnt;                 // Write
+   char txBuf[BSC_FIFO_SIZE]; // Write
+} bsc_xfer_t;
+. .
+
+To start a transfer set control (see below) and copy the bytes to
+be sent (if any) to txBuf and set the byte count in txCnt.
+
+Upon return rxCnt will be set to the number of received bytes placed
+in rxBuf.
+
+Note that the control word sets the BSC mode.  The BSC will stay in
+that mode until a different control word is sent.
+
+The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
+and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
+need to swap MISO/MOSI between master and slave.
+
+When a zero control word is received GPIO 18-21 will be reset
+to INPUT mode.
+
+The returned function value is the status of the transfer (see below).
+
+If there was an error the status will be less than zero
+(and will contain the error code).
+
+The most significant word of the returned status contains the number
+of bytes actually copied from txBuf to the BSC transmit FIFO (may be
+less than requested if the FIFO already contained untransmitted data).
+
+control consists of the following bits.
+
+. .
+22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ a  a  a  a  a  a  a  -  - IT HC TF IR RE TE BK EC ES PL PH I2 SP EN
+. .
+
+Bits 0-13 are copied unchanged to the BSC CR register.  See
+pages 163-165 of the Broadcom peripherals document for full
+details.
+
+aaaaaaa @ defines the I2C slave address (only relevant in I2C mode)
+IT      @ invert transmit status flags
+HC      @ enable host control
+TF      @ enable test FIFO
+IR      @ invert receive status flags
+RE      @ enable receive
+TE      @ enable transmit
+BK      @ abort operation and clear FIFOs
+EC      @ send control register as first I2C byte
+ES      @ send status register as first I2C byte
+PL      @ set SPI polarity high
+PH      @ set SPI phase high
+I2      @ enable I2C mode
+SP      @ enable SPI mode
+EN      @ enable BSC peripheral
+
+The returned status has the following format
+
+. .
+20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ S  S  S  S  S  R  R  R  R  R  T  T  T  T  T RB TE RF TF RE TB
+. .
+
+Bits 0-15 are copied unchanged from the BSC FR register.  See
+pages 165-166 of the Broadcom peripherals document for full
+details.
+
+SSSSS @ number of bytes successfully copied to transmit FIFO
+RRRRR @ number of bytes in receieve FIFO
+TTTTT @ number of bytes in transmit FIFO
+RB    @ receive busy
+TE    @ transmit FIFO empty
+RF    @ receive FIFO full
+TF    @ transmit FIFO full
+RE    @ receive FIFO empty
+TB    @ transmit busy
+
+The following example shows how to configure the BSC peripheral as
+an I2C slave with address 0x13 and send four bytes.
+
+...
+bsc_xfer_t xfer;
+
+xfer.control = (0x13<<16) | 0x305;
+
+memcpy(xfer.txBuf, "ABCD", 4);
+xfer.txCnt = 4;
+
+status = bscXfer(&xfer);
+
+if (status >= 0)
+{
+   // process transfer
+}
+...
+D*/
+
+/*F*/
 int bbSPIOpen(
    unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
    unsigned baud, unsigned spiFlags);
@@ -3063,6 +3272,8 @@ handle: >=0, as returned by a call to [*serOpen*]
 
 Returns the read byte (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_SER_READ_NO_DATA, or PI_SER_READ_FAILED.
+
+If no data is ready PI_SER_READ_NO_DATA is returned.
 D*/
 
 /*F*/
@@ -3094,8 +3305,10 @@ handle: >=0, as returned by a call to [*serOpen*]
  count: the maximum number of bytes to read
 . .
 
-Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
+Returns the number of bytes read (>0=) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, or PI_SER_READ_NO_DATA.
+
+If no data is ready zero is returned.
 D*/
 
 
@@ -3883,6 +4096,104 @@ Pad @ GPIO
 ...
 gpioSetPad(0, 16); // set pad 0 strength to 16 mA
 ...
+D*/
+
+/*F*/
+int eventMonitor(unsigned handle, uint32_t bits);
+/*D
+This function selects the events to be reported on a previously
+opened handle.
+
+. .
+handle: >=0, as returned by [*gpioNotifyOpen*]
+  bits: a bit mask indicating the events of interest
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+A report is sent each time an event is triggered providing the
+corresponding bit in bits is set.
+
+See [*gpioNotifyBegin*] for the notification format.
+
+...
+// Start reporting events 3, 6, and 7.
+
+//  bit      76543210
+// (0xC8 = 0b11001000)
+
+eventMonitor(h, 0xC8);
+...
+
+D*/
+
+/*F*/
+int eventSetFunc(unsigned event, eventFunc_t f);
+/*D
+Registers a function to be called (a callback) when the specified
+event occurs.
+
+. .
+event: 0-31
+    f: the callback function
+. .
+
+Returns 0 if OK, otherwise PI_BAD_EVENT_ID.
+
+One function may be registered per event.
+
+The function is passed the event, and the tick.
+
+The callback may be cancelled by passing NULL as the function.
+D*/
+
+/*F*/
+int eventSetFuncEx(unsigned event, eventFuncEx_t f, void *userdata);
+/*D
+Registers a function to be called (a callback) when the specified
+event occurs.
+
+. .
+   event: 0-31
+       f: the callback function
+userdata: pointer to arbitrary user data
+. .
+
+Returns 0 if OK, otherwise PI_BAD_EVENT_ID.
+
+One function may be registered per event.
+
+The function is passed the event, the tick, and the ueserdata pointer.
+
+The callback may be cancelled by passing NULL as the function.
+
+Only one of [*eventSetFunc*] or [*eventSetFuncEx*] can be
+registered per event.
+D*/
+
+/*F*/
+int eventTrigger(unsigned event);
+/*D
+This function signals the occurrence of an event.
+
+. .
+event: 0-31, the event
+. .
+
+Returns 0 if OK, otherwise PI_BAD_EVENT_ID.
+
+An event is a signal used to inform one or more consumers
+to start an action.  Each consumer which has registered an interest
+in the event (e.g. by calling [*eventSetFunc*]) will be informed by
+a callback.
+
+One event, PI_EVENT_BSC (31) is predefined.  This event is
+auto generated on BSC slave activity.
+
+The meaning of other events is arbitrary.
+
+Note that other than its id and its tick there is no data associated
+with an event.
 D*/
 
 
@@ -4771,6 +5082,22 @@ A convenient way to set bit n is to or in (1<<n).
 
 e.g. to select bits 5, 9, 23 you could use (1<<5) | (1<<9) | (1<<23).
 
+*bsc_xfer::
+A pointer to a [*bsc_xfer_t*] object used to control a BSC transfer.
+
+bsc_xfer_t::
+
+. .
+typedef struct
+{
+   uint32_t control;          // Write
+   int rxCnt;                 // Read only
+   char rxBuf[BSC_FIFO_SIZE]; // Read only
+   int txCnt;                 // Write
+   char txBuf[BSC_FIFO_SIZE]; // Write
+} bsc_xfer_t;
+. .
+
 *buf::
 
 A buffer to hold data being sent or being received.
@@ -4866,13 +5193,28 @@ The number may vary between 0 and range (default 255) where
 0 is off and range is fully on.
 
 edge::0-2
-The type of GPIO edge to generate an intrrupt.  See [*gpioSetISRFunc*],
+The type of GPIO edge to generate an interrupt.  See [*gpioSetISRFunc*]
 and [*gpioSetISRFuncEx*].
 
 . .
 RISING_EDGE 0
 FALLING_EDGE 1
 EITHER_EDGE 2
+. .
+
+event::0-31
+An event is a signal used to inform one or more consumers
+to start an action.
+
+eventFunc_t::
+. .
+typedef void (*eventFunc_t) (int event, uint32_t tick);
+. .
+
+eventFuncEx_t::
+. .
+typedef void (*eventFuncEx_t)
+   (int event, uint32_t tick, void *userdata);
 . .
 
 f::
@@ -4931,8 +5273,8 @@ typedef void (*gpioAlertFunc_t) (int gpio, int level, uint32_t tick);
 
 gpioAlertFuncEx_t::
 . .
-typedef void (*gpioAlertFuncEx_t)
-   (int gpio, int level, uint32_t tick, void *userdata);
+typedef void (*eventFuncEx_t)
+   (int event, int level, uint32_t tick, void *userdata);
 . .
 
 gpioCfg*::
@@ -5026,8 +5368,13 @@ One of
 
 handle::>=0
 
-A number referencing an object opened by one of [*fileOpen*],
-[*gpioNotifyOpen*], [*i2cOpen*], [*serOpen*], [*spiOpen*].
+A number referencing an object opened by one of
+
+[*fileOpen*] 
+[*gpioNotifyOpen*] 
+[*i2cOpen*] 
+[*serOpen*] 
+[*spiOpen*]
 
 i2cAddr:: 0-0x7F
 The address of a device on the I2C bus.
@@ -5231,6 +5578,7 @@ pud::0-2
 
 The setting of the pull up/down resistor for a GPIO, which may be off,
 pull-up, or pull-down.
+
 . .
 PI_PUD_OFF 0
 PI_PUD_DOWN 1
@@ -5522,17 +5870,21 @@ following technique.
 
 In the calling function:
 
+. .
 user_type *userdata; 
 user_type my_userdata;
 
 userdata = malloc(sizeof(user_type)); 
 *userdata = my_userdata;
+. .
 
 In the receiving function:
 
+. .
 user_type my_userdata = *(user_type*)userdata;
 
 free(userdata);
+. .
 
 void::
 
@@ -5697,6 +6049,11 @@ PARAMS*/
 #define PI_CMD_BSPIO 112
 #define PI_CMD_BSPIX 113
 
+#define PI_CMD_BSCX  114
+
+#define PI_CMD_EVM   115
+#define PI_CMD_EVT   116
+
 /*DEF_E*/
 
 /*
@@ -5755,6 +6112,7 @@ after this command is issued.
 #define PI_CMD_X     839
 #define PI_CMD_XA    840
 #define PI_CMD_XOR   841
+#define PI_CMD_EVTWT 842
 
 /*DEF_S Error Codes*/
 
@@ -5903,6 +6261,7 @@ after this command is issued.
 #define PI_BAD_SCRIPT_NAME -140 // bad script name
 #define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
+#define PI_BAD_EVENT_ID    -143 // bad event id
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

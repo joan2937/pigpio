@@ -3612,6 +3612,11 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 Returns the read byte (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_SER_READ_NO_DATA, or PI_SER_READ_FAILED.
 
+.br
+
+.br
+If no data is ready PI_SER_READ_NO_DATA is returned.
+
 .IP "\fBint serial_write(unsigned handle, char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes from buf to the the serial port
@@ -3661,6 +3666,11 @@ handle: >=0, as returned by a call to \fBserial_open\fP.
 .br
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, PI_SER_READ_NO_DATA, or PI_SER_WRITE_FAILED.
+
+.br
+
+.br
+If no data is ready zero is returned.
 
 .IP "\fBint serial_data_available(unsigned handle)\fP"
 .IP "" 4

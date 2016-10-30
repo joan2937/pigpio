@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 56+
+This version is for pigpio version 57+
 */
 
 #include <stdio.h>
@@ -55,6 +55,8 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
    {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
 
+   {PI_CMD_BSCX,  "BSCX",  193, 8}, // bscXfer
+
    {PI_CMD_BSPIC, "BSPIC", 112, 0}, // bbSPIClose
    {PI_CMD_BSPIO, "BSPIO", 134, 0}, // bbSPIOpen
    {PI_CMD_BSPIX, "BSPIX", 193, 6}, // bbSPIXfer
@@ -64,6 +66,9 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_CGI,   "CGI",   101, 4}, // gpioCfgGetInternals
    {PI_CMD_CSI,   "CSI",   111, 1}, // gpioCfgSetInternals
+
+   {PI_CMD_EVM,   "EVM",   122, 1}, // eventMonitor
+   {PI_CMD_EVT,   "EVT",   112, 0}, // eventTrigger
 
    {PI_CMD_FC,    "FC",    112, 0}, // fileClose
 
@@ -217,6 +222,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_DCR  , "DCR"  , 113, 0},
    {PI_CMD_DCRA , "DCRA" , 101, 0},
    {PI_CMD_DIV  , "DIV"  , 111, 0},
+   {PI_CMD_EVTWT, "EVTWT", 111, 0},
    {PI_CMD_HALT , "HALT" , 101, 0},
    {PI_CMD_INR  , "INR"  , 113, 0},
    {PI_CMD_INRA , "INRA" , 101, 0},
@@ -267,14 +273,20 @@ BSPIX cs ...    SPI bit bang transfer\n\
 \n\
 BR1              Read bank 1 GPIO\n\
 BR2              Read bank 2 GPIO\n\
+\n\
 BS1 bits         Set GPIO in bank 1\n\
 BS2 bits         Set GPIO in bank 2\n\
+\n\
+BSCX bctl bvs    BSC I2C/SPI transfer\n\
 \n\
 CF1 ...          Custom function 1\n\
 CF2 ...          Custom function 2\n\
 \n\
 CGI              Configuration get internals\n\
 CSI v            Configuration set internals\n\
+\n\
+EVM h bits       Set events to monitor\n\
+EVT n            Trigger event\n\
 \n\
 FC h             Close file handle\n\
 FG g steady      Set glitch filter on GPIO\n\
@@ -547,6 +559,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_SCRIPT_NAME  , "bad script name"},
    {PI_BAD_SPI_BAUD     , "bad SPI baud rate, not 50-500k"},
    {PI_NOT_SPI_GPIO     , "no bit bang SPI in progress on GPIO"},
+   {PI_BAD_EVENT_ID     , "bad event id"},
 
 };
 
@@ -1018,10 +1031,12 @@ int cmdParse(
 
          break;
 
-      case 193: /* BI2CZ  FW  I2CWD  I2CZ  SERW  SPIW  SPIX
-                   BSPIX
+      case 193: /* BI2CZ  BSCX  BSPIX  FW  I2CWD  I2CZ  SERW
+		   SPIW  SPIX
 
                    Two or more parameters, first >=0, rest 0-255.
+
+		   BSCX is special case one or more.
                 */
          ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
@@ -1048,7 +1063,7 @@ int cmdParse(
 
             p[3] = pars;
 
-            if (pars) valid = 1;
+            if (pars || (p[0]==PI_CMD_BSCX)) valid = 1;
          }
 
          break;

@@ -172,8 +172,8 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          break;
 
       case 6: /*
-                 BI2CZ  CF2  FL  FR  I2CPK  I2CRD  I2CRI  I2CRK  I2CZ
-                 SERR  SLR  SPIX  SPIR
+                 BI2CZ  CF2  FL  FR  I2CPK  I2CRD  I2CRI  I2CRK
+                 I2CZ  SERR  SLR  SPIX  SPIR
               */
          printf("%d", r);
          if (r < 0) fatal("ERROR: %s", cmdErrStr(r));
@@ -216,6 +216,41 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
          }
          printf("\n");
          break;
+
+      case 8: /*
+                 BSCX
+              */
+         if (r < 0)
+         {
+            printf("%d", r);
+            fatal("ERROR: %s", cmdErrStr(r));
+         }
+
+         p = (uint32_t *)response_buf;
+         printf("%d %d", r-3, p[0]);
+
+         if (r > 4)
+         {
+            if (printFlags == PRINT_ASCII) printf(" ");
+
+            for (i=4; i<r; i++)
+            {
+               ch = response_buf[i];
+
+               if (printFlags & PRINT_HEX) printf(" %hhx", ch);
+
+               else if (printFlags & PRINT_ASCII)
+               {
+                  if (isprint(ch) || (ch == '\n') || (ch == '\r'))
+                     printf("%c", ch);
+                  else printf("\\x%02hhx", ch);
+               }
+               else printf(" %hhu", response_buf[i]);
+            }
+         }
+         printf("\n");
+         break;
+
    }
 }
 
@@ -224,6 +259,7 @@ void get_extensions(int sock, int command, int res)
    switch (command)
    {
       case PI_CMD_BI2CZ:
+      case PI_CMD_BSCX:
       case PI_CMD_BSPIX:
       case PI_CMD_CF2:
       case PI_CMD_FL:

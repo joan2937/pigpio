@@ -2318,6 +2318,8 @@ handle: >=0, as returned by a call to [*serial_open*].
 
 Returns the read byte (>=0) if OK, otherwise PI_BAD_HANDLE,
 PI_SER_READ_NO_DATA, or PI_SER_READ_FAILED.
+
+If no data is ready PI_SER_READ_NO_DATA is returned.
 D*/
 
 /*F*/
@@ -2350,6 +2352,8 @@ handle: >=0, as returned by a call to [*serial_open*].
 
 Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
 PI_BAD_PARAM, PI_SER_READ_NO_DATA, or PI_SER_WRITE_FAILED.
+
+If no data is ready zero is returned.
 D*/
 
 /*F*/
