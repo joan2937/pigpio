@@ -1,11 +1,14 @@
 #
-CC       = gcc
-AR       = ar
-RANLIB   = ranlib
-SIZE     = size
-SHLIB    = $(CC) -shared
-STRIP    = strip
-STRIPLIB = $(STRIP) --strip-unneeded
+# Set CROSS_PREFIX to prepend to all compiler tools at once for easier
+# cross-compilation.
+CROSS_PREFIX =
+CC           = $(CROSS_PREFIX)gcc
+AR           = $(CROSS_PREFIX)ar
+RANLIB       = $(CROSS_PREFIX)ranlib
+SIZE         = $(CROSS_PREFIX)size
+STRIP        = $(CROSS_PREFIX)strip
+SHLIB        = $(CC) -shared
+STRIPLIB     = $(STRIP) --strip-unneeded
 
 CFLAGS	+= -O3 -Wall -pthread
 
