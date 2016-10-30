@@ -6277,6 +6277,7 @@ after this command is issued.
 #define PI_DEFAULT_CLK_MICROS              5
 #define PI_DEFAULT_CLK_PERIPHERAL          PI_CLOCK_PCM
 #define PI_DEFAULT_IF_FLAGS                0
+#define PI_DEFAULT_FOREGROUND              0
 #define PI_DEFAULT_DMA_CHANNEL             14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
