@@ -3,8 +3,9 @@ CC       = gcc
 AR       = ar
 RANLIB   = ranlib
 SIZE     = size
-SHLIB    = gcc -shared
-STRIPLIB = strip --strip-unneeded
+SHLIB    = $(CC) -shared
+STRIP    = strip
+STRIPLIB = $(STRIP) --strip-unneeded
 
 CFLAGS	+= -O3 -Wall -pthread
 
