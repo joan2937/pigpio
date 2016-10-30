@@ -55,6 +55,7 @@ static unsigned bufferSizeMilliseconds = PI_DEFAULT_BUFFER_MILLIS;
 static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
+static int      foreground             = PI_DEFAULT_FOREGROUND;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
@@ -98,6 +99,7 @@ void usage()
       "   -d value,   primary DMA channel, 0-14,         default 14\n" \
       "   -e value,   secondary DMA channel, 0-14,       default 6\n" \
       "   -f,         disable fifo interface,            default enabled\n" \
+      "   -g,         run in foreground (do not fork),   default disabled\n" \
       "   -k,         disable socket interface,          default enabled\n" \
       "   -l,         localhost socket only              default local+remote\n" \
       "   -n IP addr, allow address, name or dotted,     default allow all\n" \
@@ -160,7 +162,7 @@ static void initOpts(int argc, char *argv[])
    uint32_t addr;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fkln:p:s:t:x:vV")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:p:s:t:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -202,6 +204,10 @@ static void initOpts(int argc, char *argv[])
          case 'f':
             ifFlags |= PI_DISABLE_FIFO_IF;
             break; 
+
+         case 'g':
+            foreground = 1;
+            break;
 
          case 'k':
             ifFlags |= PI_DISABLE_SOCK_IF;
@@ -298,40 +304,42 @@ int main(int argc, char **argv)
    pid_t pid;
    int flags;
 
-   /* Fork off the parent process */
-
-   pid = fork();
-
-   if (pid < 0) { exit(EXIT_FAILURE); }
-
-   /* If we got a good PID, then we can exit the parent process. */
-
-   if (pid > 0) { exit(EXIT_SUCCESS); }
-
-   /* Change the file mode mask */
-
-   umask(0);       
-   
-   /* Open any logs here */
-
-   /* NONE */
-   
-   /* Create a new SID for the child process */
-
-   if (setsid() < 0) fatal("setsid failed (%m)");
-
-   /* Change the current working directory */
-
-   if ((chdir("/")) < 0) fatal("chdir failed (%m)");
-   
    /* check command line parameters */
 
    initOpts(argc, argv);
-   
-   /* Close out the standard file descriptors */
 
-   fclose(stdin);
-   fclose(stdout);
+   if (!foreground) {
+      /* Fork off the parent process */
+
+      pid = fork();
+
+      if (pid < 0) { exit(EXIT_FAILURE); }
+
+      /* If we got a good PID, then we can exit the parent process. */
+
+      if (pid > 0) { exit(EXIT_SUCCESS); }
+
+      /* Change the file mode mask */
+
+      umask(0);
+
+      /* Open any logs here */
+
+      /* NONE */
+
+      /* Create a new SID for the child process */
+
+      if (setsid() < 0) fatal("setsid failed (%m)");
+
+      /* Change the current working directory */
+
+      if ((chdir("/")) < 0) fatal("chdir failed (%m)");
+
+      /* Close out the standard file descriptors */
+
+      fclose(stdin);
+      fclose(stdout);
+   }
 
    /* configure library */
 
