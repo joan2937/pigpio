@@ -1,0 +1,8 @@
+*.o
+*.so
+pig2vcd
+pigpiod
+pigs
+x_pigpio
+x_pigpiod_if
+x_pigpiod_if2

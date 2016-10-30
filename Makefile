@@ -1,10 +1,14 @@
 #
-CC       = gcc
-AR       = ar
-RANLIB   = ranlib
-SIZE     = size
-SHLIB    = gcc -shared
-STRIPLIB = strip --strip-unneeded
+# Set CROSS_PREFIX to prepend to all compiler tools at once for easier
+# cross-compilation.
+CROSS_PREFIX =
+CC           = $(CROSS_PREFIX)gcc
+AR           = $(CROSS_PREFIX)ar
+RANLIB       = $(CROSS_PREFIX)ranlib
+SIZE         = $(CROSS_PREFIX)size
+STRIP        = $(CROSS_PREFIX)strip
+SHLIB        = $(CC) -shared
+STRIPLIB     = $(STRIP) --strip-unneeded
 
 CFLAGS	+= -O3 -Wall -pthread
 
@@ -59,12 +63,15 @@ x_pigpiod_if2:	x_pigpiod_if2.o $(LIB3)
 
 pigpiod:	pigpiod.o $(LIB1)
 	$(CC) -o pigpiod pigpiod.o $(LL1)
+	$(STRIP) pigpiod
 
 pigs:		pigs.o command.o
 	$(CC) -o pigs pigs.o command.o
+	$(STRIP) pigs
 
 pig2vcd:	pig2vcd.o
 	$(CC) -o pig2vcd pig2vcd.o
+	$(STRIP) pig2vcd
 
 clean:
 	rm -f *.o *.i *.s *~ $(ALL)
@@ -80,9 +87,9 @@ install:	$(ALL)
 	install -m 0755 libpigpiod_if.so  $(DESTDIR)$(libdir)
 	install -m 0755 libpigpiod_if2.so $(DESTDIR)$(libdir)
 	install -m 0755 -d                $(DESTDIR)$(bindir)
-	install -m 0755 -s pig2vcd        $(DESTDIR)$(bindir)
-	install -m 0755 -s pigpiod        $(DESTDIR)$(bindir)
-	install -m 0755 -s pigs           $(DESTDIR)$(bindir)
+	install -m 0755 pig2vcd           $(DESTDIR)$(bindir)
+	install -m 0755 pigpiod           $(DESTDIR)$(bindir)
+	install -m 0755 pigs              $(DESTDIR)$(bindir)
 	if which python2; then python2 setup.py install; fi
 	if which python3; then python3 setup.py install; fi
 	install -m 0755 -d                $(DESTDIR)$(mandir)/man1
