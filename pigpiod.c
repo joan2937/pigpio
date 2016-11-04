@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 43+
+This version is for pigpio version 58+
 */
 
 #include <sys/types.h>
@@ -42,6 +42,8 @@ This version is for pigpio version 43+
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "pigpio.h"
 
@@ -53,6 +55,7 @@ static unsigned bufferSizeMilliseconds = PI_DEFAULT_BUFFER_MILLIS;
 static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
+static int      foreground             = PI_DEFAULT_FOREGROUND;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
@@ -64,6 +67,10 @@ static uint32_t cfgInternals           = PI_DEFAULT_CFG_INTERNALS;
 static int updateMaskSet = 0;
 
 static FILE * errFifo;
+
+static uint32_t sockNetAddr[MAX_CONNECT_ADDRESSES];
+
+static int numSockNetAddr = 0;
 
 void fatal(char *fmt, ...)
 {
@@ -86,19 +93,21 @@ void usage()
    fprintf(stderr, "\n" \
       "pigpio V%d\n" \
       "Usage: sudo pigpiod [OPTION] ...\n" \
-      "   -a value, DMA mode, 0=AUTO, 1=PMAP, 2=MBOX,   default AUTO\n" \
-      "   -b value, gpio sample buffer in milliseconds, default 120\n" \
-      "   -c value, library internal settings,          default 0\n" \
-      "   -d value, primary DMA channel, 0-14,          default 14\n" \
-      "   -e value, secondary DMA channel, 0-6,         default 5\n" \
-      "   -f,       disable fifo interface,             default enabled\n" \
-      "   -k,       disable socket interface,           default enabled\n" \
-      "   -l,       localhost socket only               default all interfaces\n" \
-      "   -p value, socket port, 1024-32000,            default 8888\n" \
-      "   -s value, sample rate, 1, 2, 4, 5, 8, or 10,  default 5\n" \
-      "   -t value, clock peripheral, 0=PWM 1=PCM,      default PCM\n" \
-      "   -v, -V,   display pigpio version and exit\n" \
-      "   -x mask,  gpios which may be updated,         default board user gpios\n" \
+      "   -a value,   DMA mode, 0=AUTO, 1=PMAP, 2=MBOX,  default AUTO\n" \
+      "   -b value,   sample buffer size in ms,          default 120\n" \
+      "   -c value,   library internal settings,         default 0\n" \
+      "   -d value,   primary DMA channel, 0-14,         default 14\n" \
+      "   -e value,   secondary DMA channel, 0-14,       default 6\n" \
+      "   -f,         disable fifo interface,            default enabled\n" \
+      "   -g,         run in foreground (do not fork),   default disabled\n" \
+      "   -k,         disable socket interface,          default enabled\n" \
+      "   -l,         localhost socket only              default local+remote\n" \
+      "   -n IP addr, allow address, name or dotted,     default allow all\n" \
+      "   -p value,   socket port, 1024-32000,           default 8888\n" \
+      "   -s value,   sample rate, 1, 2, 4, 5, 8, or 10, default 5\n" \
+      "   -t value,   clock peripheral, 0=PWM 1=PCM,     default PCM\n" \
+      "   -v, -V,     display pigpio version and exit\n" \
+      "   -x mask,    GPIO which may be updated,         default board GPIO\n" \
       "EXAMPLE\n" \
       "sudo pigpiod -s 2 -b 200 -f\n" \
       "  Set a sample rate of 2 microseconds with a 200 millisecond\n" \
@@ -117,12 +126,43 @@ static uint64_t getNum(char *str, int *err)
    return val;
 }
 
+static uint32_t checkAddr(char *addrStr)
+{
+   int err;
+   struct addrinfo hints, *res;
+   struct sockaddr_in *sin;
+   const char *portStr;
+   uint32_t addr;
+
+   portStr = getenv(PI_ENVPORT);
+
+   if (!portStr) portStr = PI_DEFAULT_SOCKET_PORT_STR;
+
+   memset (&hints, 0, sizeof (hints));
+
+   hints.ai_family   = AF_INET;
+   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_flags   |= AI_CANONNAME;
+
+   err = getaddrinfo(addrStr, portStr, &hints, &res);
+
+   if (err) return 0;
+
+   sin = (struct sockaddr_in *)res->ai_addr;
+   addr = sin->sin_addr.s_addr;
+
+   freeaddrinfo(res);
+
+   return addr;
+}
+
 static void initOpts(int argc, char *argv[])
 {
    int opt, err, i;
+   uint32_t addr;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fklp:s:t:x:vV")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:p:s:t:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -149,14 +189,14 @@ static void initOpts(int argc, char *argv[])
 
          case 'd':
             i = getNum(optarg, &err);
-            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_PRIMARY_CHANNEL))
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_DMA_CHANNEL))
                DMAprimaryChannel = i;
             else fatal("invalid -d option (%d)", i);
             break;
 
          case 'e':
             i = getNum(optarg, &err);
-            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_SECONDARY_CHANNEL))
+            if ((i >= PI_MIN_DMA_CHANNEL) && (i <= PI_MAX_DMA_CHANNEL))
                DMAsecondaryChannel = i;
             else fatal("invalid -e option (%d)", i);
             break;
@@ -165,12 +205,23 @@ static void initOpts(int argc, char *argv[])
             ifFlags |= PI_DISABLE_FIFO_IF;
             break; 
 
+         case 'g':
+            foreground = 1;
+            break;
+
          case 'k':
             ifFlags |= PI_DISABLE_SOCK_IF;
             break; 
 
          case 'l':
             ifFlags |= PI_LOCALHOST_SOCK_IF;
+            break; 
+
+         case 'n':
+            addr = checkAddr(optarg);
+            if (addr && (numSockNetAddr<MAX_CONNECT_ADDRESSES))
+               sockNetAddr[numSockNetAddr++] = addr;
+            else fatal("invalid -n option (%s)", optarg);
             break; 
 
          case 'p':
@@ -253,40 +304,42 @@ int main(int argc, char **argv)
    pid_t pid;
    int flags;
 
-   /* Fork off the parent process */
-
-   pid = fork();
-
-   if (pid < 0) { exit(EXIT_FAILURE); }
-
-   /* If we got a good PID, then we can exit the parent process. */
-
-   if (pid > 0) { exit(EXIT_SUCCESS); }
-
-   /* Change the file mode mask */
-
-   umask(0);       
-   
-   /* Open any logs here */
-
-   /* NONE */
-   
-   /* Create a new SID for the child process */
-
-   if (setsid() < 0) fatal("setsid failed (%m)");
-
-   /* Change the current working directory */
-
-   if ((chdir("/")) < 0) fatal("chdir failed (%m)");
-   
    /* check command line parameters */
 
    initOpts(argc, argv);
-   
-   /* Close out the standard file descriptors */
 
-   fclose(stdin);
-   fclose(stdout);
+   if (!foreground) {
+      /* Fork off the parent process */
+
+      pid = fork();
+
+      if (pid < 0) { exit(EXIT_FAILURE); }
+
+      /* If we got a good PID, then we can exit the parent process. */
+
+      if (pid > 0) { exit(EXIT_SUCCESS); }
+
+      /* Change the file mode mask */
+
+      umask(0);
+
+      /* Open any logs here */
+
+      /* NONE */
+
+      /* Create a new SID for the child process */
+
+      if (setsid() < 0) fatal("setsid failed (%m)");
+
+      /* Change the current working directory */
+
+      if ((chdir("/")) < 0) fatal("chdir failed (%m)");
+
+      /* Close out the standard file descriptors */
+
+      fclose(stdin);
+      fclose(stdout);
+   }
 
    /* configure library */
 
@@ -303,6 +356,8 @@ int main(int argc, char **argv)
    gpioCfgMemAlloc(memAllocMode);
 
    if (updateMaskSet) gpioCfgPermissions(updateMask);
+
+   gpioCfgNetAddr(numSockNetAddr, sockNetAddr);
 
    gpioCfgSetInternals(cfgInternals);
 

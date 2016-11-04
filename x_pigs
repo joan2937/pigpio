@@ -19,7 +19,8 @@ GPIO=25
 # of tests indicate a problem.
 #
 
-echo "Testing pigs I/F"
+echo
+echo "Testing pigpio pigs"
 
 s=$(pigs pigpv)
 echo "pigpio version $s"
@@ -49,7 +50,7 @@ s=$(pigs bs2 0)
 if [[ $s = "" ]]; then echo "BS2 ok"; else echo "BS2 fail ($s)"; fi
 
 s=$(pigs h)
-if [[ ${#s} = 4544 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
+if [[ ${#s} = 5384 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
 
 s=$(pigs hwver)
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
@@ -250,8 +251,13 @@ s=$(pigs wvag 16 0 5000000 0 16 5000000)
 if [[ $s = 310 ]]; then echo "WVAG ok"; else echo "WVAG fail ($s)"; fi
 w=$(pigs wvcre)
 if [[ $w -ge 0 ]]; then echo "WVCRE ok"; else echo "WVCRE fail ($s)"; fi
+
 s=$(pigs wvtx $w)
-if [[ $s = 621 ]]; then echo "WVTX ok"; else echo "WVTX fail ($s)"; fi
+if [[ ($s = 621) || ($s = 1137) ]]
+then echo "WVTX ok"
+else echo "WVTX fail ($s)"
+fi
+
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-a ok"; else echo "WVBSY-a fail ($s)"; fi
 sleep 1
@@ -262,7 +268,11 @@ if [[ $s = "" ]]; then echo "WVHLT ok"; else echo "WVHLT fail ($s)"; fi
 s=$(pigs wvbsy)
 if [[ $s = 0 ]]; then echo "WVBSY-c ok"; else echo "WVBSY-c fail ($s)"; fi
 s=$(pigs wvtxr $w)
-if [[ $s = 621 ]]; then echo "WVTXR ok"; else echo "WVTXR fail ($s)"; fi
+if [[ ($s = 621) || ($s = 1137) ]]
+then echo "WVTXR ok"
+else echo "WVTXR fail ($s)"
+fi
+
 s=$(pigs wvbsy)
 if [[ $s = 1 ]]; then echo "WVBSY-d ok"; else echo "WVBSY-d fail ($s)"; fi
 s=$(pigs wvhlt)
@@ -271,7 +281,11 @@ s=$(pigs wvbsy)
 if [[ $s = 0 ]]; then echo "WVBSY-e ok"; else echo "WVBSY-e fail ($s)"; fi
 
 s=$(pigs wvsc 0)
-if [[ $s = 620 ]]; then echo "WVSC-a ok"; else echo "WVSC-a fail ($s)"; fi
+if [[ ($s = 620) || ($s = 933) ]]
+then echo "WVSC-a ok"
+else echo "WVSC-a fail ($s)"
+fi
+
 s=$(pigs wvsc 1)
 if [[ $s -ge 620 ]]; then echo "WVSC-b ok"; else echo "WVSC-b fail ($s)"; fi
 s=$(pigs wvsc 2)

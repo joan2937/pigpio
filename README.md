@@ -94,3 +94,4 @@ Type 3
 
 It is safe to read all the gpios. If you try to write a system gpio or change
 its mode you can crash the Pi or corrupt the data on the SD card.
+

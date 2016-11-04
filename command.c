@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 46+
+This version is for pigpio version 57+
 */
 
 #include <stdio.h>
@@ -55,14 +55,33 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_BS1,   "BS1",   111, 1}, // gpioWrite_Bits_0_31_Set
    {PI_CMD_BS2,   "BS2",   111, 1}, // gpioWrite_Bits_32_53_Set
 
+   {PI_CMD_BSCX,  "BSCX",  193, 8}, // bscXfer
+
+   {PI_CMD_BSPIC, "BSPIC", 112, 0}, // bbSPIClose
+   {PI_CMD_BSPIO, "BSPIO", 134, 0}, // bbSPIOpen
+   {PI_CMD_BSPIX, "BSPIX", 193, 6}, // bbSPIXfer
+
    {PI_CMD_CF1,   "CF1",   195, 2}, // gpioCustom1
    {PI_CMD_CF2,   "CF2",   195, 6}, // gpioCustom2
 
    {PI_CMD_CGI,   "CGI",   101, 4}, // gpioCfgGetInternals
    {PI_CMD_CSI,   "CSI",   111, 1}, // gpioCfgSetInternals
 
+   {PI_CMD_EVM,   "EVM",   122, 1}, // eventMonitor
+   {PI_CMD_EVT,   "EVT",   112, 0}, // eventTrigger
+
+   {PI_CMD_FC,    "FC",    112, 0}, // fileClose
+
    {PI_CMD_FG,    "FG",    121, 0}, // gpioGlitchFilter
+
+   {PI_CMD_FL,    "FL",    127, 6}, // fileList
+
    {PI_CMD_FN,    "FN",    131, 0}, // gpioNoiseFilter
+
+   {PI_CMD_FO,    "FO",    127, 2}, // fileOpen
+   {PI_CMD_FR,    "FR",    121, 6}, // fileRead
+   {PI_CMD_FS,    "FS",    133, 2}, // fileSeek
+   {PI_CMD_FW,    "FW",    193, 0}, // fileWrite
 
    {PI_CMD_GDC,   "GDC",   112, 2}, // gpioGetPWMdutycycle
    {PI_CMD_GPW,   "GPW",   112, 2}, // gpioGetServoPulsewidth
@@ -112,6 +131,9 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_NO,    "NO",    101, 2}, // gpioNotifyOpen
    {PI_CMD_NP,    "NP",    112, 0}, // gpioNotifyPause
 
+   {PI_CMD_PADG,  "PADG",  112, 2}, // gpioGetPad
+   {PI_CMD_PADS,  "PADS",  121, 0}, // gpioSetPad
+
    {PI_CMD_PARSE, "PARSE", 115, 0}, // cmdParseScript
 
    {PI_CMD_PFG,   "PFG",   112, 2}, // gpioGetPWMfrequency
@@ -149,6 +171,8 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_SERVO, "S",     121, 0}, // gpioServo
    {PI_CMD_SERVO, "SERVO", 121, 0}, // gpioServo
 
+   {PI_CMD_SHELL, "SHELL", 128, 2}, // shell
+
    {PI_CMD_SLR,   "SLR",   121, 6}, // gpioSerialRead
    {PI_CMD_SLRC,  "SLRC",  112, 0}, // gpioSerialReadClose
    {PI_CMD_SLRO,  "SLRO",  131, 0}, // gpioSerialReadOpen
@@ -172,6 +196,7 @@ cmdInfo_t cmdInfo[]=
 
    {PI_CMD_WVAG,  "WVAG",  192, 2}, // gpioWaveAddGeneric
    {PI_CMD_WVAS,  "WVAS",  196, 2}, // gpioWaveAddSerial
+   {PI_CMD_WVTAT, "WVTAT", 101, 2}, // gpioWaveTxAt
    {PI_CMD_WVBSY, "WVBSY", 101, 2}, // gpioWaveTxBusy
    {PI_CMD_WVCHA, "WVCHA", 197, 0}, // gpioWaveChain
    {PI_CMD_WVCLR, "WVCLR", 101, 0}, // gpioWaveClear
@@ -197,6 +222,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_DCR  , "DCR"  , 113, 0},
    {PI_CMD_DCRA , "DCRA" , 101, 0},
    {PI_CMD_DIV  , "DIV"  , 111, 0},
+   {PI_CMD_EVTWT, "EVTWT", 111, 0},
    {PI_CMD_HALT , "HALT" , 101, 0},
    {PI_CMD_INR  , "INR"  , 113, 0},
    {PI_CMD_INRA , "INRA" , 101, 0},
@@ -235,15 +261,23 @@ cmdInfo_t cmdInfo[]=
 
 
 char * cmdUsage = "\n\
-BC1 bits         Clear gpios in bank 1\n\
-BC2 bits         Clear gpios in bank 2\n\
+BC1 bits         Clear GPIO in bank 1\n\
+BC2 bits         Clear GPIO in bank 2\n\
 BI2CC sda        Close bit bang I2C\n\
 BI2CO sda scl baud | Open bit bang I2C\n\
 BI2CZ sda ...    I2C bit bang multiple transactions\n\
-BR1              Read bank 1 gpios\n\
-BR2              Read bank 2 gpios\n\
-BS1 bits         Set gpios in bank 2\n\
-BS2 bits         Set gpios in bank 2\n\
+\n\
+BSPIC cs        Close bit bang SPI\n\
+BSPIO cs miso mosi sclk baud flag | Open bit bang SPI\n\
+BSPIX cs ...    SPI bit bang transfer\n\
+\n\
+BR1              Read bank 1 GPIO\n\
+BR2              Read bank 2 GPIO\n\
+\n\
+BS1 bits         Set GPIO in bank 1\n\
+BS2 bits         Set GPIO in bank 2\n\
+\n\
+BSCX bctl bvs    BSC I2C/SPI transfer\n\
 \n\
 CF1 ...          Custom function 1\n\
 CF2 ...          Custom function 2\n\
@@ -251,11 +285,20 @@ CF2 ...          Custom function 2\n\
 CGI              Configuration get internals\n\
 CSI v            Configuration set internals\n\
 \n\
-FG g steady      Set glitch filter on gpio\n\
-FN g steady active | Set noise filter on gpio\n\
+EVM h bits       Set events to monitor\n\
+EVT n            Trigger event\n\
 \n\
-GDC g            Get PWM dutycycle for gpio\n\
-GPW g            Get servo pulsewidth for gpio\n\
+FC h             Close file handle\n\
+FG g steady      Set glitch filter on GPIO\n\
+FL pat n         List files which match pattern\n\
+FN g steady active | Set noise filter on GPIO\n\
+FO file mode     Open a file in mode\n\
+FR h n           Read bytes from file handle\n\
+FS h n from      Seek to file handle position\n\
+FW h ...         Write bytes to file handle\n\
+\n\
+GDC g            Get PWM dutycycle for GPIO\n\
+GPW g            Get servo pulsewidth for GPIO\n\
 \n\
 H/HELP           Display command help\n\
 HC g f           Set hardware clock frequency\n\
@@ -281,8 +324,8 @@ I2CWS h b        SMBus Write Byte: write byte\n\
 I2CWW h r word   SMBus Write Word Data: write word to register\n\
 I2CZ  h ...      I2C multiple transactions\n\
 \n\
-M/MODES g mode   Set gpio mode\n\
-MG/MODEG g       Get gpio mode\n\
+M/MODES g mode   Set GPIO mode\n\
+MG/MODEG g       Get GPIO mode\n\
 MICS n           Delay for microseconds\n\
 MILS n           Delay for milliseconds\n\
 \n\
@@ -291,34 +334,37 @@ NC h             Close notification\n\
 NO               Request a notification\n\
 NP h             Pause notification\n\
 \n\
-P/PWM g v        Set gpio PWM value\n\
+P/PWM g v        Set GPIO PWM value\n\
+PADG pad         Get pad drive strength\n\
+PADS pad v       Set pad drive strength\n\
 PARSE text       Validate script\n\
-PFG g            Get gpio PWM frequency\n\
-PFS g v          Set gpio PWM frequency\n\
+PFG g            Get GPIO PWM frequency\n\
+PFS g v          Set GPIO PWM frequency\n\
 PIGPV            Get pigpio library version\n\
-PRG g            Get gpio PWM range\n\
+PRG g            Get GPIO PWM range\n\
 PROC text        Store script\n\
 PROCD sid        Delete script\n\
 PROCP sid        Get script status and parameters\n\
 PROCR sid ...    Run script\n\
 PROCS sid        Stop script\n\
-PRRG g           Get gpio PWM real range\n\
-PRS g v          Set gpio PWM range\n\
-PUD g pud        Set gpio pull up/down\n\
+PRRG g           Get GPIO PWM real range\n\
+PRS g v          Set GPIO PWM range\n\
+PUD g pud        Set GPIO pull up/down\n\
 \n\
-R/READ g         Read gpio level\n\
+R/READ g         Read GPIO level\n\
 \n\
-S/SERVO g v      Set gpio servo pulsewidth\n\
+S/SERVO g v      Set GPIO servo pulsewidth\n\
 SERC h           Close serial handle\n\
 SERDA h          Check for serial data ready to read\n\
 SERO text baud flags | Open serial device at baud with flags\n\
 SERR h n         Read bytes from serial handle\n\
 SERRB h          Read byte from serial handle\n\
 SERW h ...       Write bytes to serial handle\n\
-SERWB h byte        Write byte to serial handle\n\
-SLR g v          Read bit bang serial data from gpio\n\
-SLRC g           Close gpio for bit bang serial data\n\
-SLRO g baud bitlen | Open gpio for bit bang serial data\n\
+SERWB h byte     Write byte to serial handle\n\
+SHELL name str   Execute a shell command\n\
+SLR g v          Read bit bang serial data from GPIO\n\
+SLRC g           Close GPIO for bit bang serial data\n\
+SLRO g baud bitlen | Open GPIO for bit bang serial data\n\
 SLRI g invert    Invert serial logic (1 invert, 0 normal)\n\
 SPIC h           SPI close handle\n\
 SPIO channel baud flags | SPI open channel at baud with flags\n\
@@ -327,10 +373,10 @@ SPIW h ...       SPI write bytes to handle\n\
 SPIX h ...       SPI transfer bytes to handle\n\
 \n\
 T/TICK           Get current tick\n\
-TRIG g micros l  Trigger level for micros on gpio\n\
+TRIG g micros l  Trigger level for micros on GPIO\n\
 \n\
-W/WRITE g l      Write level to gpio\n\
-WDOG g millis    Set millisecond watchdog on gpio\n\
+W/WRITE g l      Write level to GPIO\n\
+WDOG g millis    Set millisecond watchdog on GPIO\n\
 WVAG triplets    Wave add generic pulses\n\
 WVAS g baud bitlen stopbits offset ... | Wave add serial data\n\
 WVBSY            Check if wave busy\n\
@@ -345,15 +391,23 @@ WVNEW            Start a new empty wave\n\
 WVSC 0,1,2       Wave get DMA control block stats\n\
 WVSM 0,1,2       Wave get micros stats\n\
 WVSP 0,1,2       Wave get pulses stats\n\
+WVTAT            Returns the current transmitting wave\n\
 WVTX wid         Transmit wave as one-shot\n\
 WVTXM wid wmde   Transmit wave using mode\n\
 WVTXR wid        Transmit wave repeatedly\n\
 \n\
-\n\
 Numbers may be entered as hex (prefix 0x), octal (prefix 0),\n\
 otherwise they are assumed to be decimal.\n\
 \n\
-man pigs for full details.\n\n";
+Examples\n\
+\n\
+pigs w 4 1         # set GPIO 4 high\n\
+pigs r 5           # read GPIO 5\n\
+pigs t             # get current tick\n\
+pigs i2co 1 0x20 0 # get handle to device 0x20 on I2C bus 1\n\
+\n\
+man pigs for full details.\n\
+\n";
 
 typedef struct
 {
@@ -364,8 +418,8 @@ typedef struct
 static errInfo_t errInfo[]=
 {
    {PI_INIT_FAILED      , "pigpio initialisation failed"},
-   {PI_BAD_USER_GPIO    , "gpio not 0-31"},
-   {PI_BAD_GPIO         , "gpio not 0-53"},
+   {PI_BAD_USER_GPIO    , "GPIO not 0-31"},
+   {PI_BAD_GPIO         , "GPIO not 0-53"},
    {PI_BAD_MODE         , "mode not 0-7"},
    {PI_BAD_LEVEL        , "level not 0-1"},
    {PI_BAD_PUD          , "pud not 0-2"},
@@ -392,7 +446,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_CHANNEL      , "DMA channel not 0-14"},
    {PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"},
    {PI_BAD_FIFO_COMMAND , "unknown fifo command"},
-   {PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-6"},
+   {PI_BAD_SECO_CHANNEL , "DMA secondary channel not 0-14"},
    {PI_NOT_INITIALISED  , "function called before gpioInitialise"},
    {PI_INITIALISED      , "function called after gpioInitialise"},
    {PI_BAD_WAVE_MODE    , "waveform mode not 0-1"},
@@ -400,11 +454,11 @@ static errInfo_t errInfo[]=
    {PI_BAD_WAVE_BAUD    , "baud rate not 50-250K(RX)/50-1M(TX)"},
    {PI_TOO_MANY_PULSES  , "waveform has too many pulses"},
    {PI_TOO_MANY_CHARS   , "waveform has too many chars"},
-   {PI_NOT_SERIAL_GPIO  , "no bit bang serial read in progress on gpio"},
+   {PI_NOT_SERIAL_GPIO  , "no bit bang serial read in progress on GPIO"},
    {PI_BAD_SERIAL_STRUC , "bad (null) serial structure parameter"},
    {PI_BAD_SERIAL_BUF   , "bad (null) serial buf parameter"}, 
-   {PI_NOT_PERMITTED    , "no permission to update gpio"},
-   {PI_SOME_PERMITTED   , "no permission to update one or more gpios"},
+   {PI_NOT_PERMITTED    , "no permission to update GPIO"},
+   {PI_SOME_PERMITTED   , "no permission to update one or more GPIO"},
    {PI_BAD_WVSC_COMMND  , "bad WVSC subcommand"},
    {PI_BAD_WVSM_COMMND  , "bad WVSM subcommand"},
    {PI_BAD_WVSP_COMMND  , "bad WVSP subcommand"},
@@ -412,7 +466,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_SCRIPT       , "invalid script"},
    {PI_BAD_SCRIPT_ID    , "unknown script id"},
    {PI_BAD_SER_OFFSET   , "add serial data offset > 30 minute"},
-   {PI_GPIO_IN_USE      , "gpio already in use"},
+   {PI_GPIO_IN_USE      , "GPIO already in use"},
    {PI_BAD_SERIAL_COUNT , "must read at least a byte at a time"},
    {PI_BAD_PARAM_NUM    , "script parameter id not 0-9"},
    {PI_DUP_TAG          , "script has duplicate tag"},
@@ -424,7 +478,7 @@ static errInfo_t errInfo[]=
    {PI_SOCK_READ_FAILED , "socket read failed"},
    {PI_SOCK_WRIT_FAILED , "socket write failed"},
    {PI_TOO_MANY_PARAM   , "too many script parameters (> 10)"},
-   {PI_NOT_HALTED       , "script already running or failed"},
+   {PI_SCRIPT_NOT_READY , "script initialising"},
    {PI_BAD_TAG          , "script has unresolved tag"},
    {PI_BAD_MICS_DELAY   , "bad MICS delay (too large)"},
    {PI_BAD_MILS_DELAY   , "bad MILS delay (too large)"},
@@ -453,11 +507,11 @@ static errInfo_t errInfo[]=
    {PI_UNKNOWN_COMMAND  , "unknown command"},
    {PI_SPI_XFER_FAILED  , "spi xfer/read/write failed"},
    {PI_BAD_POINTER      , "bad (NULL) pointer"},
-   {PI_NO_AUX_SPI       , "need a B+ for auxiliary SPI"},
-   {PI_NOT_PWM_GPIO     , "gpio is not in use for PWM"},
-   {PI_NOT_SERVO_GPIO   , "gpio is not in use for servo pulses"},
-   {PI_NOT_HCLK_GPIO    , "gpio has no hardware clock"},
-   {PI_NOT_HPWM_GPIO    , "gpio has no hardware PWM"},
+   {PI_NO_AUX_SPI       , "no auxiliary SPI on Pi A or B"},
+   {PI_NOT_PWM_GPIO     , "GPIO is not in use for PWM"},
+   {PI_NOT_SERVO_GPIO   , "GPIO is not in use for servo pulses"},
+   {PI_NOT_HCLK_GPIO    , "GPIO has no hardware clock"},
+   {PI_NOT_HPWM_GPIO    , "GPIO has no hardware PWM"},
    {PI_BAD_HPWM_FREQ    , "hardware PWM frequency not 1-125M"},
    {PI_BAD_HPWM_DUTY    , "hardware PWM dutycycle not 0-1M"},
    {PI_BAD_HCLK_FREQ    , "hardware clock frequency not 4689-250M"},
@@ -470,7 +524,7 @@ static errInfo_t errInfo[]=
    {PI_TOO_MANY_SEGS    , "too many I2C transaction segments"},
    {PI_BAD_I2C_SEG      , "an I2C transaction segment failed"},
    {PI_BAD_SMBUS_CMD    , "SMBus command not supported by driver"},
-   {PI_NOT_I2C_GPIO     , "no bit bang I2C in progress on gpio"},
+   {PI_NOT_I2C_GPIO     , "no bit bang I2C in progress on GPIO"},
    {PI_BAD_I2C_WLEN     , "bad I2C write length"},
    {PI_BAD_I2C_RLEN     , "bad I2C read length"},
    {PI_BAD_I2C_CMD      , "bad I2C command"},
@@ -488,6 +542,24 @@ static errInfo_t errInfo[]=
    {PI_BAD_ISR_INIT     , "bad ISR initialisation"},
    {PI_BAD_FOREVER      , "loop forever must be last chain command"},
    {PI_BAD_FILTER       , "bad filter parameter"},
+   {PI_BAD_PAD          , "bad pad number"},
+   {PI_BAD_STRENGTH     , "bad pad drive strength"},
+   {PI_FIL_OPEN_FAILED  , "file open failed"},
+   {PI_BAD_FILE_MODE    , "bad file mode"},
+   {PI_BAD_FILE_FLAG    , "bad file flag"},
+   {PI_BAD_FILE_READ    , "bad file read"},
+   {PI_BAD_FILE_WRITE   , "bad file write"},
+   {PI_FILE_NOT_ROPEN   , "file not open for read"},
+   {PI_FILE_NOT_WOPEN   , "file not open for write"},
+   {PI_BAD_FILE_SEEK    , "bad file seek"},
+   {PI_NO_FILE_MATCH    , "no files match pattern"},
+   {PI_NO_FILE_ACCESS   , "no permission to access file"},
+   {PI_FILE_IS_A_DIR    , "file is a directory"},
+   {PI_BAD_SHELL_STATUS , "bad shell return status"},
+   {PI_BAD_SCRIPT_NAME  , "bad script name"},
+   {PI_BAD_SPI_BAUD     , "bad SPI baud rate, not 50-500k"},
+   {PI_NOT_SPI_GPIO     , "no bit bang SPI in progress on GPIO"},
+   {PI_BAD_EVENT_ID     , "bad event id"},
 
 };
 
@@ -505,14 +577,14 @@ static int cmdMatch(char *str)
    return CMD_UNKNOWN_CMD;
 }
 
-static int getNum(char *str, unsigned *val, int8_t *opt)
+static int getNum(char *str, uint32_t *val, int8_t *opt)
 {
    int f, n;
-   unsigned v;
+   intmax_t v;
 
    *opt = 0;
 
-   f = sscanf(str, " %i %n", &v, &n);
+   f = sscanf(str, " %ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -521,7 +593,7 @@ static int getNum(char *str, unsigned *val, int8_t *opt)
       return n;
    }
 
-   f = sscanf(str, " v%i %n", &v, &n);
+   f = sscanf(str, " v%ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -531,7 +603,7 @@ static int getNum(char *str, unsigned *val, int8_t *opt)
       return n;
    }
 
-   f = sscanf(str, " p%i %n", &v, &n);
+   f = sscanf(str, " p%ji %n", &v, &n);
 
    if (f == 1)
    {
@@ -554,12 +626,12 @@ char *cmdStr(void)
 int cmdParse(
    char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl)
 {
-   int f, valid, idx, val, pp, pars, n, n2, i;
+   int f, valid, idx, val, pp, pars, n, n2;
    char *p8;
    int32_t *p32;
    char c;
-   uint32_t tp1=0, tp2=0, tp3=0;
-   int8_t to1, to2, to3;
+   uint32_t tp1=0, tp2=0, tp3=0, tp4=0, tp5=0;
+   int8_t to1, to2, to3, to4, to5;
    int eaten;
 
    /* Check that ext is big enough for the largest message. */
@@ -609,10 +681,10 @@ int cmdParse(
 
          break;
 
-      case 112: /* BI2CC GDC  GPW  I2CC
-                   I2CRB MG  MICS  MILS  MODEG  NC  NP  PFG  PRG
+      case 112: /* BI2CC FC  GDC  GPW  I2CC  I2CRB
+                   MG  MICS  MILS  MODEG  NC  NP  PADG PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
-                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR
+                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
 
                    One positive parameter.
                 */
@@ -654,37 +726,23 @@ int cmdParse(
 
       case 116: /* SYS
 
-                   One parameter, a string of letters, digits, '-' and '_'.
+                   One parameter, a string.
                 */
          f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
          if ((f >= 0) && n)
          {
+            p[3] = n;
+            ctl->opt[3] = CMD_NUMERIC;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n2;
             valid = 1;
-
-            for (i=0; i<n; i++)
-            {
-               c = buf[ctl->eaten+i];
-
-               if ((!isalnum(c)) && (c != '_') && (c != '-'))
-               {
-                  valid = 0;
-                  break;
-               }
-            }
-
-            if (valid)
-            {
-               p[3] = n;
-               ctl->opt[3] = CMD_NUMERIC;
-               memcpy(ext, buf+ctl->eaten, n);
-               ctl->eaten += n2;
-            }
          }
 
          break;
 
-      case 121: /* HC I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P  PFS  PRS
-                   PWM  S  SERVO  SLR  SLRI  W  WDOG  WRITE WVTXM
+      case 121: /* HC  FR  I2CRD  I2CRR  I2CRW  I2CWB I2CWQ  P
+                   PADS  PFS  PRS  PWM  S  SERVO  SLR  SLRI  W
+                   WDOG  WRITE  WVTXM
 
                    Two positive parameters.
                 */
@@ -780,8 +838,53 @@ int cmdParse(
 
          break;
 
-      case 131: /* BI2CO HP I2CO  I2CPC  I2CRI  I2CWB  I2CWW  SLRO
-                   SPIO  TRIG
+      case 127: /* FL  FO
+
+                   Two parameters, first a string, other positive.
+                */
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+         if ((f >= 0) && n)
+         {
+            p[3] = n;
+            ctl->opt[2] = CMD_NUMERIC;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n2;
+
+            ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+
+            if ((ctl->opt[1] > 0) && ((int)p[1] >= 0))
+               valid = 1;
+         }
+
+         break;
+
+      case 128: /* SHELL
+
+                   Two string parameters, the first space teminated.
+                   The second arbitrary.
+                */
+         f = sscanf(buf+ctl->eaten, " %*s%n %n", &n, &n2);
+
+         if ((f >= 0) && n)
+         {
+            valid = 1;
+
+            p[1] = n;
+            memcpy(ext, buf+ctl->eaten, n);
+            ctl->eaten += n;
+            ext[n] = 0; /* terminate first string */
+
+            n2 = strlen(buf+ctl->eaten+1);
+            memcpy(ext+n+1, buf+ctl->eaten+1, n2);
+            ctl->eaten += n2;
+            ctl->eaten ++;
+            p[3] = p[1] + n2 + 1;
+         }
+
+         break;
+
+      case 131: /* BI2CO  HP  I2CO  I2CPC  I2CRI  I2CWB  I2CWW
+                   SLRO  SPIO  TRIG
 
                    Three positive parameters.
                 */
@@ -818,6 +921,56 @@ int cmdParse(
             if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
                 (ctl->opt[2] > 0) && ((int)p[2] >= 0))
                valid = 1;
+         }
+
+         break;
+
+      case 133: /* FS
+
+                   Three parameters.  First and third positive.
+                   Second may be negative when interpreted as an int.
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (ctl->opt[2] > 0) &&
+             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0))
+         {
+            p[3] = 4;
+            memcpy(ext, &tp1, 4);
+            valid = 1;
+         }
+
+         break;
+
+      case 134: /* BSPIO
+
+                   Six parameters.  First to Fifth positive.
+                   Sixth may be negative when interpreted as an int.
+                */
+         ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp2, &to2);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp3, &to3);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp4, &to4);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp5, &to5);
+                                    
+         if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
+             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0) &&
+             (to2 == CMD_NUMERIC) && ((int)tp2 >= 0) &&
+             (to3 == CMD_NUMERIC) && ((int)tp3 >= 0) &&
+             (to4 == CMD_NUMERIC) && ((int)tp4 >= 0) &&
+             (to5 == CMD_NUMERIC))
+         {
+            p[3] = 5 * 4;
+            memcpy(ext+ 0, &tp1, 4);
+            memcpy(ext+ 4, &tp2, 4);
+            memcpy(ext+ 8, &tp3, 4);
+            memcpy(ext+12, &tp4, 4);
+            memcpy(ext+16, &tp5, 4);
+            valid = 1;
          }
 
          break;
@@ -878,9 +1031,12 @@ int cmdParse(
 
          break;
 
-      case 193: /* BI2CZ  I2CWD  I2CZ  SERW  SPIW  SPIX
+      case 193: /* BI2CZ  BSCX  BSPIX  FW  I2CWD  I2CZ  SERW
+		   SPIW  SPIX
 
                    Two or more parameters, first >=0, rest 0-255.
+
+		   BSCX is special case one or more.
                 */
          ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
 
@@ -907,7 +1063,7 @@ int cmdParse(
 
             p[3] = pars;
 
-            if (pars) valid = 1;
+            if (pars || (p[0]==PI_CMD_BSCX)) valid = 1;
          }
 
          break;

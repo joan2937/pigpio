@@ -45,13 +45,13 @@ def CHECK(t, st, got, expect, pc, desc):
 
 def t0():
 
-   print("Version.")
+   print("\nTesting pigpio Python module {}".format(pigpio.VERSION))
+
+   print("Python {}".format(sys.version.replace("\n", " ")))
 
    print("pigpio version {}.".format(pi.get_pigpio_version()))
 
    print("Hardware revision {}.".format(pi.get_hardware_revision()))
-
-   print("Python version {}.".format(sys.version.replace("\n", " ")))
 
 def t1():
 
@@ -361,7 +361,10 @@ To the lascivious pleasing of a lute.
 
    wid = pi.wave_create()
    e = pi.wave_send_repeat(wid)
-   CHECK(5, 3, e, 9, 0, "wave send repeat")
+   if e < 14:
+      CHECK(5, 3, e, 9, 0, "wave send repeat")
+   else:
+      CHECK(5, 3, e, 19, 0, "wave send repeat")
 
    oc = t5_count
    time.sleep(5)
@@ -380,7 +383,10 @@ To the lascivious pleasing of a lute.
 
    wid = pi.wave_create()
    e = pi.wave_send_once(wid)
-   CHECK(5, 8, e, 6811, 0, "wave send once")
+   if e < 6964:
+      CHECK(5, 8, e, 6811, 0, "wave send once")
+   else:
+      CHECK(5, 8, e, 7116, 0, "wave send once")
 
    oc = t5_count
    time.sleep(3)
@@ -417,7 +423,10 @@ To the lascivious pleasing of a lute.
    CHECK(5, 18, c, 12000, 0, "wave get max pulses")
 
    c = pi.wave_get_cbs()
-   CHECK(5, 19, c, 6810, 0, "wave get cbs")
+   if c < 6963:
+      CHECK(5, 19, c, 6810, 0, "wave get cbs")
+   else:
+      CHECK(5, 19, c, 7115, 0, "wave get cbs")
 
    CHECK(5, 20, 0, 0, 0, "NOT APPLICABLE")
 
@@ -434,7 +443,10 @@ To the lascivious pleasing of a lute.
    CHECK(5, 24, w1, 0, 0, "wave create")
 
    e = pi.wave_send_repeat(w1)
-   CHECK(5, 25, e, 9, 0, "wave send repeat")
+   if e < 14:
+      CHECK(5, 25, e, 9, 0, "wave send repeat")
+   else:
+      CHECK(5, 25, e, 19, 0, "wave send repeat")
 
    oc = t5_count
    time.sleep(5)
@@ -451,7 +463,10 @@ To the lascivious pleasing of a lute.
    CHECK(5, 29, w2, 1, 0, "wave create")
 
    e = pi.wave_send_once(w2)
-   CHECK(5, 30, e, 6811, 0, "wave send once")
+   if e < 6964:
+      CHECK(5, 30, e, 6811, 0, "wave send once")
+   else:
+      CHECK(5, 30, e, 7116, 0, "wave send once")
 
    oc = t5_count
    time.sleep(3)

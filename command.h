@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 23+
+This version is for pigpio version 57+
 */
 
 #ifndef COMMAND_H

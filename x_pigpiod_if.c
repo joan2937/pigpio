@@ -1,5 +1,5 @@
 /*
-gcc -o x_pigpiod_if x_pigpiod_if.c -lpigpiod_if -lrt -lpthread
+gcc -Wall -pthread -o x_pigpiod_if x_pigpiod_if.c -lpigpiod_if
 ./x_pigpiod_if
 
 *** WARNING ************************************************
@@ -42,7 +42,7 @@ void CHECK(int t, int st, int got, int expect, int pc, char *desc)
 
 void t0()
 {
-   printf("Version.\n");
+   printf("\nTesting pigpiod C I/F 1\n");
 
    printf("pigpio version %d.\n", get_pigpio_version());
 
@@ -360,7 +360,8 @@ To the lascivious pleasing of a lute.\n\
 
    wid = wave_create();
    e = wave_send_repeat(wid);
-   CHECK(5, 3, e, 9, 0, "wave tx repeat");
+   if (e < 14) CHECK(5, 3, e,  9, 0, "wave tx repeat");
+   else        CHECK(5, 3, e, 19, 0, "wave tx repeat");
 
    oc = t5_count;
    time_sleep(5.05);
@@ -379,7 +380,8 @@ To the lascivious pleasing of a lute.\n\
 
    wid = wave_create();
    e = wave_send_once(wid);
-   CHECK(5, 8, e, 6811, 0, "wave tx start");
+   if (e < 6964) CHECK(5, 8, e, 6811, 0, "wave tx start");
+   else          CHECK(5, 8, e, 7116, 0, "wave tx start");
 
    oc = t5_count;
    time_sleep(3);
@@ -419,10 +421,12 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 18, c, 12000, 0, "wave get max pulses");
 
    c = wave_get_cbs();
-   CHECK(5, 19, c, 6810, 0, "wave get cbs");
+   if (c < 6963) CHECK(5, 19, c, 6810, 0, "wave get cbs");
+   else          CHECK(5, 19, c, 7115, 0, "wave get cbs");
 
    c = wave_get_high_cbs();
-   CHECK(5, 20, c, 6810, 0, "wave get high cbs");
+   if (c < 6963) CHECK(5, 20, c, 6810, 0, "wave get high cbs");
+   else          CHECK(5, 20, c, 7115, 0, "wave get high cbs");
 
    c = wave_get_max_cbs();
    CHECK(5, 21, c, 25016, 0, "wave get max cbs");
