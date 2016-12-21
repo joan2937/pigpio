@@ -1,5 +1,6 @@
 *.o
 *.so
+*.pyc
 pig2vcd
 pigpiod
 pigs
@@ -8,3 +9,5 @@ x_pigpiod_if
 x_pigpiod_if2
 __pycache__
 build
+dist
+*.egg-info
