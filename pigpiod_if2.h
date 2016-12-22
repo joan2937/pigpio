@@ -3641,13 +3641,13 @@ to cancel the callback.
 CBFunc_t::
 . .
 typedef void (*CBFunc_t)
-   (unsigned user_gpio, unsigned level, uint32_t tick);
+   (int pi, unsigned user_gpio, unsigned level, uint32_t tick);
 . .
 
 CBFuncEx_t::
 . .
 typedef void (*CBFuncEx_t)
-   (unsigned user_gpio, unsigned level, uint32_t tick, void * userdata);
+   (int pi, unsigned user_gpio, unsigned level, uint32_t tick, void * userdata);
 . .
 
 char::

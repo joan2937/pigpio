@@ -6065,7 +6065,7 @@ to cancel the callback.
 .EX
 typedef void (*CBFunc_t)
 .br
-   (unsigned user_gpio, unsigned level, uint32_t tick);
+   (int pi, unsigned user_gpio, unsigned level, uint32_t tick);
 .br
 
 .EE
@@ -6079,7 +6079,7 @@ typedef void (*CBFunc_t)
 .EX
 typedef void (*CBFuncEx_t)
 .br
-   (unsigned user_gpio, unsigned level, uint32_t tick, void * userdata);
+   (int pi, unsigned user_gpio, unsigned level, uint32_t tick, void * userdata);
 .br
 
 .EE

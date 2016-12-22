@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 58 */
+/* pigpio version 59 */
 
 /* include ------------------------------------------------------- */
 
@@ -897,6 +897,8 @@ typedef struct
    uint16_t width;
    uint16_t range; /* dutycycles specified by 0 .. range */
    uint16_t freqIdx;
+   uint16_t deferOff;
+   uint16_t deferRng;
 } gpioInfo_t;
 
 typedef struct
@@ -2507,6 +2509,7 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
 {
    int switchGpioOff;
    int newOff, oldOff, realRange, cycles, i;
+   int deferOff, deferRng;
 
    DBG(DBG_INTERNAL,
       "myGpioSetPwm %d from %d to %d", gpio, oldVal, newVal);
@@ -2520,6 +2523,18 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
    newOff = (newVal * realRange)/gpioInfo[gpio].range;
    oldOff = (oldVal * realRange)/gpioInfo[gpio].range;
 
+   deferOff = gpioInfo[gpio].deferOff;
+   deferRng = gpioInfo[gpio].deferRng;
+
+   if (gpioInfo[gpio].deferOff)
+   {
+      for (i=0; i<SUPERLEVEL; i+=deferRng)
+      {
+         myClearGpioOff(gpio, i+deferOff);
+      }
+      gpioInfo[gpio].deferOff = 0;
+   }
+
    if (newOff != oldOff)
    {
       if (newOff && oldOff)                      /* PWM CHANGE */
@@ -2527,8 +2542,16 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
          for (i=0; i<SUPERLEVEL; i+=realRange)
             mySetGpioOff(gpio, i+newOff);
 
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            myClearGpioOff(gpio, i+oldOff);
+         if (newOff > oldOff)
+         {
+            for (i=0; i<SUPERLEVEL; i+=realRange)
+               myClearGpioOff(gpio, i+oldOff);
+         }
+         else
+         {
+            gpioInfo[gpio].deferOff = oldOff;
+            gpioInfo[gpio].deferRng = realRange;
+         }
       }
       else if (newOff)                           /* PWM START */
       {
@@ -2565,6 +2588,7 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
 static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 {
    int newOff, oldOff, realRange, cycles, i;
+   int deferOff, deferRng;
 
    DBG(DBG_INTERNAL,
       "myGpioSetServo %d from %d to %d", gpio, oldVal, newVal);
@@ -2575,6 +2599,18 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
    newOff = (newVal * realRange)/20000;
    oldOff = (oldVal * realRange)/20000;
 
+   deferOff = gpioInfo[gpio].deferOff;
+   deferRng = gpioInfo[gpio].deferRng;
+
+   if (gpioInfo[gpio].deferOff)
+   {
+      for (i=0; i<SUPERLEVEL; i+=deferRng)
+      {
+         myClearGpioOff(gpio, i+deferOff);
+      }
+      gpioInfo[gpio].deferOff = 0;
+   }
+
    if (newOff != oldOff)
    {
       if (newOff && oldOff)                       /* SERVO CHANGE */
@@ -2582,8 +2618,16 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
          for (i=0; i<SUPERLEVEL; i+=realRange)
             mySetGpioOff(gpio, i+newOff);
 
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            myClearGpioOff(gpio, i+oldOff);
+         if (newOff > oldOff)
+         {
+            for (i=0; i<SUPERLEVEL; i+=realRange)
+               myClearGpioOff(gpio, i+oldOff);
+         }
+         else
+         {
+            gpioInfo[gpio].deferOff = oldOff;
+            gpioInfo[gpio].deferRng = realRange;
+         }
       }
       else if (newOff)                            /* SERVO START */
       {
@@ -2592,8 +2636,7 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 
          /* schedule new gpio on */
 
-         for (i=0; i<SUPERCYCLE; i+=cycles)
-            mySetGpioOn(gpio, i);
+         for (i=0; i<SUPERCYCLE; i+=cycles) mySetGpioOn(gpio, i);
       }
       else                                        /* SERVO STOP */
       {
@@ -8537,11 +8580,11 @@ int gpioSetPullUpDown(unsigned gpio, unsigned pud)
 
    *(gpioReg + GPPUD) = pud;
 
-   myGpioDelay(20);
+   myGpioDelay(1);
 
    *(gpioReg + GPPUDCLK0 + BANK) = BIT;
 
-   myGpioDelay(20);
+   myGpioDelay(1);
 
    *(gpioReg + GPPUD) = 0;
 
@@ -10091,7 +10134,7 @@ static void I2C_delay(wfRx_t *w)
 
 static void I2C_clock_stretch(wfRx_t *w)
 {
-   uint32_t now, max_stretch=10000;
+   uint32_t now, max_stretch=100000;
 
    myGpioSetMode(w->I.SCL, PI_INPUT);
    now = gpioTick();
@@ -10348,7 +10391,7 @@ int bbI2CZip(
             {
                if (!ack)
                {
-                  if ((bytes + outPos) < outLen)
+                  if ((bytes + outPos) <= outLen)
                   {
                      for (i=0; i<(bytes-1); i++)
                      {
@@ -10373,7 +10416,7 @@ int bbI2CZip(
             {
                if (!ack)
                {
-                  if ((bytes + inPos) < inLen)
+                  if ((bytes + inPos) <= inLen)
                   {
                      for (i=0; i<(bytes-1); i++)
                      {
@@ -10382,7 +10425,7 @@ int bbI2CZip(
                      }
                      ack = I2CPutByte(w, inBuf[inPos++]);
                   }
-                  else status = PI_BAD_I2C_RLEN;
+                  else status = PI_BAD_I2C_WLEN;
                } else status = PI_I2C_WRITE_FAILED;
             }
             else status = PI_BAD_I2C_CMD;
@@ -11224,6 +11267,7 @@ static void *pthISRThread(void *x)
       {
          lseek(fd, 0, SEEK_SET);    /* consume interrupt */
          read(fd, buf, sizeof buf);
+
          if (retval)
          {
             if (levels & (1<<isr->gpio)) level = PI_ON; else level = PI_OFF;

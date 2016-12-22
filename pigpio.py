@@ -299,7 +299,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.34"
+VERSION = "1.35"
 
 exceptions = True
 
@@ -1744,12 +1744,11 @@ class pi():
 
       The watchdog may be cancelled by setting timeout to 0.
 
-      If no level change has been detected for the GPIO for timeout
-      milliseconds any notification for the GPIO has a report written
-      to the fifo with the flags set to indicate a watchdog timeout.
+      Once a watchdog has been started callbacks for the GPIO
+      will be triggered whenever there has been no GPIO activity
+      for the timeout interval.
 
-      The callback class interprets the flags and will
-      call registered callbacks for the GPIO with level TIMEOUT.
+      The callback will receive the special level TIMEOUT.
 
       ...
       pi.set_watchdog(23, 1000) # 1000 ms watchdog on GPIO 23
