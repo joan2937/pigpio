@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 59 */
+/* pigpio version 60 */
 
 /* include ------------------------------------------------------- */
 
@@ -2539,8 +2539,10 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
    {
       if (newOff && oldOff)                      /* PWM CHANGE */
       {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
+         if (newOff != realRange)
+         {
+            for (i=0; i<SUPERLEVEL; i+=realRange) mySetGpioOff(gpio, i+newOff);
+         }
 
          if (newOff > oldOff)
          {
@@ -2555,8 +2557,10 @@ static void myGpioSetPwm(unsigned gpio, int oldVal, int newVal)
       }
       else if (newOff)                           /* PWM START */
       {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
+         if (newOff != realRange)
+         {
+            for (i=0; i<SUPERLEVEL; i+=realRange) mySetGpioOff(gpio, i+newOff);
+         }
 
          /* schedule new gpio on */
 
