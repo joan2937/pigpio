@@ -77,7 +77,7 @@ Type 1
 
     Hardware revision numbers of 2 and 3.
 
-    User gpios 0-1, 4, 7-11, 14-15, 17-18, 21-25.
+    User GPIO 0-1, 4, 7-11, 14-15, 17-18, 21-25.
 
 Type 2
 
@@ -85,7 +85,7 @@ Type 2
 
     Hardware revision numbers of 4, 5, 6, and 15.
 
-    User gpios 2-4, 7-11, 14-15, 17-18, 22-25, 27-31.
+    User GPIO 2-4, 7-11, 14-15, 17-18, 22-25, 27-31.
 
 Type 3
 
@@ -93,7 +93,7 @@ Type 3
 
     Hardware revision numbers of 16 or greater.
 
-    User gpios 2-27 (0 and 1 are reserved).
+    User GPIO 2-27 (0 and 1 are reserved).
 
 It is safe to read all the GPIO. If you try to write a system GPIO or change
 its mode you can crash the Pi or corrupt the data on the SD card.
