@@ -50,25 +50,24 @@ A number of utility programs are provided
 
     the pigpiod daemon.
     the Python module.
-    the piscope digital waveform viewer
-    
-Examples
-
-See http://abyz.co.uk/rpi/pigpio/examples.html
+    the piscope digital waveform viewer.
     the pigs command line utility.
-
     the pig2vcd utility which converts notifications into the value change dump (VCD)
     format (useful for viewing digital waveforms with GTKWave).
 
-gpios
+Example programs
 
-ALL gpios are identified by their Broadcom number.  See elinux.org
+See http://abyz.co.uk/rpi/pigpio/examples.html
 
-There are 54 gpios in total, arranged in two banks.
+GPIO
 
-Bank 1 contains gpios 0-31.  Bank 2 contains gpios 32-54.
+ALL GPIO are identified by their Broadcom number.  See elinux.org
 
-A user should only manipulate gpios in bank 1.
+There are 54 GPIO in total, arranged in two banks.
+
+Bank 1 contains GPIO 0-31.  Bank 2 contains GPIO 32-54.
+
+A user should only manipulate GPIO in bank 1.
 
 There are at least three types of board.
 
@@ -96,6 +95,5 @@ Type 3
 
     User gpios 2-27 (0 and 1 are reserved).
 
-It is safe to read all the gpios. If you try to write a system gpio or change
+It is safe to read all the GPIO. If you try to write a system GPIO or change
 its mode you can crash the Pi or corrupt the data on the SD card.
-
