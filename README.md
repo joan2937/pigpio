@@ -1,36 +1,36 @@
 # pigpio
 pigpio is a C library for the Raspberry which allows control of the
-general purpose input outputs (gpios).
+General Purpose Input Outputs (GPIO).
 
 Features
 
-    sampling and time-stamping of gpios 0-31 between 100,000 and 1,000,000 times per second.
+    sampling and time-stamping of GPIO 0-31 between 100,000 and 1,000,000 times per second.
 
-    provision of PWM on any number of the user gpios simultaneously.
+    provision of PWM on any number of the user GPIO simultaneously.
 
-    provision of servo pulses on any number of the user gpios simultaneously.
+    provision of servo pulses on any number of the user GPIO simultaneously.
 
-    callbacks when any of gpios 0-31 change state (callbacks receive the time of the event
+    callbacks when any of GPIO 0-31 change state (callbacks receive the time of the event
     accurate to a few microseconds).
 
-    notifications via pipe when any of gpios 0-31 change state.
+    notifications via pipe when any of GPIO 0-31 change state.
 
     callbacks at timed intervals.
 
-    reading/writing all of the gpios in a bank (0-31, 32-53) as a single operation.
+    reading/writing all of the GPIO in a bank (0-31, 32-53) as a single operation.
 
-    individually setting gpio modes, reading and writing.
+    individually setting GPIO modes, reading and writing.
 
     socket and pipe interfaces for the bulk of the functionality in addition to the
     underlying C library calls.
 
-    the construction of arbitrary waveforms to give precise timing of output gpio
+    the construction of arbitrary waveforms to give precise timing of output GPIO
     level changes (accurate to a few microseconds).
 
-    software serial links using any user gpio.
+    software serial links, I2C, and SPI using any user GPIO.
 
     rudimentary permission control through the socket and pipe interfaces so users
-    can be prevented from "updating" inappropriate gpios.
+    can be prevented from "updating" inappropriate GPIO.
 
     creating and running scripts on the pigpio daemon.
 
@@ -50,7 +50,11 @@ A number of utility programs are provided
 
     the pigpiod daemon.
     the Python module.
+    the piscope digital waveform viewer
+    
+Examples
 
+See http://abyz.co.uk/rpi/pigpio/examples.html
     the pigs command line utility.
 
     the pig2vcd utility which converts notifications into the value change dump (VCD)
