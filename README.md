@@ -46,7 +46,7 @@ See http://abyz.co.uk/rpi/pigpio/examples.html.
 
 ## GPIO
 
-ALL GPIO are identified by their Broadcom number.  See elinux.org
+ALL GPIO are identified by their Broadcom number.  See http://elinux.org.
 
 There are 54 GPIO in total, arranged in two banks.
 
