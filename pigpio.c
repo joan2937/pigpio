@@ -6972,11 +6972,17 @@ static void *pthSocketThreadHandler(void *fdC)
    return 0;
 }
 
-static int addrAllowed(uint32_t addr)
+static int addrAllowed(struct sockaddr *saddr)
 {
    int i;
+   uint32_t addr;
 
    if (!numSockNetAddr) return 1;
+
+   // FIXME: add IPv6 whitelisting support
+   if (saddr->sa_family != AF_INET) return 0;
+
+   addr = ((struct sockaddr_in *) saddr)->sin_addr.s_addr;
 
    for (i=0; i<numSockNetAddr; i++)
    {
@@ -6990,7 +6996,7 @@ static int addrAllowed(uint32_t addr)
 static void * pthSocketThread(void *x)
 {
    int fdC=0, c, *sock;
-   struct sockaddr_in client;
+   struct sockaddr_storage client;
    pthread_attr_t attr;
 
    if (pthread_attr_init(&attr))
@@ -7010,7 +7016,7 @@ static void * pthSocketThread(void *x)
 
    listen(fdSock, 100);
 
-   c = sizeof(struct sockaddr_in);
+   c = sizeof(client);
 
    /* don't start until DMA started */
 
@@ -7024,7 +7030,7 @@ static void * pthSocketThread(void *x)
 
       closeOrphanedNotifications(-1, fdC);
 
-      if (addrAllowed(client.sin_addr.s_addr))
+      if (addrAllowed((struct sockaddr *)&client))
       {
          sock = malloc(sizeof(int));
 
@@ -8003,6 +8009,7 @@ int initInitialise(void)
 {
    int rev, i, model;
    struct sockaddr_in server;
+   struct sockaddr_in6 server6;
    char * portStr;
    unsigned port;
    struct sched_param param;
@@ -8107,28 +8114,54 @@ int initInitialise(void)
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
    {
-      fdSock = socket(AF_INET , SOCK_STREAM , 0);
-
-      if (fdSock == -1)
-         SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
-
       portStr = getenv(PI_ENVPORT);
-
       if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
 
-      server.sin_family = AF_INET;
-      if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
+      // Accept connections on IPv6, unless we have an IPv4-only whitelist
+      if (!numSockNetAddr)
       {
-         server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-      }
-      else
-      {
-         server.sin_addr.s_addr = htonl(INADDR_ANY);
-      }
-      server.sin_port = htons(port);
+         fdSock = socket(AF_INET6, SOCK_STREAM , 0);
 
-      if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
-         SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+         if (fdSock != -1)
+         {
+            bzero((char *)&server6, sizeof(server6));
+            server6.sin6_family = AF_INET6;
+            if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
+            {
+               server6.sin6_addr = in6addr_loopback;
+            }
+            else
+            {
+               server6.sin6_addr = in6addr_any;
+            }
+            server6.sin6_port = htons(port);
+
+            if (bind(fdSock,(struct sockaddr *)&server6, sizeof(server6)) < 0)
+               SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+         }
+      }
+
+      if (numSockNetAddr || fdSock == -1)
+      {
+         fdSock = socket(AF_INET , SOCK_STREAM , 0);
+
+         if (fdSock == -1)
+            SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
+
+         server.sin_family = AF_INET;
+         if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
+         {
+            server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+         }
+         else
+         {
+            server.sin_addr.s_addr = htonl(INADDR_ANY);
+         }
+         server.sin_port = htons(port);
+
+         if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
+            SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+      }
 
       if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
          SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
