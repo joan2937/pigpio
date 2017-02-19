@@ -299,7 +299,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.35"
+VERSION = "1.36"
 
 exceptions = True
 
@@ -4888,7 +4888,7 @@ class pi():
       return a.trigger
 
    def __init__(self,
-                host = os.getenv("PIGPIO_ADDR", ''),
+                host = os.getenv("PIGPIO_ADDR", 'localhost'),
                 port = os.getenv("PIGPIO_PORT", 8888)):
       """
       Grants access to a Pi's GPIO.
@@ -4926,6 +4926,9 @@ class pi():
 
       port = int(port)
 
+      if host == '':
+         host = "localhost"
+
       self._host = host
       self._port = port
 
@@ -4954,12 +4957,7 @@ class pi():
          if self.sl.s is not None:
             self.sl.s = None
 
-         if host == '':
-            h = "localhost"
-         else:
-            h = host
-
-         s = "Can't connect to pigpio at {}({})".format(str(h), str(port))
+         s = "Can't connect to pigpio at {}({})".format(host, str(port))
 
          print(_except_a.format(s))
          if exception == 1:

@@ -190,6 +190,37 @@ When a command takes a number as a parameter it may be entered as hex
 E.g. 23 is 23 decimal, 0x100 is 256 decimal, 070 is 56 decimal.
 
 .br
+Some commands can return a variable number of data bytes.  By
+default this data is displayed as decimal.  The pigs -a option
+can be used to force the display as ASCII and the pigs -x
+option can be used to force the display as hex.
+
+.br
+E.g. assuming the transmitted serial data is the letters ABCDEONM
+
+.br
+
+.EX
+$ pigs slr 4 100
+.br
+8 65 66 67 68 69 79 78 77
+.br
+
+.br
+$ pigs -a slr 4 100
+.br
+8 ABCDEONM
+.br
+
+.br
+$ pigs -x slr 4 100
+.br
+8 41 42 43 44 45 4f 4e 4d
+.br
+
+.EE
+
+.br
 
 .SH COMMANDS
 

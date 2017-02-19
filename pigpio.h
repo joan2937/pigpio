@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 60
+#define PIGPIO_VERSION 61
 
 /*TEXT
 
@@ -676,10 +676,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* Files, I2C, SPI, SER */
 
-#define PI_FILE_SLOTS 8
-#define PI_I2C_SLOTS 32
-#define PI_SPI_SLOTS 16
-#define PI_SER_SLOTS 8
+#define PI_FILE_SLOTS 16
+#define PI_I2C_SLOTS  64
+#define PI_SPI_SLOTS  32
+#define PI_SER_SLOTS  16
 
 #define PI_MAX_I2C_ADDR 0x7F
 

@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 60 */
+/* pigpio version 61 */
 
 /* include ------------------------------------------------------- */
 
@@ -9482,6 +9482,12 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
       initClock(0); /* initialise secondary clock */
       waveClockInited = 1;
       PWMClockInited = 0;
+   }
+
+   if (wave_mode < PI_WAVE_MODE_ONE_SHOT_SYNC)
+   {
+      dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
+      dmaOut[DMA_CONBLK_AD] = 0;
    }
 
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
