@@ -1047,9 +1047,7 @@ class _callback_thread(threading.Thread):
       self.event_bits = 0
       self.callbacks = []
       self.events = []
-      self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      self.sl.s.settimeout(None)
-      self.sl.s.connect((host, port))
+      self.sl.s = socket.create_connection((host, port), None)
       self.handle = _pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0)
       self.go = True
       self.start()
@@ -4931,14 +4929,12 @@ class pi():
       self._host = host
       self._port = port
 
-      self.sl.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      self.sl.s.settimeout(None)
-
-      # Disable the Nagle algorithm.
-      self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-
       try:
-         self.sl.s.connect((host, port))
+         self.sl.s = socket.create_connection((host, port), None)
+
+         # Disable the Nagle algorithm.
+         self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
          self._notify = _callback_thread(self.sl, host, port)
 
       except socket.error:
