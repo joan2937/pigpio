@@ -717,7 +717,12 @@ int pigpio_start(char *addrStr, char *portStr)
    {
       if (!gPiInUse[pi]) break;
    }
-
+   
+   if ((!addrStr) || (strlen(addrStr) == 0))
+   {
+      addrStr = "localhost";
+   }
+   
    if (pi >= MAX_PI) return pigif_too_many_pis;
 
    gPiInUse[pi] = 1;
