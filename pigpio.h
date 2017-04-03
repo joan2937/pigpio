@@ -100,6 +100,7 @@ with the following exceptions:
 [*gpioCfg**]
 [*gpioVersion*]
 [*gpioHardwareRevision*]
+[*gpioIsInitialised*]
 . .
 
 If the library is not initialised all but the [*gpioCfg**],
@@ -116,6 +117,7 @@ TEXT*/
 ESSENTIAL
 
 gpioInitialise             Initialise library
+gpioIsInitialised          Test if library is initialised        
 gpioTerminate              Stop library
 
 BEGINNER
@@ -923,6 +925,7 @@ with the following exceptions:
 [*gpioCfg**]
 [*gpioVersion*]
 [*gpioHardwareRevision*]
+[*gpioIsInitialised*]
 . .
 
 ...
@@ -937,6 +940,26 @@ else
 ...
 D*/
 
+/*F*/
+int gpioIsInitialised(void);
+/*D
+Tests if the library is initialised.
+
+Returns 0 if OK, otherwise PI_NOT_INITIALISED.
+
+gpioIsInitialised can be called at any time.
+
+...
+if (gpioIsInitialised() < 0)
+{
+   // pigpio is not initialised.
+}
+else
+{
+   // pigpio initialised okay.
+}
+...
+D*/
 
 /*F*/
 void gpioTerminate(void);
