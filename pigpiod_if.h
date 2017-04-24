@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 25
+#define PIGPIOD_IF_VERSION 26
 
 /*TEXT
 

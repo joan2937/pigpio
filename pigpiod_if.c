@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 25 */
+/* PIGPIOD_IF_VERSION 26 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -492,6 +492,11 @@ void stop_thread(pthread_t *pth)
 
 int pigpio_start(char *addrStr, char *portStr)
 {
+   if ((!addrStr) || (strlen(addrStr) == 0))
+   {
+      addrStr = "localhost";
+   }
+
    if (!gPigStarted)
    {
       gPigCommand = pigpioOpenSocket(addrStr, portStr);

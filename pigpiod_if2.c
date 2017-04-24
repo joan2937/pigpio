@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 9 */
+/* PIGPIOD_IF2_VERSION 10 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -712,6 +712,11 @@ int pigpio_start(char *addrStr, char *portStr)
 {
    int pi;
    int *userdata;
+
+   if ((!addrStr) || (strlen(addrStr) == 0))
+   {
+      addrStr = "localhost";
+   }
 
    for (pi=0; pi<MAX_PI; pi++)
    {

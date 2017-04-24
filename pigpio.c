@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 61 */
+/* pigpio version 62 */
 
 /* include ------------------------------------------------------- */
 
@@ -4395,6 +4395,8 @@ static void spiGoS(
                  SPI_CS_CSPOL(cspol)   |
                  SPI_CS_CLEAR(3);
 
+   spiReg[SPI_DLEN] = 2; /* undocumented, stops inter-byte gap */
+
    spiReg[SPI_CS] = spiDefaults; /* stop */
 
    if (!count) return;
@@ -4925,6 +4927,8 @@ int serReadByte(unsigned handle)
 
 int serWrite(unsigned handle, char *buf, unsigned count)
 {
+   int written=0, wrote=0;
+
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
 
@@ -4939,7 +4943,19 @@ int serWrite(unsigned handle, char *buf, unsigned count)
    if (!count)
       SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
 
-   if (write(serInfo[handle].fd, buf, count) != count)
+   while ((written != count) && (wrote >= 0))
+   {
+      wrote = write(serInfo[handle].fd, buf+written, count-written);
+
+      if (wrote >= 0)
+      {
+         written += wrote;
+
+         if (written != count) time_sleep(0.05);
+      }
+   }
+
+   if (written != count)
       return PI_SER_WRITE_FAILED;
    else
       return 0;
@@ -8703,6 +8719,8 @@ int gpioPWM(unsigned gpio, unsigned val)
       switchFunctionOff(gpio);
 
       gpioInfo[gpio].is = GPIO_PWM;
+
+      if (!val) myGpioWrite(gpio, 0);
    }
 
    myGpioSetMode(gpio, PI_OUTPUT);
@@ -8940,6 +8958,8 @@ int gpioServo(unsigned gpio, unsigned val)
       switchFunctionOff(gpio);
 
       gpioInfo[gpio].is = GPIO_SERVO;
+
+      if (!val) myGpioWrite(gpio, 0);
    }
 
    myGpioSetMode(gpio, PI_OUTPUT);
