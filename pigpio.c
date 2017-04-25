@@ -8115,10 +8115,13 @@ int initInitialise(void)
    if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
       SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
 
-   if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
+   if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+   {
+      if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
+         SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
 
-   pthAlertRunning = 1;
+      pthAlertRunning = 1;
+   }
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
    {

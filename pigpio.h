@@ -846,6 +846,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_DISABLE_FIFO_IF   1
 #define PI_DISABLE_SOCK_IF   2
 #define PI_LOCALHOST_SOCK_IF 4
+#define PI_DISABLE_ALERT     8
 
 /* memAllocMode */
 

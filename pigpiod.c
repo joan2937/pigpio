@@ -217,6 +217,10 @@ static void initOpts(int argc, char *argv[])
             ifFlags |= PI_LOCALHOST_SOCK_IF;
             break; 
 
+         case 'm':
+            ifFlags |= PI_DISABLE_ALERT;
+            break; 
+
          case 'n':
             addr = checkAddr(optarg);
             if (addr && (numSockNetAddr<MAX_CONNECT_ADDRESSES))
