@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpiod_if2.3
 ."
-.TH pigpiod_if2 3 2012-2015 Linux "pigpio archive"
+.TH pigpiod_if2 3 2012-2017 Linux "pigpio archive"
 .SH NAME
 pigpiod_if2 - A C library to interface to the pigpio daemon.
 
@@ -1133,15 +1133,13 @@ The watchdog may be cancelled by setting timeout to 0.
 .br
 
 .br
-If no level change has been detected for the GPIO for timeout
-milliseconds any notification for the GPIO has a report written
-to the fifo with the flags set to indicate a watchdog timeout.
+Once a watchdog has been started callbacks for the GPIO will be
+triggered every timeout interval after the last GPIO activity.
 
 .br
 
 .br
-The \fBcallback\fP and \fBcallback_ex\fP functions interpret the flags
-and will call registered callbacks for the GPIO with level TIMEOUT.
+The callback will receive the special level PI_TIMEOUT.
 
 .IP "\fBint set_glitch_filter(int pi, unsigned user_gpio, unsigned steady)\fP"
 .IP "" 4
@@ -1177,7 +1175,19 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 .br
 
 .br
-Note, each (stable) edge will be timestamped \fBsteady\fP microseconds
+This filter affects the GPIO samples returned to callbacks set up
+with \fBcallback\fP, \fBcallback_ex\fP and \fBwait_for_edge\fP.
+
+.br
+
+.br
+It does not affect levels read by \fBgpio_read\fP,
+\fBread_bank_1\fP, or \fBread_bank_2\fP.
+
+.br
+
+.br
+Each (stable) edge will be timestamped \fBsteady\fP microseconds
 after it was first detected.
 
 .IP "\fBint set_noise_filter(int pi, unsigned user_gpio, unsigned steady, unsigned active)\fP"
@@ -1216,7 +1226,19 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 .br
 
 .br
-Note, level changes before and after the active period may
+This filter affects the GPIO samples returned to callbacks set up
+with \fBcallback\fP, \fBcallback_ex\fP and \fBwait_for_edge\fP.
+
+.br
+
+.br
+It does not affect levels read by \fBgpio_read\fP,
+\fBread_bank_1\fP, or \fBread_bank_2\fP.
+
+.br
+
+.br
+Level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
 
@@ -4208,8 +4230,19 @@ For bits 17-32 there will be four bytes per character.
 .br
 
 .br
-E.g. to transfer 32 12-bit words buf should contain 64 bytes
+Multi-byte transfers are made in least significant byte first order.
+
+.br
+
+.br
+E.g. to transfer 32 11-bit words buf should contain 64 bytes
 and count should be 64.
+
+.br
+
+.br
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
 
 .br
 
@@ -5317,6 +5350,36 @@ pigif_duplicate_callback, or pigif_bad_callback.
 The callback is called with the GPIO, edge, and tick, whenever the
 GPIO has the identified edge.
 
+.br
+
+.br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-31     The GPIO which has changed state
+.br
+
+.br
+edge        0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (a watchdog timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.EE
+
 .IP "\fBint callback_ex(int pi, unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *userdata)\fP"
 .IP "" 4
 This function initialises a new callback.
@@ -5350,6 +5413,40 @@ pigif_duplicate_callback, or pigif_bad_callback.
 .br
 The callback is called with the GPIO, edge, tick, and the userdata
 pointer, whenever the GPIO has the identified edge.
+
+.br
+
+.br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-31     The GPIO which has changed state
+.br
+
+.br
+edge        0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (a watchdog timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.br
+userdata    pointer  Pointer to an arbitrary object
+.br
+
+.EE
 
 .IP "\fBint callback_cancel(unsigned callback_id)\fP"
 .IP "" 4

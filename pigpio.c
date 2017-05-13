@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 62 */
+/* pigpio version 63 */
 
 /* include ------------------------------------------------------- */
 
@@ -732,23 +732,28 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define TICKSLOTS 50
 
-#define PI_I2C_CLOSED 0
-#define PI_I2C_OPENED 1
+#define PI_I2C_CLOSED   0
+#define PI_I2C_RESERVED 1
+#define PI_I2C_OPENED   2
 
-#define PI_SPI_CLOSED 0
-#define PI_SPI_OPENED 1
+#define PI_SPI_CLOSED   0
+#define PI_SPI_RESERVED 1
+#define PI_SPI_OPENED   2
 
-#define PI_SER_CLOSED 0
-#define PI_SER_OPENED 1
+#define PI_SER_CLOSED   0
+#define PI_SER_RESERVED 1
+#define PI_SER_OPENED   2
 
-#define PI_FILE_CLOSED 0
-#define PI_FILE_OPENED 1
+#define PI_FILE_CLOSED   0
+#define PI_FILE_RESERVED 1
+#define PI_FILE_OPENED   2
 
-#define PI_NOTIFY_CLOSED  0
-#define PI_NOTIFY_CLOSING 1
-#define PI_NOTIFY_OPENED  2
-#define PI_NOTIFY_RUNNING 3
-#define PI_NOTIFY_PAUSED  4
+#define PI_NOTIFY_CLOSED   0
+#define PI_NOTIFY_RESERVED 1
+#define PI_NOTIFY_CLOSING  2
+#define PI_NOTIFY_OPENED   3
+#define PI_NOTIFY_RUNNING  4
+#define PI_NOTIFY_PAUSED   5
 
 #define PI_WFRX_NONE     0
 #define PI_WFRX_SERIAL   1
@@ -860,6 +865,10 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 #define PI_STARTING 0
 #define PI_RUNNING  1
 #define PI_ENDING   2
+
+#define PI_THREAD_NONE    0
+#define PI_THREAD_STARTED 1
+#define PI_THREAD_RUNNING 2
 
 #define PI_MAX_PATH 512
 
@@ -1251,15 +1260,15 @@ static volatile uint32_t scriptEventBits  = 0;
 
 static volatile int runState = PI_STARTING;
 
-static int pthAlertRunning  = 0;
-static int pthFifoRunning   = 0;
-static int pthSocketRunning = 0;
+static int pthAlertRunning  = PI_THREAD_NONE;
+static int pthFifoRunning   = PI_THREAD_NONE;
+static int pthSocketRunning = PI_THREAD_NONE;
 
 static gpioAlert_t      gpioAlert  [PI_MAX_USER_GPIO+1];
 
 static eventAlert_t     eventAlert [PI_MAX_EVENT+1];
 
-static gpioISR_t        gpioISR    [PI_MAX_USER_GPIO+1];
+static gpioISR_t        gpioISR    [PI_MAX_GPIO+1];
 
 static gpioGetSamples_t gpioGetSamples;
 
@@ -1279,9 +1288,6 @@ static gpioSignal_t     gpioSignal [PI_MAX_SIGNUM+1];
 static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 
 static int pwmFreq[PWM_FREQS];
-
-static pthread_mutex_t spi_main_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t spi_aux_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* reset after gpioTerminated */
 
@@ -3333,7 +3339,7 @@ int i2cWriteQuick(unsigned handle, unsigned bit)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_QUICK) == 0)
@@ -3366,7 +3372,7 @@ int i2cReadByte(unsigned handle)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE) == 0)
@@ -3396,7 +3402,7 @@ int i2cWriteByte(unsigned handle, unsigned bVal)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE) == 0)
@@ -3434,7 +3440,7 @@ int i2cReadByteData(unsigned handle, unsigned reg)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE_DATA) == 0)
@@ -3469,7 +3475,7 @@ int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE_DATA) == 0)
@@ -3512,7 +3518,7 @@ int i2cReadWordData(unsigned handle, unsigned reg)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_WORD_DATA) == 0)
@@ -3551,7 +3557,7 @@ int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_WORD_DATA) == 0)
@@ -3594,7 +3600,7 @@ int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
@@ -3637,7 +3643,7 @@ int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
@@ -3685,7 +3691,7 @@ int i2cWriteBlockData(
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
@@ -3732,7 +3738,7 @@ int i2cBlockProcessCall(
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
@@ -3784,7 +3790,7 @@ int i2cReadI2CBlockData(
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_I2C_BLOCK) == 0)
@@ -3838,7 +3844,7 @@ int i2cWriteI2CBlockData(
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK) == 0)
@@ -3882,7 +3888,7 @@ int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
@@ -3911,7 +3917,7 @@ int i2cReadDevice(unsigned handle, char *buf, unsigned count)
    if (handle >= PI_I2C_SLOTS)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state == PI_I2C_CLOSED)
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
@@ -3930,6 +3936,7 @@ int i2cReadDevice(unsigned handle, char *buf, unsigned count)
 
 int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
 {
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    char dev[32];
    int i, slot, fd;
    uint32_t funcs;
@@ -3947,18 +3954,21 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
 
    slot = -1;
 
+   pthread_mutex_lock(&mutex);
+
    for (i=0; i<PI_I2C_SLOTS; i++)
    {
       if (i2cInfo[i].state == PI_I2C_CLOSED)
       {
-         i2cInfo[i].state = PI_I2C_OPENED;
          slot = i;
+         i2cInfo[slot].state = PI_I2C_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_HANDLE, "no I2C handles");
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no I2C handles");
 
    sprintf(dev, "/dev/i2c-%d", i2cBus);
 
@@ -3967,7 +3977,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
       /* try a modprobe */
 
       system("/sbin/modprobe i2c_dev");
-      system("/sbin/modprobe i2c_bcm2708");
+      system("/sbin/modprobe i2c_bcm2835");
 
       myGpioDelay(100000);
 
@@ -3994,6 +4004,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
    i2cInfo[slot].addr = i2cAddr;
    i2cInfo[slot].flags = i2cFlags;
    i2cInfo[slot].funcs = funcs;
+   i2cInfo[i].state = PI_I2C_OPENED;
 
    return slot;
 }
@@ -4480,17 +4491,20 @@ static void spiGo(
    char     *rxBuf,
    unsigned count)
 {
+   static pthread_mutex_t main_mutex = PTHREAD_MUTEX_INITIALIZER;
+   static pthread_mutex_t aux_mutex = PTHREAD_MUTEX_INITIALIZER;
+
    if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
    {
-      pthread_mutex_lock(&spi_aux_mutex);
+      pthread_mutex_lock(&aux_mutex);
       spiGoA(speed, flags, txBuf, rxBuf, count);
-      pthread_mutex_unlock(&spi_aux_mutex);
+      pthread_mutex_unlock(&aux_mutex);
    }
    else
    {
-      pthread_mutex_lock(&spi_main_mutex);
+      pthread_mutex_lock(&main_mutex);
       spiGoS(speed, flags, txBuf, rxBuf, count);
-      pthread_mutex_unlock(&spi_main_mutex);
+      pthread_mutex_unlock(&main_mutex);
    }
 }
 
@@ -4627,6 +4641,7 @@ static void spiTerm(uint32_t flags)
 
 int spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags)
 {
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    int i, slot;
 
    DBG(DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X",
@@ -4661,21 +4676,25 @@ int spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags)
 
    slot = -1;
 
+   pthread_mutex_lock(&mutex);
+
    for (i=0; i<PI_SPI_SLOTS; i++)
    {
       if (spiInfo[i].state == PI_SPI_CLOSED)
       {
-         spiInfo[i].state = PI_SPI_OPENED;
          slot = i;
+         spiInfo[slot].state = PI_SPI_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
 
    spiInfo[slot].speed = baud;
    spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
+   spiInfo[slot].state = PI_SPI_OPENED;
 
    return slot;
 }
@@ -4768,6 +4787,7 @@ int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
 
 int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
 {
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    struct termios new;
    int speed;
    int fd;
@@ -4810,18 +4830,21 @@ int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
 
    slot = -1;
 
+   pthread_mutex_lock(&mutex);
+
    for (i=0; i<PI_SER_SLOTS; i++)
    {
       if (serInfo[i].state == PI_SER_CLOSED)
       {
-         serInfo[i].state = PI_SER_OPENED;
          slot = i;
+         serInfo[slot].state = PI_SER_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_HANDLE, "no serial handles");
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no serial handles");
 
    if ((fd = open(tty, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK)) == -1)
    {
@@ -4846,6 +4869,7 @@ int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
 
    serInfo[slot].fd = fd;
    serInfo[slot].flags = serFlags;
+   serInfo[slot].state = PI_SER_OPENED;
 
    return slot;
 }
@@ -5816,7 +5840,7 @@ static void alertEmit(
 
          gpioNotify[n].state = PI_NOTIFY_CLOSED;
       }
-      else if (gpioNotify[n].state != PI_NOTIFY_CLOSED)
+      else if (gpioNotify[n].state >= PI_NOTIFY_OPENED)
       {
          bits = gpioNotify[n].bits;
 
@@ -5923,7 +5947,7 @@ static void alertEmit(
 
          if (!emit)
          {
-            if ((eTick - gpioNotify[n].lastReportTick) > 60000000)
+            if ((int)(eTick - gpioNotify[n].lastReportTick) > 60000000)
             {
                if (numSamples)
                   newLevel = sample[numSamples-1].level;
@@ -6268,6 +6292,7 @@ static void * pthAlertThread(void *x)
             {
                stickInited = 1;
                numSamples = 0;
+               pthAlertRunning = PI_THREAD_RUNNING;
             }
          }
       }
@@ -7745,9 +7770,9 @@ static void initClearGlobals(void)
    nFilterBits = 0;
    wdogBits    = 0;
 
-   pthAlertRunning  = 0;
-   pthFifoRunning   = 0;
-   pthSocketRunning = 0;
+   pthAlertRunning  = PI_THREAD_NONE;
+   pthFifoRunning   = PI_THREAD_NONE;
+   pthSocketRunning = PI_THREAD_NONE;
 
    wfc[0] = 0;
    wfc[1] = 0;
@@ -7856,7 +7881,7 @@ static void initReleaseResources(void)
 
    /* shut down running threads */
 
-   for (i=0; i<=PI_MAX_USER_GPIO; i++)
+   for (i=0; i<=PI_MAX_GPIO; i++)
    {
       if (gpioISR[i].pth)
       {
@@ -7878,25 +7903,25 @@ static void initReleaseResources(void)
       }
    }
 
-   if (pthAlertRunning)
+   if (pthAlertRunning != PI_THREAD_NONE)
    {
       pthread_cancel(pthAlert);
       pthread_join(pthAlert, NULL);
-      pthAlertRunning = 0;
+      pthAlertRunning = PI_THREAD_NONE;
    }
 
-   if (pthFifoRunning)
+   if (pthFifoRunning != PI_THREAD_NONE)
    {
       pthread_cancel(pthFifo);
       pthread_join(pthFifo, NULL);
-      pthFifoRunning = 0;
+      pthFifoRunning = PI_THREAD_NONE;
    }
 
-   if (pthSocketRunning)
+   if (pthSocketRunning != PI_THREAD_NONE)
    {
       pthread_cancel(pthSocket);
       pthread_join(pthSocket, NULL);
-      pthSocketRunning = 0;
+      pthSocketRunning = PI_THREAD_NONE;
    }
 
    /* release mmap'd memory */
@@ -8118,14 +8143,14 @@ int initInitialise(void)
    if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
       SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
 
-   pthAlertRunning = 1;
+   pthAlertRunning = PI_THREAD_STARTED;
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
    {
       if (pthread_create(&pthFifo, &pthAttr, pthFifoThread, &i))
          SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
 
-      pthFifoRunning = 1;
+      pthFifoRunning = PI_THREAD_STARTED;
    }
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
@@ -8182,18 +8207,16 @@ int initInitialise(void)
       if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
          SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
 
-      pthSocketRunning = 1;
+      pthSocketRunning = PI_THREAD_STARTED;
    }
 
-   myGpioDelay(10000);
+   myGpioDelay(1000);
 
    dmaInitCbs();
 
    flushMemory();
 
    initDMAgo((uint32_t *)dmaIn, (uint32_t)dmaIBus[0]);
-
-   myGpioDelay(20000);
 
    return PIGPIO_VERSION;
 }
@@ -8445,7 +8468,10 @@ int gpioInitialise(void)
    else
    {
       libInitialised = 1;
+
       runState = PI_RUNNING;
+
+      while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
    }
 
    return status;
@@ -11462,8 +11488,8 @@ int gpioSetISRFunc(
 
    CHECK_INITED;
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+   if (gpio > PI_MAX_GPIO)
+      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
 
    if (edge > EITHER_EDGE)
       SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
@@ -11486,8 +11512,8 @@ int gpioSetISRFuncEx(
 
    CHECK_INITED;
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+   if (gpio > PI_MAX_GPIO)
+      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
 
    if (edge > EITHER_EDGE)
       SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
@@ -11504,7 +11530,7 @@ static void closeOrphanedNotifications(int slot, int fd)
    for (i=0; i<PI_NOTIFY_SLOTS; i++)
    {
       if ((i != slot) &&
-          (gpioNotify[i].state != PI_NOTIFY_CLOSED) &&
+          (gpioNotify[i].state >= PI_NOTIFY_OPENED) &&
           (gpioNotify[i].fd == fd))
       {
          DBG(DBG_USER, "closed orphaned fd=%d (handle=%d)", fd, i);
@@ -11512,6 +11538,15 @@ static void closeOrphanedNotifications(int slot, int fd)
          intNotifyBits();
       }
    }
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void notifyMutex(int lock)
+{
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+   if (lock) pthread_mutex_lock(&mutex);
+   else      pthread_mutex_unlock(&mutex);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -11527,18 +11562,21 @@ int gpioNotifyOpenWithSize(int bufSize)
 
    slot = -1;
 
+   notifyMutex(1);
+
    for (i=0; i<PI_NOTIFY_SLOTS; i++)
    {
       if (gpioNotify[i].state == PI_NOTIFY_CLOSED)
       {
-         gpioNotify[i].state = PI_NOTIFY_OPENED;
          slot = i;
+         gpioNotify[slot].state = PI_NOTIFY_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_HANDLE, "no handle");
+   notifyMutex(0);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no handle");
 
    sprintf(name, "/dev/pigpio%d", slot);
 
@@ -11569,6 +11607,7 @@ int gpioNotifyOpenWithSize(int bufSize)
    gpioNotify[slot].pipe  = 1;
    gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
+   gpioNotify[i].state = PI_NOTIFY_OPENED;
 
    closeOrphanedNotifications(slot, fd);
 
@@ -11592,24 +11631,29 @@ static int gpioNotifyOpenInBand(int fd)
 
    slot = -1;
 
+   notifyMutex(1);
+
    for (i=0; i<PI_NOTIFY_SLOTS; i++)
    {
       if (gpioNotify[i].state == PI_NOTIFY_CLOSED)
       {
          slot = i;
+         gpioNotify[slot].state = PI_NOTIFY_RESERVED;
          break;
       }
    }
 
+   notifyMutex(0);
+
    if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no handle");
 
-   gpioNotify[slot].state = PI_NOTIFY_OPENED;
    gpioNotify[slot].seqno = 0;
    gpioNotify[slot].bits  = 0;
    gpioNotify[slot].fd    = fd;
    gpioNotify[slot].pipe  = 0;
    gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
+   gpioNotify[slot].state = PI_NOTIFY_OPENED;
 
    closeOrphanedNotifications(slot, fd);
 
@@ -12095,6 +12139,7 @@ void gpioStopThread(pthread_t *pth)
 
 int gpioStoreScript(char *script)
 {
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    gpioScript_t *s;
    int status, slot, i;
 
@@ -12104,18 +12149,21 @@ int gpioStoreScript(char *script)
 
    slot = -1;
 
+   pthread_mutex_lock(&mutex);
+
    for (i=0; i<PI_MAX_SCRIPTS; i++)
    {
       if (gpioScript[i].state == PI_SCRIPT_FREE)
       {
-         gpioScript[i].state = PI_SCRIPT_RESERVED;
          slot = i;
+         gpioScript[slot].state = PI_SCRIPT_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_SCRIPT_ROOM, "no room for scripts");
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_SCRIPT_ROOM, "no room for scripts");
 
    s = &gpioScript[slot];
 
@@ -12136,7 +12184,6 @@ int gpioStoreScript(char *script)
       s->pthIdp = gpioStartThread(pthScript, s);
 
       status = slot;
-
    }
    else
    {
@@ -12752,6 +12799,7 @@ int fileApprove(char *filename)
 
 int fileOpen(char *file, unsigned mode)
 {
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    int fd=-1;
    int i, slot, oflag, omode;
    struct stat statbuf;
@@ -12770,18 +12818,21 @@ int fileOpen(char *file, unsigned mode)
 
    slot = -1;
 
+   pthread_mutex_lock(&mutex);
+
    for (i=0; i<PI_FILE_SLOTS; i++)
    {
       if (fileInfo[i].state == PI_FILE_CLOSED)
       {
-         fileInfo[i].state = PI_FILE_OPENED;
          slot = i;
+         fileInfo[slot].state = PI_FILE_RESERVED;
          break;
       }
    }
 
-   if (slot < 0)
-      SOFT_ERROR(PI_NO_HANDLE, "no file handles");
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no file handles");
 
    omode = 0;
    oflag = 0;
@@ -12839,6 +12890,7 @@ int fileOpen(char *file, unsigned mode)
 
    fileInfo[slot].fd = fd;
    fileInfo[slot].mode = mode;
+   fileInfo[slot].state = PI_FILE_OPENED;
 
    return slot;
 }

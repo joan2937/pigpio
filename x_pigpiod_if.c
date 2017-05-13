@@ -253,14 +253,12 @@ void t4()
    set_PWM_range(GPIO, 100);
 
    h = notify_open();
-   e = notify_begin(h, (1<<GPIO));
-   CHECK(4, 1, e, 0, 0, "notify open/begin");
-
-   time_sleep(1);
 
    sprintf(p, "/dev/pigpio%d", h);
-
    f = open(p, O_RDONLY);
+
+   e = notify_begin(h, (1<<GPIO));
+   CHECK(4, 1, e, 0, 0, "notify open/begin");
 
    set_PWM_dutycycle(GPIO, 50);
    time_sleep(4);

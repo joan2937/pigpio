@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii foo.1
 ."
-.TH pigs 1 2012-2015 Linux "pigpio archive"
+.TH pigs 1 2012-2017 Linux "pigpio archive"
 .SH NAME
 pigs - command line socket access to the pigpio daemon.
 
@@ -1080,6 +1080,12 @@ level is then reported.  Level changes of less than \fBstdy\fP
 microseconds are ignored.
 
 .br
+The filter only affects callbacks (including pipe notifications).
+
+.br
+The \fBR/READ\fP, \fBBR1\fP, and \fBBR2\fP commands are not affected.
+
+.br
 Note, each (stable) edge will be timestamped \fBstdy\fP microseconds
 after it was first detected.
 
@@ -1159,6 +1165,12 @@ Level changes on the GPIO \fBu\fP are ignored until a level which has
 been stable for \fBstdy\fP microseconds is detected.  Level
 changes on the GPIO are then reported for \fBactv\fP microseconds
 after which the process repeats.
+
+.br
+The filter only affects callbacks (including pipe notifications).
+
+.br
+The \fBR/READ\fP, \fBBR1\fP, and \fBBR2\fP commands are not affected.
 
 .br
 Note, level changes before and after the active period may
@@ -3957,7 +3969,14 @@ For bits 9-16 there will be two bytes per character.
 For bits 17-32 there will be four bytes per character.
 
 .br
-E.g. 32 12-bit words will be transferred in 64 bytes.
+Multi-byte transfers are made in least significant byte first order.
+
+.br
+E.g. to transfer 32 11-bit words 64 bytes need to be sent.
+
+.br
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
 
 .br
 The other bits in flags should be set to zero.
@@ -4183,11 +4202,10 @@ One watchdog may be registered per GPIO.
 The watchdog may be cancelled by setting timeout to 0.
 
 .br
-If no level change has been detected for the GPIO for timeout milliseconds:-
-
-.br
-any notification for the GPIO has a report written to the fifo with
-the flags set to indicate a watchdog timeout.
+Once a watchdog has been started monitors of the GPIO
+will be triggered every timeout interval after the last
+GPIO activity.  The watchdog expiry will be indicated by
+a special TIMEOUT value.
 
 .br
 
