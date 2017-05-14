@@ -299,7 +299,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.37"
+VERSION = "1.38"
 
 exceptions = True
 
@@ -1054,7 +1054,7 @@ class _callback_thread(threading.Thread):
       self.callbacks = []
       self.events = []
       self.sl.s = socket.create_connection((host, port), None)
-      self.lastLevel = _u2i(_pigpio_command(self.sl,  _PI_CMD_BR1, 0, 0))
+      self.lastLevel = _pigpio_command(self.sl,  _PI_CMD_BR1, 0, 0)
       self.handle = _u2i(_pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0))
       self.go = True
       self.start()
@@ -4468,8 +4468,9 @@ class pi():
       file_name:= the file to open.
       file_mode:= the file open mode.
 
-      Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
-      PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+      Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE,
+      PI_NO_FILE_ACCESS, PI_BAD_FILE_MODE,
+      PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
 
       ...
       h = pi.file_open("/home/pi/shared/dir_3/file.txt",
@@ -4482,9 +4483,9 @@ class pi():
 
       File
 
-      A file may only be opened if permission is granted by an entry in
-      /opt/pigpio/access.  This is intended to allow remote access to files
-      in a more or less controlled manner.
+      A file may only be opened if permission is granted by an entry
+      in /opt/pigpio/access.  This is intended to allow remote access
+      to files in a more or less controlled manner.
 
       Each entry in /opt/pigpio/access takes the form of a file path
       which may contain wildcards followed by a single letter permission.
