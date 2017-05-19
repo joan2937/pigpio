@@ -712,7 +712,7 @@ _errors=[
    [_PI_BAD_PATHNAME     , "can't open pathname"],
    [PI_NO_HANDLE         , "no handle available"],
    [PI_BAD_HANDLE        , "unknown handle"],
-   [_PI_BAD_IF_FLAGS     , "ifFlags > 3"],
+   [_PI_BAD_IF_FLAGS     , "ifFlags > 4"],
    [_PI_BAD_CHANNEL      , "DMA channel not 0-14"],
    [_PI_BAD_SOCKET_PORT  , "socket port not 1024-30000"],
    [_PI_BAD_FIFO_COMMAND , "unknown fifo command"],

@@ -6143,7 +6143,7 @@ after this command is issued.
 #define PI_BAD_PATHNAME     -23 // can't open pathname
 #define PI_NO_HANDLE        -24 // no handle available
 #define PI_BAD_HANDLE       -25 // unknown handle
-#define PI_BAD_IF_FLAGS     -26 // ifFlags > 3
+#define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
 #define PI_BAD_CHANNEL      -27 // DMA channel not 0-14
 #define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-14
 #define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000

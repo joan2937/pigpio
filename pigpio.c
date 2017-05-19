@@ -13328,7 +13328,7 @@ int gpioCfgInterfaces(unsigned ifFlags)
 
    CHECK_NOT_INITED;
 
-   if (ifFlags > 7)
+   if (ifFlags > 15)
       SOFT_ERROR(PI_BAD_IF_FLAGS, "bad ifFlags (%X)", ifFlags);
 
    gpioCfg.ifFlags = ifFlags;
