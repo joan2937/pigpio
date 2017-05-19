@@ -805,10 +805,32 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_SCRIPT_WAITING 3
 #define PI_SCRIPT_FAILED  4
 
-/* signum: 0-63 */
+/* signum: 1 to ~64 */
 
-#define PI_MIN_SIGNUM 0
-#define PI_MAX_SIGNUM 63
+#define PI_MIN_SIGNUM (SIGHUP)
+/*
+ * The lowest signal number is 1 NOT 0, zero is a test case that checks whether
+ * a signal can be sent to a process, but it is not a signal that can be sent
+ * (so it cannot be "handled")!
+ */
+
+#define PI_MAX_SIGNUM 64
+/*
+ * We should use SIGRTMAX but it is a macro, NOT a constant, that expands to a
+ * system dependent value at run-time, typically it will be 64 but it need not
+ * be so.  If it ever changes to be more this will need to be adjusted
+ * upwards, until then this sets a highest usable limit (and is used to size)
+ * the fixed array size at compile time - if SIGRTMAX is lower then the
+ * following is reduced accordingly at runtime.
+ */
+
+#define PI_SIG_ARRAY_SIZE (PI_MAX_SIGNUM - PI_MIN_SIGNUM +1)
+#define PI_MAX_USABLE_SIGNUM ((PI_MAX_SIGNUM) < (SIGRTMAX) ? (PI_MAX_SIGNUM) : (SIGRTMAX))
+/*
+ * Use PI_MIN_SIGNUM to PI_USABLE_MAX_SIGNUM to identify range at runtime but
+ * PI_SIG_ARRAY_SIZE to size array of signal handlers at
+ * compile time.
+ */
 
 /* timetype: 0-1 */
 
@@ -3758,20 +3780,41 @@ int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f);
 Registers a function to be called (a callback) when a signal occurs.
 
 . .
-signum: 0-63
+signum: PI_MIN_SIGNUM - PI_MAX_USABLE_SIGNUM (1 to 64 is typical
+        but theoretically could change in future)
      f: the callback function
 . .
 
-Returns 0 if OK, otherwise PI_BAD_SIGNUM.
+Returns 0 if OK, otherwise PI_BAD_SIGNUM. SIGKILL and SIGSTOP signals
+cannot have a handler registered and a few numbers between the
+range of the highest POSIX one (typically 31) and the lowest
+REAL-TIME one (typically 34 or 35 depending on system libraries)
+are used internally by the kernel for real-time signals and also
+cannot have a function registered.
 
 The function is passed the signal number.
 
 One function may be registered per signal.
 
+Only one of gpioSetSignalFunc or gpioSetSignalFuncEx can be
+registered per signal.
+
 The callback may be cancelled by passing NULL.
 
-By default all signals are treated as fatal and cause the library
-to call gpioTerminate and then exit.
+By default all BUT the signals listed below are treated as fatal
+and cause the library to call gpioTerminate and then exit:
+
+SIGUSR1 - Decrease Debug level
+SIGUSR2 - Increase Debug level
+SIGPIPE - Ignored
+SIGWINCH- Ignored
+SIGPWR  - Ignored
+SIGURG  - Ignored
+SIGTTIN - Ignored (but pauses execution - can cause data loss!)
+SIGTTOU - Ignored (but pauses execution - can cause data loss!)
+SIGTSTP - Ignored (but pauses execution - can cause data loss!)
+SIGCONT - Ignored (but resumes execution)
+SIGCHLD - Ignored
 D*/
 
 
@@ -3782,7 +3825,8 @@ int gpioSetSignalFuncEx(
 Registers a function to be called (a callback) when a signal occurs.
 
 . .
-  signum: 0-63
+  signum: PI_MIN_SIGNUM - PI_MAX_USABLE_SIGNUM (1 to 64 is typical
+          but theoretically could change in future)
        f: the callback function
 userdata: a pointer to arbitrary user data
 . .
@@ -3797,6 +3841,31 @@ registered per signal.
 See gpioSetSignalFunc for further details.
 D*/
 
+/*F*/
+void processSignals(void);
+/*D
+Internal helper that MUST be included in the main application loop. It
+is needed to respond to (possibly asynchronous) signals that are not
+fatal to the application but are not handled by user provided functions
+registered with gpioSetSignalFunct or gpioSetSignalFunctEx.
+
+Currently this is needed to handle SIGUSR1 and SIGUSR2 which adjust the
+logging/debugging information up and down one step for each signal.
+
+It also logs receipt of SIGPIPE, SIGWINCH, SIGURG, SIGPWR and SIGCONT
+(and a preceeding SIGTSTP if that was the cause of execution being paused)
+- by default these are otherwise ignored.
+
+Note that SIGTTOU and SIGTTIN are also ignored by default but, as they are
+associated with the application not being currently the foreground process
+but trying to write to or read from the terminal as if it was, it is not
+wise to produce any debug output for them.
+
+If the application has been paused by SIGTSTOP, SIGTTOU, SIGTTIN or the
+impossible to catch SIGSTOP, and then resumed by recept of SIGCONT it is
+possible that the parts of the pigpio that monitor activity of the GPIO
+system may have lost data whilst paused.
+D*/
 
 /*F*/
 uint32_t gpioRead_Bits_0_31(void);

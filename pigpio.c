@@ -1283,7 +1283,33 @@ static spiInfo_t        spiInfo    [PI_SPI_SLOTS];
 
 static gpioScript_t     gpioScript [PI_MAX_SCRIPTS];
 
-static gpioSignal_t     gpioSignal [PI_MAX_SIGNUM+1];
+static gpioSignal_t     gpioSignal [PI_SIG_ARRAY_SIZE];
+static gpioSignal_t     gpioSignalBackup [PI_SIG_ARRAY_SIZE];
+/*
+ * These are fixed sized arrays but the needed size is technically run-time
+ * dependant so could be undersized if things change in the future.
+ */
+
+volatile static sig_atomic_t    isGpioSignalArrayBeingEdited = SIG_ATOMIC_MIN;
+/*
+ * Set to SIG_ATOMIC_MAX whilst being edited to cause signal handler
+ * to use backup set.
+ */
+
+volatile static sig_atomic_t    signal_usr1_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_usr2_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_pipe_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_winch_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_pwr_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_urg_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_tstp_received = SIG_ATOMIC_MIN;
+volatile static sig_atomic_t    signal_cont_received = SIG_ATOMIC_MIN;
+/*
+ * Flags for various signals that we want to report on receiving or
+ * use, for asynchronous safety we respond to these flags in main loop after they
+ * are set in the handler, rather than carrying out the wanted action from
+ * the handler.
+ */
 
 static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 
@@ -5464,17 +5490,51 @@ static void dmaInitCbs(void)
 
 static void sigHandler(int signum)
 {
-   if ((signum >= PI_MIN_SIGNUM) && (signum <= PI_MAX_SIGNUM))
+   struct sigaction defaultAction;
+   memset(&defaultAction, 0, sizeof(defaultAction));
+   /*
+    * If needed to restore action to SIG_DFL for dump core cases
+    */
+
+   int errno_saved = errno;
+   /*
+    * Must preserve errno to protect against changing it here (or in a user handler
+    * called from here)!
+    */
+
+   if ((signum >= PI_MIN_SIGNUM) && (signum <= PI_MAX_USABLE_SIGNUM))
    {
-      if (gpioSignal[signum].func)
+      /*
+       * This code can be executed asyncronously and to protect against race conditions where
+       * the handler array is being modifed whilst this function wants to use it, we use an
+       * atomic variable as a flag to require this handler to use the backup copy until the
+       * editing is complete.
+       */
+      int useBackup = isGpioSignalArrayBeingEdited;
+      if (    ( useBackup != SIG_ATOMIC_MIN && (gpioSignalBackup[signum - PI_MIN_SIGNUM].func) )
+           || ( useBackup == SIG_ATOMIC_MIN && (gpioSignal[signum - PI_MIN_SIGNUM].func) ) )
       {
-         if (gpioSignal[signum].ex)
+         if ( useBackup != SIG_ATOMIC_MIN )
          {
-            (gpioSignal[signum].func)(signum, gpioSignal[signum].userdata);
+            if (gpioSignalBackup[signum - PI_MIN_SIGNUM].ex)
+            {
+               (gpioSignalBackup[signum - PI_MIN_SIGNUM].func)(signum, gpioSignalBackup[signum - PI_MIN_SIGNUM].userdata);
+            }
+            else
+            {
+               (gpioSignalBackup[signum - PI_MIN_SIGNUM].func)(signum);
+            }
          }
          else
          {
-            (gpioSignal[signum].func)(signum);
+            if (gpioSignal[signum - PI_MIN_SIGNUM].ex)
+            {
+               (gpioSignal[signum - PI_MIN_SIGNUM].func)(signum, gpioSignal[signum - PI_MIN_SIGNUM].userdata);
+            }
+            else
+            {
+               (gpioSignal[signum - PI_MIN_SIGNUM].func)(signum);
+            }
          }
       }
       else
@@ -5482,29 +5542,81 @@ static void sigHandler(int signum)
          switch(signum)
          {
             case SIGUSR1:
-
-               if (gpioCfg.dbgLevel > DBG_MIN_LEVEL) --gpioCfg.dbgLevel;
-               else gpioCfg.dbgLevel = DBG_MIN_LEVEL;
-               DBG(DBG_USER, "Debug level %d\n", gpioCfg.dbgLevel);
+               signal_usr1_received = SIG_ATOMIC_MAX;
                break;
 
             case SIGUSR2:
-               if (gpioCfg.dbgLevel < DBG_MAX_LEVEL) ++gpioCfg.dbgLevel;
-               else gpioCfg.dbgLevel = DBG_MAX_LEVEL;
-               DBG(DBG_USER, "Debug level %d\n", gpioCfg.dbgLevel);
+               signal_usr2_received = SIG_ATOMIC_MAX;
                break;
 
             case SIGPIPE:
-            case SIGWINCH:
-               DBG(DBG_USER, "signal %d ignored", signum);
+               signal_pipe_received = SIG_ATOMIC_MAX;
                break;
 
-            case SIGCHLD:
-               /* Used to notify threads of events */
+            case SIGWINCH:
+               signal_winch_received = SIG_ATOMIC_MAX;
+               break;
+
+            case SIGPWR:
+               signal_pwr_received = SIG_ATOMIC_MAX;
+               break;
+
+            case SIGURG:
+               signal_urg_received = SIG_ATOMIC_MAX;
+               break;
+
+            case SIGTSTP: /* Used by gdb (and other things) to pause execution */
+               signal_tstp_received = SIG_ATOMIC_MAX;
+               break;
+
+            case SIGCONT: /*
+                           * Used by system (and gdb debugger) to resume
+                           * execution - however we may have lost data/infomation
+                           * from hardware during the pausing.
+                           */
+               signal_cont_received = SIG_ATOMIC_MAX;
+               break;
+
+                          /* Used by system when it stops process when it tries to: */
+            case SIGTTOU: /* ==> write to a */
+            case SIGTTIN: /* ==> read from a */
+                          /* TTY when not the foreground process */
+
+            case SIGCHLD: /* Used to notify threads of events */
+               break;
+
+            case SIGQUIT:
+            case SIGILL:
+            case SIGABRT:
+            case SIGFPE:
+            case SIGSEGV:
+            case SIGBUS:
+            case SIGSYS:
+            case SIGTRAP:
+            case SIGXCPU:
+            case SIGXFSZ:
+               defaultAction.sa_handler = SIG_DFL;
+
+               /* May be redundant as we are setting SIG_DFL anyhow */
+               defaultAction.sa_flags = SA_RESETHAND;
+
+               /* Restoration of default (dump core) action */
+               sigaction(signum, &defaultAction, NULL);
+
+               /*
+                * Return to point where signal arose and cause it to be reraised
+                * - this time to dump core!
+                */
+               return;
                break;
 
             default:
                DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
+               /*
+                * The above may not be totally safe as it uses printf(), but as exit() is then
+                * called let us hope we are safe - though if we have had, say a SIGSEG, the following
+                * gpioTerminate() could still fail horribly!
+                */
                gpioTerminate();
                exit(-1);
          }
@@ -5514,28 +5626,137 @@ static void sigHandler(int signum)
    {
       /* exit */
 
-      DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
+      DBG(DBG_ALWAYS, "Impossible signal %d, terminating\n", signum);
       gpioTerminate();
       exit(-1);
    }
+
+   errno = errno_saved;
+   /*
+    * Restore errno for those cases where the signal is NOT fatal to the program
+    * then normal execution ought to resume right from where it left off...
+    */
 }
 
 /* ----------------------------------------------------------------------- */
 
 static void sigSetHandler(void)
 {
-   int i;
+   size_t i;
    struct sigaction new;
 
-   for (i=PI_MIN_SIGNUM; i<=PI_MAX_SIGNUM; i++)
+   for (i=0; i<=PI_SIG_ARRAY_SIZE; i++)
    {
-
-      memset(&new, 0, sizeof(new));
-      new.sa_handler = sigHandler;
-
-      sigaction(i, &new, NULL);
+      switch (i + PI_MIN_SIGNUM)
+      {
+          case SIGKILL: // CANNOT REPLACE THIS
+          case SIGSTOP: // CANNOT REPLACE THIS
+              continue;
+          default:
+              if( (i + PI_MIN_SIGNUM) > SIGUNUSED && (i + PI_MIN_SIGNUM) < SIGRTMIN ) {
+                  /*
+                   * THESE SIGNAL NUMBERS DO NOT "EXIST" (OUTSIDE OF KERNEL)
+                   * They (either two or three in total) are used
+                   * internally for Real Time Signals and MUST NOT
+                   * BE USED - see manpage for signal(7)
+                   */
+                  continue;
+              }
+              memset(&new, 0, sizeof(new));
+              new.sa_handler = sigHandler;
+              sigaction(i, &new, NULL);
+      }
    }
 }
+
+/* ----------------------------------------------------------------------- */
+
+void processSignals(void)
+{
+   /*
+    * Take a local copy of these two as they will cancel each other out and
+    * processing BOTH of them could get racy if they get modifed part way
+    * through this code.
+    */
+   int local_signal_usr1 = signal_usr1_received;
+   int local_signal_usr2 = signal_usr2_received;
+   int oldDbgLevel = gpioCfg.dbgLevel;
+
+   if (local_signal_usr1 != SIG_ATOMIC_MIN && local_signal_usr2 == SIG_ATOMIC_MIN)
+   {
+       signal_usr1_received = SIG_ATOMIC_MIN;
+       /* We know it has been set so resetting it is not going to cause a race. */
+
+       if (gpioCfg.dbgLevel > DBG_MIN_LEVEL)
+       {
+           --gpioCfg.dbgLevel;
+       }
+       else
+       {
+           gpioCfg.dbgLevel = DBG_MIN_LEVEL;
+       }
+   }
+   else if (local_signal_usr1 == SIG_ATOMIC_MIN && local_signal_usr2 != SIG_ATOMIC_MIN)
+   {
+       signal_usr2_received = SIG_ATOMIC_MIN;
+       /* We know it has been set so resetting it is not going to cause a race. */
+
+       if (gpioCfg.dbgLevel < DBG_MAX_LEVEL)
+       {
+           ++gpioCfg.dbgLevel;
+       }
+       else
+       {
+           gpioCfg.dbgLevel = DBG_MAX_LEVEL;
+       }
+   }
+
+   if (    ( local_signal_usr1 != SIG_ATOMIC_MIN || local_signal_usr2 == SIG_ATOMIC_MIN )
+        && ( oldDbgLevel != gpioCfg.dbgLevel ) )
+   {
+       DBG(DBG_USER, "Debug level changed to %d\n", gpioCfg.dbgLevel);
+   }
+
+   /* Work through the remaining signals that we ignore apart from reporting them. */
+   if ( signal_pipe_received != SIG_ATOMIC_MIN )
+   {
+       signal_pipe_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d ignored", SIGPIPE);
+   }
+
+   if ( signal_winch_received != SIG_ATOMIC_MIN )
+   {
+       signal_winch_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d ignored", SIGWINCH);
+   }
+
+   if ( signal_pwr_received != SIG_ATOMIC_MIN )
+   {
+       signal_pwr_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d ignored", SIGPWR);
+   }
+
+   if ( signal_urg_received != SIG_ATOMIC_MIN )
+   {
+       signal_urg_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d ignored", SIGURG);
+   }
+
+
+   if ( signal_tstp_received != SIG_ATOMIC_MIN )
+   {
+       signal_tstp_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d was ignored - it is possible data was lost whilst execution was stopped after this signal", SIGTSTP);
+   }
+
+   if ( signal_cont_received != SIG_ATOMIC_MIN )
+   {
+       signal_cont_received = SIG_ATOMIC_MIN;
+       DBG(DBG_USER, "Signal %d was ignored - it is possible data was lost whilst execution was stopped before this signal", SIGCONT);
+   }
+}
+
+/* ----------------------------------------------------------------------- */
 
 /*
    freq mics  net
@@ -7758,7 +7979,7 @@ static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
 
 static void initClearGlobals(void)
 {
-   int i;
+   size_t i;
 
    DBG(DBG_STARTUP, "");
 
@@ -7818,12 +8039,20 @@ static void initClearGlobals(void)
       gpioNotify[i].state = PI_NOTIFY_CLOSED;
    }
 
-   for (i=0; i<=PI_MAX_SIGNUM; i++)
+   for (i=0; i<=PI_MAX_USABLE_SIGNUM; i++)
+   {
+      gpioSignalBackup[i].func     = gpioSignal[i].func;
+      gpioSignalBackup[i].ex       = gpioSignal[i].ex;
+      gpioSignalBackup[i].userdata = gpioSignal[i].userdata;
+   }
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MAX; /* Force signal handler to use backup array */
+   for (i=0; i<=PI_MAX_USABLE_SIGNUM; i++)
    {
       gpioSignal[i].func     = NULL;
       gpioSignal[i].ex       = 0;
       gpioSignal[i].userdata = NULL;
    }
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MIN; /* Restore signal handler to use normal array */
 
    for (i=0; i<=PI_MAX_TIMER; i++)
    {
@@ -8110,6 +8339,7 @@ int initInitialise(void)
    }
 
 #ifndef EMBEDDED_IN_VM
+   if ( SIGRTMAX > PI_MAX_SIGNUM ) DBG(DBG_ALWAYS, "Signal handler table undersized, please report following values, needed: %i, current: %i", (SIGRTMAX), PI_MAX_SIGNUM);
    sigSetHandler();
 #endif
 
@@ -12350,17 +12580,32 @@ int gpioDeleteScript(unsigned script_id)
 
 int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f)
 {
+   size_t i;
+
    DBG(DBG_USER, "signum=%d function=%08X", signum, (uint32_t)f);
 
    CHECK_INITED;
 
-   if (signum > PI_MAX_SIGNUM)
+   if (   signum < PI_MIN_SIGNUM              /* Invalid */
+       || signum > PI_MAX_USABLE_SIGNUM       /* Invalid */
+       || signum == SIGKILL                   /* Cannot be handled */
+       || signum == SIGSTOP                   /* Cannot be handled */
+       || ( signum > SIGUNUSED && signum < SIGRTMIN ) ) /* Kernel reserved */
       SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
 
-   gpioSignal[signum].ex = 0;
-   gpioSignal[signum].userdata = NULL;
+   for(i=0; i<PI_SIG_ARRAY_SIZE; ++i)
+   {
+      gpioSignalBackup[i].func     = gpioSignal[i].func;
+      gpioSignalBackup[i].ex       = gpioSignal[i].ex;
+      gpioSignalBackup[i].userdata = gpioSignal[i].userdata;
+   }
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MAX; /* Force signal handler to use backup array */
 
-   gpioSignal[signum].func = f;
+   gpioSignal[signum - PI_MIN_SIGNUM].ex = 0;
+   gpioSignal[signum - PI_MIN_SIGNUM].userdata = NULL;
+   gpioSignal[signum - PI_MIN_SIGNUM].func = f;
+
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MIN; /* Restore signal handler to using modified normal array */
 
    return 0;
 }
@@ -12371,18 +12616,33 @@ int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f)
 int gpioSetSignalFuncEx(unsigned signum, gpioSignalFuncEx_t f,
                         void *userdata)
 {
+   size_t i;
+
    DBG(DBG_USER, "signum=%d function=%08X userdata=%08X",
       signum, (uint32_t)f, (uint32_t)userdata);
 
    CHECK_INITED;
 
-   if (signum > PI_MAX_SIGNUM)
+   if (   signum < PI_MIN_SIGNUM              /* Invalid */
+       || signum > PI_MAX_USABLE_SIGNUM       /* Invalid */
+       || signum == SIGKILL                   /* Cannot be handled */
+       || signum == SIGSTOP                   /* Cannot be handled */
+       || ( signum > SIGUNUSED && signum < SIGRTMIN ) ) /* Kernel reserved */
       SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
 
-   gpioSignal[signum].ex = 1;
-   gpioSignal[signum].userdata = userdata;
+   for(i=0; i<PI_SIG_ARRAY_SIZE; ++i)
+   {
+      gpioSignalBackup[i].func     = gpioSignal[i].func;
+      gpioSignalBackup[i].ex       = gpioSignal[i].ex;
+      gpioSignalBackup[i].userdata = gpioSignal[i].userdata;
+   }
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MAX; /* Force signal handler to use backup array */
 
-   gpioSignal[signum].func = f;
+   gpioSignal[signum - PI_MIN_SIGNUM].ex = 1;
+   gpioSignal[signum - PI_MIN_SIGNUM].userdata = userdata;
+   gpioSignal[signum - PI_MIN_SIGNUM].func = f;
+
+   isGpioSignalArrayBeingEdited = SIG_ATOMIC_MIN; /* Restore signal handler to using normal array */
 
    return 0;
 }

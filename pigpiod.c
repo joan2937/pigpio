@@ -303,6 +303,7 @@ int main(int argc, char **argv)
 {
    pid_t pid;
    int flags;
+   struct timespec mainLoopSleep;
 
    /* check command line parameters */
 
@@ -390,11 +391,27 @@ int main(int argc, char **argv)
 
       /* sleep forever */
 
+      mainLoopSleep.tv_sec = 5;
+      mainLoopSleep.tv_nsec = 0;
       while (1)
       {
          /* cat /dev/pigerr to view daemon errors */
 
-         sleep(5);
+         nanosleep( &mainLoopSleep, NULL );
+
+         /*
+          * Have moved non-terminal signal reporting out of handler so must
+          * now process the reports/actions that are needed. Currently this
+          * is adjusting debug log level (SIGUSR1 & SIGUSR2) and reports for
+          * SIGPIPE, SIGWINCH, SIGPWR, SIGURG, SIGCONT & SIGTSTP (though the
+          * last can be seen only after the SIGCONT that resumes from it).
+          *
+          * Note that nanosleep(...) calls will stop waiting if a signal is
+          * raised. We now use nanosleep() rather than the original sleep()
+          * because that is subject to "undefined behavour" if SIGALARM handling
+          * is modifed (which we do in pigpio).
+          */
+         processSignals();
 
          fflush(errFifo);
       }
