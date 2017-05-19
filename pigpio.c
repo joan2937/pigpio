@@ -8480,6 +8480,14 @@ int gpioInitialise(void)
 
 /* ----------------------------------------------------------------------- */
 
+int gpioIsInitialised(void)
+{
+   if (libInitialised) return 0;
+   return PI_NOT_INITIALISED;
+}
+
+/* ----------------------------------------------------------------------- */
+
 void gpioTerminate(void)
 {
    int i;
