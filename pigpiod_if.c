@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF_VERSION 26 */
+/* PIGPIOD_IF_VERSION 27 */
 
 #include <stdio.h>
 #include <stdlib.h>

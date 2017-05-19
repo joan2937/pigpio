@@ -299,7 +299,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.36"
+VERSION = "1.38"
 
 exceptions = True
 
@@ -389,6 +389,8 @@ SPI_TX_LSBFIRST = 1 << 14
 SPI_RX_LSBFIRST = 1 << 15
 
 EVENT_BSC = 31
+
+_SOCK_CMD_LEN = 16
 
 # pigpio command numbers
 
@@ -848,6 +850,10 @@ _except_2 = """
 Do you have permission to access the pigpio daemon?
 Perhaps it was started with sudo pigpiod -nlocalhost"""
 
+_except_3 = """
+Can't create callback thread.
+Perhaps too many simultaneous pigpio connections."""
+
 class _socklock:
    """
    A class to store socket and lock.
@@ -971,11 +977,11 @@ def _pigpio_command(sl, cmd, p1, p2, rl=True):
     sl:= command socket and lock.
    cmd:= the command to be executed.
     p1:= command parameter 1 (if applicable).
-     p2:=  command parameter 2 (if applicable).
+    p2:= command parameter 2 (if applicable).
    """
    sl.l.acquire()
    sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
-   dummy, res = struct.unpack('12sI', sl.s.recv(16))
+   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
    if rl: sl.l.release()
    return res
 
@@ -998,7 +1004,7 @@ def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents, rl=True):
          ext.extend(x)
    sl.l.acquire()
    sl.s.sendall(ext)
-   dummy, res = struct.unpack('12sI', sl.s.recv(16))
+   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
    if rl: sl.l.release()
    return res
 
@@ -1048,7 +1054,8 @@ class _callback_thread(threading.Thread):
       self.callbacks = []
       self.events = []
       self.sl.s = socket.create_connection((host, port), None)
-      self.handle = _pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0)
+      self.lastLevel = _pigpio_command(self.sl,  _PI_CMD_BR1, 0, 0)
+      self.handle = _u2i(_pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0))
       self.go = True
       self.start()
 
@@ -1101,7 +1108,7 @@ class _callback_thread(threading.Thread):
    def run(self):
       """Runs the notification thread."""
 
-      lastLevel = _pigpio_command(self.control,  _PI_CMD_BR1, 0, 0)
+      lastLevel = self.lastLevel
 
       MSG_SIZ = 12
 
@@ -1743,8 +1750,8 @@ class pi():
       The watchdog may be cancelled by setting timeout to 0.
 
       Once a watchdog has been started callbacks for the GPIO
-      will be triggered whenever there has been no GPIO activity
-      for the timeout interval.
+      will be triggered every timeout interval after the last
+      GPIO activity.
 
       The callback will receive the special level TIMEOUT.
 
@@ -3753,7 +3760,14 @@ class pi():
       For bits 9-16 there will be two bytes per character. 
       For bits 17-32 there will be four bytes per character.
 
-      E.g. 32 12-bit words will be transferred in 64 bytes.
+      Multi-byte transfers are made in least significant byte
+      first order.
+
+      E.g. to transfer 32 11-bit words data should
+      contain 64 bytes.
+
+      E.g. to transfer the 14 bit value 0x1ABC send the
+      bytes 0xBC followed by 0x1A.
 
       The other bits in flags should be set to zero.
 
@@ -4064,7 +4078,13 @@ class pi():
 
       Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-      Note, each (stable) edge will be timestamped [*steady*]
+      This filter affects the GPIO samples returned to callbacks set up
+      with [*callback*] and [*wait_for_edge*].
+
+      It does not affect levels read by [*read*],
+      [*read_bank_1*], or [*read_bank_2*].
+
+      Each (stable) edge will be timestamped [*steady*]
       microseconds after it was first detected.
 
       ...
@@ -4088,7 +4108,13 @@ class pi():
 
       Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-      Note, level changes before and after the active period may
+      This filter affects the GPIO samples returned to callbacks set up
+      with [*callback*] and [*wait_for_edge*].
+
+      It does not affect levels read by [*read*],
+      [*read_bank_1*], or [*read_bank_2*].
+
+      Level changes before and after the active period may
       be reported.  Your software must be designed to cope with
       such reports.
 
@@ -4442,8 +4468,9 @@ class pi():
       file_name:= the file to open.
       file_mode:= the file open mode.
 
-      Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
-      PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+      Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE,
+      PI_NO_FILE_ACCESS, PI_BAD_FILE_MODE,
+      PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
 
       ...
       h = pi.file_open("/home/pi/shared/dir_3/file.txt",
@@ -4456,9 +4483,9 @@ class pi():
 
       File
 
-      A file may only be opened if permission is granted by an entry in
-      /opt/pigpio/access.  This is intended to allow remote access to files
-      in a more or less controlled manner.
+      A file may only be opened if permission is granted by an entry
+      in /opt/pigpio/access.  This is intended to allow remote access
+      to files in a more or less controlled manner.
 
       Each entry in /opt/pigpio/access takes the form of a file path
       which may contain wildcards followed by a single letter permission.
@@ -4761,6 +4788,20 @@ class pi():
       The user supplied callback receives three parameters, the GPIO,
       the level, and the tick.
 
+      . .
+      Parameter   Value    Meaning
+
+      GPIO        0-31     The GPIO which has changed state
+
+      level       0-2      0 = change to low (a falling edge)
+                           1 = change to high (a rising edge)
+                           2 = no level change (a watchdog timeout)
+
+      tick        32 bit   The number of microseconds since boot
+                           WARNING: this wraps around from
+                           4294967295 to 0 roughly every 72 minutes
+      . .
+
       If a user callback is not specified a default tally callback is
       provided which simply counts edges.  The count may be retrieved
       by calling the tally function.  The count may be reset to zero
@@ -4946,6 +4987,9 @@ class pi():
       except struct.error:
          exception = 2
 
+      except error:
+         exception = 3
+
       else:
          exception = 0
          atexit.register(self.stop)
@@ -4962,8 +5006,10 @@ class pi():
          print(_except_a.format(s))
          if exception == 1:
              print(_except_1)
-         else:
+         elif exception == 2:
              print(_except_2)
+         else:
+             print(_except_3)
          print(_except_z)
 
    def stop(self):

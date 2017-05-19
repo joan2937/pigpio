@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 62
+#define PIGPIO_VERSION 64
 
 /*TEXT
 
@@ -1364,9 +1364,23 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 
-One function may be registered per GPIO.
+One callback may be registered per GPIO.
 
-The function is passed the GPIO, the new level, and the tick.
+The callback is passed the GPIO, the new level, and the tick.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-31     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (a watchdog timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+. .
 
 The alert may be cancelled by passing NULL as the function.
 
@@ -1427,33 +1441,49 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 
-One function may be registered per GPIO.
+One callback may be registered per GPIO.
 
-The function is passed the GPIO, the new level, the tick, and
+The callback is passed the GPIO, the new level, the tick, and
 the userdata pointer.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-31     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (a watchdog timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+
+userdata    pointer  Pointer to an arbitrary object
+. .
+
+See [*gpioSetAlertFunc*] for further details.
 
 Only one of [*gpioSetAlertFunc*] or [*gpioSetAlertFuncEx*] can be
 registered per GPIO.
-
-See [*gpioSetAlertFunc*] for further details.
 D*/
 
 
 /*F*/
 int gpioSetISRFunc(
-   unsigned user_gpio, unsigned edge, int timeout, gpioISRFunc_t f);
+   unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f);
 /*D
 Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
 
 . .
-user_gpio: 0-31
-     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
-  timeout: interrupt timeout in milliseconds (<=0 to cancel)
-        f: the callback function
+   gpio: 0-53
+   edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+timeout: interrupt timeout in milliseconds (<=0 to cancel)
+      f: the callback function
 . .
 
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
 One function may be registered per GPIO.
@@ -1492,7 +1522,7 @@ D*/
 
 /*F*/
 int gpioSetISRFuncEx(
-   unsigned user_gpio,
+   unsigned gpio,
    unsigned edge,
    int timeout,
    gpioISRFuncEx_t f,
@@ -1502,14 +1532,14 @@ Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
 
 . .
-user_gpio: 0-31
-     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
-  timeout: interrupt timeout in milliseconds (<=0 to cancel)
-        f: the callback function
- userdata: pointer to arbitrary user data
+    gpio: 0-53
+    edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+ timeout: interrupt timeout in milliseconds (<=0 to cancel)
+       f: the callback function
+userdata: pointer to arbitrary user data
 . .
 
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
 The function is passed the GPIO, the current level, the
@@ -3138,12 +3168,17 @@ The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
 transfer data packed into 1, 2, or 4 bytes according to
 the word size in bits.
 
-For bits 1-8 there will be one byte per character. 
-For bits 9-16 there will be two bytes per character. 
-For bits 17-32 there will be four bytes per character.
+For bits 1-8 there will be one byte per word. 
+For bits 9-16 there will be two bytes per word. 
+For bits 17-32 there will be four bytes per word.
 
-E.g. to transfer 32 12-bit words buf should contain 64 bytes
+Multi-byte transfers are made in least significant byte first order.
+
+E.g. to transfer 32 11-bit words buf should contain 64 bytes
 and count should be 64.
+
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
 
 The other bits in flags should be set to zero.
 D*/
@@ -3363,12 +3398,15 @@ One watchdog may be registered per GPIO.
 
 The watchdog may be cancelled by setting timeout to 0.
 
-If no level change has been detected for the GPIO for timeout
-milliseconds:-
+Until cancelled a timeout will be reported every timeout milliseconds
+after the last GPIO activity.
 
-1) any registered alert function for the GPIO is called with
-   the level set to PI_TIMEOUT. 
-2) any notification for the GPIO has a report written to the
+In particular:
+
+1) any registered alert function for the GPIO will be called with
+   the level set to PI_TIMEOUT.
+
+2) any notification for the GPIO will have a report written to the
    fifo with the flags set to indicate a watchdog timeout.
 
 ...
@@ -3404,7 +3442,15 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-Note, level changes before and after the active period may
+This filter affects the GPIO samples returned to callbacks set up
+with [*gpioSetAlertFunc*], [*gpioSetAlertFuncEx*], [*gpioSetGetSamplesFunc*],
+and [*gpioSetGetSamplesFuncEx*].
+
+It does not affect interrupts set up with [*gpioSetISRFunc*],
+[*gpioSetISRFuncEx*], or levels read by [*gpioRead*],
+[*gpioRead_Bits_0_31*], or [*gpioRead_Bits_32_53*].
+
+Level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
 D*/
@@ -3427,7 +3473,15 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-Note, each (stable) edge will be timestamped [*steady*] microseconds
+This filter affects the GPIO samples returned to callbacks set up
+with [*gpioSetAlertFunc*], [*gpioSetAlertFuncEx*], [*gpioSetGetSamplesFunc*],
+and [*gpioSetGetSamplesFuncEx*].
+
+It does not affect interrupts set up with [*gpioSetISRFunc*],
+[*gpioSetISRFuncEx*], or levels read by [*gpioRead*],
+[*gpioRead_Bits_0_31*], or [*gpioRead_Bits_32_53*].
+
+Each (stable) edge will be timestamped [*steady*] microseconds
 after it was first detected.
 D*/
 

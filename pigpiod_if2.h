@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 10
+#define PIGPIOD_IF2_VERSION 11
 
 /*TEXT
 
@@ -879,12 +879,10 @@ Only one watchdog may be registered per GPIO.
 
 The watchdog may be cancelled by setting timeout to 0.
 
-If no level change has been detected for the GPIO for timeout
-milliseconds any notification for the GPIO has a report written
-to the fifo with the flags set to indicate a watchdog timeout.
+Once a watchdog has been started callbacks for the GPIO will be
+triggered every timeout interval after the last GPIO activity.
 
-The [*callback*] and [*callback_ex*] functions interpret the flags
-and will call registered callbacks for the GPIO with level TIMEOUT.
+The callback will receive the special level PI_TIMEOUT.
 D*/
 
 /*F*/
@@ -905,7 +903,13 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-Note, each (stable) edge will be timestamped [*steady*] microseconds
+This filter affects the GPIO samples returned to callbacks set up
+with [*callback*], [*callback_ex*] and [*wait_for_edge*].
+
+It does not affect levels read by [*gpio_read*],
+[*read_bank_1*], or [*read_bank_2*].
+
+Each (stable) edge will be timestamped [*steady*] microseconds
 after it was first detected.
 D*/
 
@@ -929,7 +933,13 @@ user_gpio: 0-31
 
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 
-Note, level changes before and after the active period may
+This filter affects the GPIO samples returned to callbacks set up
+with [*callback*], [*callback_ex*] and [*wait_for_edge*].
+
+It does not affect levels read by [*gpio_read*],
+[*read_bank_1*], or [*read_bank_2*].
+
+Level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
 D*/
@@ -2631,8 +2641,13 @@ For bits 1-8 there will be one byte per character.
 For bits 9-16 there will be two bytes per character. 
 For bits 17-32 there will be four bytes per character.
 
-E.g. to transfer 32 12-bit words buf should contain 64 bytes
+Multi-byte transfers are made in least significant byte first order.
+
+E.g. to transfer 32 11-bit words buf should contain 64 bytes
 and count should be 64.
+
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
 
 The other bits in flags should be set to zero.
 D*/
@@ -3247,6 +3262,20 @@ pigif_duplicate_callback, or pigif_bad_callback.
 
 The callback is called with the GPIO, edge, and tick, whenever the
 GPIO has the identified edge.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-31     The GPIO which has changed state
+
+edge        0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (a watchdog timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+. .
 D*/
 
 /*F*/
@@ -3268,6 +3297,22 @@ pigif_duplicate_callback, or pigif_bad_callback.
 
 The callback is called with the GPIO, edge, tick, and the userdata
 pointer, whenever the GPIO has the identified edge.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-31     The GPIO which has changed state
+
+edge        0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (a watchdog timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+
+userdata    pointer  Pointer to an arbitrary object
+. .
 D*/
 
 /*F*/

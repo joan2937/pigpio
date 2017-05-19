@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpio.3
 ."
-.TH pigpio 3 2012-2015 Linux "pigpio archive"
+.TH pigpio 3 2012-2017 Linux "pigpio archive"
 .SH NAME
 pigpio - A C library to manipulate the Pi's GPIO.
 
@@ -1049,12 +1049,42 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 .br
 
 .br
-One function may be registered per GPIO.
+One callback may be registered per GPIO.
 
 .br
 
 .br
-The function is passed the GPIO, the new level, and the tick.
+The callback is passed the GPIO, the new level, and the tick.
+
+.br
+
+.br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-31     The GPIO which has changed state
+.br
+
+.br
+level       0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (a watchdog timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.EE
 
 .br
 
@@ -1175,13 +1205,52 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO.
 .br
 
 .br
-One function may be registered per GPIO.
+One callback may be registered per GPIO.
 
 .br
 
 .br
-The function is passed the GPIO, the new level, the tick, and
+The callback is passed the GPIO, the new level, the tick, and
 the userdata pointer.
+
+.br
+
+.br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-31     The GPIO which has changed state
+.br
+
+.br
+level       0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (a watchdog timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.br
+userdata    pointer  Pointer to an arbitrary object
+.br
+
+.EE
+
+.br
+
+.br
+See \fBgpioSetAlertFunc\fP for further details.
 
 .br
 
@@ -1189,12 +1258,7 @@ the userdata pointer.
 Only one of \fBgpioSetAlertFunc\fP or \fBgpioSetAlertFuncEx\fP can be
 registered per GPIO.
 
-.br
-
-.br
-See \fBgpioSetAlertFunc\fP for further details.
-
-.IP "\fBint gpioSetISRFunc(unsigned user_gpio, unsigned edge, int timeout, gpioISRFunc_t f)\fP"
+.IP "\fBint gpioSetISRFunc(unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f)\fP"
 .IP "" 4
 Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
@@ -1204,13 +1268,13 @@ GPIO interrupt occurs.
 .br
 
 .EX
-user_gpio: 0-31
+   gpio: 0-53
 .br
-     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+   edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
 .br
-  timeout: interrupt timeout in milliseconds (<=0 to cancel)
+timeout: interrupt timeout in milliseconds (<=0 to cancel)
 .br
-        f: the callback function
+      f: the callback function
 .br
 
 .EE
@@ -1218,7 +1282,7 @@ user_gpio: 0-31
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
 .br
@@ -1277,7 +1341,7 @@ interrupts happening in rapid succession may be missed by the
 kernel (i.e. this mechanism can not be used to capture several
 interrupts only a few microseconds apart).
 
-.IP "\fBint gpioSetISRFuncEx(unsigned user_gpio, unsigned edge, int timeout, gpioISRFuncEx_t f, void *userdata)\fP"
+.IP "\fBint gpioSetISRFuncEx(unsigned gpio, unsigned edge, int timeout, gpioISRFuncEx_t f, void *userdata)\fP"
 .IP "" 4
 Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
@@ -1287,15 +1351,15 @@ GPIO interrupt occurs.
 .br
 
 .EX
-user_gpio: 0-31
+    gpio: 0-53
 .br
-     edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
+    edge: RISING_EDGE, FALLING_EDGE, or EITHER_EDGE
 .br
-  timeout: interrupt timeout in milliseconds (<=0 to cancel)
+ timeout: interrupt timeout in milliseconds (<=0 to cancel)
 .br
-        f: the callback function
+       f: the callback function
 .br
- userdata: pointer to arbitrary user data
+userdata: pointer to arbitrary user data
 .br
 
 .EE
@@ -1303,7 +1367,7 @@ user_gpio: 0-31
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_EDGE,
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_BAD_EDGE,
 or PI_BAD_ISR_INIT.
 
 .br
@@ -4136,17 +4200,28 @@ the word size in bits.
 .br
 
 .br
-For bits 1-8 there will be one byte per character.
+For bits 1-8 there will be one byte per word.
 .br
-For bits 9-16 there will be two bytes per character.
+For bits 9-16 there will be two bytes per word.
 .br
-For bits 17-32 there will be four bytes per character.
+For bits 17-32 there will be four bytes per word.
 
 .br
 
 .br
-E.g. to transfer 32 12-bit words buf should contain 64 bytes
+Multi-byte transfers are made in least significant byte first order.
+
+.br
+
+.br
+E.g. to transfer 32 11-bit words buf should contain 64 bytes
 and count should be 64.
+
+.br
+
+.br
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
 
 .br
 
@@ -4492,16 +4567,24 @@ The watchdog may be cancelled by setting timeout to 0.
 .br
 
 .br
-If no level change has been detected for the GPIO for timeout
-milliseconds:-
+Until cancelled a timeout will be reported every timeout milliseconds
+after the last GPIO activity.
 
 .br
 
 .br
-1) any registered alert function for the GPIO is called with
+In particular:
+
+.br
+
+.br
+1) any registered alert function for the GPIO will be called with
    the level set to PI_TIMEOUT.
+
 .br
-2) any notification for the GPIO has a report written to the
+
+.br
+2) any notification for the GPIO will have a report written to the
    fifo with the flags set to indicate a watchdog timeout.
 
 .br
@@ -4568,7 +4651,21 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 .br
 
 .br
-Note, level changes before and after the active period may
+This filter affects the GPIO samples returned to callbacks set up
+with \fBgpioSetAlertFunc\fP, \fBgpioSetAlertFuncEx\fP, \fBgpioSetGetSamplesFunc\fP,
+and \fBgpioSetGetSamplesFuncEx\fP.
+
+.br
+
+.br
+It does not affect interrupts set up with \fBgpioSetISRFunc\fP,
+\fBgpioSetISRFuncEx\fP, or levels read by \fBgpioRead\fP,
+\fBgpioRead_Bits_0_31\fP, or \fBgpioRead_Bits_32_53\fP.
+
+.br
+
+.br
+Level changes before and after the active period may
 be reported.  Your software must be designed to cope with
 such reports.
 
@@ -4604,7 +4701,21 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_BAD_FILTER.
 .br
 
 .br
-Note, each (stable) edge will be timestamped \fBsteady\fP microseconds
+This filter affects the GPIO samples returned to callbacks set up
+with \fBgpioSetAlertFunc\fP, \fBgpioSetAlertFuncEx\fP, \fBgpioSetGetSamplesFunc\fP,
+and \fBgpioSetGetSamplesFuncEx\fP.
+
+.br
+
+.br
+It does not affect interrupts set up with \fBgpioSetISRFunc\fP,
+\fBgpioSetISRFuncEx\fP, or levels read by \fBgpioRead\fP,
+\fBgpioRead_Bits_0_31\fP, or \fBgpioRead_Bits_32_53\fP.
+
+.br
+
+.br
+Each (stable) edge will be timestamped \fBsteady\fP microseconds
 after it was first detected.
 
 .IP "\fBint gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits)\fP"
