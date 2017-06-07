@@ -8477,6 +8477,11 @@ int gpioInitialise(void)
    return status;
 }
 
+int gpioInitialize(void)
+{
+   return gpioInitialise;
+}
+
 
 /* ----------------------------------------------------------------------- */
 

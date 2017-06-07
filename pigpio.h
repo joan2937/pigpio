@@ -910,6 +910,35 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_EVENT_BSC 31
 
 /*F*/
+int gpioInitialize(void);
+/*D
+Initializes the library.
+
+Returns the pigpio version number if OK, otherwise PI_INIT_FAILED.
+
+gpioInitialize must be called before using the other library functions
+with the following exceptions:
+
+. .
+[*gpioCfg**]
+[*gpioVersion*]
+[*gpioHardwareRevision*]
+. .
+
+...
+if (gpioInitialize() < 0)
+{
+   // pigpio initialization failed.
+}
+else
+{
+   // pigpio initialized okay.
+}
+...
+D*/
+
+
+/*F*/
 int gpioInitialise(void);
 /*D
 Initialises the library.
