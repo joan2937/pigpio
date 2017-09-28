@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 64
+#define PIGPIO_VERSION 65
 
 /*TEXT
 
@@ -864,8 +864,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
 #define PI_CFG_RT_PRIORITY       (1<<8)
 #define PI_CFG_STATS             (1<<9)
+#define PI_CFG_SIGHANDLER        (1<<10)
 
-#define PI_CFG_ILLEGAL_VAL       (1<<10)
+#define PI_CFG_ILLEGAL_VAL       (1<<11)
+
 
 /* gpioISR */
 
