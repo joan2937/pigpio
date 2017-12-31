@@ -980,8 +980,12 @@ def _pigpio_command(sl, cmd, p1, p2, rl=True):
     p2:= command parameter 2 (if applicable).
    """
    sl.l.acquire()
-   sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
-   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   try:
+      sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
+      dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   except Exception, e:
+      sl.l.release()
+      raise(e)
    if rl: sl.l.release()
    return res
 
@@ -1003,8 +1007,12 @@ def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents, rl=True):
       else:
          ext.extend(x)
    sl.l.acquire()
-   sl.s.sendall(ext)
-   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   try:
+      sl.s.sendall(ext)
+      dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   except Exception, e:
+      sl.l.release()
+      raise(e)
    if rl: sl.l.release()
    return res
 
