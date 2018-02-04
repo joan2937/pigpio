@@ -865,8 +865,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
 #define PI_CFG_RT_PRIORITY       (1<<8)
 #define PI_CFG_STATS             (1<<9)
+#define PI_CFG_SIGHANDLER        (1<<10)
 
-#define PI_CFG_ILLEGAL_VAL       (1<<10)
+#define PI_CFG_ILLEGAL_VAL       (1<<11)
+
 
 /* gpioISR */
 
