@@ -195,11 +195,18 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define BIT  (1<<(gpio&0x1F))
 
-#define DBG(level, format, arg...)                                               \
-   {                                                                             \
-      if (gpioCfg.dbgLevel >= level && (gpioCfg.internals & PI_CFG_SIGHANDLER))  \
-         fprintf(stderr, "%s %s: " format "\n" ,                                 \
-            myTimeStamp(), __FUNCTION__ , ## arg);                               \
+#ifndef EMBEDDED_IN_VM
+#define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
+#else
+#define DBG(level, format, arg...)
+#endif
+
+#define DO_DBG(level, format, arg...)                              \
+   {                                                               \
+      if (gpioCfg.dbgLevel >= level &&                             \
+         (gpioCfg.internals & PI_CFG_SIGHANDLER))                  \
+         fprintf(stderr, "%s %s: " format "\n" ,                   \
+            myTimeStamp(), __FUNCTION__ , ## arg);                 \
    }
 
 #ifndef DISABLE_SER_CHECK_INITED
@@ -8106,8 +8113,10 @@ int initInitialise(void)
       gpioMaskSet = 1;
    }
 
+#ifndef EMBEDDED_IN_VM
    if(gpioCfg.internals & PI_CFG_SIGHANDLER)
       sigSetHandler();
+#endif
 
    if (initPeripherals() < 0) return PI_INIT_FAILED;
 
@@ -8502,7 +8511,9 @@ void gpioTerminate(void)
    if (dmaReg != MAP_FAILED) dmaIn[DMA_CS] = DMA_CHANNEL_RESET;
    if (dmaReg != MAP_FAILED) dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
 
-   if ((gpioCfg.internals & PI_CFG_STATS) && (gpioCfg.internals & PI_CFG_SIGHANDLER))
+#ifndef EMBEDDED_IN_VM
+   if ((gpioCfg.internals & PI_CFG_STATS) &&
+       (gpioCfg.internals & PI_CFG_SIGHANDLER))
    {
       fprintf(stderr,
          "\n#####################################################\n");
@@ -8536,6 +8547,7 @@ void gpioTerminate(void)
          "\n#####################################################\n\n\n");
    }
 
+#endif
    initReleaseResources();
 
    fflush(NULL);
