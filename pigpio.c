@@ -55,6 +55,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/sysmacros.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
@@ -3977,8 +3978,8 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
    {
       /* try a modprobe */
 
-      system("/sbin/modprobe i2c_dev");
-      system("/sbin/modprobe i2c_bcm2835");
+      if (system("/sbin/modprobe i2c_dev") == -1) { /* ignore errors */}
+      if (system("/sbin/modprobe i2c_bcm2835") == -1) { /* ignore errors */}
 
       myGpioDelay(100000);
 
@@ -4040,7 +4041,14 @@ void i2cSwitchCombined(int setting)
 
    if (fd >= 0)
    {
-      if (setting) write(fd, "1\n", 2); else write(fd, "0\n", 2);
+      if (setting)
+      {
+         if (write(fd, "1\n", 2) == -1) { /* ignore errors */ }
+      }
+      else
+      {
+         if (write(fd, "0\n", 2) == -1) { /* ignore errors */ }
+      }
 
       close(fd);
    }
@@ -6765,7 +6773,7 @@ static void * pthTimerTick(void *x)
                tp->id,
               (unsigned)tp->nextTick.tv_sec,
               (unsigned)tp->nextTick.tv_nsec);
-            fprintf(stderr, buf);
+            fprintf(stderr, "%s", buf);
          }
       }
 
@@ -6856,7 +6864,7 @@ static void * pthFifoThread(void *x)
                   break;
 
                case 5:
-                  fprintf(outFifo, cmdUsage);
+                  fprintf(outFifo, "%s", cmdUsage);
                   break;
 
                case 6:
@@ -6976,7 +6984,7 @@ static void *pthSocketThreadHandler(void *fdC)
             p[3] = myDoCommand(p, sizeof(buf)-1, buf);
       }
 
-      write(sock, p, 16);
+      if (write(sock, p, 16) == -1) { /* ignore errors */ }
 
       switch (p[0])
       {
@@ -7001,7 +7009,7 @@ static void *pthSocketThreadHandler(void *fdC)
 
             if (((int)p[3]) > 0)
             {
-               write(sock, buf, p[3]);
+               if (write(sock, buf, p[3]) == 1) { /* ignore errors */ }
             }
             break;
 
@@ -7153,7 +7161,10 @@ static int initGrabLockFile(void)
       {
          sprintf(pidStr, "%d\n", (int)getpid());
 
-         write(fd, pidStr, strlen(pidStr));
+         if (write(fd, pidStr, strlen(pidStr)) == -1)
+         {
+            /* ignore errors */
+         }
       }
       else
       {
@@ -11355,7 +11366,7 @@ static void *pthISRThread(void *x)
    pfd.events = POLLPRI;
 
    lseek(fd, 0, SEEK_SET);    /* consume any prior interrupt */
-   read(fd, buf, sizeof buf);
+   if (read(fd, buf, sizeof buf) == -1) { /* ignore errors */ }
 
    while (1)
    {
@@ -11368,7 +11379,7 @@ static void *pthISRThread(void *x)
       if (retval >= 0)
       {
          lseek(fd, 0, SEEK_SET);    /* consume interrupt */
-         read(fd, buf, sizeof buf);
+         if (read(fd, buf, sizeof buf) == -1) { /* ignore errors */ }
 
          if (retval)
          {
@@ -12750,7 +12761,7 @@ int fileApprove(char *filename)
    char match[PI_MAX_PATH];
    char buffer[PI_MAX_PATH];
    char line[PI_MAX_PATH];
-   char mperm;
+   char mperm=0;
    char perm;
    char term;
    FILE *f;
