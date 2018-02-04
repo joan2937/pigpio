@@ -40,6 +40,8 @@ mandir = $(prefix)/man
 
 all:	$(ALL)
 
+lib:	$(LIB)
+
 pigpio.o: pigpio.c pigpio.h command.h custom.cext
 	$(CC) $(CFLAGS) -fpic -c -o pigpio.o pigpio.c
 
