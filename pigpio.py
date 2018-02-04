@@ -860,7 +860,7 @@ class _socklock:
    """
    def __init__(self):
       self.s = None
-      self.l = threading.Lock()
+      self.l = threading.RLock()
 
 class error(Exception):
    """pigpio module exception"""
@@ -970,7 +970,7 @@ def _u2i(uint32):
          raise error(error_text(v))
    return v
 
-def _pigpio_command(sl, cmd, p1, p2, rl=True):
+def _pigpio_command(sl, cmd, p1, p2):
    """
    Runs a pigpio socket command.
 
@@ -980,12 +980,14 @@ def _pigpio_command(sl, cmd, p1, p2, rl=True):
     p2:= command parameter 2 (if applicable).
    """
    sl.l.acquire()
-   sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
-   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
-   if rl: sl.l.release()
+   try:
+      sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
+      dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   finally:
+      sl.l.release()
    return res
 
-def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents, rl=True):
+def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents):
    """
    Runs an extended pigpio socket command.
 
@@ -1003,9 +1005,11 @@ def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents, rl=True):
       else:
          ext.extend(x)
    sl.l.acquire()
-   sl.s.sendall(ext)
-   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
-   if rl: sl.l.release()
+   try:
+      sl.s.sendall(ext)
+      dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   finally:
+      sl.l.release()
    return res
 
 class _event_ADT:
@@ -2854,13 +2858,15 @@ class pi():
          # process read failure
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command(self.sl, _PI_CMD_I2CRK, handle, reg, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command(self.sl, _PI_CMD_I2CRK, handle, reg))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def i2c_block_process_call(self, handle, reg, data):
@@ -2904,14 +2910,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_I2CPK, handle, reg, len(data), [data], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_I2CPK, handle, reg, len(data), [data]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def i2c_write_i2c_block_data(self, handle, reg, data):
@@ -2982,14 +2990,16 @@ class pi():
       # I count
       extents = [struct.pack("I", count)]
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_I2CRI, handle, reg, 4, extents, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_I2CRI, handle, reg, 4, extentse))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def i2c_read_device(self, handle, count):
@@ -3013,14 +3023,16 @@ class pi():
       (count, data) = pi.i2c_read_device(h, 12)
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(
+            _pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def i2c_write_device(self, handle, data):
@@ -3115,14 +3127,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
 
@@ -3284,14 +3298,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
 
@@ -3421,14 +3437,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_BI2CZ, SDA, 0, len(data), [data], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_BI2CZ, SDA, 0, len(data), [data]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def event_trigger(self, event):
@@ -3551,19 +3569,21 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_BSCX, bsc_control, 0, len(data), [data], False))
-      if bytes > 0:
-         rx = self._rxbuf(bytes)
-         status = struct.unpack('I', rx[0:4])[0]
-         bytes -= 4
-         data = rx[4:]
-      else:
-         status = bytes
-         bytes = 0
-         data = bytearray(b'')
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_BSCX, bsc_control, 0, len(data), [data]))
+         if bytes > 0:
+            rx = self._rxbuf(bytes)
+            status = struct.unpack('I', rx[0:4])[0]
+            bytes -= 4
+            data = rx[4:]
+         else:
+            status = bytes
+            bytes = 0
+            data = bytearray(b'')
+      finally:
+         self.sl.l.release()
       return status, bytes, data
 
    def bsc_i2c(self, i2c_address, data=[]):
@@ -3818,14 +3838,16 @@ class pi():
          # error path
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command(
-         self.sl, _PI_CMD_SPIR, handle, count, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command(
+            self.sl, _PI_CMD_SPIR, handle, count))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def spi_write(self, handle, data):
@@ -3882,14 +3904,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_SPIX, handle, 0, len(data), [data], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_SPIX, handle, 0, len(data), [data]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def serial_open(self, tty, baud, ser_flags=0):
@@ -3988,14 +4012,16 @@ class pi():
          # process read data
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_SERR, handle, count, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(
+            _pigpio_command(self.sl, _PI_CMD_SERR, handle, count))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def serial_write(self, handle, data):
@@ -4217,18 +4243,20 @@ class pi():
       (s, pars) = pi.script_status(sid)
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_PROCP, script_id, 0, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-         pars = struct.unpack('11i', _str(data))
-         status = pars[0]
-         params = pars[1:]
-      else:
-         status = bytes
-         params = ()
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(
+            _pigpio_command(self.sl, _PI_CMD_PROCP, script_id, 0))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+            pars = struct.unpack('11i', _str(data))
+            status = pars[0]
+            params = pars[1:]
+         else:
+            status = bytes
+            params = ()
+      finally:
+         self.sl.l.release()
       return status, params
 
    def stop_script(self, script_id):
@@ -4308,14 +4336,16 @@ class pi():
       (count, data) = pi.bb_serial_read(4)
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_SLR, user_gpio, 10000, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+          bytes = u2i(
+             _pigpio_command(self.sl, _PI_CMD_SLR, user_gpio, 10000))
+          if bytes > 0:
+             data = self._rxbuf(bytes)
+          else:
+             data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    
@@ -4410,14 +4440,16 @@ class pi():
       ## extension ##
       # s len argx bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_CF2, arg1, retMax, len(argx), [argx], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_CF2, arg1, retMax, len(argx), [argx]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def get_pad_strength(self, pad):
@@ -4610,14 +4642,16 @@ class pi():
          # process read data
       ...
       """
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(
-         _pigpio_command(self.sl, _PI_CMD_FR, handle, count, False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(
+            _pigpio_command(self.sl, _PI_CMD_FR, handle, count))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def file_write(self, handle, data):
@@ -4716,14 +4750,16 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      # Don't raise exception.  Must release lock.
-      bytes = u2i(_pigpio_command_ext(
-         self.sl, _PI_CMD_FL, 60000, 0, len(fpattern), [fpattern], False))
-      if bytes > 0:
-         data = self._rxbuf(bytes)
-      else:
-         data = ""
-      self.sl.l.release()
+      self.sl.l.acquire()
+      try:
+         bytes = u2i(_pigpio_command_ext(
+            self.sl, _PI_CMD_FL, 60000, 0, len(fpattern), [fpattern]))
+         if bytes > 0:
+            data = self._rxbuf(bytes)
+         else:
+            data = ""
+      finally:
+         self.sl.l.release()
       return bytes, data
 
    def shell(self, shellscr, pstring=""):
