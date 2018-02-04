@@ -6292,7 +6292,10 @@ static void * pthAlertThread(void *x)
             {
                stickInited = 1;
                numSamples = 0;
-               pthAlertRunning = PI_THREAD_RUNNING;
+               if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+               {
+                  pthAlertRunning = PI_THREAD_RUNNING;
+               }
             }
          }
       }
@@ -8474,7 +8477,11 @@ int gpioInitialise(void)
 
       runState = PI_RUNNING;
 
-      while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
+      if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+      {
+         while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
+      }
+
    }
 
    return status;
