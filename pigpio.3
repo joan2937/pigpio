@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpio.3
 ."
-.TH pigpio 3 2012-2017 Linux "pigpio archive"
+.TH pigpio 3 2012-2018 Linux "pigpio archive"
 .SH NAME
 pigpio - A C library to manipulate the Pi's GPIO.
 
@@ -329,6 +329,11 @@ gpioSetMode(22,PI_ALT0);    // Set GPIO22 to alternative mode 0.
 .br
 
 .EE
+
+.br
+
+.br
+See \fBhttp://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2835/BCM2835-ARM-Peripherals.pdf\fP page 102 for an overview of the modes.
 
 .IP "\fBint gpioGetMode(unsigned gpio)\fP"
 .IP "" 4
@@ -1300,6 +1305,36 @@ interrupt timeout expires.
 .br
 
 .br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-53     The GPIO which has changed state
+.br
+
+.br
+level       0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (interrupt timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.EE
+
+.br
+
+.br
 The underlying Linux sysfs GPIO interface is used to provide
 the interrupt services.
 
@@ -1375,6 +1410,40 @@ or PI_BAD_ISR_INIT.
 .br
 The function is passed the GPIO, the current level, the
 current tick, and the userdata pointer.
+
+.br
+
+.br
+
+.EX
+Parameter   Value    Meaning
+.br
+
+.br
+GPIO        0-53     The GPIO which has changed state
+.br
+
+.br
+level       0-2      0 = change to low (a falling edge)
+.br
+                     1 = change to high (a rising edge)
+.br
+                     2 = no level change (interrupt timeout)
+.br
+
+.br
+tick        32 bit   The number of microseconds since boot
+.br
+                     WARNING: this wraps around from
+.br
+                     4294967295 to 0 roughly every 72 minutes
+.br
+
+.br
+userdata    pointer  Pointer to an arbitrary object
+.br
+
+.EE
 
 .br
 
@@ -5050,7 +5119,7 @@ This function stores a null terminated script for later execution.
 .br
 
 .br
-See \fBhttp://abyz.co.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
+See \fBhttp://abyz.me.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
 
 .br
 
@@ -10222,4 +10291,4 @@ A 16-bit word value.
 pigpiod(1), pig2vcd(1), pigs(1), pigpiod_if(3), pigpiod_if2(3)
 .SH AUTHOR
 
-joan@abyz.co.uk
+joan@abyz.me.uk

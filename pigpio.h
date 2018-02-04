@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 64
+#define PIGPIO_VERSION 6507
 
 /*TEXT
 
@@ -980,6 +980,8 @@ gpioSetMode(18, PI_OUTPUT); // Set GPIO18 as output.
 
 gpioSetMode(22,PI_ALT0);    // Set GPIO22 to alternative mode 0.
 ...
+
+See [[http://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2835/BCM2835-ARM-Peripherals.pdf]] page 102 for an overview of the modes.
 D*/
 
 
@@ -1494,6 +1496,20 @@ The function is passed the GPIO, the current level, and the
 current tick.  The level will be PI_TIMEOUT if the optional
 interrupt timeout expires.
 
+. .
+Parameter   Value    Meaning
+
+GPIO        0-53     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (interrupt timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+. .
+
 The underlying Linux sysfs GPIO interface is used to provide
 the interrupt services.
 
@@ -1546,6 +1562,22 @@ or PI_BAD_ISR_INIT.
 
 The function is passed the GPIO, the current level, the
 current tick, and the userdata pointer.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-53     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (interrupt timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+
+userdata    pointer  Pointer to an arbitrary object
+. .
 
 Only one of [*gpioSetISRFunc*] or [*gpioSetISRFuncEx*] can be
 registered per GPIO.
@@ -3671,7 +3703,7 @@ int gpioStoreScript(char *script);
 /*D
 This function stores a null terminated script for later execution.
 
-See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+See [[http://abyz.me.uk/rpi/pigpio/pigs.html#Scripts]] for details.
 
 . .
 script: the text of the script

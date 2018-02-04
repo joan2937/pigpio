@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 64 */
+/* pigpio version 65 */
 
 /* include ------------------------------------------------------- */
 
@@ -204,8 +204,8 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 #define DO_DBG(level, format, arg...)                              \
    {                                                               \
-      if (gpioCfg.dbgLevel >= level &&                             \
-         (gpioCfg.internals & PI_CFG_SIGHANDLER))                  \
+      if ((gpioCfg.dbgLevel >= level) &&                           \
+         (!(gpioCfg.internals & PI_CFG_SIGHANDLER)))               \
          fprintf(stderr, "%s %s: " format "\n" ,                   \
             myTimeStamp(), __FUNCTION__ , ## arg);                 \
    }
@@ -1346,7 +1346,7 @@ static volatile gpioCfg_t gpioCfg =
    PI_DEFAULT_MEM_ALLOC_MODE,
    0, /* dbgLevel */
    0, /* alertFreq */
-   PI_CFG_SIGHANDLER, /* internals */
+   0, /* internals */
 };
 
 /* no initialisation required */
@@ -8135,7 +8135,7 @@ int initInitialise(void)
    }
 
 #ifndef EMBEDDED_IN_VM
-   if(gpioCfg.internals & PI_CFG_SIGHANDLER)
+   if (!(gpioCfg.internals & PI_CFG_SIGHANDLER))
       sigSetHandler();
 #endif
 
@@ -8534,7 +8534,7 @@ void gpioTerminate(void)
 
 #ifndef EMBEDDED_IN_VM
    if ((gpioCfg.internals & PI_CFG_STATS) &&
-       (gpioCfg.internals & PI_CFG_SIGHANDLER))
+       (!(gpioCfg.internals & PI_CFG_SIGHANDLER)))
    {
       fprintf(stderr,
          "\n#####################################################\n");
