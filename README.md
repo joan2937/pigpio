@@ -40,9 +40,13 @@ A number of utility programs are provided:
 * the pig2vcd utility which converts notifications into the value change dump (VCD)
   format (useful for viewing digital waveforms with GTKWave).
 
+## Documentation
+
+See http://abyz.me.uk/rpi/pigpio/
+
 ## Example programs
 
-See http://abyz.co.uk/rpi/pigpio/examples.html.
+See http://abyz.me.uk/rpi/pigpio/examples.html
 
 ## GPIO
 
