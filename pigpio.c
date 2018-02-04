@@ -6292,7 +6292,10 @@ static void * pthAlertThread(void *x)
             {
                stickInited = 1;
                numSamples = 0;
-               pthAlertRunning = PI_THREAD_RUNNING;
+               if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+               {
+                  pthAlertRunning = PI_THREAD_RUNNING;
+               }
             }
          }
       }
@@ -8140,10 +8143,13 @@ int initInitialise(void)
    if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
       SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
 
-   if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
+   if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+   {
+      if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
+         SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
 
-   pthAlertRunning = PI_THREAD_STARTED;
+      pthAlertRunning = PI_THREAD_STARTED;
+   }
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
    {
@@ -8471,7 +8477,11 @@ int gpioInitialise(void)
 
       runState = PI_RUNNING;
 
-      while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
+      if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
+      {
+         while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
+      }
+
    }
 
    return status;
@@ -13377,7 +13387,7 @@ int gpioCfgInterfaces(unsigned ifFlags)
 
    CHECK_NOT_INITED;
 
-   if (ifFlags > 7)
+   if (ifFlags > 15)
       SOFT_ERROR(PI_BAD_IF_FLAGS, "bad ifFlags (%X)", ifFlags);
 
    gpioCfg.ifFlags = ifFlags;

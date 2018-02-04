@@ -103,6 +103,7 @@ void usage()
       "   -k,         disable socket interface,          default enabled\n" \
       "   -l,         localhost socket only              default local+remote\n" \
       "   -n IP addr, allow address, name or dotted,     default allow all\n" \
+      "   -m,         disable alerts                     default enabled\n" \
       "   -p value,   socket port, 1024-32000,           default 8888\n" \
       "   -s value,   sample rate, 1, 2, 4, 5, 8, or 10, default 5\n" \
       "   -t value,   clock peripheral, 0=PWM 1=PCM,     default PCM\n" \
@@ -162,7 +163,7 @@ static void initOpts(int argc, char *argv[])
    uint32_t addr;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:p:s:t:x:vV")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:mp:s:t:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -215,6 +216,10 @@ static void initOpts(int argc, char *argv[])
 
          case 'l':
             ifFlags |= PI_LOCALHOST_SOCK_IF;
+            break; 
+
+         case 'm':
+            ifFlags |= PI_DISABLE_ALERT;
             break; 
 
          case 'n':
