@@ -890,11 +890,11 @@ int cmdParse(
                 */
          ctl->eaten += getNum(buf+ctl->eaten, &p[1], &ctl->opt[1]);
          ctl->eaten += getNum(buf+ctl->eaten, &p[2], &ctl->opt[2]);
-         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &to1);
+         ctl->eaten += getNum(buf+ctl->eaten, &tp1, &ctl->opt[3]);
 
          if ((ctl->opt[1] > 0) && ((int)p[1] >= 0) &&
              (ctl->opt[2] > 0) && ((int)p[2] >= 0) &&
-             (to1 == CMD_NUMERIC) && ((int)tp1 >= 0))
+             (ctl->opt[3] > 0) && ((int)tp1 >= 0))
          {
             p[3] = 4;
             memcpy(ext, &tp1, 4);
