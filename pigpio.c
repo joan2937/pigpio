@@ -6508,7 +6508,7 @@ static void *pthScript(void *x)
 {
    gpioScript_t *s;
    cmdInstr_t instr;
-   int p1, p2, p1o, p2o, *t1, *t2;
+   int p1, p2, p1o, p2o, p3o, *t1, *t2;
    int PC, A, F, SP;
    int S[PI_SCRIPT_STACK_SIZE];
    char buf[CMD_MAX_EXTENSION];
@@ -6554,7 +6554,17 @@ static void *pthScript(void *x)
          {
             if (instr.p[3])
             {
-               memcpy(buf, (char *)instr.p[4], instr.p[3]);
+               if ((instr.p[3] == sizeof(int)) && ((instr.opt[3] == CMD_VAR) || (instr.opt[3] == CMD_PAR)))
+               {
+                  /* Hack to allow register use in 3rd parameter */
+                  memcpy((char*)&p3o, (char *)instr.p[4], sizeof(int));
+                  if (instr.opt[3] == CMD_VAR) memcpy(buf, (char *)&(s->script.var[p3o]), sizeof(int));
+                  else                         memcpy(buf, (char *)&(s->script.par[p3o]), sizeof(int));
+               }
+               else
+               {
+                  memcpy(buf, (char *)instr.p[4], instr.p[3]);
+               }
             }
 
             A = myDoCommand(instr.p, sizeof(buf)-1, buf);
