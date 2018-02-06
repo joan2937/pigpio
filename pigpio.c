@@ -205,7 +205,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define DO_DBG(level, format, arg...)                              \
    {                                                               \
       if ((gpioCfg.dbgLevel >= level) &&                           \
-         (!(gpioCfg.internals & PI_CFG_SIGHANDLER)))               \
+         (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))             \
          fprintf(stderr, "%s %s: " format "\n" ,                   \
             myTimeStamp(), __FUNCTION__ , ## arg);                 \
    }
@@ -8135,7 +8135,7 @@ int initInitialise(void)
    }
 
 #ifndef EMBEDDED_IN_VM
-   if (!(gpioCfg.internals & PI_CFG_SIGHANDLER))
+   if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
       sigSetHandler();
 #endif
 
@@ -8534,7 +8534,7 @@ void gpioTerminate(void)
 
 #ifndef EMBEDDED_IN_VM
    if ((gpioCfg.internals & PI_CFG_STATS) &&
-       (!(gpioCfg.internals & PI_CFG_SIGHANDLER)))
+       (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))
    {
       fprintf(stderr,
          "\n#####################################################\n");

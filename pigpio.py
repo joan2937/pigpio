@@ -3,7 +3,7 @@ pigpio is a Python module for the Raspberry which talks to
 the pigpio daemon to allow control of the general purpose
 input outputs (GPIO).
 
-[http://abyz.co.uk/rpi/pigpio/python.html]
+[http://abyz.me.uk/rpi/pigpio/python.html]
 
 *Features*
 
@@ -299,7 +299,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.38"
+VERSION = "1.39"
 
 exceptions = True
 
@@ -1114,17 +1114,19 @@ class _callback_thread(threading.Thread):
 
       lastLevel = self.lastLevel
 
+      RECV_SIZ = 4096
       MSG_SIZ = 12
 
+      buf = bytes()
       while self.go:
 
-         buf = self.sl.s.recv(MSG_SIZ)
+         buf += self.sl.s.recv(RECV_SIZ)
+         offset = 0
 
-         while self.go and len(buf) < MSG_SIZ:
-            buf += self.sl.s.recv(MSG_SIZ-len(buf))
-
-         if self.go:
-            seq, flags, tick, level = (struct.unpack('HHII', buf))
+         while self.go and (len(buf) - offset) >= MSG_SIZ:
+            msgbuf = buf[offset:offset + MSG_SIZ]
+            offset += MSG_SIZ
+            seq, flags, tick, level = (struct.unpack('HHII', msgbuf))
 
             if flags == 0:
                changed = level ^ lastLevel
@@ -1147,6 +1149,7 @@ class _callback_thread(threading.Thread):
                   for cb in self.events:
                      if cb.event == event:
                         cb.func(event, tick)
+         buf = buf[offset:]
 
       self.sl.s.close()
 
@@ -4163,7 +4166,7 @@ class pi():
       """
       Store a script for later execution.
 
-      See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for
+      See [[http://abyz.me.uk/rpi/pigpio/pigs.html#Scripts]] for
       details.
 
       script:= the script text as a series of bytes.

@@ -6936,8 +6936,11 @@ and 611 control blocks on a lite channel.
 
 .IP "\fBint gpioCfgPermissions(uint64_t updateMask)\fP"
 .IP "" 4
-Configures pigpio to only allow updates (writes or mode changes) for the
-GPIO specified by the mask.
+Configures pigpio to restrict GPIO updates via the socket or pipe
+interfaces to the GPIO specified by the mask.  Programs directly
+calling the pigpio library (i.e. linked with -lpigpio are not
+affected).  A GPIO update is a write to a GPIO or a GPIO mode
+change or any function which would force such an action.
 
 .br
 
@@ -6963,7 +6966,7 @@ added to the mask.
 .br
 
 .br
-If the board revision is not recognised then GPIO 0-31 are allowed.
+If the board revision is not recognised then GPIO 2-27 are allowed.
 
 .br
 
@@ -10259,7 +10262,7 @@ A 16-bit word value.
 .br
 #define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
 .br
-#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0xFFFFFFFF
+#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 .br
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 .br

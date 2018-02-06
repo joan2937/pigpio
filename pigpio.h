@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6507
+#define PIGPIO_VERSION 6509
 
 /*TEXT
 
@@ -865,7 +865,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
 #define PI_CFG_RT_PRIORITY       (1<<8)
 #define PI_CFG_STATS             (1<<9)
-#define PI_CFG_SIGHANDLER        (1<<10)
+#define PI_CFG_NOSIGHANDLER      (1<<10)
 
 #define PI_CFG_ILLEGAL_VAL       (1<<11)
 
@@ -4712,8 +4712,11 @@ D*/
 /*F*/
 int gpioCfgPermissions(uint64_t updateMask);
 /*D
-Configures pigpio to only allow updates (writes or mode changes) for the
-GPIO specified by the mask.
+Configures pigpio to restrict GPIO updates via the socket or pipe
+interfaces to the GPIO specified by the mask.  Programs directly
+calling the pigpio library (i.e. linked with -lpigpio are not
+affected).  A GPIO update is a write to a GPIO or a GPIO mode
+change or any function which would force such an action.
 
 This function is only effective if called before [*gpioInitialise*].
 
@@ -4724,7 +4727,7 @@ updateMask: bit (1<<n) is set for each GPIO n which may be updated
 The default setting depends upon the Pi model. The user GPIO are
 added to the mask.
 
-If the board revision is not recognised then GPIO 0-31 are allowed.
+If the board revision is not recognised then GPIO 2-27 are allowed.
 
 Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0xFFFFFFFF 
 Type 1 board  @ PI_DEFAULT_UPDATE_MASK_B1 @ 0x03E6CF93 
@@ -6373,7 +6376,7 @@ after this command is issued.
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
-#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0xFFFFFFFF
+#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_A_B2        0xFBC7CF9C
 #define PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS 0x0080480FFFFFFCLL
