@@ -837,7 +837,7 @@ int main(int argc, char *argv[])
 {
    int i, t, c, pi;
 
-   char test[64];
+   char test[64]={0,};
 
    if (argc > 1)
    {
