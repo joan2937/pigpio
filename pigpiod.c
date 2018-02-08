@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 58+
+This version is for pigpio version 65+
 */
 
 #include <sys/types.h>
@@ -102,8 +102,8 @@ void usage()
       "   -g,         run in foreground (do not fork),   default disabled\n" \
       "   -k,         disable socket interface,          default enabled\n" \
       "   -l,         localhost socket only              default local+remote\n" \
-      "   -n IP addr, allow address, name or dotted,     default allow all\n" \
       "   -m,         disable alerts                     default enabled\n" \
+      "   -n IP addr, allow address, name or dotted,     default allow all\n" \
       "   -p value,   socket port, 1024-32000,           default 8888\n" \
       "   -s value,   sample rate, 1, 2, 4, 5, 8, or 10, default 5\n" \
       "   -t value,   clock peripheral, 0=PWM 1=PCM,     default PCM\n" \

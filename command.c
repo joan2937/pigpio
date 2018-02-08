@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 57+
+This version is for pigpio version 65+
 */
 
 #include <stdio.h>
