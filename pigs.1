@@ -4656,6 +4656,18 @@ ERROR: attempt to create an empty waveform
 This command deletes the waveform with id \fBwid\fP.
 
 .br
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+.br
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+.br
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
+.br
 Upon success nothing is returned.  On error a negative status code
 will be returned.
 

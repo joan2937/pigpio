@@ -33,7 +33,7 @@ TEST (optional)
 
 *** WARNING ************************************************
 *                                                          *
-* All the tests make extensive use of gpio 4 (pin P1/J8-7).*
+* All the tests make extensive use of gpio 25 (pin 22).    *
 * Ensure that either nothing or just a LED is connected to *
 * gpio 4 before running any of the tests.                  *
 *                                                          *
@@ -157,7 +157,7 @@ reflect the Windows/Mac socket interface.
 
 DOCUMENTATION
 
-The most up to date should be http://abyz.co.uk/rpi/pigpio/
+The most up to date should be http://abyz.me.uk/rpi/pigpio/
 
 On the Pi try
 

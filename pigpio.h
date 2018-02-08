@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6511
+#define PIGPIO_VERSION 6514
 
 /*TEXT
 
@@ -1955,6 +1955,15 @@ D*/
 int gpioWaveDelete(unsigned wave_id);
 /*D
 This function deletes the waveform with id wave_id.
+
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
 
 . .
 wave_id: >=0, as returned by [*gpioWaveCreate*]

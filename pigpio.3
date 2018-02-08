@@ -2131,6 +2131,24 @@ This function deletes the waveform with id wave_id.
 .br
 
 .br
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+.br
+
+.br
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+.br
+
+.br
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
+.br
+
+.br
 
 .EX
 wave_id: >=0, as returned by \fBgpioWaveCreate\fP

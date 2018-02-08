@@ -1772,6 +1772,24 @@ Wave ids are allocated in order, 0, 1, 2, etc.
 .br
 
 .br
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+.br
+
+.br
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+.br
+
+.br
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
+.br
+
+.br
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 
 .IP "\fBint wave_send_once(unsigned wave_id)\fP"
@@ -2115,7 +2133,7 @@ This function stores a script for later execution.
 .br
 
 .br
-See \fBhttp://abyz.co.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
+See \fBhttp://abyz.me.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
 
 .br
 

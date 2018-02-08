@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF_VERSION 27
+#define PIGPIOD_IF_VERSION 28
 
 /*TEXT
 
@@ -1223,6 +1223,15 @@ wave_id: >=0, as returned by [*wave_create*].
 
 Wave ids are allocated in order, 0, 1, 2, etc.
 
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
 Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 D*/
 
@@ -1454,7 +1463,7 @@ int store_script(char *script);
 /*D
 This function stores a script for later execution.
 
-See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+See [[http://abyz.me.uk/rpi/pigpio/pigs.html#Scripts]] for details.
 
 . .
 script: the text of the script.

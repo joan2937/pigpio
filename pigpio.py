@@ -860,7 +860,7 @@ class _socklock:
    """
    def __init__(self):
       self.s = None
-      self.l = threading.RLock()
+      self.l = threading.Lock()
 
 class error(Exception):
    """pigpio module exception"""
@@ -987,6 +987,19 @@ def _pigpio_command(sl, cmd, p1, p2):
       sl.l.release()
    return res
 
+def _pigpio_command_nolock(sl, cmd, p1, p2):
+   """
+   Runs a pigpio socket command.
+
+    sl:= command socket and lock.
+   cmd:= the command to be executed.
+    p1:= command parameter 1 (if applicable).
+    p2:= command parameter 2 (if applicable).
+   """
+   sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
+   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
+   return res
+
 def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents):
    """
    Runs an extended pigpio socket command.
@@ -1010,6 +1023,27 @@ def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents):
       dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
    finally:
       sl.l.release()
+   return res
+
+def _pigpio_command_ext_nolock(sl, cmd, p1, p2, p3, extents):
+   """
+   Runs an extended pigpio socket command.
+
+        sl:= command socket and lock.
+       cmd:= the command to be executed.
+        p1:= command parameter 1 (if applicable).
+        p2:= command parameter 2 (if applicable).
+        p3:= total size in bytes of following extents
+   extents:= additional data blocks
+   """
+   ext = bytearray(struct.pack('IIII', cmd, p1, p2, p3))
+   for x in extents:
+      if type(x) == type(""):
+         ext.extend(_b(x))
+      else:
+         ext.extend(x)
+   sl.s.sendall(ext)
+   dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
    return res
 
 class _event_ADT:
@@ -2240,6 +2274,15 @@ class pi():
 
       Wave ids are allocated in order, 0, 1, 2, etc.
 
+      The wave is flagged for deletion.  The resources used by the wave
+      will only be reused when either of the following apply.
+
+      - all waves with higher numbered wave ids have been deleted or have
+      been flagged for deletion.
+
+      - a new wave is created which uses exactly the same resources as
+      the current wave (see the C source for gpioWaveCreate for details).
+
       ...
       pi.wave_delete(6) # delete waveform with id 6
 
@@ -2863,7 +2906,8 @@ class pi():
       """
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command(self.sl, _PI_CMD_I2CRK, handle, reg))
+         bytes = u2i(_pigpio_command_nolock(
+            self.sl, _PI_CMD_I2CRK, handle, reg))
          if bytes > 0:
             data = self._rxbuf(bytes)
          else:
@@ -2915,7 +2959,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_I2CPK, handle, reg, len(data), [data]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -2995,7 +3039,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_I2CRI, handle, reg, 4, extentse))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -3029,7 +3073,7 @@ class pi():
       self.sl.l.acquire()
       try:
          bytes = u2i(
-            _pigpio_command(self.sl, _PI_CMD_I2CRD, handle, count))
+            _pigpio_command_nolock(self.sl, _PI_CMD_I2CRD, handle, count))
          if bytes > 0:
             data = self._rxbuf(bytes)
          else:
@@ -3132,7 +3176,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -3303,7 +3347,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -3442,7 +3486,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BI2CZ, SDA, 0, len(data), [data]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -3574,7 +3618,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BSCX, bsc_control, 0, len(data), [data]))
          if bytes > 0:
             rx = self._rxbuf(bytes)
@@ -3843,7 +3887,7 @@ class pi():
       """
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command(
+         bytes = u2i(_pigpio_command_nolock(
             self.sl, _PI_CMD_SPIR, handle, count))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -3909,7 +3953,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_SPIX, handle, 0, len(data), [data]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -4018,7 +4062,7 @@ class pi():
       self.sl.l.acquire()
       try:
          bytes = u2i(
-            _pigpio_command(self.sl, _PI_CMD_SERR, handle, count))
+            _pigpio_command_nolock(self.sl, _PI_CMD_SERR, handle, count))
          if bytes > 0:
             data = self._rxbuf(bytes)
          else:
@@ -4249,7 +4293,7 @@ class pi():
       self.sl.l.acquire()
       try:
          bytes = u2i(
-            _pigpio_command(self.sl, _PI_CMD_PROCP, script_id, 0))
+            _pigpio_command_nolock(self.sl, _PI_CMD_PROCP, script_id, 0))
          if bytes > 0:
             data = self._rxbuf(bytes)
             pars = struct.unpack('11i', _str(data))
@@ -4342,7 +4386,7 @@ class pi():
       self.sl.l.acquire()
       try:
           bytes = u2i(
-             _pigpio_command(self.sl, _PI_CMD_SLR, user_gpio, 10000))
+             _pigpio_command_nolock(self.sl, _PI_CMD_SLR, user_gpio, 10000))
           if bytes > 0:
              data = self._rxbuf(bytes)
           else:
@@ -4445,7 +4489,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_CF2, arg1, retMax, len(argx), [argx]))
          if bytes > 0:
             data = self._rxbuf(bytes)
@@ -4648,7 +4692,7 @@ class pi():
       self.sl.l.acquire()
       try:
          bytes = u2i(
-            _pigpio_command(self.sl, _PI_CMD_FR, handle, count))
+            _pigpio_command_nolock(self.sl, _PI_CMD_FR, handle, count))
          if bytes > 0:
             data = self._rxbuf(bytes)
          else:
@@ -4755,7 +4799,7 @@ class pi():
 
       self.sl.l.acquire()
       try:
-         bytes = u2i(_pigpio_command_ext(
+         bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_FL, 60000, 0, len(fpattern), [fpattern]))
          if bytes > 0:
             data = self._rxbuf(bytes)
