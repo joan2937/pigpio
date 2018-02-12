@@ -5012,7 +5012,7 @@ class pi():
       return a.trigger
 
    def __init__(self,
-                host = os.getenv("PIGPIO_ADDR", 'localhost'),
+                host = os.getenv("PIGPIO_ADDR", socket.INADDR_LOOPBACK),
                 port = os.getenv("PIGPIO_PORT", 8888)):
       """
       Grants access to a Pi's GPIO.
@@ -5051,7 +5051,7 @@ class pi():
       port = int(port)
 
       if host == '':
-         host = "localhost"
+         host = socket.INADDR_LOOPBACK
 
       self._host = host
       self._port = port
