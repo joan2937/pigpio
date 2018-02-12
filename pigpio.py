@@ -5012,14 +5012,14 @@ class pi():
       return a.trigger
 
    def __init__(self,
-                host = os.getenv("PIGPIO_ADDR", 'localhost'),
+                host = os.getenv("PIGPIO_ADDR", '127.0.0.1'),
                 port = os.getenv("PIGPIO_PORT", 8888)):
       """
       Grants access to a Pi's GPIO.
 
       host:= the host name of the Pi on which the pigpio daemon is
-             running.  The default is localhost unless overridden by
-             the PIGPIO_ADDR environment variable.
+             running.  The default is localhost (127.0.0.1) unless
+             overridden by the PIGPIO_ADDR environment variable.
        
       port:= the port number on which the pigpio daemon is listening.
              The default is 8888 unless overridden by the PIGPIO_PORT
@@ -5051,7 +5051,7 @@ class pi():
       port = int(port)
 
       if host == '':
-         host = "localhost"
+         host = "127.0.0.1"
 
       self._host = host
       self._port = port
