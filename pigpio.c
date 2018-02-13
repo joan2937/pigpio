@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 65 */
+/* pigpio version 66 */
 
 /* include ------------------------------------------------------- */
 
@@ -981,7 +981,6 @@ typedef struct
    unsigned id;
    unsigned running;
    unsigned millis;
-   struct timespec nextTick;
    pthread_t pthId;
 } gpioTimer_t;
 
@@ -6750,45 +6749,20 @@ static void *pthScript(void *x)
 
 static void * pthTimerTick(void *x)
 {
-   gpioTimer_t *     tp;
-   struct timespec   req, rem, period;
-   char              buf[256];
+   gpioTimer_t *tp;
+   struct timespec req, rem;
 
    tp = x;
 
-   clock_gettime(CLOCK_REALTIME, &tp->nextTick);
-
    while (1)
    {
-      clock_gettime(CLOCK_REALTIME, &rem);
-
-      period.tv_sec  = tp->millis / THOUSAND;
-      period.tv_nsec = (tp->millis % THOUSAND) * THOUSAND * THOUSAND;
-
-      do
-      {
-         TIMER_ADD(&tp->nextTick, &period, &tp->nextTick);
-
-         TIMER_SUB(&tp->nextTick, &rem, &req);
-      }
-      while (req.tv_sec < 0);
+      req.tv_sec  = tp->millis / THOUSAND;
+      req.tv_nsec = (tp->millis % THOUSAND) * THOUSAND * THOUSAND;
 
       while (nanosleep(&req, &rem))
       {
          req.tv_sec  = rem.tv_sec;
          req.tv_nsec = rem.tv_nsec;
-      }
-
-      if (gpioCfg.dbgLevel >= DBG_SLOW_TICK)
-      {
-         if ((tp->millis > 50) || (gpioCfg.dbgLevel >= DBG_FAST_TICK))
-         {
-            sprintf(buf, "pigpio: TIMER=%d @ %u %u\n",
-               tp->id,
-              (unsigned)tp->nextTick.tv_sec,
-              (unsigned)tp->nextTick.tv_nsec);
-            fprintf(stderr, "%s", buf);
-         }
       }
 
       if (tp->ex) (tp->func)(tp->userdata);
