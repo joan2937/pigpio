@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 65
+#define PIGPIO_VERSION 6601
 
 /*TEXT
 
@@ -207,6 +207,7 @@ SCRIPTS
 
 gpioStoreScript            Store a script
 gpioRunScript              Run a stored script
+gpioUpdateScript           Set a scripts parameters
 gpioScriptStatus           Get script status and parameters
 gpioStopScript             Stop a running script
 gpioDeleteScript           Delete a stored script
@@ -3741,6 +3742,46 @@ param is an array of up to 10 parameters which may be referenced in
 the script as p0 to p9.
 D*/
 
+/*F*/
+int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
+/*D
+This function runs a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+
+
+
+/*F*/
+int gpioUpdateScript(unsigned script_id, unsigned numPar, uint32_t *param);
+/*D
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+
 
 /*F*/
 int gpioScriptStatus(unsigned script_id, uint32_t *param);
@@ -6154,6 +6195,8 @@ PARAMS*/
 
 #define PI_CMD_EVM   115
 #define PI_CMD_EVT   116
+
+#define PI_CMD_PROCU 117
 
 /*DEF_E*/
 

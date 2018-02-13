@@ -3182,6 +3182,45 @@ ERROR: unknown script id
 
 .br
 
+.IP "\fBPROCU sid pars\fP - Set script parameters"
+.IP "" 4
+
+.br
+This command sets the parameters of a stored script \fBsid\fP passing
+it up to 10 parameters.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+See \fBScripts\fP.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs proc tag 0 hp 18 p0 p1 mils 1000 jmp 0
+.br
+0
+.br
+$ pigs procu 0 50 500000
+.br
+$ pigs procr 0
+.br
+$ pigs procu 0 100
+.br
+$ pigs procu 0 200
+.br
+$ pigs procu 0 200 100000
+.br
+
+.EE
+
+.br
+
 .IP "\fBPRRG u\fP - Get GPIO PWM real range"
 .IP "" 4
 

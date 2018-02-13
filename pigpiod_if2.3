@@ -2584,6 +2584,40 @@ PI_TOO_MANY_PARAM
 param is an array of up to 10 parameters which may be referenced in
 the script as p0 to p9.
 
+.IP "\fBint update_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param)\fP"
+.IP "" 4
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
+
+.br
+
+.br
+
+.EX
+       pi: >=0 (as returned by \fBpigpio_start\fP).
+.br
+script_id: >=0, as returned by \fBstore_script\fP.
+.br
+   numPar: 0-10, the number of parameters.
+.br
+    param: an array of parameters.
+.br
+
+.EE
+
+.br
+
+.br
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+.br
+
+.br
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+
 .IP "\fBint script_status(int pi, unsigned script_id, uint32_t *param)\fP"
 .IP "" 4
 This function returns the run status of a stored script as well

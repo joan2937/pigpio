@@ -2207,6 +2207,10 @@ static int myDoCommand(uint32_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_PROCS: res = gpioStopScript(p[1]); break;
 
+      case PI_CMD_PROCU:
+         res = gpioUpdateScript(p[1], p[3]/4, (uint32_t *)buf);
+         break;
+
       case PI_CMD_PRRG: res = gpioGetPWMrealRange(p[1]); break;
 
       case PI_CMD_PRS:
@@ -12276,6 +12280,38 @@ int gpioRunScript(unsigned script_id, unsigned numParam, uint32_t *param)
    {
       return PI_BAD_SCRIPT_ID;
    }
+}
+
+
+/* ----------------------------------------------------------------------- */
+
+int gpioUpdateScript(unsigned script_id, unsigned numParam, uint32_t *param)
+{
+   DBG(DBG_USER, "script_id=%d numParam=%d param=%08X",
+      script_id, numParam, (uint32_t)param);
+
+   CHECK_INITED;
+
+   if (script_id >= PI_MAX_SCRIPTS)
+      SOFT_ERROR(PI_BAD_SCRIPT_ID, "bad script id(%d)", script_id);
+
+   if (numParam > PI_MAX_SCRIPT_PARAMS)
+      SOFT_ERROR(PI_TOO_MANY_PARAM, "bad number of parameters(%d)", numParam);
+
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
+   {
+      if ((numParam > 0) && (param != 0))
+      {
+         memcpy(gpioScript[script_id].script.par, param,
+            sizeof(uint32_t) * numParam);
+      }
+   }
+   else
+   {
+      return PI_BAD_SCRIPT_ID;
+   }
+
+   return 0;
 }
 
 

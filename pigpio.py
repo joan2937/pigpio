@@ -168,6 +168,7 @@ Scripts
 
 store_script              Store a script
 run_script                Run a stored script
+update_script             Set a scripts parameters
 script_status             Get script status and parameters
 stop_script               Stop a running script
 delete_script             Delete a stored script
@@ -299,7 +300,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.39"
+VERSION = "1.40"
 
 exceptions = True
 
@@ -538,6 +539,8 @@ _PI_CMD_BSCX =114
 
 _PI_CMD_EVM  =115
 _PI_CMD_EVT  =116
+
+_PI_CMD_PROCU=117
 
 # pigpio error numbers
 
@@ -4264,6 +4267,38 @@ class pi():
          extents = []
       return _u2i(_pigpio_command_ext(
          self.sl, _PI_CMD_PROCR, script_id, 0, nump*4, extents))
+
+   def update_script(self, script_id, params=None):
+      """
+      Sets the parameters of a script.  The script may or
+      may not be running.  The first parameters of the script are
+      overwritten with the new values.
+
+      script_id:= id of stored script.
+         params:= up to 10 parameters required by the script.
+
+      ...
+      s = pi.update_script(sid, [par1, par2])
+
+      s = pi.update_script(sid, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      ...
+      """
+      # I p1 script id
+      # I p2 0
+      # I p3 params * 4 (0-10 params)
+      ## (optional) extension ##
+      # I[] params
+      if params is not None:
+         ext = bytearray()
+         for p in params:
+            ext.extend(struct.pack("I", p))
+         nump = len(params)
+         extents = [ext]
+      else:
+         nump = 0
+         extents = []
+      return _u2i(_pigpio_command_ext(
+         self.sl, _PI_CMD_PROCU, script_id, 0, nump*4, extents))
 
    def script_status(self, script_id):
       """

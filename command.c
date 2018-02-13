@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 65+
+This version is for pigpio version 66+
 */
 
 #include <stdio.h>
@@ -148,6 +148,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_PROCP, "PROCP", 112, 7}, // gpioScriptStatus
    {PI_CMD_PROCR, "PROCR", 191, 0}, // gpioRunScript
    {PI_CMD_PROCS, "PROCS", 112, 0}, // gpioStopScript
+   {PI_CMD_PROCU, "PROCU", 191, 0}, // gpioUpdateScript
 
    {PI_CMD_PRRG,  "PRRG",  112, 2}, // gpioGetPWMrealRange
    {PI_CMD_PRS,   "PRS",   121, 2}, // gpioSetPWMrange
@@ -347,6 +348,7 @@ PROCD sid        Delete script\n\
 PROCP sid        Get script status and parameters\n\
 PROCR sid ...    Run script\n\
 PROCS sid        Stop script\n\
+PROCU sid ...    Set script parameters\n\
 PRRG g           Get GPIO PWM real range\n\
 PRS g v          Set GPIO PWM range\n\
 PUD g pud        Set GPIO pull up/down\n\
@@ -975,7 +977,7 @@ int cmdParse(
 
          break;
 
-      case 191: /* PROCR
+      case 191: /* PROCR PROCU
 
                    One to 11 parameters, first positive,
                    optional remainder, any value.

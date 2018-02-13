@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 12
+#define PIGPIOD_IF2_VERSION 13
 
 /*TEXT
 
@@ -178,6 +178,7 @@ SCRIPTS
 
 store_script               Store a script
 run_script                 Run a stored script
+update_script              Set a scripts parameters
 script_status              Get script status and parameters
 stop_script                Stop a running script
 delete_script              Delete a stored script
@@ -1716,6 +1717,27 @@ script_id: >=0, as returned by [*store_script*].
 
 The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
 PI_TOO_MANY_PARAM
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+
+/*F*/
+int update_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param);
+/*D
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
+
+. .
+       pi: >=0 (as returned by [*pigpio_start*]).
+script_id: >=0, as returned by [*store_script*].
+   numPar: 0-10, the number of parameters.
+    param: an array of parameters.
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
 
 param is an array of up to 10 parameters which may be referenced in
 the script as p0 to p9.
