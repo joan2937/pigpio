@@ -6553,7 +6553,7 @@ static void *pthScript(void *x)
             PC, instr.p[0], p1o, instr.p[1], p2o, instr.p[2]);
          fflush(stderr);
 */
-         if (instr.p[0] < 100)
+         if (instr.p[0] < PI_CMD_SCRIPT)
          {
             if (instr.p[3])
             {
