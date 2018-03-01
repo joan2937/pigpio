@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 66 */
+/* pigpio version 67 */
 
 /* include ------------------------------------------------------- */
 
@@ -770,7 +770,7 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define BPD 4
 
-#define MAX_REPORT 120
+#define MAX_REPORT 250
 #define MAX_SAMPLE 4000
 
 #define DEFAULT_PWM_IDX 5
@@ -5713,7 +5713,8 @@ static void alertEmit(
    int err;
    int max_emits;
    char fifo[32];
-   gpioReport_t report[MAX_REPORT];
+   /* ensure space for maximum number of watchdog and event notifications */
+   gpioReport_t report[MAX_REPORT+PI_MAX_USER_GPIO+1+PI_MAX_EVENT+1];
 
    if (changedBits)
    {
