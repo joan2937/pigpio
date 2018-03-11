@@ -135,7 +135,7 @@ $(LIB3):	$(OBJ3)
 
 pig2vcd.o: pig2vcd.c pigpio.h
 pigpiod.o: pigpiod.c pigpio.h
-pigs.o: pigs.c pigpio.h command.h
+pigs.o: pigs.c pigpio.h command.h pigs.h
 x_pigpio.o: x_pigpio.c pigpio.h
 x_pigpiod_if.o: x_pigpiod_if.c pigpiod_if.h pigpio.h
 x_pigpiod_if2.o: x_pigpiod_if2.c pigpiod_if2.h pigpio.h

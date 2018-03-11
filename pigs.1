@@ -97,6 +97,26 @@ echo "{command}+" >/dev/pigpio
 pigs will show the result of the command on screen.
 
 .br
+The pigs process returns an exit status (which can be displayed with
+the command echo $?).
+
+.br
+
+.EX
+PIGS_OK            0
+.br
+PIGS_CONNECT_ERR 255
+.br
+PIGS_OPTION_ERR  254
+.br
+PIGS_SCRIPT_ERR  253
+.br
+.br
+.br
+
+.EE
+
+.br
 The results of /dev/pigpio commands need to be read from /dev/pigout,
 e.g. cat /dev/pigout (try cat /dev/pigout& so that all subsequent
 results are shown on screen).
