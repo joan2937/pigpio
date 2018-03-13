@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6702
+#define PIGPIO_VERSION 6703
 
 /*TEXT
 
@@ -496,7 +496,7 @@ typedef struct
 
 /* BSC FIFO size */
 
-#define BSC_FIFO_SIZE 16
+#define BSC_FIFO_SIZE 512
 
 typedef struct
 {
