@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 66+
+This version is for pigpio version 67+
 */
 
 #include <stdio.h>
@@ -562,6 +562,7 @@ static errInfo_t errInfo[]=
    {PI_BAD_SPI_BAUD     , "bad SPI baud rate, not 50-500k"},
    {PI_NOT_SPI_GPIO     , "no bit bang SPI in progress on GPIO"},
    {PI_BAD_EVENT_ID     , "bad event id"},
+   {PI_CMD_INTERRUPTED  , "command interrupted, Python"},
 
 };
 

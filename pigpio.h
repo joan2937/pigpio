@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6703
+#define PIGPIO_VERSION 67
 
 /*TEXT
 
@@ -4779,7 +4779,7 @@ added to the mask.
 
 If the board revision is not recognised then GPIO 2-27 are allowed.
 
-Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0xFFFFFFFF 
+Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0x0FFFFFFC 
 Type 1 board  @ PI_DEFAULT_UPDATE_MASK_B1 @ 0x03E6CF93 
 Type 2 board  @ PI_DEFAULT_UPDATE_MASK_A_B2 @ 0xFBC6CF9C
 Type 3 board  @ PI_DEFAULT_UPDATE_MASK_R3 @ 0x0FFFFFFC
@@ -6406,6 +6406,7 @@ after this command is issued.
 #define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 #define PI_BAD_EVENT_ID    -143 // bad event id
+#define PI_CMD_INTERRUPTED -144 // Used by Python
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

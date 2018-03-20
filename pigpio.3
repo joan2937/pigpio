@@ -7051,7 +7051,7 @@ If the board revision is not recognised then GPIO 2-27 are allowed.
 .br
 
 .br
-Unknown board   PI_DEFAULT_UPDATE_MASK_UNKNOWN   0xFFFFFFFF
+Unknown board   PI_DEFAULT_UPDATE_MASK_UNKNOWN   0x0FFFFFFC
 .br
 .br
 Type 1 board    PI_DEFAULT_UPDATE_MASK_B1   0x03E6CF93
@@ -10302,6 +10302,8 @@ A 16-bit word value.
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 .br
 #define PI_BAD_EVENT_ID    -143 // bad event id
+.br
+#define PI_CMD_INTERRUPTED -144 // Used by Python
 .br
 
 .br

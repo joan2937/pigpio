@@ -300,7 +300,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.40"
+VERSION = "1.41"
 
 exceptions = True
 
@@ -688,6 +688,7 @@ PI_BAD_SCRIPT_NAME  =-140
 PI_BAD_SPI_BAUD     =-141
 PI_NOT_SPI_GPIO     =-142
 PI_BAD_EVENT_ID     =-143
+PI_CMD_INTERRUPTED  =-144
 
 # pigpio error text
 
@@ -833,6 +834,7 @@ _errors=[
    [PI_BAD_SPI_BAUD      , "bad SPI baud rate, not 50-500k"],
    [PI_NOT_SPI_GPIO      , "no bit bang SPI in progress on GPIO"],
    [PI_BAD_EVENT_ID      , "bad event id"],
+   [PI_CMD_INTERRUPTED   , "pigpio command interrupted"],
 ]
 
 _except_a = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n{}"
@@ -982,12 +984,10 @@ def _pigpio_command(sl, cmd, p1, p2):
     p1:= command parameter 1 (if applicable).
     p2:= command parameter 2 (if applicable).
    """
-   sl.l.acquire()
-   try:
+   res = PI_CMD_INTERRUPTED
+   with sl.l:
       sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
       dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
-   finally:
-      sl.l.release()
    return res
 
 def _pigpio_command_nolock(sl, cmd, p1, p2):
@@ -999,6 +999,7 @@ def _pigpio_command_nolock(sl, cmd, p1, p2):
     p1:= command parameter 1 (if applicable).
     p2:= command parameter 2 (if applicable).
    """
+   res = PI_CMD_INTERRUPTED
    sl.s.send(struct.pack('IIII', cmd, p1, p2, 0))
    dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
    return res
@@ -1020,12 +1021,10 @@ def _pigpio_command_ext(sl, cmd, p1, p2, p3, extents):
          ext.extend(_b(x))
       else:
          ext.extend(x)
-   sl.l.acquire()
-   try:
+   res = PI_CMD_INTERRUPTED
+   with sl.l:
       sl.s.sendall(ext)
       dummy, res = struct.unpack('12sI', sl.s.recv(_SOCK_CMD_LEN))
-   finally:
-      sl.l.release()
    return res
 
 def _pigpio_command_ext_nolock(sl, cmd, p1, p2, p3, extents):
@@ -1039,6 +1038,7 @@ def _pigpio_command_ext_nolock(sl, cmd, p1, p2, p3, extents):
         p3:= total size in bytes of following extents
    extents:= additional data blocks
    """
+   res = PI_CMD_INTERRUPTED
    ext = bytearray(struct.pack('IIII', cmd, p1, p2, p3))
    for x in extents:
       if type(x) == type(""):
@@ -2907,17 +2907,14 @@ class pi():
          # process read failure
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_nolock(
             self.sl, _PI_CMD_I2CRK, handle, reg))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def i2c_block_process_call(self, handle, reg, data):
       """
@@ -2960,17 +2957,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_I2CPK, handle, reg, len(data), [data]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def i2c_write_i2c_block_data(self, handle, reg, data):
       """
@@ -3040,17 +3034,14 @@ class pi():
       # I count
       extents = [struct.pack("I", count)]
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
-            self.sl, _PI_CMD_I2CRI, handle, reg, 4, extentse))
+            self.sl, _PI_CMD_I2CRI, handle, reg, 4, extents))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def i2c_read_device(self, handle, count):
       """
@@ -3073,17 +3064,14 @@ class pi():
       (count, data) = pi.i2c_read_device(h, 12)
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(
             _pigpio_command_nolock(self.sl, _PI_CMD_I2CRD, handle, count))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def i2c_write_device(self, handle, data):
       """
@@ -3177,17 +3165,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_I2CZ, handle, 0, len(data), [data]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
 
    def bb_spi_open(self, CS, MISO, MOSI, SCLK, baud=100000, spi_flags=0):
@@ -3348,17 +3333,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BSPIX, CS, 0, len(data), [data]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
 
    def bb_i2c_open(self, SDA, SCL, baud=100000):
@@ -3487,17 +3469,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BI2CZ, SDA, 0, len(data), [data]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def event_trigger(self, event):
       """
@@ -3619,22 +3598,21 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      status = PI_CMD_INTERRUPTED
+      bytes = 0
+      rdata = bytearray(b'')
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_BSCX, bsc_control, 0, len(data), [data]))
          if bytes > 0:
             rx = self._rxbuf(bytes)
             status = struct.unpack('I', rx[0:4])[0]
             bytes -= 4
-            data = rx[4:]
+            rdata = rx[4:]
          else:
             status = bytes
             bytes = 0
-            data = bytearray(b'')
-      finally:
-         self.sl.l.release()
-      return status, bytes, data
+      return status, bytes, rdata
 
    def bsc_i2c(self, i2c_address, data=[]):
       """
@@ -3888,17 +3866,14 @@ class pi():
          # error path
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_nolock(
             self.sl, _PI_CMD_SPIR, handle, count))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def spi_write(self, handle, data):
       """
@@ -3954,17 +3929,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_SPIX, handle, 0, len(data), [data]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def serial_open(self, tty, baud, ser_flags=0):
       """
@@ -4062,17 +4034,14 @@ class pi():
          # process read data
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(
             _pigpio_command_nolock(self.sl, _PI_CMD_SERR, handle, count))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def serial_write(self, handle, data):
       """
@@ -4325,8 +4294,9 @@ class pi():
       (s, pars) = pi.script_status(sid)
       ...
       """
-      self.sl.l.acquire()
-      try:
+      status = PI_CMD_INTERRUPTED
+      params = ()
+      with self.sl.l:
          bytes = u2i(
             _pigpio_command_nolock(self.sl, _PI_CMD_PROCP, script_id, 0))
          if bytes > 0:
@@ -4336,9 +4306,6 @@ class pi():
             params = pars[1:]
          else:
             status = bytes
-            params = ()
-      finally:
-         self.sl.l.release()
       return status, params
 
    def stop_script(self, script_id):
@@ -4418,17 +4385,14 @@ class pi():
       (count, data) = pi.bb_serial_read(4)
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
           bytes = u2i(
              _pigpio_command_nolock(self.sl, _PI_CMD_SLR, user_gpio, 10000))
           if bytes > 0:
-             data = self._rxbuf(bytes)
-          else:
-             data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+             rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    
    def bb_serial_read_close(self, user_gpio):
@@ -4522,17 +4486,14 @@ class pi():
       ## extension ##
       # s len argx bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_CF2, arg1, retMax, len(argx), [argx]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def get_pad_strength(self, pad):
       """
@@ -4724,17 +4685,14 @@ class pi():
          # process read data
       ...
       """
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(
             _pigpio_command_nolock(self.sl, _PI_CMD_FR, handle, count))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def file_write(self, handle, data):
       """
@@ -4832,17 +4790,14 @@ class pi():
       ## extension ##
       # s len data bytes
 
-      self.sl.l.acquire()
-      try:
+      bytes = PI_CMD_INTERRUPTED
+      rdata = ""
+      with self.sl.l:
          bytes = u2i(_pigpio_command_ext_nolock(
             self.sl, _PI_CMD_FL, 60000, 0, len(fpattern), [fpattern]))
          if bytes > 0:
-            data = self._rxbuf(bytes)
-         else:
-            data = ""
-      finally:
-         self.sl.l.release()
-      return bytes, data
+            rdata = self._rxbuf(bytes)
+      return bytes, rdata
 
    def shell(self, shellscr, pstring=""):
       """
@@ -5048,7 +5003,8 @@ class pi():
 
    def __init__(self,
                 host = os.getenv("PIGPIO_ADDR", 'localhost'),
-                port = os.getenv("PIGPIO_PORT", 8888)):
+                port = os.getenv("PIGPIO_PORT", 8888),
+                show_errors = True):
       """
       Grants access to a Pi's GPIO.
 
@@ -5106,6 +5062,7 @@ class pi():
          exception = 2
 
       except error:
+         # assumed to be no handle available
          exception = 3
 
       else:
@@ -5119,16 +5076,19 @@ class pi():
          if self.sl.s is not None:
             self.sl.s = None
 
-         s = "Can't connect to pigpio at {}({})".format(host, str(port))
+         if show_errors:
 
-         print(_except_a.format(s))
-         if exception == 1:
-             print(_except_1)
-         elif exception == 2:
-             print(_except_2)
-         else:
-             print(_except_3)
-         print(_except_z)
+            s = "Can't connect to pigpio at {}({})".format(host, str(port))
+
+         
+            print(_except_a.format(s))
+            if exception == 1:
+                print(_except_1)
+            elif exception == 2:
+                print(_except_2)
+            else:
+                print(_except_3)
+            print(_except_z)
 
    def stop(self):
       """Release pigpio resources.
@@ -5361,7 +5321,8 @@ def xref():
    PI_BAD_SCRIPT_NAME = -140
    PI_BAD_SPI_BAUD = -141
    PI_NOT_SPI_GPIO = -142
-   PI_BAD_EVENT_ID = -143 
+   PI_BAD_EVENT_ID = -143
+   PI_CMD_INTERRUPTED = -144
    . .
 
    event:0-31
@@ -5610,6 +5571,11 @@ def xref():
    shellscr:
    The name of a shell script.  The script must exist
    in /opt/pigpio/cgi and must be executable.
+
+   show_errors:
+   Controls the display of pigpio daemon connection failures.
+   The default of True prints the probable failure reasons to
+   standard output.
 
    spi_*:
    One of the spi_ functions.
