@@ -2725,7 +2725,7 @@ i2cBus: i2C Bus Number (0 or 1).
 Returns 0 on an error, otherwise the bus' baud rate.
 
 .IP "\fBuint32_t i2cAddress(unsigned handle)\fP"
-.IP 4
+.IP "" 4
 This function returns an i2c device address given a valid handle.
 
 .br
@@ -3354,7 +3354,7 @@ of bytes (using repeated start if enabled).
 .br
 
 .EX
- handle: >=0, as returned by a call to \fBi2cOpen\fp
+ handle: >=0, as returned by a call to \fBi2cOpen\fP
 .br
 sendBuf: pointer to the bytes to write
 .br
