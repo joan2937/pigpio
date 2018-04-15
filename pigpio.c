@@ -4108,6 +4108,47 @@ int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)
    else             return PI_BAD_I2C_SEG;
 }
 
+uint32_t i2cAddress(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   if (handle >= PI_I2C_SLOTS || i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   return i2cInfo[handle].addr;
+}
+
+int i2cWriteReadRS(unsigned handle, char *sendBuf, unsigned sendLen, char *recvBuf, unsigned recvLen)
+{
+   pi_i2c_msg_t msg[2];
+
+   DBG(DBG_USER, "handle=%d sendBuf=%s recvLen=%d",
+      handle, myBuf2Str(sendLen, (char *)sendBuf), recvLen);
+
+   if (handle >= PI_I2C_SLOTS | i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!sendBuf || !sendLen)
+      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
+
+   if (!recvBuf && recvLen)
+      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
+
+   // First the write:
+   msg[0].addr  = i2cAddress(handle);
+   msg[0].flags = 0;
+   msg[0].len   = sendLen;
+   msg[0].bug   = sendBuf;
+
+   // And then the read:
+   msg[1].addr  = i2cAddress(handle);
+   msg[1].flags = I2C_M_RD; // Repeated start; should just be a read
+   msg[1].len   = recvLen;
+   msg[1].buf   = recvBuf;
+
+   return i2cSegments(handle, msg, 2);
+}
+
 int i2cZip(
    unsigned handle,
    char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)

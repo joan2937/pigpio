@@ -251,6 +251,8 @@ i2cClose                   Closes an I2C device
 
 i2cBaudRate                Gets baud rate of an I2C bus
 
+i2cAddress                 Gets I2C device address from a handle
+
 i2cWriteQuick              SMBus write quick
 i2cWriteByte               SMBus write byte
 i2cReadByte                SMBus read byte
@@ -265,6 +267,7 @@ i2cBlockProcessCall        SMBus block process call
 
 i2cWriteI2CBlockData       SMBus write I2C block data
 i2cReadI2CBlockData        SMBus read I2C block data
+i2cWriteReadRS             Writes and then reads bytes with repeated start
 
 i2cReadDevice              Reads the raw I2C device
 i2cWriteDevice             Writes the raw I2C device
@@ -2710,6 +2713,41 @@ numSegs: >0, the number of I2C segments
 . .
 
 Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
+D*/
+
+/*F*/
+uint32_t i2cAddress(unsigned handle)
+/*D
+This function returns an i2c device address given a valid handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+. .
+
+Returns the device address that the handle corresponds to if OK, otherwise
+PI_BAD_HANDLE.
+D*/
+
+/*F*/
+int i2cWriteReadRS(
+   unsigned handle,
+   char    *sendBuf,
+   unsigned sendLen,
+   char    *recvBuf,
+   unsigned recvLen);
+/*D
+This function writes a given number of bytes and then reads a given number of
+bytes (using repeated start if enabled).
+
+. .
+ handle: >=0, as returned by a call to [*i2cOpen*]
+sendBuf: pointer to the bytes to write
+sendLen: number of bytes to write (>0)
+recvBuf: pointer to the buffer to hold the data that's read in
+recvLen: number of bytes to read in (>0)
+. .
+
+Returns 2 if OK, otherwise PI_BAD_I2C_SEG or PI_BAD_HANDLE or PI_BAD_POINTER.
 D*/
 
 /*F*/
