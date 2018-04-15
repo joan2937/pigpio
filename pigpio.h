@@ -2683,7 +2683,10 @@ D*/
 void i2cSwitchCombined(int setting);
 /*D
 This sets the I2C (i2c-bcm2708) module "use combined transactions"
-parameter on or off.
+parameter on or off. This is equivalent to repeated start in i2c parlance.
+
+Note that the i2c-bcm2835 module (the default since 4.9) has no such setting
+(combined transactions are enabled by default).
 
 . .
 setting: 0 to set the parameter off, non-zero to set it on
