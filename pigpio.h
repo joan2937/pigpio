@@ -2716,7 +2716,7 @@ Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
 D*/
 
 /*F*/
-uint32_t i2cAddress(unsigned handle)
+uint32_t i2cAddress(unsigned handle);
 /*D
 This function returns an i2c device address given a valid handle.
 
@@ -2731,10 +2731,10 @@ D*/
 /*F*/
 int i2cWriteReadRS(
    unsigned handle,
-   char    *sendBuf,
-   unsigned sendLen,
-   char    *recvBuf,
-   unsigned recvLen);
+   uint8_t *sendBuf,
+   uint16_t sendLen,
+   uint8_t *recvBuf,
+   uint16_t recvLen);
 /*D
 This function writes a given number of bytes and then reads a given number of
 bytes (using repeated start if enabled).

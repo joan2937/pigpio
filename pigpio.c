@@ -4043,9 +4043,9 @@ uint32_t i2cBaudRate(unsigned i2cBus)
 
    CHECK_INITED;
 
-   sprintf(dev, "/sys/class/i2c-adapter/i2c-%d/of_node/clock-frequency", i2cBus);
+   sprintf(path, "/sys/class/i2c-adapter/i2c-%d/of_node/clock-frequency", i2cBus);
 
-   if ((fd = fopen(dev, "rt")) == NULL) SOFT_ERROR(0, "Bad i2c bus (%d)", i2cBus)
+   if ((fd = fopen(dev, "rt")) == NULL) SOFT_ERROR(0, "Bad i2c bus (%d)", i2cBus);
 
    fread(buf, 4, 1, fd);
 
@@ -4118,14 +4118,14 @@ uint32_t i2cAddress(unsigned handle)
    return i2cInfo[handle].addr;
 }
 
-int i2cWriteReadRS(unsigned handle, char *sendBuf, unsigned sendLen, char *recvBuf, unsigned recvLen)
+int i2cWriteReadRS(unsigned handle, uint8_t *sendBuf, uint16_t sendLen, uint8_t *recvBuf, uint16_t recvLen)
 {
    pi_i2c_msg_t msg[2];
 
    DBG(DBG_USER, "handle=%d sendBuf=%s recvLen=%d",
       handle, myBuf2Str(sendLen, (char *)sendBuf), recvLen);
 
-   if (handle >= PI_I2C_SLOTS | i2cInfo[handle].state != PI_I2C_OPENED)
+   if (handle >= PI_I2C_SLOTS || i2cInfo[handle].state != PI_I2C_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
    if (!sendBuf || !sendLen)
@@ -4138,11 +4138,11 @@ int i2cWriteReadRS(unsigned handle, char *sendBuf, unsigned sendLen, char *recvB
    msg[0].addr  = i2cAddress(handle);
    msg[0].flags = 0;
    msg[0].len   = sendLen;
-   msg[0].bug   = sendBuf;
+   msg[0].buf   = sendBuf;
 
    // And then the read:
    msg[1].addr  = i2cAddress(handle);
-   msg[1].flags = I2C_M_RD; // Repeated start; should just be a read
+   msg[1].flags = 1; // Repeated start; should just be a read
    msg[1].len   = recvLen;
    msg[1].buf   = recvBuf;
 
