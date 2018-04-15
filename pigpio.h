@@ -267,12 +267,13 @@ i2cBlockProcessCall        SMBus block process call
 
 i2cWriteI2CBlockData       SMBus write I2C block data
 i2cReadI2CBlockData        SMBus read I2C block data
-i2cWriteReadRS             Writes and then reads bytes with repeated start
 
 i2cReadDevice              Reads the raw I2C device
 i2cWriteDevice             Writes the raw I2C device
 
 i2cSwitchCombined          Sets or clears the combined flag
+
+i2cWriteReadRS             Writes and then reads bytes with repeated start
 
 i2cSegments                Performs multiple I2C transactions
 
@@ -2228,6 +2229,7 @@ It is the caller's responsibility to read data from the cyclic buffer
 in a timely fashion.
 D*/
 
+
 /*F*/
 int gpioSerialReadInvert(unsigned user_gpio, unsigned invert);
 /*D
@@ -2285,6 +2287,7 @@ user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 D*/
 
+
 /*F*/
 int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 /*D
@@ -2334,6 +2337,7 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 D*/
 
+
 /*F*/
 uint32_t i2cBaudRate(unsigned i2cBus);
 /*D
@@ -2347,6 +2351,21 @@ i2cBus: i2C Bus Number (0 or 1).
 
 Returns 0 on an error, otherwise the bus' baud rate.
 D*/
+
+
+/*F*/
+uint32_t i2cAddress(unsigned handle);
+/*D
+This function returns an i2c device address given a valid handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+. .
+
+Returns the device address that the handle corresponds to if OK, otherwise
+PI_BAD_HANDLE.
+D*/
+
 
 /*F*/
 int i2cWriteQuick(unsigned handle, unsigned bit);
@@ -2715,20 +2734,6 @@ numSegs: >0, the number of I2C segments
 Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
 D*/
 
-/*F*/
-uint32_t i2cAddress(unsigned handle);
-/*D
-This function returns an i2c device address given a valid handle.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-. .
-
-Returns the device address that the handle corresponds to if OK, otherwise
-PI_BAD_HANDLE.
-D*/
-
-/*F*/
 int i2cWriteReadRS(
    unsigned handle,
    uint8_t *sendBuf,
@@ -2749,6 +2754,7 @@ recvLen: number of bytes to read in (>0)
 
 Returns 2 if OK, otherwise PI_BAD_I2C_SEG or PI_BAD_HANDLE or PI_BAD_POINTER.
 D*/
+
 
 /*F*/
 int i2cZip(

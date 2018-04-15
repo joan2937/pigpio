@@ -4045,7 +4045,7 @@ uint32_t i2cBaudRate(unsigned i2cBus)
 
    sprintf(path, "/sys/class/i2c-adapter/i2c-%d/of_node/clock-frequency", i2cBus);
 
-   if ((fd = fopen(dev, "rt")) == NULL) SOFT_ERROR(0, "Bad i2c bus (%d)", i2cBus);
+   if ((fd = fopen(path, "rt")) == NULL) SOFT_ERROR(0, "Bad i2c bus (%d)", i2cBus);
 
    fread(buf, 4, 1, fd);
 
