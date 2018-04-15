@@ -249,6 +249,8 @@ I2C
 i2cOpen                    Opens an I2C device
 i2cClose                   Closes an I2C device
 
+i2cBaudRate                Gets baud rate of an I2C bus
+
 i2cWriteQuick              SMBus write quick
 i2cWriteByte               SMBus write byte
 i2cReadByte                SMBus read byte
@@ -2329,6 +2331,19 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 D*/
 
+/*F*/
+uint32_t i2cBaudRate(unsigned i2cBus);
+/*D
+This gets the baud rate of a provided i2cBus.
+Note that this has only been tested with the i2c_bcm2835 kernel module; it may
+work with the i2c_bcm2708 module.
+
+. .
+i2cBus: i2C Bus Number (0 or 1).
+. .
+
+Returns 0 on an error, otherwise the bus' baud rate.
+D*/
 
 /*F*/
 int i2cWriteQuick(unsigned handle, unsigned bit);

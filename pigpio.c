@@ -4034,6 +4034,27 @@ int i2cClose(unsigned handle)
    return 0;
 }
 
+uint32_t i2cBaudRate(unsigned i2cBus)
+{
+   FILE *fd;
+   uint8_t buf[4] = {0};
+   char path[60] = {0};
+   uint32_t num = 0;
+
+   CHECK_INITED;
+
+   sprintf(dev, "/sys/class/i2c-adapter/i2c-%d/of_node/clock-frequency", i2cBus);
+
+   if ((fd = fopen(dev, "rt")) == NULL) SOFT_ERROR(0, "Bad i2c bus (%d)", i2cBus)
+
+   fread(buf, 4, 1, fd);
+
+   for (uint8_t i = 0; i < sizeof(buf); i++)
+       num |= (buf[i] << (8*(sizeof(buf) - i - 1)));
+
+   return num;
+}
+
 void i2cSwitchCombined(int setting)
 {
    int fd;
