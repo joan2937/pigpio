@@ -3231,13 +3231,6 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
       {
          /* pulse 1 due */
 
-         if (tNow < tNext1)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext1 - tNow);
-            tNow = tNext1;
-         }
-
          out[outPos].gpioOn  = in1[inPos1].gpioOn;
          out[outPos].gpioOff = in1[inPos1].gpioOff;
          out[outPos].flags   = in1[inPos1].flags;
@@ -3249,13 +3242,6 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
       {
          /* pulse 2 due */
 
-         if (tNow < tNext2)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext2 - tNow);
-            tNow = tNext2;
-         }
-
          out[outPos].gpioOn  = in2[inPos2].gpioOn;
          out[outPos].gpioOff = in2[inPos2].gpioOff;
          out[outPos].flags   = in2[inPos2].flags;
@@ -3266,13 +3252,6 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
       else
       {
          /* pulse 1 and 2 both due */
-
-         if (tNow < tNext1)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext1 - tNow);
-            tNow = tNext1;
-         }
 
          out[outPos].gpioOn  = in1[inPos1].gpioOn  | in2[inPos2].gpioOn;
          out[outPos].gpioOff = in1[inPos1].gpioOff | in2[inPos2].gpioOff;
@@ -3316,7 +3295,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
    if (tNow < tMax)
    {
-      /* extend previous delay */
+      /* extend final delay */
       out[outPos-1].usDelay += (tMax - tNow);
       tNow = tMax;
    }
