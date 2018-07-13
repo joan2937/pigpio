@@ -3209,7 +3209,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
    unsigned numIn2, numOut;
 
-   uint32_t tNow, tNext1, tNext2, tDelay;
+   uint32_t tNow, tNext1, tNext2, tDelay, tMax;
 
    rawWave_t *in2, *out;
 
@@ -3220,6 +3220,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
    out   = wf[1-wfcur];
 
    tNow = 0;
+   tMax = 0;
 
    if (!numIn1) tNext1 = -1; else tNext1 = 0;
    if (!numIn2) tNext2 = -1; else tNext2 = 0;
@@ -3242,6 +3243,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
          out[outPos].flags   = in1[inPos1].flags;
 
          tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
+         if (tMax < tNext1) tMax = tNext1;
       }
       else if (tNext2 < tNext1)
       {
@@ -3259,6 +3261,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
          out[outPos].flags   = in2[inPos2].flags;
 
          tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
+         if (tMax < tNext2) tMax = tNext2;
       }
       else
       {
@@ -3277,6 +3280,8 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
          tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
          tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
+         if (tMax < tNext1) tMax = tNext1;
+         if (tMax < tNext2) tMax = tNext2;
       }
 
       if (tNext1 <= tNext2) { tDelay = tNext1 - tNow; tNow = tNext1; }
@@ -3307,6 +3312,13 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
       if (inPos1 >= numIn1) tNext1 = -1;
       if (inPos2 >= numIn2) tNext2 = -1;
 
+   }
+
+   if (tNow < tMax)
+   {
+      /* extend previous delay */
+      out[outPos-1].usDelay += (tMax - tNow);
+      tNow = tMax;
    }
 
    if ((outPos < numOut) && (outPos < level))
