@@ -7011,6 +7011,8 @@ static void *pthSocketThreadHandler(void *fdC)
 
    close(sock);
 
+   DBG(DBG_ALWAYS, "Socket %d closed", sock);
+
    return 0;
 }
 
@@ -7074,9 +7076,22 @@ static void * pthSocketThread(void *x)
 
       if (addrAllowed((struct sockaddr *)&client))
       {
+         DBG(DBG_ALWAYS, "Connection accepted on socket %d", fdC);
+
          sock = malloc(sizeof(int));
 
          *sock = fdC;
+
+         /* Enable tcp_keepalive */
+         int optval = 1;
+         socklen_t optlen = sizeof(optval);
+
+         if (setsockopt(fdC, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+           DBG(0, "setsockopt() fail, closing socket %d", fdC);
+           close(fdC);
+         }
+
+         DBG(DBG_ALWAYS, "SO_KEEPALIVE enabled on socket %d\n", fdC);
 
          if (pthread_create
             (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
@@ -7085,6 +7100,7 @@ static void * pthSocketThread(void *x)
       }
       else
       {
+         DBG(DBG_ALWAYS, "Connection rejected, closing");
          close(fdC);
       }
    }
@@ -8185,6 +8201,8 @@ int initInitialise(void)
             }
             server6.sin6_port = htons(port);
 
+            int opt;
+            setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
             if (bind(fdSock,(struct sockaddr *)&server6, sizeof(server6)) < 0)
                SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
          }
@@ -8196,7 +8214,11 @@ int initInitialise(void)
 
          if (fdSock == -1)
             SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
-
+         else
+         {
+           int opt;
+           setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+         }
          server.sin_family = AF_INET;
          if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
          {
