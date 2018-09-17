@@ -6371,6 +6371,7 @@ static void * pthAlertThread(void *x)
       }
 
       alertEmit(sample, reports, changedBits, sTick);
+      reportedLevel = sample[numSamples -1].level;
 
       if (totalSamples > gpioStats.maxSamples)
          gpioStats.maxSamples = numSamples;
