@@ -2191,8 +2191,8 @@ class pi():
 
       The bytes required for each character depend upon [*bb_bits*].
 
-      For [*bb_bits*] 1-8 there will be one byte per character. 
-      For [*bb_bits*] 9-16 there will be two bytes per character. 
+      For [*bb_bits*] 1-8 there will be one byte per character.
+      For [*bb_bits*] 9-16 there will be two bytes per character.
       For [*bb_bits*] 17-32 there will be four bytes per character.
 
       ...
@@ -2253,8 +2253,8 @@ class pi():
 
       A pulse specifies
 
-      1) the GPIO to be switched on at the start of the pulse. 
-      2) the GPIO to be switched off at the start of the pulse. 
+      1) the GPIO to be switched on at the start of the pulse.
+      2) the GPIO to be switched off at the start of the pulse.
       3) the delay in microseconds before the next pulse.
 
       Any or all the fields can be zero.  It doesn't make any sense
@@ -2389,7 +2389,7 @@ class pi():
       Returns the waveform id or one of the following special
       values:
 
-      WAVE_NOT_FOUND (9998) - transmitted wave not found. 
+      WAVE_NOT_FOUND (9998) - transmitted wave not found.
       NO_TX_WAVE (9999) - no wave being transmitted.
 
       ...
@@ -2615,7 +2615,7 @@ class pi():
       S     (1 bit) : Start bit
       P     (1 bit) : Stop bit
       Rd/Wr (1 bit) : Read/Write bit. Rd equals 1, Wr equals 0.
-      A, NA (1 bit) : Accept and not accept bit. 
+      A, NA (1 bit) : Accept and not accept bit.
       Addr  (7 bits): I2C 7 bit address.
       reg   (8 bits): Command byte, which often selects a register.
       Data  (8 bits): A data byte.
@@ -3186,7 +3186,7 @@ class pi():
           SCLK := 0-31
           baud := 50-250000
       spiFlags := see below
-      
+
       spiFlags consists of the least significant 22 bits.
 
       . .
@@ -3249,7 +3249,7 @@ class pi():
       # I SCLK
       # I baud
       # I spi_flags
-      
+
       extents = [struct.pack("IIIII", MISO, MOSI, SCLK, baud, spi_flags)]
       return _u2i(_pigpio_command_ext(
          self.sl, _PI_CMD_BSPIO, CS, 0, 20, extents))
@@ -3351,9 +3351,9 @@ class pi():
       Bit banging I2C allows for certain operations which are not possible
       with the standard I2C driver.
 
-      o baud rates as low as 50 
-      o repeated starts 
-      o clock stretching 
+      o baud rates as low as 50
+      o repeated starts
+      o clock stretching
       o I2C on any pair of spare GPIO
 
        SDA:= 0-31
@@ -3804,8 +3804,8 @@ class pi():
       transfer data packed into 1, 2, or 4 bytes according to
       the word size in bits.
 
-      For bits 1-8 there will be one byte per character. 
-      For bits 9-16 there will be two bytes per character. 
+      For bits 1-8 there will be one byte per character.
+      For bits 9-16 there will be two bytes per character.
       For bits 17-32 there will be four bytes per character.
 
       Multi-byte transfers are made in least significant byte
@@ -4377,8 +4377,8 @@ class pi():
       data bits [*bb_bits*] specified in the [*bb_serial_read_open*]
       command.
 
-      For [*bb_bits*] 1-8 there will be one byte per character. 
-      For [*bb_bits*] 9-16 there will be two bytes per character. 
+      For [*bb_bits*] 1-8 there will be one byte per character.
+      For [*bb_bits*] 9-16 there will be two bytes per character.
       For [*bb_bits*] 17-32 there will be four bytes per character.
 
       ...
@@ -4394,7 +4394,7 @@ class pi():
              rdata = self._rxbuf(bytes)
       return bytes, rdata
 
-   
+
    def bb_serial_read_close(self, user_gpio):
       """
       Closes a GPIO for bit bang reading of serial data.
@@ -5011,7 +5011,7 @@ class pi():
       host:= the host name of the Pi on which the pigpio daemon is
              running.  The default is localhost unless overridden by
              the PIGPIO_ADDR environment variable.
-       
+
       port:= the port number on which the pigpio daemon is listening.
              The default is 8888 unless overridden by the PIGPIO_PORT
              environment variable.  The pigpio daemon must have been
@@ -5080,7 +5080,7 @@ class pi():
 
             s = "Can't connect to pigpio at {}({})".format(host, str(port))
 
-         
+
             print(_except_a.format(s))
             if exception == 1:
                 print(_except_1)
@@ -5089,6 +5089,9 @@ class pi():
             else:
                 print(_except_3)
             print(_except_z)
+
+   def __repr__(self):
+      return "<pipio.pi host={} port={}>".format(self._host, self._port)
 
    def stop(self):
       """Release pigpio resources.
@@ -5201,8 +5204,8 @@ def xref():
    edge: 0-2
 
    . .
-   EITHER_EDGE = 2 
-   FALLING_EDGE = 1 
+   EITHER_EDGE = 2
+   FALLING_EDGE = 1
    RISING_EDGE = 0
    . .
 
@@ -5405,10 +5408,10 @@ def xref():
    handle: >=0
    A number referencing an object opened by one of the following
 
-   [*file_open*] 
-   [*i2c_open*] 
-   [*notify_open*] 
-   [*serial_open*] 
+   [*file_open*]
+   [*i2c_open*]
+   [*notify_open*]
+   [*serial_open*]
    [*spi_open*]
 
    host:
@@ -5433,12 +5436,12 @@ def xref():
    level: 0-1 (2)
 
    . .
-   CLEAR = 0 
-   HIGH = 1 
-   LOW = 0 
-   OFF = 0 
-   ON = 1 
-   SET = 1 
+   CLEAR = 0
+   HIGH = 1
+   LOW = 0
+   OFF = 0
+   ON = 1
+   SET = 1
    TIMEOUT = 2 # only returned for a watchdog timeout
    . .
 
@@ -5450,22 +5453,22 @@ def xref():
    1.The operational mode of a GPIO, normally INPUT or OUTPUT.
 
    . .
-   ALT0 = 4 
-   ALT1 = 5 
-   ALT2 = 6 
-   ALT3 = 7 
-   ALT4 = 3 
-   ALT5 = 2 
-   INPUT = 0 
+   ALT0 = 4
+   ALT1 = 5
+   ALT2 = 6
+   ALT3 = 7
+   ALT4 = 3
+   ALT5 = 2
+   INPUT = 0
    OUTPUT = 1
    . .
 
    2. The mode of waveform transmission.
 
    . .
-   WAVE_MODE_ONE_SHOT = 0 
-   WAVE_MODE_REPEAT = 1 
-   WAVE_MODE_ONE_SHOT_SYNC = 2 
+   WAVE_MODE_ONE_SHOT = 0
+   WAVE_MODE_REPEAT = 1
+   WAVE_MODE_ONE_SHOT_SYNC = 2
    WAVE_MODE_REPEAT_SYNC = 3
    . .
 
@@ -5492,7 +5495,7 @@ def xref():
    When scripts are started they can receive up to 10 parameters
    to define their operation.
 
-   port: 
+   port:
    The port used by the pigpio daemon, defaults to 8888.
 
    pstring:
@@ -5500,9 +5503,9 @@ def xref():
 
    pud: 0-2
    . .
-   PUD_DOWN = 1 
-   PUD_OFF = 0 
-   PUD_UP = 2 
+   PUD_DOWN = 1
+   PUD_OFF = 0
+   PUD_UP = 2
    . .
 
    pulse_len: 1-100
@@ -5553,9 +5556,9 @@ def xref():
    Direction to seek for [*file_seek*].
 
    . .
-   FROM_START=0 
-   FROM_CURRENT=1 
-   FROM_END=2 
+   FROM_START=0
+   FROM_CURRENT=1
+   FROM_END=2
    . .
 
    seek_offset:
@@ -5621,8 +5624,8 @@ def xref():
    wave_add_*:
    One of the following
 
-   [*wave_add_new*] 
-   [*wave_add_generic*] 
+   [*wave_add_new*]
+   [*wave_add_generic*]
    [*wave_add_serial*]
 
    wave_id: >=0
@@ -5631,7 +5634,7 @@ def xref():
    wave_send_*:
    One of the following
 
-   [*wave_send_once*] 
+   [*wave_send_once*]
    [*wave_send_repeat*]
 
    wdog_timeout: 0-60000
