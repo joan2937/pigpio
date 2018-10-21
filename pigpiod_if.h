@@ -1627,6 +1627,12 @@ No flags are currently defined.  This parameter should be set to zero.
 Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
 will be available if a kernel supported bus multiplexor is being used.
 
+The GPIO used are given in the following table.
+
+      @ SDA @ SCL
+I2C 0 @  0  @  1
+I2C 1 @  2  @  3
+
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
 
@@ -2150,18 +2156,26 @@ D*/
 /*F*/
 int spi_open(unsigned spi_channel, unsigned baud, unsigned spi_flags);
 /*D
-This function returns a handle for the SPI device on channel.
+This function returns a handle for the SPI device on the channel.
 Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on all models but the
-A and B and may be selected by setting the A bit in the
-flags.  The auxiliary device has 3 chip selects and a
-selectable word size in bits.
+The Pi has two SPI peripherals: main and auxiliary.
+
+The main SPI has two chip selects (channels), the auxiliary has
+three.
+
+The auxiliary SPI is available on all models but the A and B.
+
+The GPIO used are given in the following table.
+
+         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
+Main SPI @    9 @   10 @   11 @   8 @   7 @   -
+Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
 
 . .
-spi_channel: 0-1 (0-2 for the auxiliary SPI device).
+spi_channel: 0-1 (0-2 for the auxiliary SPI).
        baud: 32K-125M (values above 30M are unlikely to work).
   spi_flags: see below.
 . .
@@ -2178,7 +2192,7 @@ spi_flags consists of the least significant 22 bits.
 
 mm defines the SPI mode.
 
-Warning: modes 1 and 3 do not appear to work on the auxiliary device.
+Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
 
 . .
 Mode POL PHA
@@ -2192,25 +2206,25 @@ px is 0 if CEx is active low (default) and 1 for active high.
 
 ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.
+A is 0 for the main SPI, 1 for the auxiliary SPI.
 
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
-SPI device only.
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
+SPI only.
 
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.  Standard SPI device only.
+if W is not set.  Main SPI only.
 
 T is 1 if the least significant bit is transmitted on MOSI first, the
 default (0) shifts the most significant bit out first.  Auxiliary SPI
-device only.
+only.
 
 R is 1 if the least significant bit is received on MISO first, the
 default (0) receives the most significant bit first.  Auxiliary SPI
-device only.
+only.
 
 bbbbbb defines the word size in bits (0-32).  The default (0)
-sets 8 bits per word.  Auxiliary SPI device only.
+sets 8 bits per word.  Auxiliary SPI only.
 
 The [*spi_read*], [*spi_write*], and [*spi_xfer*] functions
 transfer data packed into 1, 2, or 4 bytes according to
