@@ -80,6 +80,12 @@ pig2vcd:	pig2vcd.o
 clean:
 	rm -f *.o *.i *.s *~ $(ALL) *.so.$(SOVERSION)
 
+ifeq ($(DESTDIR),)
+  PYINSTALLARGS =
+else
+  PYINSTALLARGS = --root=$(DESTDIR)
+endif
+
 install:	$(ALL)
 	install -m 0755 -d                             $(DESTDIR)/opt/pigpio/cgi
 	install -m 0755 -d                             $(DESTDIR)$(includedir)
@@ -97,8 +103,8 @@ install:	$(ALL)
 	install -m 0755 pig2vcd                        $(DESTDIR)$(bindir)
 	install -m 0755 pigpiod                        $(DESTDIR)$(bindir)
 	install -m 0755 pigs                           $(DESTDIR)$(bindir)
-	if which python2; then python2 setup.py install; fi
-	if which python3; then python3 setup.py install; fi
+	if which python2; then python2 setup.py install $(PYINSTALLARGS); fi
+	if which python3; then python3 setup.py install $(PYINSTALLARGS); fi
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man1
 	install -m 0644 *.1                            $(DESTDIR)$(mandir)/man1
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man3
@@ -120,11 +126,13 @@ uninstall:
 	rm -f $(DESTDIR)$(bindir)/pig2vcd
 	rm -f $(DESTDIR)$(bindir)/pigpiod
 	rm -f $(DESTDIR)$(bindir)/pigs
-	if which python2; then python2 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
-	if which python3; then python3 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
+	if which python2; then python2 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
+	if which python3; then python3 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
 	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
 	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
+ifeq ($(DESTDIR),)
 	ldconfig
+endif
 
 $(LIB1):	$(OBJ1)
 	$(SHLIB) -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
