@@ -10,6 +10,8 @@ STRIP        = $(CROSS_PREFIX)strip
 SHLIB        = $(CC) -shared
 STRIPLIB     = $(STRIP) --strip-unneeded
 
+SOVERSION    = 1
+
 CFLAGS	+= -O3 -Wall -pthread
 
 LIB1     = libpigpio.so
@@ -76,29 +78,40 @@ pig2vcd:	pig2vcd.o
 	$(STRIP) pig2vcd
 
 clean:
-	rm -f *.o *.i *.s *~ $(ALL)
+	rm -f *.o *.i *.s *~ $(ALL) *.so.$(SOVERSION)
+
+ifeq ($(DESTDIR),)
+  PYINSTALLARGS =
+else
+  PYINSTALLARGS = --root=$(DESTDIR)
+endif
 
 install:	$(ALL)
-	install -m 0755 -d                $(DESTDIR)/opt/pigpio/cgi
-	install -m 0755 -d                $(DESTDIR)$(includedir)
-	install -m 0644 pigpio.h          $(DESTDIR)$(includedir)
-	install -m 0644 pigpiod_if.h      $(DESTDIR)$(includedir)
-	install -m 0644 pigpiod_if2.h     $(DESTDIR)$(includedir)
-	install -m 0755 -d                $(DESTDIR)$(libdir)
-	install -m 0755 libpigpio.so      $(DESTDIR)$(libdir)
-	install -m 0755 libpigpiod_if.so  $(DESTDIR)$(libdir)
-	install -m 0755 libpigpiod_if2.so $(DESTDIR)$(libdir)
-	install -m 0755 -d                $(DESTDIR)$(bindir)
-	install -m 0755 pig2vcd           $(DESTDIR)$(bindir)
-	install -m 0755 pigpiod           $(DESTDIR)$(bindir)
-	install -m 0755 pigs              $(DESTDIR)$(bindir)
-	if which python2; then python2 setup.py install; fi
-	if which python3; then python3 setup.py install; fi
-	install -m 0755 -d                $(DESTDIR)$(mandir)/man1
-	install -m 0644 *.1               $(DESTDIR)$(mandir)/man1
-	install -m 0755 -d                $(DESTDIR)$(mandir)/man3
-	install -m 0644 *.3               $(DESTDIR)$(mandir)/man3
+	install -m 0755 -d                             $(DESTDIR)/opt/pigpio/cgi
+	install -m 0755 -d                             $(DESTDIR)$(includedir)
+	install -m 0644 pigpio.h                       $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if.h                   $(DESTDIR)$(includedir)
+	install -m 0644 pigpiod_if2.h                  $(DESTDIR)$(includedir)
+	install -m 0755 -d                             $(DESTDIR)$(libdir)
+	install -m 0755 libpigpio.so.$(SOVERSION)      $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if.so.$(SOVERSION)  $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if2.so.$(SOVERSION) $(DESTDIR)$(libdir)
+	cd $(DESTDIR)$(libdir) && ln -fs libpigpio.so.$(SOVERSION)      libpigpio.so
+	cd $(DESTDIR)$(libdir) && ln -fs libpigpiod_if.so.$(SOVERSION)  libpigpiod_if.so
+	cd $(DESTDIR)$(libdir) && ln -fs libpigpiod_if2.so.$(SOVERSION) libpigpiod_if2.so
+	install -m 0755 -d                             $(DESTDIR)$(bindir)
+	install -m 0755 pig2vcd                        $(DESTDIR)$(bindir)
+	install -m 0755 pigpiod                        $(DESTDIR)$(bindir)
+	install -m 0755 pigs                           $(DESTDIR)$(bindir)
+	if which python2; then python2 setup.py install $(PYINSTALLARGS); fi
+	if which python3; then python3 setup.py install $(PYINSTALLARGS); fi
+	install -m 0755 -d                             $(DESTDIR)$(mandir)/man1
+	install -m 0644 *.1                            $(DESTDIR)$(mandir)/man1
+	install -m 0755 -d                             $(DESTDIR)$(mandir)/man3
+	install -m 0644 *.3                            $(DESTDIR)$(mandir)/man3
+ifeq ($(DESTDIR),)
 	ldconfig
+endif
 
 uninstall:
 	rm -f $(DESTDIR)$(includedir)/pigpio.h
@@ -107,27 +120,36 @@ uninstall:
 	rm -f $(DESTDIR)$(libdir)/libpigpio.so
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so
+	rm -f $(DESTDIR)$(libdir)/libpigpio.so.$(SOVERSION)
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so.$(SOVERSION)
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so.$(SOVERSION)
 	rm -f $(DESTDIR)$(bindir)/pig2vcd
 	rm -f $(DESTDIR)$(bindir)/pigpiod
 	rm -f $(DESTDIR)$(bindir)/pigs
-	if which python2; then python2 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
-	if which python3; then python3 setup.py install --record /tmp/pigpio >/dev/null; xargs rm -f < /tmp/pigpio >/dev/null; fi
+	if which python2; then python2 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
+	if which python3; then python3 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
 	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
+	rm -f $(DESTDIR)$(mandir)/man1/libpigpio*.1
 	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
+ifeq ($(DESTDIR),)
 	ldconfig
+endif
 
 $(LIB1):	$(OBJ1)
-	$(SHLIB) -o $(LIB1) $(OBJ1)
+	$(SHLIB) -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
+	ln -fs $(LIB1).$(SOVERSION) $(LIB1)
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
 $(LIB2):	$(OBJ2)
-	$(SHLIB) -o $(LIB2) $(OBJ2)
+	$(SHLIB) -Wl,-soname,$(LIB2).$(SOVERSION) -o $(LIB2).$(SOVERSION) $(OBJ2)
+	ln -fs $(LIB2).$(SOVERSION) $(LIB2)
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
 
 $(LIB3):	$(OBJ3)
-	$(SHLIB) -o $(LIB3) $(OBJ3)
+	$(SHLIB) -Wl,-soname,$(LIB3).$(SOVERSION) -o $(LIB3).$(SOVERSION) $(OBJ3)
+	ln -fs $(LIB3).$(SOVERSION) $(LIB3)
 	$(STRIPLIB) $(LIB3)
 	$(SIZE)     $(LIB3)
 
