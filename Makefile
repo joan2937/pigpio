@@ -129,6 +129,7 @@ uninstall:
 	if which python2; then python2 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
 	if which python3; then python3 setup.py install $(PYINSTALLARGS) --record /tmp/pigpio >/dev/null; sed 's!^!$(DESTDIR)!' < /tmp/pigpio | xargs rm -f >/dev/null; fi
 	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
+	rm -f $(DESTDIR)$(mandir)/man1/libpigpio*.1
 	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
 ifeq ($(DESTDIR),)
 	ldconfig
