@@ -1576,7 +1576,7 @@ int myPathBad(const char *name)
 
 /* ----------------------------------------------------------------------- */
 
-static char *myBuf2Str(unsigned count, char *buf)
+static char *myBuf2Str(unsigned count, const char *buf)
 {
    static char str[128];
    int i, c;
