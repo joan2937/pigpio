@@ -1835,13 +1835,13 @@ D*/
 
 /*F*/
 int gpioWaveAddSerial
-   (unsigned user_gpio,
-    unsigned baud,
-    unsigned data_bits,
-    unsigned stop_bits,
-    unsigned offset,
-    unsigned numBytes,
-    char     *str);
+   (unsigned   user_gpio,
+    unsigned   baud,
+    unsigned   data_bits,
+    unsigned   stop_bits,
+    unsigned   offset,
+    unsigned   numBytes,
+    const char *str);
 /*D
 This function adds a waveform representing serial data to the
 existing waveform (if any).  The serial data starts offset
@@ -2001,7 +2001,7 @@ D*/
 
 
 /*F*/
-int gpioWaveChain(char *buf, unsigned bufSize);
+int gpioWaveChain(const char *buf, unsigned bufSize);
 /*D
 This function transmits a chain of waveforms.
 
@@ -2507,7 +2507,7 @@ D*/
 
 /*F*/
 int i2cWriteBlockData(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+unsigned handle, unsigned i2cReg, const char *buf, unsigned count);
 /*D
 This writes up to 32 bytes to the specified register of the device
 associated with handle.
@@ -2611,7 +2611,7 @@ D*/
 
 /*F*/
 int i2cWriteI2CBlockData(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+unsigned handle, unsigned i2cReg, const char *buf, unsigned count);
 /*D
 This writes 1 to 32 bytes to the specified register of the device
 associated with handle.
@@ -2652,7 +2652,7 @@ D*/
 
 
 /*F*/
-int i2cWriteDevice(unsigned handle, char *buf, unsigned count);
+int i2cWriteDevice(unsigned handle, const char *buf, unsigned count);
 /*D
 This writes count bytes from buf to the raw device.
 
@@ -2702,11 +2702,11 @@ D*/
 
 /*F*/
 int i2cZip(
-   unsigned handle,
-   char    *inBuf,
-   unsigned inLen,
-   char    *outBuf,
-   unsigned outLen);
+   unsigned    handle,
+   const char *inBuf,
+   unsigned    inLen,
+   char       *outBuf,
+   unsigned    outLen);
 /*D
 This function executes a sequence of I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -2804,11 +2804,11 @@ D*/
 
 /*F*/
 int bbI2CZip(
-   unsigned SDA,
-   char    *inBuf,
-   unsigned inLen,
-   char    *outBuf,
-   unsigned outLen);
+   unsigned    SDA,
+   const char *inBuf,
+   unsigned    inLen,
+   char       *outBuf,
+   unsigned    outLen);
 /*D
 This function executes a sequence of bit banged I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -3065,10 +3065,10 @@ D*/
 
 /*F*/
 int bbSPIXfer(
-   unsigned CS,
-   char    *inBuf,
-   char    *outBuf,
-   unsigned count);
+   unsigned    CS,
+   const char *inBuf,
+   char       *outBuf,
+   unsigned    count);
 /*D
 This function executes a bit banged SPI transfer.
 
@@ -3272,7 +3272,7 @@ D*/
 
 
 /*F*/
-int spiWrite(unsigned handle, char *buf, unsigned count);
+int spiWrite(unsigned handle, const char *buf, unsigned count);
 /*D
 This function writes count bytes of data from buf to the SPI
 device associated with the handle.
@@ -3288,7 +3288,7 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 
 /*F*/
-int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count);
+int spiXfer(unsigned handle, const char *txBuf, char *rxBuf, unsigned count);
 /*D
 This function transfers count bytes of data from txBuf to the SPI
 device associated with the handle.  Simultaneously count bytes of
@@ -3307,7 +3307,7 @@ D*/
 
 
 /*F*/
-int serOpen(char *sertty, unsigned baud, unsigned serFlags);
+int serOpen(const char *sertty, unsigned baud, unsigned serFlags);
 /*D
 This function opens a serial device at a specified baud rate
 and with specified flags.  The device name must start with
@@ -3371,7 +3371,7 @@ If no data is ready PI_SER_READ_NO_DATA is returned.
 D*/
 
 /*F*/
-int serWrite(unsigned handle, char *buf, unsigned count);
+int serWrite(unsigned handle, const char *buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the serial port
 associated with handle.
@@ -4351,7 +4351,7 @@ D*/
 
 
 /*F*/
-int shell(char *scriptName, char *scriptString);
+int shell(const char *scriptName, const char *scriptString);
 /*D
 This function uses the system call to execute a shell script
 with the given string as its parameter.
@@ -4397,7 +4397,7 @@ D*/
 #pragma GCC diagnostic ignored "-Wcomment"
 
 /*F*/
-int fileOpen(char *file, unsigned mode);
+int fileOpen(const char *file, unsigned mode);
 /*D
 This function returns a handle to a file opened in a specified mode.
 
@@ -4522,7 +4522,7 @@ D*/
 
 
 /*F*/
-int fileWrite(unsigned handle, char *buf, unsigned count);
+int fileWrite(unsigned handle, const char *buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the file
 associated with handle.
@@ -4603,7 +4603,7 @@ D*/
 #pragma GCC diagnostic ignored "-Wcomment"
 
 /*F*/
-int fileList(char *fpat,  char *buf, unsigned count);
+int fileList(char *fpat, char *buf, unsigned count);
 /*D
 This function returns a list of files which match a pattern.  The
 pattern may contain wildcards.
@@ -4948,14 +4948,14 @@ D*/
 
 /*F*/
 int rawWaveAddSPI(
-   rawSPI_t *spi,
-   unsigned offset,
-   unsigned spiSS,
-   char *buf,
-   unsigned spiTxBits,
-   unsigned spiBitFirst,
-   unsigned spiBitLast,
-   unsigned spiBits);
+   rawSPI_t    *spi,
+   unsigned    offset,
+   unsigned    spiSS,
+   const char *buf,
+   unsigned    spiTxBits,
+   unsigned    spiBitFirst,
+   unsigned    spiBitLast,
+   unsigned    spiBits);
 /*D
 This function adds a waveform representing SPI data to the
 existing waveform (if any).
@@ -5124,7 +5124,7 @@ Not intended for general use.
 D*/
 
 /*F*/
-int getBitInBytes(int bitPos, char *buf, int numBits);
+int getBitInBytes(int bitPos, const char *buf, int numBits);
 /*D
 Returns the value of the bit bitPos bits from the start of buf.  Returns
 0 if bitPos is greater than or equal to numBits.

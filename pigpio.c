@@ -1490,7 +1490,7 @@ static void closeOrphanedNotifications(int slot, int fd);
 
 /* ======================================================================= */
 
-int myScriptNameValid(char *name)
+int myScriptNameValid(const char *name)
 {
    int i, c, len, valid;
 
@@ -1535,7 +1535,7 @@ static char * myTimeStamp()
 
 /* ----------------------------------------------------------------------- */
 
-int myPathBad(char *name)
+int myPathBad(const char *name)
 {
    int i, c, len, in_part, parts, last_char_dot;
    char *bad="/*?.";
@@ -1679,7 +1679,7 @@ static uint32_t myGpioDelay(uint32_t micros)
 
 /* ----------------------------------------------------------------------- */
 
-static void myCreatePipe(char * name, int perm)
+static void myCreatePipe(const char * name, int perm)
 {
    unlink(name);
 
@@ -1732,7 +1732,7 @@ static uint32_t myGetLevel(int pos)
 
 /* ----------------------------------------------------------------------- */
 
-static int myI2CGetPar(char *inBuf, int *inPos, int inLen, int *esc)
+static int myI2CGetPar(const char *inBuf, int *inPos, int inLen, int *esc)
 {
    int bytes;
 
@@ -2678,7 +2678,7 @@ static void myGpioSetServo(unsigned gpio, int oldVal, int newVal)
 https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 */
 
-static int mbCreate(char *dev)
+static int mbCreate(const char *dev)
 {
    /* <0 error */
 
@@ -3682,7 +3682,7 @@ int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
 
 
 int i2cWriteBlockData(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
+   unsigned handle, unsigned reg, const char *buf, unsigned count)
 {
    union my_smbus_data data;
 
@@ -3835,7 +3835,7 @@ int i2cReadI2CBlockData(
 
 
 int i2cWriteI2CBlockData(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
+   unsigned handle, unsigned reg, const char *buf, unsigned count)
 {
    union my_smbus_data data;
 
@@ -3881,7 +3881,7 @@ int i2cWriteI2CBlockData(
    return status;
 }
 
-int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
+int i2cWriteDevice(unsigned handle, const char *buf, unsigned count)
 {
    int bytes;
 
@@ -4089,14 +4089,14 @@ int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)
 
 int i2cZip(
    unsigned handle,
-   char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
+   const char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
 {
    int numSegs, inPos, outPos, status, bytes, flags, addr;
    int esc, setesc;
    pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
 
    DBG(DBG_USER, "handle=%d inBuf=%s outBuf=%08X len=%d",
-      handle, myBuf2Str(inLen, (char *)inBuf), (int)outBuf, outLen);
+      handle, myBuf2Str(inLen, (const char *)inBuf), (int)outBuf, outLen);
 
    CHECK_INITED;
 
@@ -4247,7 +4247,7 @@ int i2cZip(
 
 /*SPI */
 
-static uint32_t _spiTXBits(char *buf, int pos, int bitlen, int msbf)
+static uint32_t _spiTXBits(const char *buf, int pos, int bitlen, int msbf)
 {
    uint32_t bits=0;
 
@@ -4290,11 +4290,11 @@ static void spiACS(int channel, int on)
 }
 
 static void spiGoA(
-   unsigned speed,    /* bits per second */
-   uint32_t flags,    /* flags           */
-   char     *txBuf,   /* tx buffer       */
-   char     *rxBuf,   /* rx buffer       */
-   unsigned count)    /* number of bytes */
+   unsigned   speed,    /* bits per second */
+   uint32_t   flags,    /* flags           */
+   const char *txBuf,   /* tx buffer       */
+   char       *rxBuf,   /* rx buffer       */
+   unsigned   count)    /* number of bytes */
 {
    int cs;
    char bit_ir[4] = {1, 0, 0, 1}; /* read on rising edge */
@@ -4393,11 +4393,11 @@ static void spiGoA(
 }
 
 static void spiGoS(
-   unsigned speed,
-   uint32_t flags,
-   char     *txBuf,
-   char     *rxBuf,
-   unsigned count)
+   unsigned   speed,
+   uint32_t   flags,
+   const char *txBuf,
+   char       *rxBuf,
+   unsigned   count)
 {
    unsigned txCnt=0;
    unsigned rxCnt=0;
@@ -4497,11 +4497,11 @@ static void spiGoS(
 }
 
 static void spiGo(
-   unsigned speed,
-   uint32_t flags,
-   char     *txBuf,
-   char     *rxBuf,
-   unsigned count)
+   unsigned   speed,
+   uint32_t   flags,
+   const char *txBuf,
+   char       *rxBuf,
+   unsigned   count)
 {
    static pthread_mutex_t main_mutex = PTHREAD_MUTEX_INITIALIZER;
    static pthread_mutex_t aux_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -4752,7 +4752,7 @@ int spiRead(unsigned handle, char *buf, unsigned count)
    return count;
 }
 
-int spiWrite(unsigned handle, char *buf, unsigned count)
+int spiWrite(unsigned handle, const char *buf, unsigned count)
 {
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
@@ -4773,7 +4773,7 @@ int spiWrite(unsigned handle, char *buf, unsigned count)
    return count;
 }
 
-int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
+int spiXfer(unsigned handle, const char *txBuf, char *rxBuf, unsigned count)
 {
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, txBuf));
@@ -4797,7 +4797,7 @@ int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)
 /* ======================================================================= */
 
 
-int serOpen(char *tty, unsigned serBaud, unsigned serFlags)
+int serOpen(const char *tty, unsigned serBaud, unsigned serFlags)
 {
    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    struct termios new;
@@ -4961,7 +4961,7 @@ int serReadByte(unsigned handle)
       return PI_SER_READ_FAILED;
 }
 
-int serWrite(unsigned handle, char *buf, unsigned count)
+int serWrite(unsigned handle, const char *buf, unsigned count)
 {
    int written=0, wrote=0;
 
@@ -6488,7 +6488,7 @@ static int scrWait(gpioScript_t *s, uint32_t bits)
 
 /* ----------------------------------------------------------------------- */
 
-static int scrSys(char *cmd, uint32_t p1, uint32_t p2)
+static int scrSys(const char *cmd, uint32_t p1, uint32_t p2)
 {
    char buf[1024];
    int status;
@@ -7710,7 +7710,7 @@ static void initClock(int mainClock)
    const unsigned BITS=10;
    int clockPWM;
    unsigned clkCtl, clkDiv, clkSrc, clkDivI, clkDivF, clkMash, clkBits;
-   char *per;
+   const char *per;
    unsigned micros;
 
    DBG(DBG_STARTUP, "mainClock=%d", mainClock);
@@ -8072,7 +8072,7 @@ int initInitialise(void)
    int rev, i, model;
    struct sockaddr_in server;
    struct sockaddr_in6 server6;
-   char * portStr;
+   const char * portStr;
    unsigned port;
    struct sched_param param;
    pthread_attr_t pthAttr;
@@ -8255,7 +8255,7 @@ int initInitialise(void)
 
 /* ======================================================================= */
 
-int getBitInBytes(int bitPos, char *buf, int numBits)
+int getBitInBytes(int bitPos, const char *buf, int numBits)
 {
    int bitp, bufp;
 
@@ -9131,13 +9131,13 @@ int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses)
 /* ----------------------------------------------------------------------- */
 
 int gpioWaveAddSerial
-   (unsigned gpio,
-    unsigned baud,
-    unsigned data_bits,
-    unsigned stop_bits,
-    unsigned offset,
-    unsigned numBytes,
-    char     *bstr)
+   (unsigned   gpio,
+    unsigned   baud,
+    unsigned   data_bits,
+    unsigned   stop_bits,
+    unsigned   offset,
+    unsigned   numBytes,
+    const char *bstr)
 {
    int i, b, p, lev, c, v;
 
@@ -9265,14 +9265,14 @@ int gpioWaveAddSerial
 /* ----------------------------------------------------------------------- */
 
 int rawWaveAddSPI(
-   rawSPI_t *spi,
-   unsigned offset,
-   unsigned spiSS,
-   char *buf,
-   unsigned spiTxBits,
-   unsigned spiBitFirst,
-   unsigned spiBitLast,
-   unsigned spiBits)
+   rawSPI_t   *spi,
+   unsigned   offset,
+   unsigned   spiSS,
+   const char *buf,
+   unsigned   spiTxBits,
+   unsigned   spiBitFirst,
+   unsigned   spiBitLast,
+   unsigned   spiBits)
 {
    int p, bit, dbv, halfbit;
    int rising_edge[2], read_cycle[2];
@@ -9784,7 +9784,7 @@ static void chainMakeCounter(
 }
 
 
-int gpioWaveChain(char *buf, unsigned bufSize)
+int gpioWaveChain(const char *buf, unsigned bufSize)
 {
    unsigned blklen=16, blocks=4;
    int cb, chaincb;
@@ -10431,11 +10431,11 @@ int bbI2CClose(unsigned SDA)
 /*-------------------------------------------------------------------------*/
 
 int bbI2CZip(
-   unsigned SDA,
-   char *inBuf,
-   unsigned inLen,
-   char *outBuf,
-   unsigned outLen)
+   unsigned   SDA,
+   const char *inBuf,
+   unsigned   inLen,
+   char       *outBuf,
+   unsigned   outLen)
 {
    int i, ack, inPos, outPos, status, bytes;
    int addr, flags, esc, setesc;
@@ -10988,10 +10988,10 @@ int bbSPIClose(unsigned CS)
 /*-------------------------------------------------------------------------*/
 
 int bbSPIXfer(
-   unsigned CS,
-   char *inBuf,
-   char *outBuf,
-   unsigned count)
+   unsigned   CS,
+   const char *inBuf,
+   char       *outBuf,
+   unsigned   count)
 {
    int SCLK;
    int pos;
@@ -12780,7 +12780,7 @@ int gpioGetPad(unsigned pad)
    return strength;
 }
 
-int shell(char *scriptName, char *scriptString)
+int shell(const char *scriptName, const char *scriptString)
 {
    int status;
    char buf[4096];
@@ -12805,7 +12805,7 @@ int shell(char *scriptName, char *scriptString)
 }
 
 
-int fileApprove(char *filename)
+int fileApprove(const char *filename)
 {
    char match[PI_MAX_PATH];
    char buffer[PI_MAX_PATH];
@@ -12870,7 +12870,7 @@ int fileApprove(char *filename)
    return PI_FILE_NONE;
 }
 
-int fileOpen(char *file, unsigned mode)
+int fileOpen(const char *file, unsigned mode)
 {
    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    int fd=-1;
@@ -12988,7 +12988,7 @@ int fileClose(unsigned handle)
    return 0;
 }
 
-int fileWrite(unsigned handle, char *buf, unsigned count)
+int fileWrite(unsigned handle, const char *buf, unsigned count)
 {
    int w;
 
