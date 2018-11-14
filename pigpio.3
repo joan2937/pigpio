@@ -1907,7 +1907,7 @@ else
 
 .EE
 
-.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset, unsigned numBytes, char *str)\fP"
+.IP "\fBint gpioWaveAddSerial(unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset, unsigned numBytes, const char *str)\fP"
 .IP "" 4
 This function adds a waveform representing serial data to the
 existing waveform (if any).  The serial data starts offset
@@ -2204,7 +2204,7 @@ wave_mode: PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
 Returns the number of DMA control blocks in the waveform if OK,
 otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 
-.IP "\fBint gpioWaveChain(char *buf, unsigned bufSize)\fP"
+.IP "\fBint gpioWaveChain(const char *buf, unsigned bufSize)\fP"
 .IP "" 4
 This function transmits a chain of waveforms.
 
@@ -2994,7 +2994,7 @@ S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A]
 
 .EE
 
-.IP "\fBint i2cWriteBlockData(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
+.IP "\fBint i2cWriteBlockData(unsigned handle, unsigned i2cReg, const char *buf, unsigned count)\fP"
 .IP "" 4
 This writes up to 32 bytes to the specified register of the device
 associated with handle.
@@ -3164,7 +3164,7 @@ S Addr Wr [A] i2cReg [A]
 
 .EE
 
-.IP "\fBint i2cWriteI2CBlockData(unsigned handle, unsigned i2cReg, char *buf, unsigned count)\fP"
+.IP "\fBint i2cWriteI2CBlockData(unsigned handle, unsigned i2cReg, const char *buf, unsigned count)\fP"
 .IP "" 4
 This writes 1 to 32 bytes to the specified register of the device
 associated with handle.
@@ -3235,7 +3235,7 @@ S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
 
 .EE
 
-.IP "\fBint i2cWriteDevice(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint i2cWriteDevice(unsigned handle, const char *buf, unsigned count)\fP"
 .IP "" 4
 This writes count bytes from buf to the raw device.
 
@@ -3318,7 +3318,7 @@ numSegs: >0, the number of I2C segments
 .br
 Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
 
-.IP "\fBint i2cZip(unsigned handle, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.IP "\fBint i2cZip(unsigned handle, const char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
 .IP "" 4
 This function executes a sequence of I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -3497,7 +3497,7 @@ SDA: 0-31, the SDA GPIO used in a prior call to \fBbbI2COpen\fP
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
 
-.IP "\fBint bbI2CZip(unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
+.IP "\fBint bbI2CZip(unsigned SDA, const char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)\fP"
 .IP "" 4
 This function executes a sequence of bit banged I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -4002,7 +4002,7 @@ CS: 0-31, the CS GPIO used in a prior call to \fBbbSPIOpen\fP
 .br
 Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
 
-.IP "\fBint bbSPIXfer(unsigned CS, char *inBuf, char *outBuf, unsigned count)\fP"
+.IP "\fBint bbSPIXfer(unsigned CS, const char *inBuf, char *outBuf, unsigned count)\fP"
 .IP "" 4
 This function executes a bit banged SPI transfer.
 
@@ -4397,7 +4397,7 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint spiWrite(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint spiWrite(unsigned handle, const char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes of data from buf to the SPI
 device associated with the handle.
@@ -4422,7 +4422,7 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count)\fP"
+.IP "\fBint spiXfer(unsigned handle, const char *txBuf, char *rxBuf, unsigned count)\fP"
 .IP "" 4
 This function transfers count bytes of data from txBuf to the SPI
 device associated with the handle.  Simultaneously count bytes of
@@ -4450,7 +4450,7 @@ handle: >=0, as returned by a call to \fBspiOpen\fP
 Returns the number of bytes transferred if OK, otherwise
 PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 
-.IP "\fBint serOpen(char *sertty, unsigned baud, unsigned serFlags)\fP"
+.IP "\fBint serOpen(const char *sertty, unsigned baud, unsigned serFlags)\fP"
 .IP "" 4
 This function opens a serial device at a specified baud rate
 and with specified flags.  The device name must start with
@@ -4552,7 +4552,7 @@ PI_SER_READ_NO_DATA, or PI_SER_READ_FAILED.
 .br
 If no data is ready PI_SER_READ_NO_DATA is returned.
 
-.IP "\fBint serWrite(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint serWrite(unsigned handle, const char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes from buf to the the serial port
 associated with handle.
@@ -6262,7 +6262,7 @@ The meaning of other events is arbitrary.
 Note that other than its id and its tick there is no data associated
 with an event.
 
-.IP "\fBint shell(char *scriptName, char *scriptString)\fP"
+.IP "\fBint shell(const char *scriptName, const char *scriptString)\fP"
 .IP "" 4
 This function uses the system call to execute a shell script
 with the given string as its parameter.
@@ -6346,7 +6346,7 @@ status = shell("scr1", "\"hello string with spaces world\"");
 
 .EE
 
-.IP "\fBint fileOpen(char *file, unsigned mode)\fP"
+.IP "\fBint fileOpen(const char *file, unsigned mode)\fP"
 .IP "" 4
 This function returns a handle to a file opened in a specified mode.
 
@@ -6600,7 +6600,7 @@ fileClose(h);
 
 .EE
 
-.IP "\fBint fileWrite(unsigned handle, char *buf, unsigned count)\fP"
+.IP "\fBint fileWrite(unsigned handle, const char *buf, unsigned count)\fP"
 .IP "" 4
 This function writes count bytes from buf to the the file
 associated with handle.
@@ -7324,7 +7324,7 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 .br
 The number of returned bytes must be retMax or less.
 
-.IP "\fBint rawWaveAddSPI(rawSPI_t *spi, unsigned offset, unsigned spiSS, char *buf, unsigned spiTxBits, unsigned spiBitFirst, unsigned spiBitLast, unsigned spiBits)\fP"
+.IP "\fBint rawWaveAddSPI(rawSPI_t *spi, unsigned offset, unsigned spiSS, const char *buf, unsigned spiTxBits, unsigned spiBitFirst, unsigned spiBitLast, unsigned spiBits)\fP"
 .IP "" 4
 This function adds a waveform representing SPI data to the
 existing waveform (if any).
@@ -7602,7 +7602,7 @@ wave_id: the wave of interest
 .br
 Not intended for general use.
 
-.IP "\fBint getBitInBytes(int bitPos, char *buf, int numBits)\fP"
+.IP "\fBint getBitInBytes(int bitPos, const char *buf, int numBits)\fP"
 .IP "" 4
 Returns the value of the bit bitPos bits from the start of buf.  Returns
 0 if bitPos is greater than or equal to numBits.
