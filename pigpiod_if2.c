@@ -27,25 +27,39 @@ For more information, please refer to <http://unlicense.org/>
 
 /* PIGPIOD_IF2_VERSION 13 */
 
+#if defined WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT _WIN32_WINNT_WIN7 /* 0x0601 */
+   #endif
+   #include <winsock2.h>
+   #include <ws2tcpip.h>
+   #define SENDPTR const char *
+   #define RECVPTR char *
+#else
+   #define closesocket close
+   #include <sys/socket.h>
+   #include <arpa/inet.h>
+   #include <unistd.h>
+   #include <netdb.h>
+   #include <netinet/tcp.h>
+   #include <sys/select.h>
+   #define SENDPTR const void *
+   #define RECVPTR void *
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
 #include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <sys/select.h>
 
-#include <arpa/inet.h>
 
 #include "pigpio.h"
 #include "command.h"
@@ -144,13 +158,13 @@ static int pigpio_command(int pi, int command, int p1, int p2, int rl)
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -175,13 +189,13 @@ static int pigpio_notify(int pi)
 
    _pml(pi);
 
-   if (send(gPigNotify[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigNotify[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigNotify[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigNotify[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -209,7 +223,7 @@ static int pigpio_command_ext
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
@@ -217,14 +231,14 @@ static int pigpio_command_ext
 
    for (i=0; i<extents; i++)
    {
-      if (send(gPigCommand[pi], ext[i].ptr, ext[i].size, 0) != ext[i].size)
+      if (send(gPigCommand[pi], (SENDPTR)ext[i].ptr, ext[i].size, 0) != ext[i].size)
       {
          _pmu(pi);
          return pigif_bad_send;
       }
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -573,7 +587,7 @@ static int recvMax(int pi, void *buf, int bufsize, int sent)
 
    if (sent < bufsize) count = sent; else count = bufsize;
 
-   if (count) recv(gPigCommand[pi], buf, count, MSG_WAITALL);
+   if (count) recv(gPigCommand[pi], (RECVPTR)buf, count, MSG_WAITALL);
 
    remaining = sent - count;
 
@@ -581,7 +595,7 @@ static int recvMax(int pi, void *buf, int bufsize, int sent)
    {
       fetch = remaining;
       if (fetch > sizeof(scratch)) fetch = sizeof(scratch);
-      recv(gPigCommand[pi], scratch, fetch, MSG_WAITALL);
+      recv(gPigCommand[pi], (RECVPTR)scratch, fetch, MSG_WAITALL);
       remaining -= fetch;
    }
 

@@ -4,9 +4,16 @@
 pig2vcd
 pigpiod
 pigs
+pigs.exe
 x_pigpio
+libpigpiod_if.a
+libpigpiod_if2.a
 x_pigpiod_if
+x_pigpiod_if.a
+x_pigpiod_if.exe
 x_pigpiod_if2
+x_pigpiod_if2.a
+x_pigpiod_if2.exe
 __pycache__
 build
 dist

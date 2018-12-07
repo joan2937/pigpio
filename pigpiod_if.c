@@ -27,25 +27,39 @@ For more information, please refer to <http://unlicense.org/>
 
 /* PIGPIOD_IF_VERSION 27 */
 
+#if defined WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT _WIN32_WINNT_WIN7 /* 0x0601 */
+   #endif
+   #include <winsock2.h>
+   #include <ws2tcpip.h>
+   #define SENDPTR const char *
+   #define RECVPTR char *
+#else
+   #define closesocket close
+   #include <sys/socket.h>
+   #include <arpa/inet.h>
+   #include <unistd.h>
+   #include <netdb.h>
+   #include <netinet/tcp.h>
+   #include <sys/select.h>
+   #define SENDPTR const void *
+   #define RECVPTR void *
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
 #include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <sys/select.h>
 
-#include <arpa/inet.h>
 
 #include "pigpio.h"
 #include "command.h"
@@ -104,13 +118,13 @@ static int pigpio_command(int fd, int command, int p1, int p2, int rl)
 
    pthread_mutex_lock(&command_mutex);
 
-   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(fd, (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_send;
    }
 
-   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(fd, (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_recv;
@@ -135,7 +149,7 @@ static int pigpio_command_ext
 
    pthread_mutex_lock(&command_mutex);
 
-   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(fd, (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_send;
@@ -150,7 +164,7 @@ static int pigpio_command_ext
       }
    }
 
-   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(fd, (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_recv;
@@ -900,7 +914,7 @@ int recvMax(void *buf, int bufsize, int sent)
    {
       fetch = remaining;
       if (fetch > sizeof(scratch)) fetch = sizeof(scratch);
-      recv(gPigCommand, scratch, fetch, MSG_WAITALL);
+      recv(gPigCommand, (RECVPTR)scratch, fetch, MSG_WAITALL);
       remaining -= fetch;
    }
 

@@ -29,16 +29,33 @@ For more information, please refer to <http://unlicense.org/>
 This version is for pigpio version 67+
 */
 
+#if defined WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT _WIN32_WINNT_WIN7 /* 0x0601 */
+   #endif
+   #include <winsock2.h>
+   #include <ws2tcpip.h>
+   #include <getopt.h>
+   #define SENDPTR const char *
+   #define RECVPTR char *
+#else
+   #define closesocket close
+   #include <sys/socket.h>
+   #include <arpa/inet.h>
+   #include <unistd.h>
+   #include <netdb.h>
+   #include <netinet/tcp.h>
+   #include <sys/select.h>
+   #define SENDPTR const void *
+   #define RECVPTR void *
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
-#include <unistd.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 
 #include "pigpio.h"
 #include "command.h"
@@ -305,6 +322,15 @@ int main(int argc , char *argv[])
    cmdScript_t s;
    char v[CMD_MAX_EXTENSION];
 
+   #ifdef WIN32
+      WSADATA wsaData;
+      int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+      if (iResult != 0) {
+         printf("WSAStartup failed: %d\n", iResult);
+         return 1;
+      }
+   #endif
+
    sock = openSocket();
 
    args = initOpts(argc, argv);
@@ -353,12 +379,12 @@ int main(int argc , char *argv[])
 
                if (sock != SOCKET_OPEN_FAILED)
                {
-                  if (send(sock, &cmd, sizeof(cmdCmd_t), 0) ==
+                  if (send(sock, (SENDPTR)&cmd, sizeof(cmdCmd_t), 0) ==
                      sizeof(cmdCmd_t))
                   {
-                     if (p[3]) send(sock, v, p[3], 0); /* send extensions */
+                     if (p[3]) send(sock, (SENDPTR)v, p[3], 0); /* send extensions */
 
-                     if (recv(sock, &cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
+                     if (recv(sock, (RECVPTR)&cmd, sizeof(cmdCmd_t), MSG_WAITALL) ==
                         sizeof(cmdCmd_t))
                      {
                         get_extensions(sock, command, cmd.res);
@@ -387,6 +413,10 @@ int main(int argc , char *argv[])
    }
 
    if (sock >= 0) close(sock);
+
+   #ifdef WIN32
+      WSACleanup();
+   #endif
 
    return status;
 }
