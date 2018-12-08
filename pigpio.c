@@ -1198,6 +1198,7 @@ typedef struct
 /* initialise once then preserve */
 
 static volatile uint32_t piCores      = 0;
+static volatile uint32_t pi_ispi      = 0;
 static volatile uint32_t pi_peri_phys = 0x20000000;
 static volatile uint32_t pi_dram_bus  = 0x40000000;
 static volatile uint32_t pi_mem_flag  = 0x0C;
@@ -7197,6 +7198,17 @@ static uint32_t * initMapMem(int fd, uint32_t addr, uint32_t len)
 static int initCheckPermitted(void)
 {
    DBG(DBG_STARTUP, "");
+
+   if (!pi_ispi)
+   {
+      DBG(DBG_ALWAYS,
+         "\n" \
+         "+---------------------------------------------------------+\n" \
+         "|Sorry, this system does not appear to be a raspberry pi. |\n" \
+         "|aborting.                                                |\n" \
+         "+---------------------------------------------------------+\n\n");
+      return -1;
+   }
 
    if ((fdMem = open("/dev/mem", O_RDWR | O_SYNC) ) < 0)
    {
@@ -13324,6 +13336,13 @@ unsigned gpioHardwareRevision(void)
                   pi_dram_bus  = 0xC0000000;
                   pi_mem_flag  = 0x04;
                }
+            }
+         }
+
+         if (!strncasecmp("hardware\t: BCM", buf, 14)) {
+            int bcmno = atoi(buf+14);
+            if ((bcmno == 2708) || (bcmno == 2709) || (bcmno == 2710) || (bcmno == 2835) || (bcmno == 2836) || (bcmno == 2837)) {
+              pi_ispi = 1;
             }
          }
 
