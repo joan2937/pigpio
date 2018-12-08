@@ -300,7 +300,7 @@ int main(int argc , char *argv[])
    int sock, command;
    int args, idx, i, pp, l, len;
    cmdCmd_t cmd;
-   uint32_t p[CMD_P_ARR];
+   uintptr_t p[CMD_P_ARR];
    cmdCtlParse_t ctl;
    cmdScript_t s;
    char v[CMD_MAX_EXTENSION];

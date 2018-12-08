@@ -34,6 +34,7 @@ This version is for pigpio version 67+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include "pigpio.h"
 #include "command.h"
@@ -580,7 +581,7 @@ static int cmdMatch(char *str)
    return CMD_UNKNOWN_CMD;
 }
 
-static int getNum(char *str, uint32_t *val, int8_t *opt)
+static int getNum(char *str, uintptr_t *val, int8_t *opt)
 {
    int f, n;
    intmax_t v;
@@ -627,13 +628,13 @@ char *cmdStr(void)
 }
 
 int cmdParse(
-   char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl)
+   char *buf, uintptr_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl)
 {
    int f, valid, idx, val, pp, pars, n, n2;
    char *p8;
    int32_t *p32;
    char c;
-   uint32_t tp1=0, tp2=0, tp3=0, tp4=0, tp5=0;
+   uintptr_t tp1=0, tp2=0, tp3=0, tp4=0, tp5=0;
    int8_t to1, to2, to3, to4, to5;
    int eaten;
 
@@ -1260,7 +1261,7 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
 {
    int idx, len, b, i, j, tags, resolved;
    int status;
-   uint32_t p[10];
+   uintptr_t p[10];
    cmdInstr_t instr;
    cmdCtlParse_t ctl;
    char v[CMD_MAX_EXTENSION];
@@ -1324,7 +1325,7 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
                   {
                      if (diags)
                      {
-                        fprintf(stderr, "Duplicate tag: %d\n", instr.p[1]);
+                        fprintf(stderr, "Duplicate tag: %"PRIdPTR"\n", instr.p[1]);
                      }
 
                      if (!status) status = PI_DUP_TAG;
@@ -1340,7 +1341,7 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
             {
                if (diags)
                {
-                  fprintf(stderr, "Too many tags: %d\n", instr.p[1]);
+                  fprintf(stderr, "Too many tags: %"PRIdPTR"\n", instr.p[1]);
                }
                if (!status) status = PI_TOO_MANY_TAGS;
                idx = -1;
@@ -1395,7 +1396,7 @@ int cmdParseScript(char *script, cmdScript_t *s, int diags)
          {
             if (diags)
             {
-               fprintf(stderr, "Can't resolve tag %d\n", instr.p[1]);
+               fprintf(stderr, "Can't resolve tag %"PRIdPTR"\n", instr.p[1]);
             }
             if (!status) status = PI_BAD_TAG;
          }

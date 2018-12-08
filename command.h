@@ -86,7 +86,7 @@ typedef struct
 
 typedef struct
 {
-   uint32_t p[5];
+   uintptr_t p[5]; //these are sometimes converted to pointers, so presumablly they sometimes have pointers stored in them, I haven't figured out where though. --plugwash
    int8_t opt[4];
 } cmdInstr_t;
 
@@ -110,7 +110,7 @@ extern cmdInfo_t cmdInfo[];
 
 extern char *cmdUsage;
 
-int cmdParse(char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl);
+int cmdParse(char *buf, uintptr_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl);
 
 int cmdParseScript(char *script, cmdScript_t *s, int diags);
 
