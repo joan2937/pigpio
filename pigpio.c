@@ -62,6 +62,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/select.h>
 #include <fnmatch.h>
 #include <glob.h>
+#include <arpa/inet.h>
 
 #include "pigpio.h"
 
@@ -7265,7 +7266,7 @@ static int initPeripherals(void)
    gpioReg = initMapMem(fdMem, GPIO_BASE, GPIO_LEN);
 
    if (gpioReg == MAP_FAILED)
-      SOFT_ERROR(PI_INIT_FAILED, "mmap gpio failed (%m)");
+      SOFT_ERROR(PI_INIT_FAILED, "mmap gpio failed (%m) GPIO_BASE=%08X GPIO_LEN=%08X REV=%08X",GPIO_BASE,GPIO_LEN,gpioHardwareRevision());
 
    /* dma channels 0-14 share one page, 15 has another */
 
@@ -13392,7 +13393,8 @@ unsigned gpioHardwareRevision(void)
 
          if (!strncasecmp("hardware\t: BCM", buf, 14)) {
             int bcmno = atoi(buf+14);
-            if ((bcmno == 2708) || (bcmno == 2709) || (bcmno == 2710) || (bcmno == 2835) || (bcmno == 2836) || (bcmno == 2837)) {
+            if ((bcmno == 2708) || (bcmno == 2709) || (bcmno == 2710) || (bcmno == 2835) || (bcmno == 2836) || (bcmno == 2837))
+            {
               pi_ispi = 1;
             }
          }
@@ -13408,6 +13410,42 @@ unsigned gpioHardwareRevision(void)
       }
 
       fclose(filp);
+      //raspberry pi 3 running arm64 don't put all the information we need in /proc/cpuinfo, but we can get it elsewhere.
+      if (!pi_ispi)
+      {
+         filp = fopen ("/proc/device-tree/model", "r");
+         if (filp != NULL)
+         {
+            if (fgets(buf, sizeof(buf), filp) != NULL)
+            {
+               if (!strncmp("Raspberry Pi 3", buf, 14)) 
+               {
+                  pi_ispi = 1;
+                  piCores = 4;
+                  pi_peri_phys = 0x3F000000;
+                  pi_dram_bus  = 0xC0000000;
+                  pi_mem_flag  = 0x04;
+               }
+            }
+         }
+         fclose(filp);
+      }
+      if (rev == 0)
+      {
+         filp = fopen ("/proc/device-tree/system/linux,revision", "r");
+         if (filp != NULL)
+         {
+            uint32_t tmp;
+            if (fread(&tmp,1 , 4, filp) == 4)
+            {
+               // for some reason the value returned by reading this 
+               // /proc entry seems to be big endian, convert it.
+               rev = ntohl(tmp);
+               rev &= 0xFFFFFF; /* mask out warranty bit */
+            }
+         }
+         fclose(filp);
+      }
    }
    return rev;
 }
