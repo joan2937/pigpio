@@ -106,9 +106,9 @@ install:	$(ALL)
 	if which python2; then python2 setup.py install $(PYINSTALLARGS); fi
 	if which python3; then python3 setup.py install $(PYINSTALLARGS); fi
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man1
-	install -m 0644 *.1                            $(DESTDIR)$(mandir)/man1
+	install -m 0644 p*.1                           $(DESTDIR)$(mandir)/man1
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man3
-	install -m 0644 *.3                            $(DESTDIR)$(mandir)/man3
+	install -m 0644 p*.3                           $(DESTDIR)$(mandir)/man3
 ifeq ($(DESTDIR),)
 	ldconfig
 endif
