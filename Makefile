@@ -136,19 +136,19 @@ ifeq ($(DESTDIR),)
 endif
 
 $(LIB1):	$(OBJ1)
-	$(SHLIB) -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
 	ln -fs $(LIB1).$(SOVERSION) $(LIB1)
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
 $(LIB2):	$(OBJ2)
-	$(SHLIB) -Wl,-soname,$(LIB2).$(SOVERSION) -o $(LIB2).$(SOVERSION) $(OBJ2)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB2).$(SOVERSION) -o $(LIB2).$(SOVERSION) $(OBJ2)
 	ln -fs $(LIB2).$(SOVERSION) $(LIB2)
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
 
 $(LIB3):	$(OBJ3)
-	$(SHLIB) -Wl,-soname,$(LIB3).$(SOVERSION) -o $(LIB3).$(SOVERSION) $(OBJ3)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB3).$(SOVERSION) -o $(LIB3).$(SOVERSION) $(OBJ3)
 	ln -fs $(LIB3).$(SOVERSION) $(LIB3)
 	$(STRIPLIB) $(LIB3)
 	$(SIZE)     $(LIB3)
