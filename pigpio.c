@@ -7572,7 +7572,7 @@ static int initAllocDMAMem(void)
 
       close(fdPmap);
 
-      DBG(DBG_STARTUP, "dmaPMapBlk=%08"PRIXPTR" dmaIn=%08"PRIX64,
+      DBG(DBG_STARTUP, "dmaPMapBlk=%08"PRIXPTR" dmaIn=%08"PRIXPTR,
          (uintptr_t)dmaPMapBlk, (uintptr_t)dmaIn);
    }
    else
@@ -7610,12 +7610,12 @@ static int initAllocDMAMem(void)
    }
 
    DBG(DBG_STARTUP,
-      "gpioReg=%08"PRIX64" pwmReg=%08"PRIX64" pcmReg=%08"PRIX64" clkReg=%08"PRIX64" auxReg=%08"PRIX64,
+      "gpioReg=%08"PRIXPTR" pwmReg=%08"PRIXPTR" pcmReg=%08"PRIXPTR" clkReg=%08"PRIXPTR" auxReg=%08"PRIXPTR,
       (uintptr_t)gpioReg, (uintptr_t)pwmReg,
       (uintptr_t)pcmReg,  (uintptr_t)clkReg, (uintptr_t)auxReg);
 
    for (i=0; i<DMAI_PAGES; i++)
-      DBG(DBG_STARTUP, "dmaIBus[%d]=%08"PRIX64, i, (uintptr_t)dmaIBus[i]);
+      DBG(DBG_STARTUP, "dmaIBus[%d]=%08"PRIXPTR, i, (uintptr_t)dmaIBus[i]);
 
    if (gpioCfg.dbgLevel >= DBG_DMACBS)
    {
@@ -10505,7 +10505,7 @@ int bbI2CZip(
    int addr, flags, esc, setesc;
    wfRx_t *w;
 
-   DBG(DBG_USER, "gpio=%d inBuf=%s outBuf=%08"PRIX64" len=%d",
+   DBG(DBG_USER, "gpio=%d inBuf=%s outBuf=%08"PRIXPTR" len=%d",
       SDA, myBuf2Str(inLen, (char *)inBuf), (uintptr_t)outBuf, outLen);
 
    CHECK_INITED;
@@ -11304,7 +11304,7 @@ int eventSetFunc(unsigned event, eventFunc_t f)
 
 int eventSetFuncEx(unsigned event, eventFuncEx_t f, void *userdata)
 {
-   DBG(DBG_USER, "event=%d function=%08"PRIx64" userdata=%08"PRIx64,
+   DBG(DBG_USER, "event=%d function=%08"PRIxPTR" userdata=%08"PRIxPTR,
       event, (uintptr_t)f, (uintptr_t)userdata);
 
    CHECK_INITED;
@@ -11406,7 +11406,7 @@ int gpioSetAlertFunc(unsigned gpio, gpioAlertFunc_t f)
 
 int gpioSetAlertFuncEx(unsigned gpio, gpioAlertFuncEx_t f, void *userdata)
 {
-   DBG(DBG_USER, "gpio=%d function=%08"PRIX64" userdata=%08"PRIX64,
+   DBG(DBG_USER, "gpio=%d function=%08"PRIXPTR" userdata=%08"PRIXPTR,
       gpio, (uintptr_t)f, (uintptr_t)userdata);
 
    CHECK_INITED;
