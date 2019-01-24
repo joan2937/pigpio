@@ -121,7 +121,9 @@ if __name__ == "__main__":
    import wiegand
 
    def callback(bits, value):
-      print("bits={} value={}".format(bits, value))
+      card_id = int("{:026b}".format(value)[1:25],2)
+      print("bits={} value={:026b}".format(bits, value))
+      print("Card ID: {:010d}".format(card_id))
 
    pi = pigpio.pi()
 
