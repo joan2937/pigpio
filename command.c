@@ -571,7 +571,7 @@ static char * fmtPudStr="ODU";
 
 static int cmdMatch(char *str)
 {
-   int i;
+   size_t i;
 
    for (i=0; i<(sizeof(cmdInfo)/sizeof(cmdInfo_t)); i++)
    {
@@ -1248,7 +1248,7 @@ int cmdParse(
 
 char * cmdErrStr(int error)
 {
-   int i;
+   size_t i;
 
    for (i=0; i<(sizeof(errInfo)/sizeof(errInfo_t)); i++)
    {

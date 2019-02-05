@@ -35,7 +35,6 @@ For more information, please refer to <http://unlicense.org/>
    #include <ws2tcpip.h>
    #define SENDPTR const char *
    #define RECVPTR char *
-   #define close(x) closesocket(x)
 
 #else
    #include <sys/socket.h>
@@ -964,13 +963,21 @@ void pigpio_stop(int pi)
          gPigHandle[pi] = -1;
       }
 
-      close(gPigCommand[pi]);
+      #if defined WIN32
+         closesocket(gPigCommand[pi]);
+      #else
+         close(gPigCommand[pi]);
+      #endif
       gPigCommand[pi] = -1;
    }
 
    if (gPigNotify[pi] >= 0)
    {
-      close(gPigNotify[pi]);
+      #if defined WIN32
+         closesocket(gPigCommand[pi]);
+      #else
+         close(gPigCommand[pi]);
+      #endif
       gPigNotify[pi] = -1;
    }
 
@@ -979,7 +986,7 @@ void pigpio_stop(int pi)
    #ifdef WIN32
       int iResult = WSACleanup();
       if (iResult != 0) {
-         pigpioPrintWinErrorMessage();
+    	  pigpioPrintWinErrorMessage();
       }
    #endif
 }
