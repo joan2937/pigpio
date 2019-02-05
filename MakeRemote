@@ -5,7 +5,9 @@ SHLIB    = gcc -shared
 STRIPLIB = strip --strip-unneeded
 AR       = ar rcs
 
-CFLAGS += -O3 -Wall -pthread
+#CFLAGS += -m32 -O0 -march=i686 -Wall -pthread
+CFLAGS += -m32 -O0 -march=i686 -Wall -pthread
+#CFLAGS += -O3 -Wall -pthread
 
 ALL = libpigpiod_if.so libpigpiod_if2.so libpigpiod_if.a libpigpiod_if2.a pigs x_pigpiod_if x_pigpiod_if2
 
@@ -88,7 +90,7 @@ LIB2A = libpigpiod_if2.a
 OBJ2 = pigpiod_if2.o command.o
 
 $(LIB1): $(OBJ1)
-	$(SHLIB) -o $(LIB1) $(OBJ1) -lWs2_32
+	$(SHLIB) -o $(LIB1) $(OBJ1) -lgcc -lWs2_32
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
@@ -96,7 +98,7 @@ $(LIB1A): $(OBJ1)
 	$(AR) $(LIB1A) $(OBJ1)
 
 $(LIB2): $(OBJ2)
-	$(SHLIB) -o $(LIB2) $(OBJ2) -lWs2_32
+	$(SHLIB) -o $(LIB2) $(OBJ2) -lgcc -lWs2_32
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
 
