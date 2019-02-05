@@ -386,10 +386,10 @@ static int pigpioOpenWinSocket(char *addr, char *port)
          printf("connect function failed with error: %d\n", WSAGetLastError());
          int closeResult = closesocket(connectSocket);
          if (closeResult == SOCKET_ERROR) {
-        	 pigpioPrintWinErrorMessage();
+            pigpioPrintWinErrorMessage();
          }
       } else {
-    	 break;
+         break;
       }
    }
 
@@ -979,7 +979,7 @@ void pigpio_stop(int pi)
    #ifdef WIN32
       int iResult = WSACleanup();
       if (iResult != 0) {
-         return pigif_bad_win_cleanup;
+         pigpioPrintWinErrorMessage();
       }
    #endif
 }
