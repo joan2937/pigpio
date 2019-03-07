@@ -234,33 +234,10 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
-static int pigpioOpenSocket(char *addr, char *port)
+static int pigpioOpenSocket(char const *addrStr, char const *portStr)
 {
    int sock, err, opt;
    struct addrinfo hints, *res, *rp;
-   const char *addrStr, *portStr;
-
-   if (!addr)
-   {
-      addrStr = getenv(PI_ENVADDR);
-
-      if ((!addrStr) || (!strlen(addrStr)))
-      {
-         addrStr = PI_DEFAULT_SOCKET_ADDR_STR;
-      }
-   }
-   else addrStr = addr;
-
-   if (!port)
-   {
-      portStr = getenv(PI_ENVPORT);
-
-      if ((!portStr) || (!strlen(portStr)))
-      {
-         portStr = PI_DEFAULT_SOCKET_PORT_STR;
-      }
-   }
-   else portStr = port;
 
    memset (&hints, 0, sizeof (hints));
 
@@ -708,14 +685,37 @@ void stop_thread(pthread_t *pth)
    }
 }
 
-int pigpio_start(char *addrStr, char *portStr)
+int pigpio_start(char const *addrStr, char const *portStr)
 {
    int pi;
    int *userdata;
 
-   if ((!addrStr) || (strlen(addrStr) == 0))
+   // check the information provided about the pigpiod network address/port
+   // if no suitable information is provided, then...
+   //   1) ... first check the environmenvt variables
+   //      PIGPIO_ADDR and PIGPIO_PORT
+   //   2) ... fall back to default values, if the environment
+   //      does not provide anything useful
+   if ((NULL == addrStr) || (0 == strlen(addrStr)))
    {
-      addrStr = "localhost";
+      char *p = getenv(PI_ENVADDR);
+
+      if ((NULL == p) || (0 == strlen(p)))
+      {
+         p = PI_DEFAULT_SOCKET_ADDR_STR;
+      }
+      addrStr = p;
+   }
+
+   if ((NULL == portStr) || (0 == strlen(portStr)))
+   {
+      char *p = getenv(PI_ENVPORT);
+
+      if ((NULL == p) || (0 == strlen(p)))
+      {
+         p = PI_DEFAULT_SOCKET_PORT_STR;
+      }
+      portStr = p;
    }
 
    for (pi=0; pi<MAX_PI; pi++)
