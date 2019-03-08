@@ -35,17 +35,27 @@ For more information, please refer to <http://unlicense.org/>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
 #include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <sys/select.h>
 
-#include <arpa/inet.h>
+#if defined __WIN32__
+#  include <ws2tcpip.h> /* for Windows sockets */
+#else
+#  include <netdb.h>
+#  include <sys/socket.h>
+#  include <netinet/tcp.h>
+#  include <sys/select.h>
+#  include <arpa/inet.h>
+
+#  define INVALID_SOCKET ((SOCKET)-1)
+#  define SOCKET_ERROR   ((SOCKET)-1)
+#  define closesocket(x) close(x)
+
+typedef int SOCKET;
+#endif
 
 #include "pigpio.h"
 #include "command.h"
@@ -75,9 +85,9 @@ struct callback_s
 
 static gpioReport_t gReport[PISCOPE_MAX_REPORTS_PER_READ];
 
-static int gPigCommand = -1;
+static SOCKET gPigCommand = INVALID_SOCKET;
+static SOCKET gPigNotify  = INVALID_SOCKET;
 static int gPigHandle = -1;
-static int gPigNotify = -1;
 
 static uint32_t gNotifyBits;
 static uint32_t gLastLevel;
@@ -104,13 +114,13 @@ static int pigpio_command(int fd, int command, int p1, int p2, int rl)
 
    pthread_mutex_lock(&command_mutex);
 
-   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(fd, (void *)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_send;
    }
 
-   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(fd, (void *)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_recv;
@@ -135,7 +145,7 @@ static int pigpio_command_ext
 
    pthread_mutex_lock(&command_mutex);
 
-   if (send(fd, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(fd, (void *)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_send;
@@ -143,14 +153,14 @@ static int pigpio_command_ext
 
    for (i=0; i<extents; i++)
    {
-      if (send(fd, ext[i].ptr, ext[i].size, 0) != ext[i].size)
+      if (send(fd, (void *)ext[i].ptr, ext[i].size, 0) != ext[i].size)
       {
          pthread_mutex_unlock(&command_mutex);
          return pigif_bad_send;
       }
    }
 
-   if (recv(fd, &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(fd, (void *)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       pthread_mutex_unlock(&command_mutex);
       return pigif_bad_recv;
@@ -161,9 +171,9 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
-static int pigpioOpenSocket(char const *addrStr, char const *portStr)
+static int pigpioOpenSocket(char const *addrStr, char const *portStr, SOCKET *sock)
 {
-   int sock, err, opt;
+   int err = 0, opt;
    struct addrinfo hints, *res, *rp;
    memset (&hints, 0, sizeof (hints));
 
@@ -173,26 +183,32 @@ static int pigpioOpenSocket(char const *addrStr, char const *portStr)
 
    err = getaddrinfo (addrStr, portStr, &hints, &res);
 
-   if (err) return pigif_bad_getaddrinfo;
-
+   if (err)
+   {
+       err = pigif_bad_getaddrinfo;
+   }
+   else
+   {
    for (rp=res; rp!=NULL; rp=rp->ai_next)
    {
-      sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+          *sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-      if (sock == -1) continue;
+          if (*sock == INVALID_SOCKET) continue;
 
       /* Disable the Nagle algorithm. */
       opt = 1;
-      setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
+          setsockopt(*sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
 
-      if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) break;
+          if (connect(*sock, rp->ai_addr, rp->ai_addrlen) != SOCKET_ERROR) break;
    }
 
    freeaddrinfo(res);
 
-   if (rp == NULL) return pigif_bad_connect;
+       if (rp == NULL)
+          err = pigif_bad_connect;
+    }
 
-   return sock;
+   return err;
 }
 
 static void dispatch_notification(gpioReport_t *r)
@@ -468,6 +484,7 @@ void stop_thread(pthread_t *pth)
 
 int pigpio_start(char const *addrStr, char const *portStr)
 {
+   int err = 0;
    // check the information provided about the pigpiod network address/port
    // if no suitable information is provided, then...
    //   1) ... first check the environmenvt variables
@@ -498,17 +515,17 @@ int pigpio_start(char const *addrStr, char const *portStr)
 
    if (!gPigStarted)
    {
-      gPigCommand = pigpioOpenSocket(addrStr, portStr);
+      err = pigpioOpenSocket(addrStr, portStr, &gPigCommand);
 
-      if (gPigCommand >= 0)
+      if (err >= 0)
       {
-         gPigNotify = pigpioOpenSocket(addrStr, portStr);
+         err = pigpioOpenSocket(addrStr, portStr, &gPigNotify);
 
-         if (gPigNotify >= 0)
+         if (err >= 0)
          {
             gPigHandle = pigpio_command(gPigNotify, PI_CMD_NOIB, 0, 0, 1);
 
-            if (gPigHandle < 0) return pigif_bad_noib;
+            if (gPigHandle < 0) err = pigif_bad_noib;
             else
             {
                gLastLevel = read_bank_1();
@@ -517,16 +534,16 @@ int pigpio_start(char const *addrStr, char const *portStr)
                if (pthNotify)
                {
                   gPigStarted = 1;
-                  return 0;
+                  err = 0;
                }
-               else return pigif_notify_failed;
+               else err = pigif_notify_failed;
             }
          }
-         else return gPigNotify;
+         else err = gPigNotify;
       }
-      else return gPigCommand;
+      else err = gPigCommand;
    }
-   return 0;
+   return err;
 }
 
 void pigpio_stop(void)
@@ -547,8 +564,8 @@ void pigpio_stop(void)
          gPigHandle = -1;
       }
 
-      close(gPigNotify);
-      gPigNotify = -1;
+      closesocket(gPigNotify);
+      gPigNotify = INVALID_SOCKET;
    }
 
    if (gPigCommand >= 0)
@@ -559,9 +576,12 @@ void pigpio_stop(void)
          gPigHandle = -1;
       }
 
-      close(gPigCommand);
-      gPigCommand = -1;
-   }
+      closesocket(gPigCommand);
+      gPigCommand = INVALID_SOCKET;
+
+#if defined __WIN32__
+   WSACleanup();
+#endif
 }
 
 int set_mode(unsigned gpio, unsigned mode)

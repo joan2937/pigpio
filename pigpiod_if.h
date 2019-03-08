@@ -2984,6 +2984,7 @@ typedef enum
    pigif_bad_callback       = -2008,
    pigif_notify_failed      = -2009,
    pigif_callback_not_found = -2010,
+   pigif_bad_winsock_init   = -2013,
 } pigifError_t;
 
 /*DEF_E*/
