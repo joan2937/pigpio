@@ -578,6 +578,7 @@ void pigpio_stop(void)
 
       closesocket(gPigCommand);
       gPigCommand = INVALID_SOCKET;
+    }
 
 #if defined __WIN32__
    WSACleanup();
