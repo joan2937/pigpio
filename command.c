@@ -640,7 +640,7 @@ int cmdParse(
    /* Check that ext is big enough for the largest message. */
    if (ext_len < (4 * CMD_MAX_PARAM)) return CMD_EXT_TOO_SMALL;
 
-   bzero(&ctl->opt, sizeof(ctl->opt));
+   memset(&ctl->opt, 0, sizeof(ctl->opt));
 
    sscanf(buf+ctl->eaten, " %31s %n", intCmdStr, &pp);
 

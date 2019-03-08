@@ -35,17 +35,27 @@ For more information, please refer to <http://unlicense.org/>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
 #include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <sys/select.h>
 
-#include <arpa/inet.h>
+#if defined __WIN32__
+#  include <ws2tcpip.h> /* for Windows sockets */
+#else
+#  include <netdb.h>
+#  include <sys/socket.h>
+#  include <netinet/tcp.h>
+#  include <sys/select.h>
+#  include <arpa/inet.h>
+
+#  define INVALID_SOCKET ((SOCKET)-1)
+#  define SOCKET_ERROR   ((SOCKET)-1)
+#  define closesocket(x) close(x)
+
+typedef int SOCKET;
+#endif
 
 #include "pigpio.h"
 #include "command.h"
@@ -91,9 +101,9 @@ struct evtCallback_s
 
 static int             gPiInUse     [MAX_PI];
 
-static int             gPigCommand  [MAX_PI];
+static SOCKET          gPigCommand  [MAX_PI];
+static SOCKET          gPigNotify   [MAX_PI];
 static int             gPigHandle   [MAX_PI];
-static int             gPigNotify   [MAX_PI];
 
 static uint32_t        gEventBits   [MAX_PI];
 static uint32_t        gNotifyBits  [MAX_PI];
@@ -144,13 +154,13 @@ static int pigpio_command(int pi, int command, int p1, int p2, int rl)
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (void *)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (void *)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -175,13 +185,13 @@ static int pigpio_notify(int pi)
 
    _pml(pi);
 
-   if (send(gPigNotify[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigNotify[pi], (void *)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigNotify[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigNotify[pi], (void *)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -209,7 +219,7 @@ static int pigpio_command_ext
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (void *)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
@@ -217,14 +227,14 @@ static int pigpio_command_ext
 
    for (i=0; i<extents; i++)
    {
-      if (send(gPigCommand[pi], ext[i].ptr, ext[i].size, 0) != ext[i].size)
+      if (send(gPigCommand[pi], (void *)ext[i].ptr, ext[i].size, 0) != ext[i].size)
       {
          _pmu(pi);
          return pigif_bad_send;
       }
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (void *)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -253,13 +263,13 @@ static int pigpioOpenSocket(char const *addrStr, char const *portStr)
    {
       sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-      if (sock == -1) continue;
+      if (sock == INVALID_SOCKET) continue;
 
       /* Disable the Nagle algorithm. */
       opt = 1;
       setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
 
-      if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) break;
+      if (connect(sock, rp->ai_addr, rp->ai_addrlen) != SOCKET_ERROR) break;
    }
 
    freeaddrinfo(res);
@@ -558,7 +568,7 @@ static int recvMax(int pi, void *buf, int bufsize, int sent)
    {
       fetch = remaining;
       if (fetch > sizeof(scratch)) fetch = sizeof(scratch);
-      recv(gPigCommand[pi], scratch, fetch, MSG_WAITALL);
+      recv(gPigCommand[pi], (void *)scratch, fetch, MSG_WAITALL);
       remaining -= fetch;
    }
 
@@ -690,6 +700,15 @@ int pigpio_start(char const *addrStr, char const *portStr)
    int pi;
    int *userdata;
 
+#if defined __WIN32__
+   WSADATA wsaData;
+
+   /* initialize Windows sockets version 2.2 */
+   if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) {
+       return pigif_bad_winsock_init;
+    }
+#endif
+
    // check the information provided about the pigpiod network address/port
    // if no suitable information is provided, then...
    //   1) ... first check the environmenvt variables
@@ -778,15 +797,19 @@ void pigpio_stop(int pi)
          gPigHandle[pi] = -1;
       }
 
-      close(gPigCommand[pi]);
-      gPigCommand[pi] = -1;
+      closesocket(gPigCommand[pi]);
+      gPigCommand[pi] = INVALID_SOCKET;
    }
 
    if (gPigNotify[pi] >= 0)
    {
-      close(gPigNotify[pi]);
-      gPigNotify[pi] = -1;
+      closesocket(gPigNotify[pi]);
+      gPigNotify[pi] = INVALID_SOCKET;
    }
+
+#if defined __WIN32__
+   WSACleanup();
+#endif
 
    gPiInUse[pi] = 0;
 }
