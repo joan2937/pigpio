@@ -3,6 +3,12 @@
 pigpio is a C library for the Raspberry which allows control of the
 General Purpose Input Outputs (GPIO).
 
+At the moment pigpio on the Pi4B is experimental. I am not sure if the DMA channels
+    being used are safe.  The Pi4B defaults are primary channel 7, secondary channel 6.
+    If these channels do not work you will have to experiment. You can set the channels
+    used by the pigpio daemon by invoking it with the -d and -e options, e.g. 
+    <small>sudo pigpiod -d 5 -e 8</small> to specify primary 5, secondary 8.
+
 ## Features
 
 * Sampling and time-stamping of GPIO 0-31 between 100,000 and 1,000,000 times per second
