@@ -970,6 +970,7 @@ typedef struct
    int timeout;
    unsigned ex;
    void *userdata;
+   int fd;
    int inited;
 } gpioISR_t;
 
@@ -11477,11 +11478,15 @@ static void *pthISRThread(void *x)
 
    sprintf(buf, "/sys/class/gpio/gpio%d/value", isr->gpio);
 
+   isr->fd = -1; /* no fd assigned */
+
    if ((fd = open(buf, O_RDONLY)) < 0)
    {
       DBG(DBG_ALWAYS, "gpio %d not exported", isr->gpio);
       return NULL;
    }
+
+   isr->fd = fd; /* store fd so it can be closed */
 
    pfd.fd = fd;
 
@@ -11602,6 +11607,13 @@ static int intGpioSetISRFunc(
       if (gpioISR[gpio].pth) /* delete any existing ISR */
       {
          gpioStopThread(gpioISR[gpio].pth);
+
+         if (gpioISR[gpio].fd >= 0)
+         {
+            close(gpioISR[gpio].fd);
+            gpioISR[gpio].fd = -1;
+         }
+
          gpioISR[gpio].func = NULL;
          gpioISR[gpio].pth = NULL;
       }
