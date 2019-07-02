@@ -7029,8 +7029,20 @@ secondaryChannel: 0-14
 .br
 
 .br
-The default setting is to use channel 14 for the primary channel and
-channel 6 for the secondary channel.
+The default setting depends on whether the Pi has a BCM2711 chip or
+not (currently only the Pi4B has a BCM2711).
+
+.br
+
+.br
+The default setting for a non-BCM2711 is to use channel 14 for the
+primary channel and channel 6 for the secondary channel.
+
+.br
+
+.br
+The default setting for a BCM2711 is to use channel 7 for the
+primary channel and channel 6 for the secondary channel.
 
 .br
 
@@ -8022,12 +8034,12 @@ PI_MAX_WAVE_DATABITS 32
 
 .br
 
-.IP "\fBDMAchannel\fP: 0-14" 0
+.IP "\fBDMAchannel\fP: 0-15" 0
 
 .EX
 PI_MIN_DMA_CHANNEL 0
 .br
-PI_MAX_DMA_CHANNEL 14
+PI_MAX_DMA_CHANNEL 15
 .br
 
 .EE
@@ -8928,7 +8940,7 @@ The position of an item.
 
 .br
 
-.IP "\fBprimaryChannel\fP: 0-14" 0
+.IP "\fBprimaryChannel\fP: 0-15" 0
 The DMA channel used to time the sampling of GPIO and to time servo and
 PWM pulses.
 
@@ -10103,15 +10115,15 @@ A 16-bit word value.
 .br
 #define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
 .br
-#define PI_BAD_CHANNEL      -27 // DMA channel not 0-14
+#define PI_BAD_CHANNEL      -27 // DMA channel not 0-15
 .br
-#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-14
+#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-15
 .br
 #define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000
 .br
 #define PI_BAD_FIFO_COMMAND -29 // unrecognized fifo command
 .br
-#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
+#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-15
 .br
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 .br
@@ -10380,6 +10392,12 @@ A 16-bit word value.
 .br
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
 .br
+#define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
+.br
+#define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
+.br
+#define PI_DEFAULT_DMA_NOT_SET             15
+.br
 #define PI_DEFAULT_SOCKET_PORT             8888
 .br
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
@@ -10399,6 +10417,8 @@ A 16-bit word value.
 #define PI_DEFAULT_UPDATE_MASK_PI2B        0x0080480FFFFFFCLL
 .br
 #define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
+.br
+#define PI_DEFAULT_UPDATE_MASK_PI4B        0x0000000FFFFFFCLL
 .br
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
 .br

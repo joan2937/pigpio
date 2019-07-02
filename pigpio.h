@@ -31,7 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 68
+#define PIGPIO_VERSION 6904
 
 /*TEXT
 
@@ -831,10 +831,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CLOCK_PWM 0
 #define PI_CLOCK_PCM 1
 
-/* DMA channel: 0-14 */
+/* DMA channel: 0-15, 15 is unset */
 
 #define PI_MIN_DMA_CHANNEL 0
-#define PI_MAX_DMA_CHANNEL 14
+#define PI_MAX_DMA_CHANNEL 15
 
 /* port */
 
@@ -4745,8 +4745,7 @@ D*/
 
 
 /*F*/
-int gpioCfgDMAchannels(
-   unsigned primaryChannel, unsigned secondaryChannel);
+int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
 
@@ -4757,8 +4756,14 @@ This function is only effective if called before [*gpioInitialise*].
 secondaryChannel: 0-14
 . .
 
-The default setting is to use channel 14 for the primary channel and
-channel 6 for the secondary channel.
+The default setting depends on whether the Pi has a BCM2711 chip or
+not (currently only the Pi4B has a BCM2711).
+
+The default setting for a non-BCM2711 is to use channel 14 for the
+primary channel and channel 6 for the secondary channel.
+
+The default setting for a BCM2711 is to use channel 7 for the
+primary channel and channel 6 for the secondary channel.
 
 The secondary channel is only used for the transmission of waves.
 
@@ -5331,10 +5336,10 @@ PI_MIN_WAVE_DATABITS 1
 PI_MAX_WAVE_DATABITS 32
 . .
 
-DMAchannel::0-14
+DMAchannel::0-15
 . .
 PI_MIN_DMA_CHANNEL 0
-PI_MAX_DMA_CHANNEL 14
+PI_MAX_DMA_CHANNEL 15
 . .
 
 double::
@@ -5718,7 +5723,7 @@ The port used to bind to the pigpio socket.  Defaults to 8888.
 pos::
 The position of an item.
 
-primaryChannel:: 0-14
+primaryChannel:: 0-15
 The DMA channel used to time the sampling of GPIO and to time servo and
 PWM pulses.
 
@@ -6301,11 +6306,11 @@ after this command is issued.
 #define PI_NO_HANDLE        -24 // no handle available
 #define PI_BAD_HANDLE       -25 // unknown handle
 #define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
-#define PI_BAD_CHANNEL      -27 // DMA channel not 0-14
-#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-14
+#define PI_BAD_CHANNEL      -27 // DMA channel not 0-15
+#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-15
 #define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000
 #define PI_BAD_FIFO_COMMAND -29 // unrecognized fifo command
-#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
+#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-15
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 #define PI_INITIALISED      -32 // function called after gpioInitialise
 #define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
@@ -6440,6 +6445,9 @@ after this command is issued.
 #define PI_DEFAULT_DMA_CHANNEL             14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
+#define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
+#define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
+#define PI_DEFAULT_DMA_NOT_SET             15
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
@@ -6450,6 +6458,7 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_ZERO        0x0080000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI2B        0x0080480FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_PI4B        0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
 #define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 

@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 68 */
+/* pigpio version 69 */
 
 /* include ------------------------------------------------------- */
 
@@ -114,6 +114,11 @@ For more information, please refer to <http://unlicense.org/>
 39 GPPUDCLK1 GPIO Pin Pull-up/down Enable Clock 1
 40 -         Reserved
 41 -         Test
+42-56        Reserved
+57 GPPUPPDN1 Pin pull-up/down for pins 15:0
+58 GPPUPPDN1 Pin pull-up/down for pins 31:16
+59 GPPUPPDN2 Pin pull-up/down for pins 47:32
+60 GPPUPPDN3 Pin pull-up/down for pins 57:48
 */
 
 /*
@@ -317,7 +322,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define BSCS_LEN  0x40
 #define CLK_LEN   0xA8
 #define DMA_LEN   0x1000 /* allow access to all channels */
-#define GPIO_LEN  0xB4
+#define GPIO_LEN  0xF4   /* 2711 has more registers */
 #define PADS_LEN  0x38
 #define PCM_LEN   0x24
 #define PWM_LEN   0x28
@@ -356,6 +361,13 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define GPPUD     37
 #define GPPUDCLK0 38
 #define GPPUDCLK1 39
+
+/* BCM2711 has different pulls */
+
+#define GPPUPPDN0 57
+#define GPPUPPDN1 58
+#define GPPUPPDN2 59
+#define GPPUPPDN3 60
 
 #define DMA_CS        0
 #define DMA_CONBLK_AD 1
@@ -498,8 +510,9 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define CLK_CTL_SRC_OSC  1
 #define CLK_CTL_SRC_PLLD 6
 
-#define CLK_OSC_FREQ   19200000
-#define CLK_PLLD_FREQ 500000000
+#define CLK_OSC_FREQ        19200000
+#define CLK_PLLD_FREQ      500000000
+#define CLK_PLLD_FREQ_2711 750000000
 
 #define CLK_DIV_DIVI(x) ((x)<<12)
 #define CLK_DIV_DIVF(x) ((x)<< 0)
@@ -1199,11 +1212,13 @@ typedef struct
 
 /* initialise once then preserve */
 
-static volatile uint32_t piCores      = 0;
-static volatile uint32_t pi_ispi      = 0;
-static volatile uint32_t pi_peri_phys = 0x20000000;
-static volatile uint32_t pi_dram_bus  = 0x40000000;
-static volatile uint32_t pi_mem_flag  = 0x0C;
+static volatile uint32_t piCores       = 0;
+static volatile uint32_t pi_peri_phys  = 0x20000000;
+static volatile uint32_t pi_dram_bus   = 0x40000000;
+static volatile uint32_t pi_mem_flag   = 0x0C;
+static volatile uint32_t pi_ispi       = 0;
+static volatile uint32_t pi_is_2711    = 0;
+static volatile uint32_t clk_plld_freq = CLK_PLLD_FREQ;
 
 static int libInitialised = 0;
 
@@ -1341,8 +1356,8 @@ static volatile gpioCfg_t gpioCfg =
    PI_DEFAULT_BUFFER_MILLIS,
    PI_DEFAULT_CLK_MICROS,
    PI_DEFAULT_CLK_PERIPHERAL,
-   PI_DEFAULT_DMA_PRIMARY_CHANNEL,
-   PI_DEFAULT_DMA_SECONDARY_CHANNEL,
+   PI_DEFAULT_DMA_NOT_SET, /* primary DMA */
+   PI_DEFAULT_DMA_NOT_SET, /* secondary DMA */
    PI_DEFAULT_SOCKET_PORT,
    PI_DEFAULT_IF_FLAGS,
    PI_DEFAULT_MEM_ALLOC_MODE,
@@ -4336,7 +4351,7 @@ static void spiGoA(
 
    cs = PI_SPI_FLAGS_GET_CSPOLS(flags) & (1<<channel);
 
-   spiDefaults = AUXSPI_CNTL0_SPEED(125000000/speed)   |
+   spiDefaults = AUXSPI_CNTL0_SPEED((125000000/speed)-1)|
                  AUXSPI_CNTL0_IN_RISING(bit_ir[mode])  |
                  AUXSPI_CNTL0_OUT_RISING(bit_or[mode]) |
                  AUXSPI_CNTL0_INVERT_CLK(bit_ic[mode]) |
@@ -7259,36 +7274,41 @@ static int initCheckPermitted(void)
 
 static int initPeripherals(void)
 {
-   uint32_t dmaBase;
-
    DBG(DBG_STARTUP, "");
 
    gpioReg = initMapMem(fdMem, GPIO_BASE, GPIO_LEN);
 
    if (gpioReg == MAP_FAILED)
-      SOFT_ERROR(PI_INIT_FAILED, "mmap gpio failed (%m) GPIO_BASE=%08X GPIO_LEN=%08X REV=%08X",GPIO_BASE,GPIO_LEN,gpioHardwareRevision());
+      SOFT_ERROR(PI_INIT_FAILED, "mmap gpio failed (%m)");
 
-   /* dma channels 0-14 share one page, 15 has another */
-
-   if (gpioCfg.DMAprimaryChannel < 15)
-   {
-      dmaBase = DMA_BASE;
-   }
-   else dmaBase = DMA15_BASE;
-
-   dmaReg = initMapMem(fdMem, dmaBase,  DMA_LEN);
+   dmaReg = initMapMem(fdMem, DMA_BASE, DMA_LEN);
 
    if (dmaReg == MAP_FAILED)
       SOFT_ERROR(PI_INIT_FAILED, "mmap dma failed (%m)");
 
-   if (gpioCfg.DMAprimaryChannel < 15)
-   {
-      dmaIn =  dmaReg + (gpioCfg.DMAprimaryChannel   * 0x40);
-      dmaOut = dmaReg + (gpioCfg.DMAsecondaryChannel * 0x40);
-   }
+   /* we should know if we are running on a BCM2711 by now */
 
-   DBG(DBG_STARTUP, "DMA #%d @ %08X @ %08"PRIXPTR,
-      gpioCfg.DMAprimaryChannel, dmaBase, (uintptr_t)dmaIn);
+   if (gpioCfg.DMAprimaryChannel == PI_DEFAULT_DMA_NOT_SET)
+   {
+      if (pi_is_2711)
+         gpioCfg.DMAprimaryChannel = PI_DEFAULT_DMA_PRIMARY_CH_2711;
+      else
+         gpioCfg.DMAprimaryChannel = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
+   }
+      
+   if (gpioCfg.DMAsecondaryChannel == PI_DEFAULT_DMA_NOT_SET)
+   {
+      if (pi_is_2711)
+         gpioCfg.DMAsecondaryChannel = PI_DEFAULT_DMA_SECONDARY_CH_2711;
+      else
+         gpioCfg.DMAsecondaryChannel = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
+   }
+      
+   dmaIn =  dmaReg + (gpioCfg.DMAprimaryChannel   * 0x40);
+   dmaOut = dmaReg + (gpioCfg.DMAsecondaryChannel * 0x40);
+
+   DBG(DBG_STARTUP, "DMA #%d @ %08"PRIXPTR,
+      gpioCfg.DMAprimaryChannel, (uintptr_t)dmaIn);
 
    DBG(DBG_STARTUP, "debug reg is %08X", dmaIn[DMA_DEBUG]);
 
@@ -7780,7 +7800,7 @@ static void initClock(int mainClock)
    }
 
    clkSrc  = CLK_CTL_SRC_PLLD;
-   clkDivI = 50 * micros; /* 10      MHz - 1      MHz */
+   clkDivI = clk_plld_freq / (10000000 / micros); /* 10 MHz - 1 MHz */ 
    clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
    clkDivF = 0;
    clkMash = 0;
@@ -8732,6 +8752,10 @@ int gpioGetMode(unsigned gpio)
 
 int gpioSetPullUpDown(unsigned gpio, unsigned pud)
 {
+   int shift = (gpio & 0xf) << 1;
+   uint32_t bits;
+   uint32_t pull;
+
    DBG(DBG_USER, "gpio=%d pud=%d", gpio, pud);
 
    CHECK_INITED;
@@ -8742,17 +8766,34 @@ int gpioSetPullUpDown(unsigned gpio, unsigned pud)
    if (pud > PI_PUD_UP)
       SOFT_ERROR(PI_BAD_PUD, "gpio %d, bad pud (%d)", gpio, pud);
 
-   *(gpioReg + GPPUD) = pud;
+   if (pi_is_2711)
+   {
+      switch (pud)
+      {
+         case PI_PUD_OFF:  pull = 0; break;
+         case PI_PUD_UP:   pull = 1; break;
+         case PI_PUD_DOWN: pull = 2; break;
+      }
 
-   myGpioDelay(1);
+      bits = *(gpioReg + GPPUPPDN0 + (gpio>>4));
+      bits &= ~(3 << shift);
+      bits |= (pull << shift);
+      *(gpioReg + GPPUPPDN0 + (gpio>>4)) = bits;
+   }
+   else
+   {
+      *(gpioReg + GPPUD) = pud;
 
-   *(gpioReg + GPPUDCLK0 + BANK) = BIT;
+      myGpioDelay(1);
 
-   myGpioDelay(1);
+      *(gpioReg + GPPUDCLK0 + BANK) = BIT;
 
-   *(gpioReg + GPPUD) = 0;
+      myGpioDelay(1);
 
-   *(gpioReg + GPPUDCLK0 + BANK) = 0;
+      *(gpioReg + GPPUD) = 0;
+
+      *(gpioReg + GPPUDCLK0 + BANK) = 0;
+   }
 
    return 0;
 }
@@ -12611,7 +12652,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
    int cdiv[] = {CLK_GP0_DIV, CLK_GP1_DIV, CLK_GP2_DIV};
    int csrc[CLK_SRCS] = {CLK_CTL_SRC_OSC, CLK_CTL_SRC_PLLD};
-   uint32_t cfreq[CLK_SRCS]={CLK_OSC_FREQ, CLK_PLLD_FREQ};
+   uint32_t cfreq[CLK_SRCS]={CLK_OSC_FREQ, clk_plld_freq};
    unsigned clock, mode, mash;
    int password = 0;
    double f;
@@ -12722,13 +12763,13 @@ int gpioHardwarePWM(
 
    if (frequency)
    {
-      real_range = ((double)CLK_PLLD_FREQ / (2.0 * frequency)) + 0.5;
+      real_range = ((double)clk_plld_freq / (2.0 * frequency)) + 0.5;
       real_dutycycle = ((uint64_t)dutycycle * real_range) / PI_HW_PWM_RANGE;
 
       /* record the set PWM frequency and dutycycle */
 
       hw_pwm_freq[pwm] =
-         ((double)CLK_PLLD_FREQ / ( 2.0 * real_range)) + 0.5;
+         ((double)clk_plld_freq / ( 2.0 * real_range)) + 0.5;
 
       hw_pwm_duty[pwm]  = dutycycle;
 
@@ -13391,9 +13432,15 @@ unsigned gpioHardwareRevision(void)
             }
          }
 
-         if (!strncasecmp("hardware\t: BCM", buf, 14)) {
+         if (!strncasecmp("hardware\t: BCM", buf, 14))
+         {
             int bcmno = atoi(buf+14);
-            if ((bcmno == 2708) || (bcmno == 2709) || (bcmno == 2710) || (bcmno == 2835) || (bcmno == 2836) || (bcmno == 2837))
+            if ((bcmno == 2708) ||
+                (bcmno == 2709) ||
+                (bcmno == 2710) ||
+                (bcmno == 2835) ||
+                (bcmno == 2836) ||
+                (bcmno == 2837))
             {
               pi_ispi = 1;
             }
@@ -13405,12 +13452,37 @@ unsigned gpioHardwareRevision(void)
             {
                if (term != '\n') rev = 0;
                else rev &= 0xFFFFFF; /* mask out warranty bit */
+               switch (rev&0xFFF0)  /* just interested in BCM model */
+               {
+                  case 0x3110: /* Pi4B */
+                     piCores = 4;
+                     pi_peri_phys = 0xFE000000;
+                     pi_dram_bus  = 0xC0000000;
+                     pi_mem_flag  = 0x04;
+                     pi_is_2711   = 1;
+                     pi_ispi      = 1;
+                     clk_plld_freq = CLK_PLLD_FREQ_2711;
+                     fclose(filp);
+                     if (!gpioMaskSet)
+                     {
+                        gpioMaskSet = 1;
+                        gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
+                     }
+                     return rev;
+                     break;
+               }
             }
          }
       }
 
       fclose(filp);
-      //raspberry pi 3 running arm64 don't put all the information we need in /proc/cpuinfo, but we can get it elsewhere.
+
+      /*
+         Raspberry pi 3 running arm64 don't put all the
+         information we need in /proc/cpuinfo, but we can
+         get it elsewhere.
+      */
+
       if (!pi_ispi)
       {
          filp = fopen ("/proc/device-tree/model", "r");
@@ -13430,6 +13502,7 @@ unsigned gpioHardwareRevision(void)
          }
          fclose(filp);
       }
+
       if (rev == 0)
       {
          filp = fopen ("/proc/device-tree/system/linux,revision", "r");
@@ -13438,8 +13511,11 @@ unsigned gpioHardwareRevision(void)
             uint32_t tmp;
             if (fread(&tmp,1 , 4, filp) == 4)
             {
-               // for some reason the value returned by reading this 
-               // /proc entry seems to be big endian, convert it.
+               /*
+                  for some reason the value returned by reading
+                  this /proc entry seems to be big endian,
+                  convert it.
+               */
                rev = ntohl(tmp);
                rev &= 0xFFFFFF; /* mask out warranty bit */
             }
@@ -13523,7 +13599,8 @@ int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel)
          primaryChannel);
 
    if ((secondaryChannel > PI_MAX_DMA_CHANNEL) ||
-       (secondaryChannel == primaryChannel))
+         ((secondaryChannel == primaryChannel) &&
+            (secondaryChannel != PI_DEFAULT_DMA_NOT_SET)))
       SOFT_ERROR(PI_BAD_SECO_CHANNEL, "bad secondary channel (%d)",
          secondaryChannel);
 
