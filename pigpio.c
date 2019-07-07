@@ -10731,6 +10731,9 @@ int bscXfer(bsc_xfer_t *xfer)
 
    CHECK_INITED;
 
+   if (pi_is_2711)
+      SOFT_ERROR(PI_NOT_ON_BCM2711, "SPI/BSC slave not available on BCM2711");
+
    eventAlert[PI_EVENT_BSC].ignore = 1;
 
    if (xfer->control)

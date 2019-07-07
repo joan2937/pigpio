@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 13
+#define PIGPIOD_IF2_VERSION 14
 
 /*TEXT
 
@@ -3402,6 +3402,9 @@ This function provides a low-level interface to the
 SPI/I2C Slave peripheral.  This peripheral allows the
 Pi to act as a slave device on an I2C or SPI bus.
 
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -3521,6 +3524,9 @@ D*/
 int bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer);
 /*D
 This function allows the Pi to act as a slave I2C device.
+
+This function is not available on the BCM2711 (e.g.as
+used in the Pi4B).
 
 The data bytes (if any) are written to the BSC transmit
 FIFO and the bytes in the BSC receive FIFO are returned.

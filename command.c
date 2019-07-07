@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 67+
+This version is for pigpio version 69+
 */
 
 #include <stdio.h>
@@ -564,6 +564,8 @@ static errInfo_t errInfo[]=
    {PI_NOT_SPI_GPIO     , "no bit bang SPI in progress on GPIO"},
    {PI_BAD_EVENT_ID     , "bad event id"},
    {PI_CMD_INTERRUPTED  , "command interrupted, Python"},
+   {PI_NOT_ON_BCM2711   , "not available on BCM2711"},
+   {PI_ONLY_ON_BCM2711  , "only available on BCM2711"},
 
 };
 

@@ -3635,6 +3635,12 @@ Pi to act as a slave device on an I2C or SPI bus.
 .br
 
 .br
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
+.br
+
+.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -10354,6 +10360,10 @@ A 16-bit word value.
 #define PI_BAD_EVENT_ID    -143 // bad event id
 .br
 #define PI_CMD_INTERRUPTED -144 // Used by Python
+.br
+#define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
+.br
+#define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
 .br
 
 .br

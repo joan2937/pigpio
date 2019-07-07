@@ -13,7 +13,6 @@ of the public at large and to the detriment of our heirs and
 successors. We intend this dedication to be an overt act of
 relinquishment in perpetuity of all present and future rights to this
 software under copyright law.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -31,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6901
+#define PIGPIO_VERSION 6902
 
 /*TEXT
 
@@ -2879,6 +2878,9 @@ int bscXfer(bsc_xfer_t *bsc_xfer);
 This function provides a low-level interface to the
 SPI/I2C Slave peripheral.  This peripheral allows the
 Pi to act as a slave device on an I2C or SPI bus.
+
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
 
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
@@ -6426,6 +6428,8 @@ after this command is issued.
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 #define PI_BAD_EVENT_ID    -143 // bad event id
 #define PI_CMD_INTERRUPTED -144 // Used by Python
+#define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
+#define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099

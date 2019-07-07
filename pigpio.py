@@ -300,7 +300,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.42"
+VERSION = "1.43"
 
 exceptions = True
 
@@ -689,6 +689,8 @@ PI_BAD_SPI_BAUD     =-141
 PI_NOT_SPI_GPIO     =-142
 PI_BAD_EVENT_ID     =-143
 PI_CMD_INTERRUPTED  =-144
+PI_NOT_ON_BCM2711   =-145
+PI_ONLY_ON_BCM2711  =-146
 
 # pigpio error text
 
@@ -835,6 +837,8 @@ _errors=[
    [PI_NOT_SPI_GPIO      , "no bit bang SPI in progress on GPIO"],
    [PI_BAD_EVENT_ID      , "bad event id"],
    [PI_CMD_INTERRUPTED   , "pigpio command interrupted"],
+   [PI_NOT_ON_BCM2711    , "not available on BCM2711"],
+   [PI_ONLY_ON_BCM2711   , "only available on BCM2711"],
 ]
 
 _except_a = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n{}"
@@ -3513,6 +3517,9 @@ class pi():
       SPI/I2C Slave peripheral.  This peripheral allows the
       Pi to act as a slave device on an I2C or SPI bus.
 
+      This function is not available on the BCM2711 (e.g. as
+      used in the Pi4B).
+
       I can't get SPI to work properly.  I tried with a
       control word of 0x303 and swapped MISO and MOSI.
 
@@ -3618,6 +3625,9 @@ class pi():
    def bsc_i2c(self, i2c_address, data=[]):
       """
       This function allows the Pi to act as a slave I2C device.
+
+      This function is not available on the BCM2711 (e.g. as
+      used in the Pi4B).
 
       The data bytes (if any) are written to the BSC transmit
       FIFO and the bytes in the BSC receive FIFO are returned.

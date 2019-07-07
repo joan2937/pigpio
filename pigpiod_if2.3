@@ -5605,6 +5605,12 @@ Pi to act as a slave device on an I2C or SPI bus.
 .br
 
 .br
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
+.br
+
+.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -5844,6 +5850,12 @@ if (status >= 0)
 .IP "\fBint bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer)\fP"
 .IP "" 4
 This function allows the Pi to act as a slave I2C device.
+
+.br
+
+.br
+This function is not available on the BCM2711 (e.g.as
+used in the Pi4B).
 
 .br
 
