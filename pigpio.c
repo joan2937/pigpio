@@ -6982,8 +6982,8 @@ static void *pthSocketThreadHandler(void *fdC)
          else
          {
             /* Serious error.  No point continuing. */
-            DBG(DBG_ALWAYS,
-               "ext too large %"PRIdPTR"(%zd), sock=%d", p[3], sizeof(buf), sock);
+            DBG(DBG_ALWAYS, "ext too large %"PRIdPTR"(%zd), sock=%d",
+               p[3], sizeof(buf), sock);
 
             closeOrphanedNotifications(-1, sock);
 
@@ -7061,7 +7061,7 @@ static void *pthSocketThreadHandler(void *fdC)
 
    close(sock);
 
-   DBG(DBG_ALWAYS, "Socket %d closed", sock);
+   DBG(DBG_USER, "Socket %d closed", sock);
 
    return 0;
 }
@@ -7126,7 +7126,7 @@ static void * pthSocketThread(void *x)
 
       if (addrAllowed((struct sockaddr *)&client))
       {
-         DBG(DBG_ALWAYS, "Connection accepted on socket %d", fdC);
+         DBG(DBG_USER, "Connection accepted on socket %d", fdC);
 
          sock = malloc(sizeof(int));
 
@@ -7136,12 +7136,13 @@ static void * pthSocketThread(void *x)
          int optval = 1;
          socklen_t optlen = sizeof(optval);
 
-         if (setsockopt(fdC, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-           DBG(0, "setsockopt() fail, closing socket %d", fdC);
+         if (setsockopt(fdC, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0)
+         {
+           DBG(DBG_ALWAYS, "setsockopt() fail, closing socket %d", fdC);
            close(fdC);
          }
 
-         DBG(DBG_ALWAYS, "SO_KEEPALIVE enabled on socket %d\n", fdC);
+         DBG(DBG_USER, "SO_KEEPALIVE enabled on socket %d\n", fdC);
 
          if (pthread_create
             (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
