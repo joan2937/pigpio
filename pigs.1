@@ -5755,11 +5755,36 @@ Each script has
 .br
 .SS Commands
 .br
-All the normal pigs commands may be used within a script.  However
-commands which return more than an integer will be of little use.
+Many pigpio commands may be used within a script.  However
+some commands do not work within the script model as designed and
+are not permitted.
 
 .br
-The following commands are only legal within a script.
+The following commands are not permitted within a script:
+
+.br
+File - FL FO FR FW
+
+.br
+I2C - BI2CZ I2CPK I2CRD I2CRI I2CRK I2CWD I2CWI I2CWK I2CZ
+
+.br
+Misc - BSCX CF1 CF2 SHELL
+
+.br
+Script control - PARSE PROC PROCD PROCP PROCR PROCS PROCU
+
+.br
+Serial - SERO SERR SERW SLR
+
+.br
+SPI - BSPIO BSPIX SPIR SPIW SPIX
+
+.br
+Waves - WVAG WVAS WVCHA WVGO WVGOR
+
+.br
+The following commands are only permitted within a script:
 
 .br
 
