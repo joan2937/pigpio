@@ -511,6 +511,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define CLK_CTL_SRC_PLLD 6
 
 #define CLK_OSC_FREQ        19200000
+#define CLK_OSC_FREQ_2711   54000000
 #define CLK_PLLD_FREQ      500000000
 #define CLK_PLLD_FREQ_2711 750000000
 
@@ -1219,7 +1220,11 @@ static volatile uint32_t pi_dram_bus   = 0x40000000;
 static volatile uint32_t pi_mem_flag   = 0x0C;
 static volatile uint32_t pi_ispi       = 0;
 static volatile uint32_t pi_is_2711    = 0;
+static volatile uint32_t clk_osc_freq  = CLK_OSC_FREQ;
 static volatile uint32_t clk_plld_freq = CLK_PLLD_FREQ;
+static volatile uint32_t hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ;
+static volatile uint32_t hw_clk_min_freq = PI_HW_CLK_MIN_FREQ;
+static volatile uint32_t hw_clk_max_freq = PI_HW_CLK_MAX_FREQ;
 
 static int libInitialised = 0;
 
@@ -12668,7 +12673,7 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
    int cdiv[] = {CLK_GP0_DIV, CLK_GP1_DIV, CLK_GP2_DIV};
    int csrc[CLK_SRCS] = {CLK_CTL_SRC_OSC, CLK_CTL_SRC_PLLD};
-   uint32_t cfreq[CLK_SRCS]={CLK_OSC_FREQ, clk_plld_freq};
+   uint32_t cfreq[CLK_SRCS]={clk_osc_freq, clk_plld_freq};
    unsigned clock, mode, mash;
    int password = 0;
    double f;
@@ -12688,11 +12693,12 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
    if (!clkDef[gpio])
       SOFT_ERROR(PI_NOT_HCLK_GPIO, "bad gpio for clock (%d)", gpio);
 
-   if (((frequency < PI_HW_CLK_MIN_FREQ) ||
-        (frequency > PI_HW_CLK_MAX_FREQ)) &&
+   if (((frequency < hw_clk_min_freq) ||
+        (frequency > hw_clk_max_freq)) &&
         (frequency))
       SOFT_ERROR(PI_BAD_HCLK_FREQ,
-         "bad hardware clock frequency (%d)", frequency);
+         "bad hardware clock frequency %d-%d: (%d)",
+            hw_clk_min_freq, hw_clk_max_freq, frequency);
 
    clock = (clkDef[gpio] >> 4) & 3;
 
@@ -12727,7 +12733,8 @@ int gpioHardwareClock(unsigned gpio, unsigned frequency)
       else
       {
          SOFT_ERROR(PI_BAD_HCLK_FREQ,
-            "bad hardware clock frequency (%d)", frequency);
+            "bad hardware clock frequency %d-%d: (%d)",
+               hw_clk_min_freq, hw_clk_max_freq, frequency);
       }
    }
    else
@@ -12766,10 +12773,12 @@ int gpioHardwarePWM(
       SOFT_ERROR(PI_BAD_HPWM_DUTY, "bad PWM dutycycle (%d)", dutycycle);
 
    if (((frequency < PI_HW_PWM_MIN_FREQ) ||
-        (frequency > PI_HW_PWM_MAX_FREQ)) &&
+        (frequency > hw_pwm_max_freq)) &&
         (frequency))
       SOFT_ERROR(PI_BAD_HPWM_FREQ,
-         "bad hardware PWM frequency (%d)", frequency);
+         "bad hardware PWM frequency %d-%d: (%d)",
+            PI_HW_PWM_MIN_FREQ, hw_pwm_max_freq, frequency);
+
 
    if (gpioCfg.clockPeriph == PI_CLOCK_PWM)
       SOFT_ERROR(PI_HPWM_ILLEGAL, "illegal, PWM in use for main clock");
@@ -13477,7 +13486,12 @@ unsigned gpioHardwareRevision(void)
                      pi_mem_flag  = 0x04;
                      pi_is_2711   = 1;
                      pi_ispi      = 1;
+                     clk_osc_freq = CLK_OSC_FREQ_2711;
                      clk_plld_freq = CLK_PLLD_FREQ_2711;
+                     hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
+                     hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
+                     hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
+
                      fclose(filp);
                      if (!gpioMaskSet)
                      {

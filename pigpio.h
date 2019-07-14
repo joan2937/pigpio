@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 6906
+#define PIGPIO_VERSION 6909
 
 /*TEXT
 
@@ -610,13 +610,16 @@ typedef void *(gpioThreadFunc_t) (void *);
 /* hardware PWM */
 
 #define PI_HW_PWM_MIN_FREQ 1
-#define PI_HW_PWM_MAX_FREQ 125000000
+#define PI_HW_PWM_MAX_FREQ      125000000
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
 #define PI_HW_PWM_RANGE 1000000
 
 /* hardware clock */
 
-#define PI_HW_CLK_MIN_FREQ 4689
-#define PI_HW_CLK_MAX_FREQ 250000000
+#define PI_HW_CLK_MIN_FREQ       4689
+#define PI_HW_CLK_MIN_FREQ_2711 13184
+#define PI_HW_CLK_MAX_FREQ      250000000
+#define PI_HW_CLK_MAX_FREQ_2711 375000000
 
 #define PI_NOTIFY_SLOTS  32
 
@@ -3982,7 +3985,7 @@ Frequencies above 30MHz are unlikely to work.
 
 . .
    gpio: see description
-clkfreq: 0 (off) or 4689-250000000 (250M)
+clkfreq: 0 (off) or 4689-250M (13184-375M for the BCM2711)
 . .
 
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
@@ -4027,7 +4030,7 @@ main clock defaults to PCM but may be overridden by a call to
 
 . .
    gpio: see description
-PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
 . .
 
@@ -4054,12 +4057,12 @@ The GPIO must be one of the following.
 . .
 
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by PWMfreq.
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
-There will only be a million steps for a PWMfreq of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 D*/
@@ -5312,13 +5315,14 @@ char::
 
 A single character, an 8 bit quantity able to store 0-255.
 
-clkfreq::4689-250M
+clkfreq::4689-250M (13184-375M for the BCM2711)
 
 The hardware clock frequency.
 
 . .
 PI_HW_CLK_MIN_FREQ 4689
 PI_HW_CLK_MAX_FREQ 250000000
+PI_HW_CLK_MAX_FREQ_2711 375000000
 . .
 
 count::
@@ -5770,12 +5774,13 @@ The hardware PWM dutycycle.
 PI_HW_PWM_RANGE 1000000
 . .
 
-PWMfreq::5-250K
+PWMfreq::1-125M (1-187.5M for the BCM2711)
 The hardware PWM frequency.
 
 . .
 PI_HW_PWM_MIN_FREQ 1
 PI_HW_PWM_MAX_FREQ 125000000
+PI_HW_PWM_MAX_FREQ_2711 187500000
 . .
 
 range::25-40000
@@ -6379,9 +6384,9 @@ after this command is issued.
 #define PI_NOT_SERVO_GPIO   -93 // GPIO is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // GPIO has no hardware clock
 #define PI_NOT_HPWM_GPIO    -95 // GPIO has no hardware PWM
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 1-125M
+#define PI_BAD_HPWM_FREQ    -96 // invalid hardware PWM frequency
 #define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
-#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-250M
+#define PI_BAD_HCLK_FREQ    -98 // invalid hardware clock frequency
 #define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
 #define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
 #define PI_BAD_DATABITS    -101 // serial data bits not 1-32

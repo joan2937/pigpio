@@ -300,7 +300,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.43"
+VERSION = "1.44"
 
 exceptions = True
 
@@ -788,9 +788,9 @@ _errors=[
    [PI_NOT_SERVO_GPIO    , "GPIO is not in use for servo pulses"],
    [PI_NOT_HCLK_GPIO     , "GPIO has no hardware clock"],
    [PI_NOT_HPWM_GPIO     , "GPIO has no hardware PWM"],
-   [PI_BAD_HPWM_FREQ     , "hardware PWM frequency not 1-125M"],
+   [PI_BAD_HPWM_FREQ     , "invalid hardware PWM frequency"],
    [PI_BAD_HPWM_DUTY     , "hardware PWM dutycycle not 0-1M"],
-   [PI_BAD_HCLK_FREQ     , "hardware clock frequency not 4689-250M"],
+   [PI_BAD_HCLK_FREQ     , "invalid hardware clock frequency"],
    [PI_BAD_HCLK_PASS     , "need password to use hardware clock 1"],
    [PI_HPWM_ILLEGAL      , "illegal, PWM in use for main clock"],
    [PI_BAD_DATABITS      , "serial data bits not 1-32"],
@@ -1909,7 +1909,7 @@ class pi():
       Frequencies above 30MHz are unlikely to work.
 
          gpio:= see description
-      clkfreq:= 0 (off) or 4689-250000000 (250M)
+      clkfreq:= 0 (off) or 4689-250M (13184-375M for the BCM2711)
 
 
       Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -1959,7 +1959,7 @@ class pi():
       pigpio daemon is started (option -t).
 
          gpio:= see descripton
-      PWMfreq:= 0 (off) or 1-125000000 (125M).
+      PWMfreq:= 0 (off) or 1-125M (1-187.5M for the BCM2711).
       PWMduty:= 0 (off) to 1000000 (1M)(fully on).
 
       Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -1985,14 +1985,15 @@ class pi():
       . .
 
       The actual number of steps beween off and fully on is the
-      integral part of 250 million divided by PWMfreq.
+      integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
-      The actual frequency set is 250 million / steps.
+      The actual frequency set is 250M/steps (375M/steps
+      for the BCM2711).
 
-      There will only be a million steps for a PWMfreq of 250.
-      Lower frequencies will have more steps and higher
-      frequencies will have fewer steps.  PWMduty is
-      automatically scaled to take this into account.
+      There will only be a million steps for a PWMfreq of 250
+      (375 for the BCM2711). Lower frequencies will have more
+      steps and higher frequencies will have fewer steps.
+      PWMduty is automatically scaled to take this into account.
 
       ...
       pi.hardware_PWM(18, 800, 250000) # 800Hz 25% dutycycle
@@ -5184,7 +5185,7 @@ def xref():
    byte_val: 0-255
    A whole number.
 
-   clkfreq: 4689-250M
+   clkfreq: 4689-250M (13184-375M for the BCM2711)
    The hardware clock frequency.
 
    connected:
@@ -5340,6 +5341,8 @@ def xref():
    PI_NOT_SPI_GPIO = -142
    PI_BAD_EVENT_ID = -143
    PI_CMD_INTERRUPTED = -144
+   PI_NOT_ON_BCM2711   = -145
+   PI_ONLY_ON_BCM2711  = -146
    . .
 
    event:0-31
@@ -5532,7 +5535,7 @@ def xref():
    PWMduty: 0-1000000 (1M)
    The hardware PWM dutycycle.
 
-   PWMfreq: 1-125000000 (125M)
+   PWMfreq: 1-125M (1-187.5M for the BCM2711)
    The hardware PWM frequency.
 
    range_: 25-40000

@@ -1705,11 +1705,11 @@ $ pigs hp 19 100 200000 # 20% dutycycle
 .br
 
 .br
-$ pigs hp 19 125000001 100000
+$ pigs hp 19 400000000 100000
 .br
 -96
 .br
-ERROR: hardware PWM frequency not 1-125M
+ERROR: invalid hardware PWM frequency
 .br
 
 .EE
@@ -1745,14 +1745,14 @@ The GPIO must be one of the following.
 
 .br
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by \fBpf\fP.
+integral part of 250M/\fBpf\fP (375M/\fBpf\fP for the BCM2711).
 
 .br
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
 .br
-There will only be a million steps for a \fBpf\fP of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a \fBpf\fP of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  \fBpdc\fP is
 automatically scaled to take this into account.
 
@@ -5125,7 +5125,7 @@ The command expects a SPI channel.
 
 .br
 
-.IP "\fBcf\fP - hardware clock frequency (4689-250M)" 0
+.IP "\fBcf\fP - hardware clock frequency (4689-250M, 13184-375M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
@@ -5408,7 +5408,7 @@ The command expects a dutycycle.
 
 .br
 
-.IP "\fBpf\fP - hardware PWM frequency (1-125M)" 0
+.IP "\fBpf\fP - hardware PWM frequency (1-125M, 1-187.5M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
