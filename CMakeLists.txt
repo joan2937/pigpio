@@ -6,23 +6,19 @@ set(CMAKE_C_FLAGS "-O3 -Wall -pthread")
 set(PIGPIO_FLAGS "-L. -lrt")
 #set(DESTDIR ${CMAKE_CURRENT_SOURCE_DIR}/build/dest)
 
-# libpigpio.so
-add_library(pigpio SHARED pigpio.c command.c custom.cext)
-set_property(TARGET pigpio
-	PROPERTY POSITION_INDEPENDENT_CODE ON
-)
+if(NOT DEFINED BUILD_SHARED_LIBS)
+set(BUILD_SHARED_LIBS "ON")
+endif(NOT DEFINED BUILD_SHARED_LIBS)
 
-# libpigpiod_if.so
-add_library(pigpiod_if SHARED pigpiod_if.c command.c)
-set_property(TARGET pigpiod_if
-	PROPERTY POSITION_INDEPENDENT_CODE ON
-)
+# libpigpio.(so|a)
+add_library(pigpio pigpio.c command.c custom.cext)
 
-# libpigpiod_if2.so
-add_library(pigpiod_if2 SHARED pigpiod_if2.c command.c)
-set_property(TARGET pigpiod_if2
-	PROPERTY POSITION_INDEPENDENT_CODE ON
-)
+# libpigpiod_if.(so|a)
+add_library(pigpiod_if pigpiod_if.c command.c)
+
+# libpigpiod_if2.(so|a)
+add_library(pigpiod_if2 pigpiod_if2.c command.c)
+
 
 # x_pigpio
 add_executable(x_pigpio x_pigpio.c)
@@ -74,6 +70,7 @@ install(DIRECTORY
 install(TARGETS pigpio pigpiod_if pigpiod_if2 pig2vcd pigpiod pigs
 	LIBRARY DESTINATION ${DESTDIR}/usr/local/lib
 	RUNTIME DESTINATION ${DESTDIR}/usr/local/bin
+	ARCHIVE DESTINATION ${DESTDIR}/usr/local/lib
 )
 
 install(FILES pigpio.h pigpiod_if.h pigpiod_if2.h
