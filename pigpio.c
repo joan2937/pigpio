@@ -6953,6 +6953,7 @@ static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
    uintptr_t p[10];
+   uint32_t tmp;
    int opt;
    char buf[CMD_MAX_EXTENSION];
 
@@ -6964,7 +6965,21 @@ static void *pthSocketThreadHandler(void *fdC)
 
    while (1)
    {
-      if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
+      if (sizeof(uintptr_t) == 8)
+      {
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[0] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[1] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[2] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[3] = (uintptr_t)tmp;
+      }
+      else
+      {
+         if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
+      }
 
       if (p[3])
       {
