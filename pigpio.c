@@ -13528,6 +13528,25 @@ unsigned gpioHardwareRevision(void)
                   pi_dram_bus  = 0xC0000000;
                   pi_mem_flag  = 0x04;
                }
+               else if (!strncmp("Raspberry Pi 4 Model B", buf, 22))
+               {
+                  pi_ispi      = 1;
+                  piCores      = 4;
+                  pi_peri_phys = 0xFE000000;
+                  pi_dram_bus  = 0xC0000000;
+                  pi_mem_flag  = 0x04;
+                  pi_is_2711   = 1;
+                  clk_osc_freq = CLK_OSC_FREQ_2711;
+                  clk_plld_freq = CLK_PLLD_FREQ_2711;
+                  hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
+                  hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
+                  hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
+                  if (!gpioMaskSet)
+                  {
+                     gpioMaskSet = 1;
+                     gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
+                  }
+               }
             }
          }
          fclose(filp);
