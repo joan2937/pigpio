@@ -6953,6 +6953,7 @@ static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
    uintptr_t p[10];
+   uint32_t tmp;
    int opt;
    char buf[CMD_MAX_EXTENSION];
 
@@ -6964,7 +6965,21 @@ static void *pthSocketThreadHandler(void *fdC)
 
    while (1)
    {
-      if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
+      if (sizeof(uintptr_t) == 8)
+      {
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[0] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[1] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[2] = (uintptr_t)tmp;
+         if (recv(sock, &tmp, 4, MSG_WAITALL) != 4) break;
+         p[3] = (uintptr_t)tmp;
+      }
+      else
+      {
+         if (recv(sock, p, 16, MSG_WAITALL) != 16) break;
+      }
 
       if (p[3])
       {
@@ -13527,6 +13542,25 @@ unsigned gpioHardwareRevision(void)
                   pi_peri_phys = 0x3F000000;
                   pi_dram_bus  = 0xC0000000;
                   pi_mem_flag  = 0x04;
+               }
+               else if (!strncmp("Raspberry Pi 4 Model B", buf, 22))
+               {
+                  pi_ispi      = 1;
+                  piCores      = 4;
+                  pi_peri_phys = 0xFE000000;
+                  pi_dram_bus  = 0xC0000000;
+                  pi_mem_flag  = 0x04;
+                  pi_is_2711   = 1;
+                  clk_osc_freq = CLK_OSC_FREQ_2711;
+                  clk_plld_freq = CLK_PLLD_FREQ_2711;
+                  hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
+                  hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
+                  hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
+                  if (!gpioMaskSet)
+                  {
+                     gpioMaskSet = 1;
+                     gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
+                  }
                }
             }
          }
