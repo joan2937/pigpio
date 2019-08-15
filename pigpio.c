@@ -11958,6 +11958,8 @@ int gpioNotifyPause (unsigned handle)
 
 int gpioNotifyClose(unsigned handle)
 {
+   char fifo[32];
+
    DBG(DBG_USER, "handle=%d", handle);
 
    CHECK_INITED;
@@ -11974,7 +11976,24 @@ int gpioNotifyClose(unsigned handle)
 
    intNotifyBits();
 
-   /* actual close done in alert thread */
+   if (gpioCfg.ifFlags & PI_DISABLE_ALERT)
+   {
+      if (gpioNotify[handle].pipe)
+      {
+         DBG(DBG_INTERNAL, "close notify pipe %d", gpioNotify[handle].fd);
+         close(gpioNotify[handle].fd);
+
+         sprintf(fifo, "/dev/pigpio%d", handle);
+
+         unlink(fifo);
+      }
+
+      gpioNotify[handle].state = PI_NOTIFY_CLOSED;
+   }
+   else
+   {
+      /* actual close done in alert thread */
+   }
 
    return 0;
 }
