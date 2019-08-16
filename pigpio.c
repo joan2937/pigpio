@@ -6953,7 +6953,8 @@ static void *pthSocketThreadHandler(void *fdC)
 {
    int sock = *(int*)fdC;
    uintptr_t p[10];
-   uint32_t tmp;
+   uint32_t tmp, response[4];
+   int i;
    int opt;
    char buf[CMD_MAX_EXTENSION];
 
@@ -7043,7 +7044,16 @@ static void *pthSocketThreadHandler(void *fdC)
             p[3] = myDoCommand(p, sizeof(buf)-1, buf);
       }
 
-      if (write(sock, p, 16) == -1) { /* ignore errors */ }
+      if (sizeof(uintptr_t) == 8) // 64-bit system
+      {
+         for (i = 0; i < 4; i++)
+            response[i] = (uint32_t)p[i];
+         if (write(sock, response, 16) == -1) { /* ignore errors */ }
+      }
+      else // 32-bit system
+      {
+         if (write(sock, p, 16) == -1) { /* ignore errors */ }
+      }
 
       switch (p[0])
       {
