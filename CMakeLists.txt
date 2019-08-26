@@ -134,7 +134,7 @@ if(Python_FOUND)
 		${CMAKE_CURRENT_BINARY_DIR}/setup.py
 	)
 
-	install(CODE "execute_process(${Python_EXECUTABLE} setup.py install)")
+	install(CODE "execute_process(${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install)")
 endif()
 #
 #install(CODE "execute_process(COMMAND ldconfig)")
