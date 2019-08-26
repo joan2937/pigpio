@@ -7,9 +7,7 @@ list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 find_package(Threads REQUIRED)
 find_package(RT REQUIRED)
 
-if(NOT DEFINED BUILD_SHARED_LIBS)
-set(BUILD_SHARED_LIBS "ON")
-endif(NOT DEFINED BUILD_SHARED_LIBS)
+option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 
 add_compile_options(-Wall)
 
@@ -21,7 +19,6 @@ add_library(pigpiod_if pigpiod_if.c command.c)
 
 # libpigpiod_if2.(so|a)
 add_library(pigpiod_if2 pigpiod_if2.c command.c)
-
 
 # x_pigpio
 add_executable(x_pigpio x_pigpio.c)
@@ -47,20 +44,12 @@ target_link_libraries(pigs Threads::Threads)
 add_executable(pig2vcd pig2vcd.c command.c)
 target_link_libraries(pig2vcd Threads::Threads)
 
-# install
+# Configure and install project
 
 include (GenerateExportHeader)
 include (CMakePackageConfigHelpers)
 
 generate_export_header(${PROJECT_NAME})
-
-#install(DIRECTORY
-#	DESTINATION ${DESTDIR}/opt/pigpio/cgi
-#	PATTERN ""
-#	PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
-#		GROUP_READ GROUP_EXECUTE
-#		WORLD_READ WORLD_EXECUTE
-#)
 
 install(TARGETS pigpio pigpiod_if pigpiod_if2 pig2vcd pigpiod pigs
     EXPORT ${PROJECT_NAME}Targets
@@ -80,11 +69,6 @@ export(EXPORT ${PROJECT_NAME}Targets
   FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
   NAMESPACE pigpio::
 )
-
-#configure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/${PROJECT_NAME}Config.cmake
-#  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-#  COPYONLY
-#)
 
 set(ConfigPackageLocation lib/cmake/${PROJECT_NAME})
 install(EXPORT ${PROJECT_NAME}Targets
@@ -127,6 +111,7 @@ install(FILES ${man_3_SRC}
 		WORLD_READ
 )
 
+# Install python modules.
 find_package(Python COMPONENTS Interpreter QUIET)
 
 if(Python_FOUND)
@@ -136,22 +121,6 @@ if(Python_FOUND)
 
 	install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install)")
 endif()
-#
-#install(CODE "execute_process(COMMAND ldconfig)")
-
-# One does not need a uninstall command if every file was installed via cmake
-# install commands. That python script however seems to need some more
-# script code.
-# uninstall
-#if(Python_FOUND)
-#	set(PY_CMD ${Python_EXECUTABLE} ${setup_SRC} install --record /tmp/pigpio > /dev/null)
-#	set(PY_CMD ${PY2_CMD} && xargs rm -f < /tmp/pigpio > /dev/null)
-#endif()
-
-#add_custom_target(uninstall
-#	COMMAND cd ${CMAKE_SOURCE_DIR} && ${PY_CMD}
-#)
-
 
 # package project
 
