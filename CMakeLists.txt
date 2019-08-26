@@ -130,8 +130,7 @@ install(FILES ${man_3_SRC}
 find_package(Python COMPONENTS Interpreter QUIET)
 
 if(Python_FOUND)
-	message(STATUS "Installing python modules.")
-	install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/setup.py install)")
+	install(CODE "execute_process(COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/setup.py install)")
 endif()
 #
 #install(CODE "execute_process(COMMAND ldconfig)")
