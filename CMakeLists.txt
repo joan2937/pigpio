@@ -29,11 +29,11 @@ target_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)
 
 # x_pigpiod_if
 add_executable(x_pigpiod_if x_pigpiod_if.c)
-target_link_libraries(x_pigpiod_if pigpio_if RT::RT Threads::Threads)
+target_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)
 
 # x_pigpiod_if2
 add_executable(x_pigpiod_if2 x_pigpiod_if2.c)
-target_link_libraries(x_pigpiod_if2 pigpio_if2 RT::RT Threads::Threads)
+target_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)
 
 # pigpiod
 add_executable(pigpiod pigpiod.c)
