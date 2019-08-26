@@ -129,10 +129,10 @@ install(FILES ${man_3_SRC}
 
 find_package(Python COMPONENTS Interpreter QUIET)
 
-#file(GLOB setup_SRC "setup.py")
-#if(Python_FOUND)
-#	install(CODE "execute_process(COMMAND cd ${CMAKE_SOURCE_DIR} && ${Python_EXECUTABLE} ${setup_SRC} install)")
-#endif()
+file(GLOB setup_SRC "setup.py")
+if(Python_FOUND)
+	install(CODE "execute_process(COMMAND cd ${CMAKE_SOURCE_DIR} && ${Python_EXECUTABLE} ${setup_SRC} install)")
+endif()
 #
 #install(CODE "execute_process(COMMAND ldconfig)")
 
