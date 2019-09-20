@@ -28,11 +28,19 @@ or
 
 
 .br
-The socket and pipe interfaces allow control of the GPIO by passing
-messages to the running pigpio library.
+If you use pigpio directly, by linking to the C library, then there are two main gotchas:
+.br
+.IP \[bu]
+Your entire process has to run as root - not good for security for anything that a user interacts with, or that has an external interface such as a web server.
+.IP \[bu]
+Only one process can use pigpio at any one time, so you can't have different processes dealing with different gpios.
 
 .br
-The normal way to start the pigpio library would be as a daemon during boot.
+To solve these, pigpio can run as a daemon, with either (or both) a socket or pipe interface. The socket and pipe interfaces allow control of the GPIO by passing
+messages to the running pigpio library. So instead of working directly with the C library, you send messages to the single daemon process which uses it internally.
+
+.br
+The normal way to start the pigpio daemon would be during boot, e.g. in rclocal, using:
 
 .br
 
@@ -43,55 +51,59 @@ sudo pigpiod
 .EE
 
 .br
-pigs is a program and internally uses the socket interface to pigpio
-whereas /dev/pigpio uses the pipe interface.
+There are two ways of communicating with the daemon, via the socket interface, or via the pipe. To use the pipe, write text files to /dev/pigpio.
+pigs is a program you can use from bash which uses the socket interface to pigpio.
 
 .br
 .SS Features
 .br
-o hardware timed PWM on any of GPIO 0-31
+Pigs only sends commands to pigpiod, so the features are the same as for pigpio.
 
-.br
-o hardware timed servo pulses on any of GPIO 0-31
-
-.br
-o reading/writing all of the GPIO in a bank as one operation
-
-.br
-o individually setting GPIO modes, reading and writing
-
-.br
-o notifications when any of GPIO 0-31 change state
-
-.br
-o the construction of output waveforms with microsecond timing
-
-.br
-o I2C, SPI, and serial link wrappers
-
-.br
-o creating and running scripts on the pigpio daemon
+.IP \[bu]
+hardware timed PWM on any of GPIO 0-31
+.IP \[bu]
+hardware timed servo pulses on any of GPIO 0-31
+.IP \[bu]
+reading/writing all of the GPIO in a bank as one operation
+.IP \[bu]
+individually setting GPIO modes, reading and writing
+.IP \[bu]
+notifications when any of GPIO 0-31 change state
+.IP \[bu]
+the construction of output waveforms with microsecond timing
+.IP \[bu]
+I2C, SPI, and serial link wrappers
+.IP \[bu]
+creating and running scripts on the pigpio daemon
 
 .br
 .SS GPIO
 .br
-ALL GPIO are identified by their Broadcom number.
+ALL GPIO are identified by their Broadcom number. Look for BCMxx or GPIOxx on a pinout drawing, 
+where xx is the pin number you're looking for. For example pin 5 on the Rev 1 Pi header is BCM1,
+whereas on the Rev 2 header it's BCM3. Make sure you're looking at the right diagram for your Pi.
 
 .br
 .SS Usage
 .br
-pigs and the socket interface share the same commands and are invoked in
+pigs and the pipe interface share the same commands and are invoked in
 a similar fashion from the command line.
 
 .br
-The pigpio library must be running, either by running a program linked
-with the library or starting the pigpio daemon (sudo pigpiod).
+Before using pigs, the pigpio library must be running, either by running a program linked
+with the library or starting the pigpio daemon ( .CW sudo pigpiod .R ).
 
 .br
+.CW
 pigs {command}+
-
 .br
+.I
+The + sign means you can pass one or more commands, separated by white space.
+.R
+.br
+.CW 
 echo "{command}+" >/dev/pigpio
+.R
 
 .br
 pigs will show the result of the command on screen.
@@ -117,19 +129,19 @@ PIGS_SCRIPT_ERR  253
 .EE
 
 .br
-The results of /dev/pigpio commands need to be read from /dev/pigout,
-e.g. cat /dev/pigout (try cat /dev/pigout& so that all subsequent
+The results of .CW /dev/pigpio .R commands need to be read from .CW /dev/pigout .R,
+e.g. .CW cat /dev/pigout .R (try .CW cat /dev/pigout& .R so that all subsequent
 results are shown on screen).
 
 .br
 In both cases if an error was detected a message will have been written
-to /dev/pigerr (try cat /dev/pigerr&).  This is likely to be more
+to .CW /dev/pigerr .R (try .CW cat /dev/pigerr& .R ).  This is likely to be more
 informative than the message returned by pigs or the error code
 returned by the pipe interface.
 
 .br
-Several commands may be entered on a line.  If present PROC and PARSE must
-be the last command on a line.
+Several commands may be entered on a single line.  If present PROC and PARSE must
+be the last command on the line.
 
 .br
 E.g.
@@ -138,8 +150,6 @@ E.g.
 
 .EX
 pigs w 22 1 mils 1000 w 22 0
-.br
-
 .EE
 
 .br
@@ -153,8 +163,6 @@ pigs w 22 1
 pigs mils 1000
 .br
 pigs w 22 0
-.br
-
 .EE
 
 .br
@@ -163,9 +171,7 @@ and
 .br
 
 .EX
-echo "m 4 w w 4 0 mils 250 m 4 r r 4" >/dev/pigpio
-.br
-
+echo "m 4 w w 4 0 mils 250 m 4 r r 4" > /dev/pigpio
 .EE
 
 .br
@@ -174,17 +180,15 @@ is equivalent to
 .br
 
 .EX
-echo "m 4 w"    >/dev/pigpio
+echo "m 4 w"    > /dev/pigpio
 .br
-echo "w 4 0"    >/dev/pigpio
+echo "w 4 0"    > /dev/pigpio
 .br
-echo "mils 250" >/dev/pigpio
+echo "mils 250" > /dev/pigpio
 .br
-echo "m 4 r"    >/dev/pigpio
+echo "m 4 r"    > /dev/pigpio
 .br
-echo "r 4"      >/dev/pigpio
-.br
-
+echo "r 4"      > /dev/pigpio
 .EE
 
 .br
@@ -200,7 +204,7 @@ pigs but will be discarded.
 
 .br
 The status/data of each command sent to the pipe interface should
-be read from /dev/pigout.
+be read from .CW /dev/pigout .R .
 
 .br
 When a command takes a number as a parameter it may be entered as hex
@@ -211,8 +215,8 @@ E.g. 23 is 23 decimal, 0x100 is 256 decimal, 070 is 56 decimal.
 
 .br
 Some commands can return a variable number of data bytes.  By
-default this data is displayed as decimal.  The pigs -a option
-can be used to force the display as ASCII and the pigs -x
+default this data is displayed as decimal.  The .CW pigs -a .R option
+can be used to force the display as ASCII and the .CW pigs -x .R
 option can be used to force the display as hex.
 
 .br
@@ -240,9 +244,90 @@ $ pigs -x slr 4 100
 
 .EE
 
+Some commands have a shortened form. These are shown below with a forward slash
+separating the two forms. For example the pwm set duty cycle command .CW P/PWM .R
+means that all of these do the same thing:
+
+.EX
+$ pigs P 4 100
+.br
+$ pigs PWM 4 100
+.br
+$ pigs p 4 100
+.br
+$ pigs pwm 4 100
+.br
+.EE
+
 .br
 
 .SH COMMANDS
+
+.br
+
+.IP "\fBH/HELP \fP - Display command help"
+.IP "" 4
+This command displays a brief list of the commands and their parameters.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs h
+.br
+
+.br
+$ pigs help
+.br
+
+.EE
+
+.br
+
+.B
+Direct Access
+.R
+.br
+
+.IP "\fBBR1 \fP - Read bank 1 GPIO"
+.IP "" 4
+This command read GPIO 0-31 (bank 1) and returns the levels as a
+32-bit hexadecimal value.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs br1
+.br
+1001C1CF
+.br
+
+.EE
+
+.br
+
+.IP "\fBBR2 \fP - Read bank 2 GPIO"
+.IP "" 4
+This command read GPIO 32-53 (bank 2) and returns the levels as a
+32-bit hexadecimal value.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs br2
+.br
+003F0000
+.br
+
+.EE
 
 .br
 
@@ -306,10 +391,14 @@ ERROR: no permission to update one or more GPIO
 
 .br
 
-.IP "\fBBI2CC sda\fP - Close bit bang I2C"
+.IP "\fBBS1 bits\fP - Set specified GPIO in bank 1"
 .IP "" 4
-This command signals that bit banging I2C on \fBsda\fP (and \fBscl\fP) is no
-longer required.
+This command sets (sets high) the GPIO specified by \fBbits\fP in bank 1.
+Bank 1 consists of GPIO 0-31.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
 
 .br
 
@@ -317,11 +406,54 @@ longer required.
 .br
 
 .EX
-$ pigs bi2cc 5
+$ pigs bs1 16 # set GPIO 4 (1<<4)
+.br
+
+.br
+$ pigs bs1 1 # set GPIO 1 (1<<0)
+.br
+-42
+.br
+ERROR: no permission to update one or more GPIO
 .br
 
 .EE
 
+.br
+
+.IP "\fBBS2 bits\fP - Set specified GPIO in bank 2"
+.IP "" 4
+This command sets (sets high) the GPIO specified by \fBbits\fP in bank 2.
+Bank 2 consists of GPIO 32-53.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bs2 0x40 # set GPIO 38 (enable high current mode A+/B+/Pi2/Pi3)
+.br
+
+.br
+$ pigs bs2 1 # set GPIO 32 (first in bank 2)
+.br
+-42
+.br
+ERROR: no permission to update one or more GPIO
+.br
+
+.EE
+
+.br
+
+.B
+I2C and SPI low level access
+.R
 .br
 
 .IP "\fBBI2CO sda scl b\fP - Open bit bang I2C"
@@ -348,6 +480,24 @@ The baud rate may be between 50 and 500000 bits per second.
 .br
 The GPIO used for SDA and SCL must have pull-ups to 3V3 connected.  As
 a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
+
+.br
+
+.IP "\fBBI2CC sda\fP - Close bit bang I2C"
+.IP "" 4
+This command signals that bit banging I2C on \fBsda\fP (and \fBscl\fP) is no
+longer required.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bi2cc 5
+.br
+
+.EE
 
 .br
 
@@ -429,106 +579,6 @@ End
 
 .br
 0x00
-.br
-
-.EE
-
-.br
-
-.IP "\fBBR1 \fP - Read bank 1 GPIO"
-.IP "" 4
-This command read GPIO 0-31 (bank 1) and returns the levels as a
-32-bit hexadecimal value.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs br1
-.br
-1001C1CF
-.br
-
-.EE
-
-.br
-
-.IP "\fBBR2 \fP - Read bank 2 GPIO"
-.IP "" 4
-This command read GPIO 32-53 (bank 2) and returns the levels as a
-32-bit hexadecimal value.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs br2
-.br
-003F0000
-.br
-
-.EE
-
-.br
-
-.IP "\fBBS1 bits\fP - Set specified GPIO in bank 1"
-.IP "" 4
-This command sets (sets high) the GPIO specified by \fBbits\fP in bank 1.
-Bank 1 consists of GPIO 0-31.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs bs1 16 # set GPIO 4 (1<<4)
-.br
-
-.br
-$ pigs bs1 1 # set GPIO 1 (1<<0)
-.br
--42
-.br
-ERROR: no permission to update one or more GPIO
-.br
-
-.EE
-
-.br
-
-.IP "\fBBS2 bits\fP - Set specified GPIO in bank 2"
-.IP "" 4
-This command sets (sets high) the GPIO specified by \fBbits\fP in bank 2.
-Bank 2 consists of GPIO 32-53.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs bs2 0x40 # set GPIO 38 (enable high current mode A+/B+/Pi2/Pi3)
-.br
-
-.br
-$ pigs bs2 1 # set GPIO 32 (first in bank 2)
-.br
--42
-.br
-ERROR: no permission to update one or more GPIO
 .br
 
 .EE
@@ -739,41 +789,6 @@ $ pigs i2crd 0 5
 
 .br
 
-.IP "\fBBSPIC cs\fP - Close bit bang SPI"
-.IP "" 4
-
-.br
-This command stops bit banging SPI on a set of GPIO
-opened with \fBBSPIO\fP.
-
-.br
-The set of GPIO is specifed by \fBcs\fP.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs bspic 10
-.br
-
-.br
-$ pigs bspic 10
-.br
--142
-.br
-ERROR: no bit bang SPI in progress on GPIO
-.br
-
-.EE
-
-.br
-
 .IP "\fBBSPIO cs miso mosi sclk b spf\fP - Open bit bang SPI"
 .IP "" 4
 
@@ -862,6 +877,41 @@ $ pigs bspio 29 19 20 21 50000 0 # GPIO 29 not avaialble on this Pi
 -41
 .br
 ERROR: no permission to update GPIO
+.br
+
+.EE
+
+.br
+
+.IP "\fBBSPIC cs\fP - Close bit bang SPI"
+.IP "" 4
+
+.br
+This command stops bit banging SPI on a set of GPIO
+opened with \fBBSPIO\fP.
+
+.br
+The set of GPIO is specifed by \fBcs\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspic 10
+.br
+
+.br
+$ pigs bspic 10
+.br
+-142
+.br
+ERROR: no bit bang SPI in progress on GPIO
 .br
 
 .EE
@@ -1508,6 +1558,96 @@ $ pigs fw 0 23 45 67 89
 
 .br
 
+.B
+PWM and Servo control
+.R
+.br
+
+
+.IP "\fBHP g pf pdc\fP - Set hardware PWM frequency and dutycycle"
+.IP "" 4
+This command sets the hardware PWM associated with GPIO \fBg\fP to
+frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
+are unlikely to work.
+
+.br
+NOTE: Any waveform started by \fBWVTX\fP, \fBWVTXR\fP, or \fBWVCHA\fP
+will be cancelled.
+
+.br
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden when the pigpio
+daemon is started (option -t).
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+
+.EX
+$ pigs hp 18 100 800000 # 80% dutycycle
+.br
+
+.br
+$ pigs hp 19 100 200000 # 20% dutycycle
+.br
+
+.br
+$ pigs hp 19 400000000 100000
+.br
+-96
+.br
+ERROR: invalid hardware PWM frequency
+.br
+
+.EE
+
+.br
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
+share a PWM channel.
+
+.br
+The GPIO must be one of the following.
+
+.br
+
+.EX
+12  PWM channel 0  All models but A and B
+13  PWM channel 1  All models but A and B
+18  PWM channel 0  All models
+19  PWM channel 1  All models but A and B
+
+.EE
+
+.br
+
+.EX
+40  PWM channel 0  Compute module only
+41  PWM channel 1  Compute module only
+45  PWM channel 1  Compute module only
+52  PWM channel 0  Compute module only
+53  PWM channel 1  Compute module only
+
+.EE
+
+.br
+The actual number of steps beween off and fully on is the
+integral part of 250M/\fBpf\fP (375M/\fBpf\fP for the BCM2711).
+
+.br
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
+
+.br
+There will only be a million steps for a \fBpf\fP of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  \fBpdc\fP is
+automatically scaled to take this into account.
+
+.br
+
+
 .IP "\fBGDC u\fP - Get GPIO PWM dutycycle"
 .IP "" 4
 
@@ -1590,9 +1730,23 @@ ERROR: GPIO is not in use for servo pulses
 
 .br
 
-.IP "\fBH/HELP \fP - Display command help"
+.IP "\fBP/PWM u v\fP - Set GPIO PWM value"
 .IP "" 4
-This command displays a brief list of the commands and their parameters.
+
+.br
+This command starts PWM on GPIO \fBu\fP with dutycycle \fBv\fP.  The dutycycle
+varies from 0 (off) to range (fully on).  The range defaults to 255.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+This and the servo functionality use the DMA and PWM or PCM peripherals
+to control and schedule the pulsewidths and dutycycles.
+
+.br
+The \fBPRS\fP command may be used to change the default range of 255.
 
 .br
 
@@ -1600,15 +1754,357 @@ This command displays a brief list of the commands and their parameters.
 .br
 
 .EX
-$ pigs h
+$ pigs p 4 64  # Start PWM on GPIO 4 with 25% dutycycle
 .br
-
+$ pigs p 4 128 # 50%
 .br
-$ pigs help
+$ pigs p 4 192 # 75%
+.br
+$ pigs p 4 255 # 100%
 .br
 
 .EE
 
+.br
+
+.IP "\fBPFG u\fP - Get GPIO PWM frequency"
+.IP "" 4
+
+.br
+This command returns the PWM frequency in Hz used for GPIO \fBu\fP.
+
+.br
+Upon success the PWM frequency is returned.  On error a negative
+status code will be returned.
+
+.br
+For normal PWM the frequency will be that defined for the GPIO
+by \fBPFS\fP.
+
+.br
+If a hardware clock is active on the GPIO the reported frequency
+will be that set by \fBHC\fP.
+
+.br
+If hardware PWM is active on the GPIO the reported frequency
+will be that set by \fBHP\fP.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs pfg 4
+.br
+800
+.br
+
+.br
+$ pigs pfg 34
+.br
+ERROR: GPIO not 0-31
+.br
+-2
+.br
+
+.EE
+
+.br
+
+.IP "\fBPFS u v\fP - Set GPIO PWM frequency"
+.IP "" 4
+This command sets the PWM frequency \fBv\fP to be used for GPIO \fBu\fP.
+
+.br
+The numerically closest frequency to \fBv\fP will be selected.
+
+.br
+Upon success the new frequency is returned.  On error a negative status code
+will be returned.
+
+.br
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
+
+.br
+Each GPIO can be independently set to one of 18 different PWM
+frequencies.
+
+.br
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
+
+.br
+The frequencies for each sample rate are:
+
+.br
+
+.EX
+                       Hertz
+.br
+
+.br
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+.br
+           1250  1000   800  500  400  250  200  100   50
+.br
+
+.br
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+.br
+            625   500   400  250  200  125  100   50   25
+.br
+
+.br
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+.br
+            313   250   200  125  100   63   50   25   13
+.br
+sample
+.br
+ rate
+.br
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+.br
+            250   200   160  100   80   50   40   20   10
+.br
+
+.br
+       8:  5000  2500  1250 1000  625  500  313  250  200
+.br
+            156   125   100   63   50   31   25   13    6
+.br
+
+.br
+      10:  4000  2000  1000  800  500  400  250  200  160
+.br
+            125   100    80   50   40   25   20   10    5
+.br
+
+.EE
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+pigs pfs 4 0 # 0 selects the lowest frequency.
+.br
+10
+.br
+
+.br
+$ pigs pfs 4 1000 # Set 1000Hz PWM.
+.br
+1000
+.br
+
+.br
+$ pigs pfs 4 100000 # Very big number selects the highest frequency.
+.br
+8000
+.br
+
+.EE
+
+.br
+
+.IP "\fBPRG u\fP - Get GPIO PWM range"
+.IP "" 4
+
+.br
+This command returns the dutycycle range for GPIO \fBu\fP.
+
+.br
+Upon success the range is returned.  On error a negative status code
+will be returned.
+
+.br
+If a hardware clock or hardware PWM is active on the GPIO the reported
+range will be 1000000 (1M).
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs prg 4
+.br
+255
+.br
+
+.EE
+
+.br
+
+.IP "\fBPRRG u\fP - Get GPIO PWM real range"
+.IP "" 4
+
+.br
+This command returns the real underlying range used by GPIO \fBu\fP.
+
+.br
+If a hardware clock is active on the GPIO the reported
+real range will be 1000000 (1M).
+
+.br
+If hardware PWM is active on the GPIO the reported real range
+will be approximately 250M divided by the set PWM frequency.
+
+.br
+On error a negative status code will be returned.
+
+.br
+See \fBPRS\fP.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs prrg 17
+.br
+250
+.br
+
+.br
+$ pigs pfs 17 0
+.br
+10
+.br
+$ pigs prrg 17
+.br
+20000
+.br
+
+.br
+$ pigs pfs 17 100000
+.br
+8000
+.br
+$ pigs prrg 17
+.br
+25
+.br
+
+.EE
+
+.br
+
+.IP "\fBPRS u v\fP - Set GPIO PWM range"
+.IP "" 4
+
+.br
+This command sets the dutycycle range \fBv\fP to be used for GPIO \fBu\fP.
+Subsequent uses of command \fBP/PWM\fP will use a dutycycle between 0 (off)
+and \fBv\fP (fully on).
+
+.br
+Upon success the real underlying range used by the GPIO is returned.
+On error a negative status code will be returned.
+
+.br
+If PWM is currently active on the GPIO its dutycycle will be scaled to
+reflect the new range.
+
+.br
+The real range, the number of steps between fully off and fully on
+for each frequency, is given in the following table.
+
+.br
+
+.EX
+ #1   #2   #3   #4   #5   #6   #7    #8    #9
+ 25   50  100  125  200  250  400   500   625
+                                        
+#10  #11  #12  #13  #14  #15  #16   #17   #18
+800 1000 1250 2000 2500 4000 5000 10000 20000
+
+.EE
+
+.br
+The real value set by \fBPRS\fP is (dutycycle * real range) / range.
+
+.br
+See \fBPRRG\fP
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs prs 18 1000
+.br
+250
+.br
+
+.EE
+
+.br
+
+.IP "\fBS/SERVO u v\fP - Set GPIO servo pulsewidth"
+.IP "" 4
+
+.br
+This command starts servo pulses of \fBv\fP microseconds on GPIO \fBu\fP.
+
+.br
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+.br
+The servo pulsewidth may be 0 (off), 500 (most anti-clockwise)
+to 2500 (most clockwise).
+
+.br
+The range supported by servos varies and should probably be determined
+by experiment. Generally values between 1000-2000 should be safe.
+A value of 1500 should always be safe and represents
+the mid-point of rotation.
+
+.br
+You can DAMAGE a servo if you command it to move beyond its limits.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs SERVO 17 1500
+.br
+
+.EE
+
+.br
+This example causes an on pulse of 1500 microseconds duration to be
+transmitted on GPIO 17 at a rate of 50 times per second.
+
+.br
+This will command a servo connected to GPIO 17 to rotate to its mid-point.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+pigs s 17 0 # Switch servo pulses off.
+.br
+
+.EE
+
+.br
+
+.B
+Configuration
+.RB
 .br
 
 .IP "\fBHC g cf\fP - Set hardware clock frequency"
@@ -1672,89 +2168,6 @@ The GPIO must be one of the following.
 Access to clock 1 is protected by a password as its use will
 likely crash the Pi.  The password is given by or'ing 0x5A000000
 with the GPIO number.
-
-.br
-
-.IP "\fBHP g pf pdc\fP - Set hardware PWM frequency and dutycycle"
-.IP "" 4
-This command sets the hardware PWM associated with GPIO \fBg\fP to
-frequency \fBpf\fP with dutycycle \fBpdc\fP. Frequencies above 30MHz
-are unlikely to work.
-
-.br
-NOTE: Any waveform started by \fBWVTX\fP, \fBWVTXR\fP, or \fBWVCHA\fP
-will be cancelled.
-
-.br
-This function is only valid if the pigpio main clock is PCM.  The
-main clock defaults to PCM but may be overridden when the pigpio
-daemon is started (option -t).
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-
-.EX
-$ pigs hp 18 100 800000 # 80% dutycycle
-.br
-
-.br
-$ pigs hp 19 100 200000 # 20% dutycycle
-.br
-
-.br
-$ pigs hp 19 400000000 100000
-.br
--96
-.br
-ERROR: invalid hardware PWM frequency
-.br
-
-.EE
-
-.br
-The same PWM channel is available on multiple GPIO.  The latest
-frequency and dutycycle setting will be used by all GPIO which
-share a PWM channel.
-
-.br
-The GPIO must be one of the following.
-
-.br
-
-.EX
-12  PWM channel 0  All models but A and B
-13  PWM channel 1  All models but A and B
-18  PWM channel 0  All models
-19  PWM channel 1  All models but A and B
-
-.EE
-
-.br
-
-.EX
-40  PWM channel 0  Compute module only
-41  PWM channel 1  Compute module only
-45  PWM channel 1  Compute module only
-52  PWM channel 0  Compute module only
-53  PWM channel 1  Compute module only
-
-.EE
-
-.br
-The actual number of steps beween off and fully on is the
-integral part of 250M/\fBpf\fP (375M/\fBpf\fP for the BCM2711).
-
-.br
-The actual frequency set is 250M/steps (375M/steps for the BCM2711).
-
-.br
-There will only be a million steps for a \fBpf\fP of 250 (375 for
-the BCM2711). Lower frequencies will have more steps and higher
-frequencies will have fewer steps.  \fBpdc\fP is
-automatically scaled to take this into account.
 
 .br
 
@@ -2648,43 +3061,6 @@ $ pigs np 0
 
 .br
 
-.IP "\fBP/PWM u v\fP - Set GPIO PWM value"
-.IP "" 4
-
-.br
-This command starts PWM on GPIO \fBu\fP with dutycycle \fBv\fP.  The dutycycle
-varies from 0 (off) to range (fully on).  The range defaults to 255.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-This and the servo functionality use the DMA and PWM or PCM peripherals
-to control and schedule the pulsewidths and dutycycles.
-
-.br
-The \fBPRS\fP command may be used to change the default range of 255.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs p 4 64  # Start PWM on GPIO 4 with 25% dutycycle
-.br
-$ pigs p 4 128 # 50%
-.br
-$ pigs p 4 192 # 75%
-.br
-$ pigs p 4 255 # 100%
-.br
-
-.EE
-
-.br
-
 .IP "\fBPADG pad\fP - Get pad drive strength"
 .IP "" 4
 
@@ -2816,151 +3192,6 @@ Can't resolve tag 99
 
 .br
 
-.IP "\fBPFG u\fP - Get GPIO PWM frequency"
-.IP "" 4
-
-.br
-This command returns the PWM frequency in Hz used for GPIO \fBu\fP.
-
-.br
-Upon success the PWM frequency is returned.  On error a negative
-status code will be returned.
-
-.br
-For normal PWM the frequency will be that defined for the GPIO
-by \fBPFS\fP.
-
-.br
-If a hardware clock is active on the GPIO the reported frequency
-will be that set by \fBHC\fP.
-
-.br
-If hardware PWM is active on the GPIO the reported frequency
-will be that set by \fBHP\fP.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs pfg 4
-.br
-800
-.br
-
-.br
-$ pigs pfg 34
-.br
-ERROR: GPIO not 0-31
-.br
--2
-.br
-
-.EE
-
-.br
-
-.IP "\fBPFS u v\fP - Set GPIO PWM frequency"
-.IP "" 4
-This command sets the PWM frequency \fBv\fP to be used for GPIO \fBu\fP.
-
-.br
-The numerically closest frequency to \fBv\fP will be selected.
-
-.br
-Upon success the new frequency is returned.  On error a negative status code
-will be returned.
-
-.br
-If PWM is currently active on the GPIO it will be
-switched off and then back on at the new frequency.
-
-.br
-Each GPIO can be independently set to one of 18 different PWM
-frequencies.
-
-.br
-The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
-sample rate is set when the pigpio daemon is started.
-
-.br
-The frequencies for each sample rate are:
-
-.br
-
-.EX
-                       Hertz
-.br
-
-.br
-       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
-.br
-           1250  1000   800  500  400  250  200  100   50
-.br
-
-.br
-       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
-.br
-            625   500   400  250  200  125  100   50   25
-.br
-
-.br
-       4: 10000  5000  2500 2000 1250 1000  625  500  400
-.br
-            313   250   200  125  100   63   50   25   13
-.br
-sample
-.br
- rate
-.br
- (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
-.br
-            250   200   160  100   80   50   40   20   10
-.br
-
-.br
-       8:  5000  2500  1250 1000  625  500  313  250  200
-.br
-            156   125   100   63   50   31   25   13    6
-.br
-
-.br
-      10:  4000  2000  1000  800  500  400  250  200  160
-.br
-            125   100    80   50   40   25   20   10    5
-.br
-
-.EE
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-pigs pfs 4 0 # 0 selects the lowest frequency.
-.br
-10
-.br
-
-.br
-$ pigs pfs 4 1000 # Set 1000Hz PWM.
-.br
-1000
-.br
-
-.br
-$ pigs pfs 4 100000 # Very big number selects the highest frequency.
-.br
-8000
-.br
-
-.EE
-
-.br
-
 .IP "\fBPIGPV \fP - Get pigpio library version"
 .IP "" 4
 
@@ -2976,35 +3207,6 @@ This command returns the pigpio library version.
 $ pigs pigpv
 .br
 17
-.br
-
-.EE
-
-.br
-
-.IP "\fBPRG u\fP - Get GPIO PWM range"
-.IP "" 4
-
-.br
-This command returns the dutycycle range for GPIO \fBu\fP.
-
-.br
-Upon success the range is returned.  On error a negative status code
-will be returned.
-
-.br
-If a hardware clock or hardware PWM is active on the GPIO the reported
-range will be 1000000 (1M).
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs prg 4
-.br
-255
 .br
 
 .EE
@@ -3257,113 +3459,6 @@ $ pigs procu 0 200 100000
 
 .br
 
-.IP "\fBPRRG u\fP - Get GPIO PWM real range"
-.IP "" 4
-
-.br
-This command returns the real underlying range used by GPIO \fBu\fP.
-
-.br
-If a hardware clock is active on the GPIO the reported
-real range will be 1000000 (1M).
-
-.br
-If hardware PWM is active on the GPIO the reported real range
-will be approximately 250M divided by the set PWM frequency.
-
-.br
-On error a negative status code will be returned.
-
-.br
-See \fBPRS\fP.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs prrg 17
-.br
-250
-.br
-
-.br
-$ pigs pfs 17 0
-.br
-10
-.br
-$ pigs prrg 17
-.br
-20000
-.br
-
-.br
-$ pigs pfs 17 100000
-.br
-8000
-.br
-$ pigs prrg 17
-.br
-25
-.br
-
-.EE
-
-.br
-
-.IP "\fBPRS u v\fP - Set GPIO PWM range"
-.IP "" 4
-
-.br
-This command sets the dutycycle range \fBv\fP to be used for GPIO \fBu\fP.
-Subsequent uses of command \fBP/PWM\fP will use a dutycycle between 0 (off)
-and \fBv\fP (fully on).
-
-.br
-Upon success the real underlying range used by the GPIO is returned.
-On error a negative status code will be returned.
-
-.br
-If PWM is currently active on the GPIO its dutycycle will be scaled to
-reflect the new range.
-
-.br
-The real range, the number of steps between fully off and fully on
-for each frequency, is given in the following table.
-
-.br
-
-.EX
- #1   #2   #3   #4   #5   #6   #7    #8    #9
- 25   50  100  125  200  250  400   500   625
-                                        
-#10  #11  #12  #13  #14  #15  #16   #17   #18
-800 1000 1250 2000 2500 4000 5000 10000 20000
-
-.EE
-
-.br
-The real value set by \fBPRS\fP is (dutycycle * real range) / range.
-
-.br
-See \fBPRRG\fP
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs prs 18 1000
-.br
-250
-.br
-
-.EE
-
-.br
-
 .IP "\fBPUD g p\fP - Set GPIO pull up/down"
 .IP "" 4
 
@@ -3419,60 +3514,6 @@ $ pigs r 17 # Get level of GPIO 17.
 $ pigs r 4 # Get level of GPIO 4.
 .br
 1
-.br
-
-.EE
-
-.br
-
-.IP "\fBS/SERVO u v\fP - Set GPIO servo pulsewidth"
-.IP "" 4
-
-.br
-This command starts servo pulses of \fBv\fP microseconds on GPIO \fBu\fP.
-
-.br
-Upon success nothing is returned.  On error a negative status code
-will be returned.
-
-.br
-The servo pulsewidth may be 0 (off), 500 (most anti-clockwise)
-to 2500 (most clockwise).
-
-.br
-The range supported by servos varies and should probably be determined
-by experiment. Generally values between 1000-2000 should be safe.
-A value of 1500 should always be safe and represents
-the mid-point of rotation.
-
-.br
-You can DAMAGE a servo if you command it to move beyond its limits.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-$ pigs SERVO 17 1500
-.br
-
-.EE
-
-.br
-This example causes an on pulse of 1500 microseconds duration to be
-transmitted on GPIO 17 at a rate of 50 times per second.
-
-.br
-This will command a servo connected to GPIO 17 to rotate to its mid-point.
-
-.br
-
-\fBExample\fP
-.br
-
-.EX
-pigs s 17 0 # Switch servo pulses off.
 .br
 
 .EE
