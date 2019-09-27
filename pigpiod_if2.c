@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 13 */
+/* PIGPIOD_IF2_VERSION 15 */
 
 #if defined WIN32
    #ifndef _WIN32_WINNT

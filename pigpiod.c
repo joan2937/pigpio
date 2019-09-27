@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 65+
+This version is for pigpio version 69+
 */
 
 #include <sys/types.h>
@@ -56,8 +56,8 @@ static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
 static int      foreground             = PI_DEFAULT_FOREGROUND;
-static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
-static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
+static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_NOT_SET;
+static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_NOT_SET;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
 static unsigned memAllocMode           = PI_DEFAULT_MEM_ALLOC_MODE;
 static uint64_t updateMask             = -1;

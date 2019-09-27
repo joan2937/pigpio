@@ -543,6 +543,10 @@ This command performs a BSC I2C/SPI slave transfer as defined by
 \fBbctl\fP with data \fBbvs\fP.
 
 .br
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
+.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -1701,11 +1705,11 @@ $ pigs hp 19 100 200000 # 20% dutycycle
 .br
 
 .br
-$ pigs hp 19 125000001 100000
+$ pigs hp 19 400000000 100000
 .br
 -96
 .br
-ERROR: hardware PWM frequency not 1-125M
+ERROR: invalid hardware PWM frequency
 .br
 
 .EE
@@ -1741,14 +1745,14 @@ The GPIO must be one of the following.
 
 .br
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by \fBpf\fP.
+integral part of 250M/\fBpf\fP (375M/\fBpf\fP for the BCM2711).
 
 .br
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
 .br
-There will only be a million steps for a \fBpf\fP of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a \fBpf\fP of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  \fBpdc\fP is
 automatically scaled to take this into account.
 
@@ -1844,6 +1848,18 @@ The device is opened with flags \fBif\fP.
 Physically buses 0 and 1 are available on the Pi.  Higher
 numbered buses will be available if a kernel supported bus
 multiplexor is being used.
+
+.br
+The GPIO used are given in the following table.
+
+.br
+
+.EX
+        SDA   SCL
+I2C 0    0     1
+I2C 1    2     3
+
+.EE
 
 .br
 No flags are currently defined.  The parameter \fBif\fP should be 0.
@@ -3944,10 +3960,26 @@ Speeds between 32kbps and 125Mbps are allowed.  Speeds above 30Mbps
 are unlikely to work.
 
 .br
-An auxiliary SPI device is available on all models but the
-A and B and may be selected by setting the A bit in the
-flags.  The auxiliary device has 3 chip selects and a
-selectable word size in bits.
+The Pi has two SPI peripherals: main and auxiliary.
+
+.br
+The main SPI has two chip selects (channels), the auxiliary has
+three.
+
+.br
+The auxiliary SPI is available on all models but the A and B.
+
+.br
+The GPIO used are given in the following table.
+
+.br
+
+.EX
+           MISO   MOSI   SCLK   CE0   CE1   CE2
+Main SPI      9     10     11     8     7     -
+Aux SPI      19     20     21    18    17    16
+
+.EE
 
 .br
 The flags consists of the least significant 22 bits.
@@ -3966,7 +3998,7 @@ The flags consists of the least significant 22 bits.
 mm defines the SPI mode.
 
 .br
-Warning:  modes 1 and 3 do not appear to work on the auxiliary device.
+Warning:  modes 1 and 3 do not appear to work on the auxiliary SPI.
 
 .br
 
@@ -3991,30 +4023,30 @@ px is 0 if CEx is active low (default) and 1 for active high.
 ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
 .br
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.
+A is 0 for the main SPI, 1 for the auxiliary SPI.
 
 .br
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
-SPI device only.
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
+SPI only.
 
 .br
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.  Standard SPI device only.
+if W is not set.  Main SPI only.
 
 .br
 T is 1 if the least significant bit is transmitted on MOSI first, the
 default (0) shifts the most significant bit out first.  Auxiliary SPI
-device only.
+only.
 
 .br
 R is 1 if the least significant bit is received on MISO first, the
 default (0) receives the most significant bit first.  Auxiliary SPI
-device only.
+only.
 
 .br
 bbbbbb defines the word size in bits (0-32).  The default (0)
-sets 8 bits per word.  Auxiliary SPI device only.
+sets 8 bits per word.  Auxiliary SPI only.
 
 .br
 The \fBSPIR\fP, \fBSPIW\fP, and \fBSPIX\fP commands transfer data
@@ -5093,7 +5125,7 @@ The command expects a SPI channel.
 
 .br
 
-.IP "\fBcf\fP - hardware clock frequency (4689-250M)" 0
+.IP "\fBcf\fP - hardware clock frequency (4689-250M, 13184-375M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
@@ -5376,7 +5408,7 @@ The command expects a dutycycle.
 
 .br
 
-.IP "\fBpf\fP - hardware PWM frequency (1-125M)" 0
+.IP "\fBpf\fP - hardware PWM frequency (1-125M, 1-187.5M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
@@ -5723,11 +5755,36 @@ Each script has
 .br
 .SS Commands
 .br
-All the normal pigs commands may be used within a script.  However
-commands which return more than an integer will be of little use.
+Many pigpio commands may be used within a script.  However
+some commands do not work within the script model as designed and
+are not permitted.
 
 .br
-The following commands are only legal within a script.
+The following commands are not permitted within a script:
+
+.br
+File - FL FO FR FW
+
+.br
+I2C - BI2CZ I2CPK I2CRD I2CRI I2CRK I2CWD I2CWI I2CWK I2CZ
+
+.br
+Misc - BSCX CF1 CF2 SHELL
+
+.br
+Script control - PARSE PROC PROCD PROCP PROCR PROCS PROCU
+
+.br
+Serial - SERO SERR SERW SLR
+
+.br
+SPI - BSPIO BSPIX SPIR SPIW SPIX
+
+.br
+Waves - WVAG WVAS WVCHA WVGO WVGOR
+
+.br
+The following commands are only permitted within a script:
 
 .br
 

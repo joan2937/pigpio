@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 57+
+This version is for pigpio version 70+
 */
 
 #ifndef COMMAND_H
@@ -43,6 +43,7 @@ This version is for pigpio version 57+
 #define CMD_UNKNOWN_CMD   -1
 #define CMD_BAD_PARAMETER -2
 #define CMD_EXT_TOO_SMALL -3
+#define CMD_NOT_IN_SCRIPT -4
 
 #define CMD_P_ARR 10
 #define CMD_V_ARR 10
@@ -76,6 +77,7 @@ typedef struct
    char *name; /* command name              */
    int   vt;   /* command verification type */
    int   rv;   /* command return value type */
+   int   cvis; /* command valid in a script */
 } cmdInfo_t;
 
 typedef struct
@@ -86,7 +88,7 @@ typedef struct
 
 typedef struct
 {
-   uint32_t p[5];
+   uintptr_t p[5]; //these are sometimes converted to pointers, so presumablly they sometimes have pointers stored in them, I haven't figured out where though. --plugwash
    int8_t opt[4];
 } cmdInstr_t;
 
@@ -110,7 +112,7 @@ extern cmdInfo_t cmdInfo[];
 
 extern char *cmdUsage;
 
-int cmdParse(char *buf, uint32_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl);
+int cmdParse(char *buf, uintptr_t *p, unsigned ext_len, char *ext, cmdCtlParse_t *ctl);
 
 int cmdParseScript(char *script, cmdScript_t *s, int diags);
 
