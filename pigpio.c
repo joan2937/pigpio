@@ -8288,7 +8288,8 @@ int initInitialise(void)
 
          if (fdSock != -1)
          {
-            bzero((char *)&server6, sizeof(server6));
+            //bzero((char *)&server6, sizeof(server6));
+            memset((char *)&server6, 0, sizeof(server6));
             server6.sin6_family = AF_INET6;
             if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
             {

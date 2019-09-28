@@ -3,10 +3,13 @@ CC       = gcc
 SIZE     = size
 SHLIB    = gcc -shared
 STRIPLIB = strip --strip-unneeded
+AR       = ar rcs
 
-CFLAGS += -O3 -Wall -pthread
+#CFLAGS += -m32 -O0 -march=i686 -Wall -pthread
+CFLAGS += -m32 -O0 -march=i686 -Wall -pthread
+#CFLAGS += -O3 -Wall -pthread
 
-ALL = libpigpiod_if.so libpigpiod_if2.so pigs x_pigpiod_if x_pigpiod_if2
+ALL = libpigpiod_if.so libpigpiod_if2.so libpigpiod_if.a libpigpiod_if2.a pigs x_pigpiod_if x_pigpiod_if2
 
 prefix = /usr/local
 exec_prefix = $(prefix)
@@ -27,7 +30,7 @@ command.o: command.c pigpio.h command.h
 	$(CC) $(CFLAGS) -fpic -c -o command.o command.c
 
 pigs: command.o pigs.o
-	$(CC) $(CFLAGS) -fpic -o pigs pigs.c command.c
+	$(CC) $(CFLAGS) -fpic -o pigs pigs.c command.c -lWs2_32
 
 x_pigpiod_if:  x_pigpiod_if.o $(LIB1)
 	$(CC) -o x_pigpiod_if x_pigpiod_if.o $(LL1)
@@ -45,7 +48,9 @@ install: $(LIB1) $(LIB2)
 	install -m 0644 pigpiod_if2.h     $(DESTDIR)$(includedir)
 	install -m 0755 -d                $(DESTDIR)$(libdir)
 	install -m 0644 libpigpiod_if.so  $(DESTDIR)$(libdir)
+	install -m 0644 libpigpiod_if.a   $(DESTDIR)$(libdir)
 	install -m 0644 libpigpiod_if2.so $(DESTDIR)$(libdir)
+	install -m 0644 libpigpiod_if2.a  $(DESTDIR)$(libdir)
 	install -m 0755 -d                $(DESTDIR)$(bindir)
 	install -m 0755 pigs              $(DESTDIR)$(bindir)
 	python2 setup.py install
@@ -60,7 +65,9 @@ uninstall:
 	rm -f $(DESTDIR)$(includedir)/pigpiod_if.h
 	rm -f $(DESTDIR)$(includedir)/pigpiod_if2.h
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.a
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.a
 	echo removing python2 files
 	python2 setup.py install --record /tmp/pigpio >/dev/null
 	xargs rm -f < /tmp/pigpio >/dev/null
@@ -71,24 +78,32 @@ uninstall:
 	rm -f $(DESTDIR)$(mandir)/man1/pig*.1
 	rm -f $(DESTDIR)$(mandir)/man3/pig*.3
 
-LL1	= -L. -lpigpiod_if -pthread -lrt
-LL2	= -L. -lpigpiod_if2 -pthread -lrt
+LL1	= -L. -lpigpiod_if -pthread -lWs2_32
+LL2	= -L. -lpigpiod_if2 -pthread -lWs2_32
 
 LIB1 = libpigpiod_if.so
+LIB1A = libpigpiod_if.a
 OBJ1 = pigpiod_if.o command.o
 
 LIB2 = libpigpiod_if2.so
+LIB2A = libpigpiod_if2.a
 OBJ2 = pigpiod_if2.o command.o
 
 $(LIB1): $(OBJ1)
-	$(SHLIB) -o $(LIB1) $(OBJ1)
+	$(SHLIB) -o $(LIB1) $(OBJ1) -lgcc -lWs2_32
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
+$(LIB1A): $(OBJ1)
+	$(AR) $(LIB1A) $(OBJ1)
+
 $(LIB2): $(OBJ2)
-	$(SHLIB) -o $(LIB2) $(OBJ2)
+	$(SHLIB) -o $(LIB2) $(OBJ2) -lgcc -lWs2_32
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
+
+$(LIB2A): $(OBJ2)
+	$(AR) $(LIB2A) $(OBJ2)
 
 # generated using gcc -MM *.c
 

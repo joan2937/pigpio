@@ -27,25 +27,39 @@ For more information, please refer to <http://unlicense.org/>
 
 /* PIGPIOD_IF2_VERSION 15 */
 
+#if defined WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT _WIN32_WINNT_WIN7 /* 0x0601 */
+   #endif
+   #include <winsock2.h>
+   #include <ws2tcpip.h>
+   #define SENDPTR const char *
+   #define RECVPTR char *
+
+#else
+   #include <sys/socket.h>
+   #include <arpa/inet.h>
+   #include <unistd.h>
+   #include <netdb.h>
+   #include <netinet/tcp.h>
+   #include <sys/select.h>
+   #define SENDPTR const void *
+   #define RECVPTR void *
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
 #include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <sys/select.h>
 
-#include <arpa/inet.h>
 
 #include "pigpio.h"
 #include "command.h"
@@ -110,6 +124,9 @@ static callback_t *gCallBackLast  = 0;
 static evtCallback_t *geCallBackFirst = 0;
 static evtCallback_t *geCallBackLast  = 0;
 
+#ifdef WIN32
+   static WSADATA gWsaData;
+#endif
 /* PRIVATE ---------------------------------------------------------------- */
 
 static void _pml(int pi)
@@ -144,13 +161,13 @@ static int pigpio_command(int pi, int command, int p1, int p2, int rl)
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -175,13 +192,13 @@ static int pigpio_notify(int pi)
 
    _pml(pi);
 
-   if (send(gPigNotify[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigNotify[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
    }
 
-   if (recv(gPigNotify[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigNotify[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -209,7 +226,7 @@ static int pigpio_command_ext
 
    _pml(pi);
 
-   if (send(gPigCommand[pi], &cmd, sizeof(cmd), 0) != sizeof(cmd))
+   if (send(gPigCommand[pi], (SENDPTR)&cmd, sizeof(cmd), 0) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_send;
@@ -217,14 +234,14 @@ static int pigpio_command_ext
 
    for (i=0; i<extents; i++)
    {
-      if (send(gPigCommand[pi], ext[i].ptr, ext[i].size, 0) != ext[i].size)
+      if (send(gPigCommand[pi], (SENDPTR)ext[i].ptr, ext[i].size, 0) != ext[i].size)
       {
          _pmu(pi);
          return pigif_bad_send;
       }
    }
 
-   if (recv(gPigCommand[pi], &cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
+   if (recv(gPigCommand[pi], (RECVPTR)&cmd, sizeof(cmd), MSG_WAITALL) != sizeof(cmd))
    {
       _pmu(pi);
       return pigif_bad_recv;
@@ -234,10 +251,194 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
+#ifdef WIN32
+static void pigpioPrintWinErrorMessage() {
+   int errCode = WSAGetLastError();
+   LPSTR errString = NULL;
+
+   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, 0, errCode, 0, (LPSTR)&errString, 0, 0);
+   printf("Error (%d): %s\n", errCode, errString) ;
+
+   LocalFree(errString);
+}
+
+static void pigpioPrintAddressInfo(struct addrinfo *ptr) {
+   struct sockaddr_in  *sockaddr_ipv4;
+   LPSOCKADDR sockaddr_ip;
+   char ipstringbuffer[46];
+   DWORD ipbufferlength = 46;
+   INT iRetval;
+
+   printf("getaddrinfo response\n");
+   printf("\tFlags: 0x%x\n", ptr->ai_flags);
+   printf("\tFamily: ");
+   switch (ptr->ai_family) {
+      case AF_UNSPEC:
+         printf("Unspecified\n");
+         break;
+      case AF_INET:
+         printf("AF_INET (IPv4)\n");
+         sockaddr_ipv4 = (struct sockaddr_in *) ptr->ai_addr;
+         printf("\tIPv4 address %s\n", inet_ntoa(sockaddr_ipv4->sin_addr) );
+         printf("\tIPv4 port %hu\n", sockaddr_ipv4->sin_port);
+         break;
+      case AF_INET6:
+         printf("AF_INET6 (IPv6)\n");
+         // the InetNtop function is available on Windows Vista and later
+         // sockaddr_ipv6 = (struct sockaddr_in6 *) ptr->ai_addr;
+         // printf("\tIPv6 address %s\n",
+         //    InetNtop(AF_INET6, &sockaddr_ipv6->sin6_addr, ipstringbuffer, 46) );
+
+         // We use WSAAddressToString since it is supported on Windows XP and later
+         sockaddr_ip = (LPSOCKADDR) ptr->ai_addr;
+         // The buffer length is changed by each call to WSAAddresstoString
+         // So we need to set it for each iteration through the loop for safety
+         ipbufferlength = 46;
+         iRetval = WSAAddressToString(sockaddr_ip, (DWORD) ptr->ai_addrlen, NULL, ipstringbuffer, &ipbufferlength );
+         if (iRetval)
+            printf("WSAAddressToString failed with %u\n", WSAGetLastError() );
+         else
+            printf("\tIPv6 address %s\n", ipstringbuffer);
+         break;
+      case AF_NETBIOS:
+         printf("AF_NETBIOS (NetBIOS)\n");
+         break;
+      default:
+         printf("Other %d\n", ptr->ai_family);
+         break;
+   }
+   printf("\tSocket type: ");
+   switch (ptr->ai_socktype) {
+      case 0:
+         printf("Unspecified\n");
+         break;
+      case SOCK_STREAM:
+         printf("SOCK_STREAM (stream)\n");
+         break;
+      case SOCK_DGRAM:
+         printf("SOCK_DGRAM (datagram) \n");
+         break;
+      case SOCK_RAW:
+         printf("SOCK_RAW (raw) \n");
+         break;
+      case SOCK_RDM:
+         printf("SOCK_RDM (reliable message datagram)\n");
+         break;
+      case SOCK_SEQPACKET:
+         printf("SOCK_SEQPACKET (pseudo-stream packet)\n");
+         break;
+      default:
+         printf("Other %d\n", ptr->ai_socktype);
+         break;
+   }
+   printf("\tProtocol: ");
+   switch (ptr->ai_protocol) {
+      case 0:
+         printf("Unspecified\n");
+         break;
+      case IPPROTO_TCP:
+         printf("IPPROTO_TCP (TCP)\n");
+         break;
+      case IPPROTO_UDP:
+         printf("IPPROTO_UDP (UDP) \n");
+         break;
+      default:
+         printf("Other %d\n", ptr->ai_protocol);
+         break;
+   }
+   printf("\tLength of this sockaddr: %zu\n", ptr->ai_addrlen);
+   printf("\tCanonical name: %s\n", ptr->ai_canonname);
+}
+
+static int pigpioOpenWinSocket(char *addr, char *port)
+{
+   struct addrinfo hints;
+   ZeroMemory(&hints, sizeof(hints));
+   hints.ai_family = PF_UNSPEC; //AF_INET;
+   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_protocol = IPPROTO_TCP;
+   hints.ai_flags   |= AI_CANONNAME;
+
+   struct addrinfo *result = NULL;
+   printf("addr: %s, port: %s\n", addr, port);
+   DWORD dwRetval = getaddrinfo(addr, port, &hints, &result);
+   if ( dwRetval != 0 ) {
+	   pigpioPrintWinErrorMessage();
+	   return pigif_bad_getaddrinfo;
+   }
+   pigpioPrintAddressInfo(result);
+
+   struct addrinfo *ptr = NULL;
+   SOCKET connectSocket;
+   for(ptr = result; ptr != NULL ; ptr = ptr->ai_next) {
+	  pigpioPrintAddressInfo(ptr);
+
+	  // Create a SOCKET for connecting to server
+	   connectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+	   if (connectSocket == INVALID_SOCKET) {
+		   pigpioPrintWinErrorMessage();
+		   continue;
+	   }
+
+      int iResult = connect(connectSocket, ptr->ai_addr, sizeof (*(ptr->ai_addr)));
+      if (iResult == SOCKET_ERROR) {
+         printf("connect function failed with error: %d\n", WSAGetLastError());
+         int closeResult = closesocket(connectSocket);
+         if (closeResult == SOCKET_ERROR) {
+            pigpioPrintWinErrorMessage();
+         }
+      } else {
+         break;
+      }
+   }
+
+   if (ptr == NULL) return pigif_bad_connect;
+
+   return connectSocket;
+}
+#else
+static int pigpioOpenPosixSocket(char *addr, char *port)
+{
+   int sock, err;
+   struct addrinfo hints, *res, *rp;
+
+   memset (&hints, 0, sizeof (hints));
+
+   hints.ai_family   = PF_UNSPEC;
+   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_flags   |= AI_CANONNAME;
+
+   err = getaddrinfo (addrStr, portStr, &hints, &res);
+
+   if (err) return pigif_bad_getaddrinfo;
+
+   for (rp=res; rp!=NULL; rp=rp->ai_next)
+   {
+      sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+
+      if (sock == -1) continue;
+
+      /* Disable the Nagle algorithm. */
+      opt = 1;
+      setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
+
+      int connectRes = connect(sock, rp->ai_addr, rp->ai_addrlen);
+      if (connectRes)
+         printf("socket connect errno=%d\n", errno);
+      if (connectRes != -1) break;
+   }
+
+   freeaddrinfo(res);
+
+   if (rp == NULL) return pigif_bad_connect;
+
+   return sock;
+}
+#endif
+
+
 static int pigpioOpenSocket(char *addr, char *port)
 {
-   int sock, err, opt;
-   struct addrinfo hints, *res, *rp;
    const char *addrStr, *portStr;
 
    if (!addr)
@@ -262,34 +463,11 @@ static int pigpioOpenSocket(char *addr, char *port)
    }
    else portStr = port;
 
-   memset (&hints, 0, sizeof (hints));
-
-   hints.ai_family   = PF_UNSPEC;
-   hints.ai_socktype = SOCK_STREAM;
-   hints.ai_flags   |= AI_CANONNAME;
-
-   err = getaddrinfo (addrStr, portStr, &hints, &res);
-
-   if (err) return pigif_bad_getaddrinfo;
-
-   for (rp=res; rp!=NULL; rp=rp->ai_next)
-   {
-      sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-
-      if (sock == -1) continue;
-
-      /* Disable the Nagle algorithm. */
-      opt = 1;
-      setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&opt, sizeof(int));
-
-      if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) break;
-   }
-
-   freeaddrinfo(res);
-
-   if (rp == NULL) return pigif_bad_connect;
-
-   return sock;
+   #ifdef WIN32
+      return pigpioOpenWinSocket(addr, port);
+   #else
+      return pigpioOpenPosixSocket(addr, port);
+   #endif
 }
 
 static void dispatch_notification(int pi, gpioReport_t *r)
@@ -573,7 +751,7 @@ static int recvMax(int pi, void *buf, int bufsize, int sent)
 
    if (sent < bufsize) count = sent; else count = bufsize;
 
-   if (count) recv(gPigCommand[pi], buf, count, MSG_WAITALL);
+   if (count) recv(gPigCommand[pi], (RECVPTR)buf, count, MSG_WAITALL);
 
    remaining = sent - count;
 
@@ -581,7 +759,7 @@ static int recvMax(int pi, void *buf, int bufsize, int sent)
    {
       fetch = remaining;
       if (fetch > sizeof(scratch)) fetch = sizeof(scratch);
-      recv(gPigCommand[pi], scratch, fetch, MSG_WAITALL);
+      recv(gPigCommand[pi], (RECVPTR)scratch, fetch, MSG_WAITALL);
       remaining -= fetch;
    }
 
@@ -713,6 +891,13 @@ int pigpio_start(char *addrStr, char *portStr)
    int pi;
    int *userdata;
 
+   #ifdef WIN32
+      int iResult = WSAStartup(MAKEWORD(2,2), &gWsaData);
+      if (iResult != 0) {
+         return pigif_bad_win_init;
+      }
+   #endif
+
    if ((!addrStr) || (strlen(addrStr) == 0))
    {
       addrStr = "localhost";
@@ -778,17 +963,32 @@ void pigpio_stop(int pi)
          gPigHandle[pi] = -1;
       }
 
-      close(gPigCommand[pi]);
+      #if defined WIN32
+         closesocket(gPigCommand[pi]);
+      #else
+         close(gPigCommand[pi]);
+      #endif
       gPigCommand[pi] = -1;
    }
 
    if (gPigNotify[pi] >= 0)
    {
-      close(gPigNotify[pi]);
+      #if defined WIN32
+         closesocket(gPigCommand[pi]);
+      #else
+         close(gPigCommand[pi]);
+      #endif
       gPigNotify[pi] = -1;
    }
 
    gPiInUse[pi] = 0;
+
+   #ifdef WIN32
+      int iResult = WSACleanup();
+      if (iResult != 0) {
+    	  pigpioPrintWinErrorMessage();
+      }
+   #endif
 }
 
 int set_mode(int pi, unsigned gpio, unsigned mode)
