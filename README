@@ -23,6 +23,7 @@ o the library (libpigpiod_if2.so) in /usr/local/lib
 o the header file (pigpio.h) in /usr/local/include
 o the header file (pigpiod_if.h) in /usr/local/include
 o the header file (pigpiod_if2.h) in /usr/local/include
+o the header file (pigs.h) in /usr/local/include
 o the daemon (pigpiod) in /usr/local/bin
 o the socket interface (pigs) in /usr/local/bin
 o the utility pig2vcd in /usr/local/bin
@@ -33,9 +34,9 @@ TEST (optional)
 
 *** WARNING ************************************************
 *                                                          *
-* All the tests make extensive use of gpio 4 (pin P1/J8-7).*
+* All the tests make extensive use of gpio 25 (pin 22).    *
 * Ensure that either nothing or just a LED is connected to *
-* gpio 4 before running any of the tests.                  *
+* gpio 25 before running any of the tests.                 *
 *                                                          *
 * Some tests are statistical in nature and so may on       *
 * occasion fail.  Repeated failures on the same test or    *
@@ -157,7 +158,7 @@ reflect the Windows/Mac socket interface.
 
 DOCUMENTATION
 
-The most up to date should be http://abyz.co.uk/rpi/pigpio/
+The most up to date should be http://abyz.me.uk/rpi/pigpio/
 
 On the Pi try
 

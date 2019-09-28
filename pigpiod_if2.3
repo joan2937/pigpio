@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpiod_if2.3
 ."
-.TH pigpiod_if2 3 2012-2017 Linux "pigpio archive"
+.TH pigpiod_if2 3 2012-2018 Linux "pigpio archive"
 .SH NAME
 pigpiod_if2 - A C library to interface to the pigpio daemon.
 
@@ -1412,7 +1412,7 @@ Frequencies above 30MHz are unlikely to work.
 .br
      gpio: see description
 .br
-frequency: 0 (off) or 4689-250000000 (250M)
+frequency: 0 (off) or 4689-250M (13184-375M for the BCM2711)
 .br
 
 .EE
@@ -1498,7 +1498,7 @@ daemon is started (option -t).
 .br
    gpio: see descripton
 .br
-PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
 .br
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
 .br
@@ -1556,18 +1556,18 @@ The GPIO must be one of the following.
 
 .br
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by PWMfreq.
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
 .br
 
 .br
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
 .br
 
 .br
-There will only be a million steps for a PWMfreq of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 
@@ -1961,6 +1961,24 @@ wave_id: >=0, as returned by \fBwave_create\fP.
 
 .br
 Wave ids are allocated in order, 0, 1, 2, etc.
+
+.br
+
+.br
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+.br
+
+.br
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+.br
+
+.br
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
 
 .br
 
@@ -2514,7 +2532,7 @@ This function stores a script for later execution.
 .br
 
 .br
-See \fBhttp://abyz.co.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
+See \fBhttp://abyz.me.uk/rpi/pigpio/pigs.html#Scripts\fP for details.
 
 .br
 
@@ -2559,6 +2577,40 @@ script_id: >=0, as returned by \fBstore_script\fP.
 .br
 The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
 PI_TOO_MANY_PARAM
+
+.br
+
+.br
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+
+.IP "\fBint update_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param)\fP"
+.IP "" 4
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
+
+.br
+
+.br
+
+.EX
+       pi: >=0 (as returned by \fBpigpio_start\fP).
+.br
+script_id: >=0, as returned by \fBstore_script\fP.
+.br
+   numPar: 0-10, the number of parameters.
+.br
+    param: an array of parameters.
+.br
+
+.EE
+
+.br
+
+.br
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
 
 .br
 
@@ -2815,6 +2867,21 @@ No flags are currently defined.  This parameter should be set to zero.
 .br
 Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
 will be available if a kernel supported bus multiplexor is being used.
+
+.br
+
+.br
+The GPIO used are given in the following table.
+
+.br
+
+.br
+        SDA   SCL
+.br
+I2C 0    0     1
+.br
+I2C 1    2     3
+.br
 
 .br
 
@@ -4083,7 +4150,7 @@ int main(int argc, char *argv[])
 
 .IP "\fBint spi_open(int pi, unsigned spi_channel, unsigned baud, unsigned spi_flags)\fP"
 .IP "" 4
-This function returns a handle for the SPI device on channel.
+This function returns a handle for the SPI device on the channel.
 Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
@@ -4091,10 +4158,33 @@ active low chip select.
 .br
 
 .br
-An auxiliary SPI device is available on all models but the
-A and B and may be selected by setting the A bit in the
-flags.  The auxiliary device has 3 chip selects and a
-selectable word size in bits.
+The Pi has two SPI peripherals: main and auxiliary.
+
+.br
+
+.br
+The main SPI has two chip selects (channels), the auxiliary has
+three.
+
+.br
+
+.br
+The auxiliary SPI is available on all models but the A and B.
+
+.br
+
+.br
+The GPIO used are given in the following table.
+
+.br
+
+.br
+           MISO   MOSI   SCLK   CE0   CE1   CE2
+.br
+Main SPI      9     10     11     8     7     -
+.br
+Aux SPI      19     20     21    18    17    16
+.br
 
 .br
 
@@ -4103,7 +4193,7 @@ selectable word size in bits.
 .EX
          pi: >=0 (as returned by \fBpigpio_start\fP).
 .br
-spi_channel: 0-1 (0-2 for the auxiliary device).
+spi_channel: 0-1 (0-2 for the auxiliary SPI).
 .br
        baud: 32K-125M (values above 30M are unlikely to work).
 .br
@@ -4143,7 +4233,7 @@ mm defines the SPI mode.
 .br
 
 .br
-Warning: modes 1 and 3 do not appear to work on the auxiliary device.
+Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
 
 .br
 
@@ -4176,40 +4266,40 @@ ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 .br
 
 .br
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.
+A is 0 for the main SPI, 1 for the auxiliary SPI.
 
 .br
 
 .br
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
-SPI device only.
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
+SPI only.
 
 .br
 
 .br
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.  Standard SPI device only.
+if W is not set.  Main SPI only.
 
 .br
 
 .br
 T is 1 if the least significant bit is transmitted on MOSI first, the
 default (0) shifts the most significant bit out first.  Auxiliary SPI
-device only.
+only.
 
 .br
 
 .br
 R is 1 if the least significant bit is received on MISO first, the
 default (0) receives the most significant bit first.  Auxiliary SPI
-device only.
+only.
 
 .br
 
 .br
 bbbbbb defines the word size in bits (0-32).  The default (0)
-sets 8 bits per word.  Auxiliary SPI device only.
+sets 8 bits per word.  Auxiliary SPI only.
 
 .br
 
@@ -5515,6 +5605,12 @@ Pi to act as a slave device on an I2C or SPI bus.
 .br
 
 .br
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
+.br
+
+.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -5754,6 +5850,12 @@ if (status >= 0)
 .IP "\fBint bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer)\fP"
 .IP "" 4
 This function allows the Pi to act as a slave I2C device.
+
+.br
+
+.br
+This function is not available on the BCM2711 (e.g.as
+used in the Pi4B).
 
 .br
 
@@ -6192,7 +6294,7 @@ A single character, an 8 bit quantity able to store 0-255.
 
 .br
 
-.IP "\fBclkfreq\fP: 4689-250000000 (250M)" 0
+.IP "\fBclkfreq\fP: 4689-250M (13184-375M for the BCM2711)" 0
 The hardware clock frequency.
 
 .br
@@ -6870,7 +6972,7 @@ The hardware PWM dutycycle.
 
 .br
 
-.IP "\fBPWMfreq\fP: 1-125000000 (125M)" 0
+.IP "\fBPWMfreq\fP: 1-125M (1-187.5M for the BCM2711)" 0
 The hardware PWM frequency.
 
 .br
@@ -6881,6 +6983,8 @@ The hardware PWM frequency.
 #define PI_HW_PWM_MIN_FREQ 1
 .br
 #define PI_HW_PWM_MAX_FREQ 125000000
+.br
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
 .br
 
 .EE
@@ -7315,4 +7419,4 @@ typedef enum
 pigpiod(1), pig2vcd(1), pigs(1), pigpio(3), pigpiod_if(3)
 .SH AUTHOR
 
-joan@abyz.co.uk
+joan@abyz.me.uk

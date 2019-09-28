@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* PIGPIOD_IF2_VERSION 11 */
+/* PIGPIOD_IF2_VERSION 15 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1115,6 +1115,25 @@ int run_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param)
 
    return pigpio_command_ext
       (pi, PI_CMD_PROCR, script_id, 0, numPar*4, 1, ext, 1);
+}
+
+int update_script(int pi, unsigned script_id, unsigned numPar, uint32_t *param)
+{
+   gpioExtent_t ext[1];
+
+   /*
+   p1=script id
+   p2=0
+   p3=numPar * 4
+   ## extension ##
+   uint32_t[numPar] pars
+   */
+
+   ext[0].size = 4 * numPar;
+   ext[0].ptr = param;
+
+   return pigpio_command_ext
+      (pi, PI_CMD_PROCU, script_id, 0, numPar*4, 1, ext, 1);
 }
 
 int script_status(int pi, unsigned script_id, uint32_t *param)

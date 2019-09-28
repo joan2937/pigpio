@@ -96,6 +96,6 @@ command.o: command.c pigpio.h command.h
 pigpiod.o: pigpiod.c pigpio.h
 pigpiod_if.o: pigpiod_if.c pigpio.h pigpiod_if.h command.h
 pigpiod_if2.o: pigpiod_if2.c pigpio.h pigpiod_if2.h command.h
-pigs.o: pigs.c pigpio.h command.h
+pigs.o: pigs.c pigpio.h command.h pigs.h
 
 

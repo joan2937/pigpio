@@ -13,7 +13,6 @@ of the public at large and to the detriment of our heirs and
 successors. We intend this dedication to be an overt act of
 relinquishment in perpetuity of all present and future rights to this
 software under copyright law.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -31,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 64
+#define PIGPIO_VERSION 7101
 
 /*TEXT
 
@@ -207,6 +206,7 @@ SCRIPTS
 
 gpioStoreScript            Store a script
 gpioRunScript              Run a stored script
+gpioUpdateScript           Set a scripts parameters
 gpioScriptStatus           Get script status and parameters
 gpioStopScript             Stop a running script
 gpioDeleteScript           Delete a stored script
@@ -495,7 +495,7 @@ typedef struct
 
 /* BSC FIFO size */
 
-#define BSC_FIFO_SIZE 16
+#define BSC_FIFO_SIZE 512
 
 typedef struct
 {
@@ -610,13 +610,16 @@ typedef void *(gpioThreadFunc_t) (void *);
 /* hardware PWM */
 
 #define PI_HW_PWM_MIN_FREQ 1
-#define PI_HW_PWM_MAX_FREQ 125000000
+#define PI_HW_PWM_MAX_FREQ      125000000
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
 #define PI_HW_PWM_RANGE 1000000
 
 /* hardware clock */
 
-#define PI_HW_CLK_MIN_FREQ 4689
-#define PI_HW_CLK_MAX_FREQ 250000000
+#define PI_HW_CLK_MIN_FREQ       4689
+#define PI_HW_CLK_MIN_FREQ_2711 13184
+#define PI_HW_CLK_MAX_FREQ      250000000
+#define PI_HW_CLK_MAX_FREQ_2711 375000000
 
 #define PI_NOTIFY_SLOTS  32
 
@@ -830,10 +833,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CLOCK_PWM 0
 #define PI_CLOCK_PCM 1
 
-/* DMA channel: 0-14 */
+/* DMA channel: 0-15, 15 is unset */
 
 #define PI_MIN_DMA_CHANNEL 0
-#define PI_MAX_DMA_CHANNEL 14
+#define PI_MAX_DMA_CHANNEL 15
 
 /* port */
 
@@ -846,6 +849,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_DISABLE_FIFO_IF   1
 #define PI_DISABLE_SOCK_IF   2
 #define PI_LOCALHOST_SOCK_IF 4
+#define PI_DISABLE_ALERT     8
 
 /* memAllocMode */
 
@@ -864,8 +868,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
 #define PI_CFG_RT_PRIORITY       (1<<8)
 #define PI_CFG_STATS             (1<<9)
+#define PI_CFG_NOSIGHANDLER      (1<<10)
 
-#define PI_CFG_ILLEGAL_VAL       (1<<10)
+#define PI_CFG_ILLEGAL_VAL       (1<<11)
+
 
 /* gpioISR */
 
@@ -977,6 +983,8 @@ gpioSetMode(18, PI_OUTPUT); // Set GPIO18 as output.
 
 gpioSetMode(22,PI_ALT0);    // Set GPIO22 to alternative mode 0.
 ...
+
+See [[http://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2835/BCM2835-ARM-Peripherals.pdf]] page 102 for an overview of the modes.
 D*/
 
 
@@ -1491,6 +1499,20 @@ The function is passed the GPIO, the current level, and the
 current tick.  The level will be PI_TIMEOUT if the optional
 interrupt timeout expires.
 
+. .
+Parameter   Value    Meaning
+
+GPIO        0-53     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (interrupt timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+. .
+
 The underlying Linux sysfs GPIO interface is used to provide
 the interrupt services.
 
@@ -1543,6 +1565,22 @@ or PI_BAD_ISR_INIT.
 
 The function is passed the GPIO, the current level, the
 current tick, and the userdata pointer.
+
+. .
+Parameter   Value    Meaning
+
+GPIO        0-53     The GPIO which has changed state
+
+level       0-2      0 = change to low (a falling edge)
+                     1 = change to high (a rising edge)
+                     2 = no level change (interrupt timeout)
+
+tick        32 bit   The number of microseconds since boot
+                     WARNING: this wraps around from
+                     4294967295 to 0 roughly every 72 minutes
+
+userdata    pointer  Pointer to an arbitrary object
+. .
 
 Only one of [*gpioSetISRFunc*] or [*gpioSetISRFuncEx*] can be
 registered per GPIO.
@@ -1921,6 +1959,15 @@ int gpioWaveDelete(unsigned wave_id);
 /*D
 This function deletes the waveform with id wave_id.
 
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
 . .
 wave_id: >=0, as returned by [*gpioWaveCreate*]
 . .
@@ -2250,6 +2297,12 @@ No flags are currently defined.  This parameter should be set to zero.
 
 Physically buses 0 and 1 are available on the Pi.  Higher numbered buses
 will be available if a kernel supported bus multiplexor is being used.
+
+The GPIO used are given in the following table.
+
+      @ SDA @ SCL
+I2C 0 @  0  @  1
+I2C 1 @  2  @  3
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_I2C_BUS, PI_BAD_I2C_ADDR,
 PI_BAD_FLAGS, PI_NO_HANDLE, or PI_I2C_OPEN_FAILED.
@@ -2829,6 +2882,9 @@ This function provides a low-level interface to the
 SPI/I2C Slave peripheral.  This peripheral allows the
 Pi to act as a slave device on an I2C or SPI bus.
 
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -3106,13 +3162,21 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0,
 active low chip select.
 
-An auxiliary SPI device is available on all models but the
-A and B and may be selected by setting the A bit in the flags.
-The auxiliary device has 3 chip selects and a selectable word
-size in bits.
+The Pi has two SPI peripherals: main and auxiliary.
+
+The main SPI has two chip selects (channels), the auxiliary has
+three.
+
+The auxiliary SPI is available on all models but the A and B.
+
+The GPIO used are given in the following table.
+
+         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
+Main SPI @    9 @   10 @   11 @   8 @   7 @   -
+Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
 
 . .
- spiChan: 0-1 (0-2 for the auxiliary SPI device)
+ spiChan: 0-1 (0-2 for the auxiliary SPI)
     baud: 32K-125M (values above 30M are unlikely to work)
 spiFlags: see below
 . .
@@ -3129,7 +3193,7 @@ spiFlags consists of the least significant 22 bits.
 
 mm defines the SPI mode.
 
-Warning: modes 1 and 3 do not appear to work on the auxiliary device.
+Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
 
 . .
 Mode POL PHA
@@ -3143,25 +3207,25 @@ px is 0 if CEx is active low (default) and 1 for active high.
 
 ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
-A is 0 for the standard SPI device, 1 for the auxiliary SPI.
+A is 0 for the main SPI, 1 for the auxiliary SPI.
 
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Standard
-SPI device only.
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
+SPI only.
 
 nnnn defines the number of bytes (0-15) to write before switching
 the MOSI line to MISO to read data.  This field is ignored
-if W is not set.  Standard SPI device only.
+if W is not set.  Main SPI only.
 
 T is 1 if the least significant bit is transmitted on MOSI first, the
 default (0) shifts the most significant bit out first.  Auxiliary SPI
-device only.
+only.
 
 R is 1 if the least significant bit is received on MISO first, the
 default (0) receives the most significant bit first.  Auxiliary SPI
-device only.
+only.
 
 bbbbbb defines the word size in bits (0-32).  The default (0)
-sets 8 bits per word.  Auxiliary SPI device only.
+sets 8 bits per word.  Auxiliary SPI only.
 
 The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
 transfer data packed into 1, 2, or 4 bytes according to
@@ -3668,7 +3732,7 @@ int gpioStoreScript(char *script);
 /*D
 This function stores a null terminated script for later execution.
 
-See [[http://abyz.co.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+See [[http://abyz.me.uk/rpi/pigpio/pigs.html#Scripts]] for details.
 
 . .
 script: the text of the script
@@ -3683,6 +3747,46 @@ D*/
 int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
 /*D
 This function runs a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+
+/*F*/
+int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
+/*D
+This function runs a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+
+
+
+/*F*/
+int gpioUpdateScript(unsigned script_id, unsigned numPar, uint32_t *param);
+/*D
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
 
 . .
 script_id: >=0, as returned by [*gpioStoreScript*]
@@ -3881,7 +3985,7 @@ Frequencies above 30MHz are unlikely to work.
 
 . .
    gpio: see description
-clkfreq: 0 (off) or 4689-250000000 (250M)
+clkfreq: 0 (off) or 4689-250M (13184-375M for the BCM2711)
 . .
 
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
@@ -3926,7 +4030,7 @@ main clock defaults to PCM but may be overridden by a call to
 
 . .
    gpio: see description
-PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
 . .
 
@@ -3953,12 +4057,12 @@ The GPIO must be one of the following.
 . .
 
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by PWMfreq.
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
-There will only be a million steps for a PWMfreq of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 D*/
@@ -4646,8 +4750,7 @@ D*/
 
 
 /*F*/
-int gpioCfgDMAchannels(
-   unsigned primaryChannel, unsigned secondaryChannel);
+int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
 
@@ -4658,8 +4761,14 @@ This function is only effective if called before [*gpioInitialise*].
 secondaryChannel: 0-14
 . .
 
-The default setting is to use channel 14 for the primary channel and
-channel 6 for the secondary channel.
+The default setting depends on whether the Pi has a BCM2711 chip or
+not (currently only the Pi4B has a BCM2711).
+
+The default setting for a non-BCM2711 is to use channel 14 for the
+primary channel and channel 6 for the secondary channel.
+
+The default setting for a BCM2711 is to use channel 7 for the
+primary channel and channel 6 for the secondary channel.
 
 The secondary channel is only used for the transmission of waves.
 
@@ -4677,8 +4786,11 @@ D*/
 /*F*/
 int gpioCfgPermissions(uint64_t updateMask);
 /*D
-Configures pigpio to only allow updates (writes or mode changes) for the
-GPIO specified by the mask.
+Configures pigpio to restrict GPIO updates via the socket or pipe
+interfaces to the GPIO specified by the mask.  Programs directly
+calling the pigpio library (i.e. linked with -lpigpio are not
+affected).  A GPIO update is a write to a GPIO or a GPIO mode
+change or any function which would force such an action.
 
 This function is only effective if called before [*gpioInitialise*].
 
@@ -4689,9 +4801,9 @@ updateMask: bit (1<<n) is set for each GPIO n which may be updated
 The default setting depends upon the Pi model. The user GPIO are
 added to the mask.
 
-If the board revision is not recognised then GPIO 0-31 are allowed.
+If the board revision is not recognised then GPIO 2-27 are allowed.
 
-Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0xFFFFFFFF 
+Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0x0FFFFFFC 
 Type 1 board  @ PI_DEFAULT_UPDATE_MASK_B1 @ 0x03E6CF93 
 Type 2 board  @ PI_DEFAULT_UPDATE_MASK_A_B2 @ 0xFBC6CF9C
 Type 3 board  @ PI_DEFAULT_UPDATE_MASK_R3 @ 0x0FFFFFFC
@@ -5203,13 +5315,14 @@ char::
 
 A single character, an 8 bit quantity able to store 0-255.
 
-clkfreq::4689-250M
+clkfreq::4689-250M (13184-375M for the BCM2711)
 
 The hardware clock frequency.
 
 . .
 PI_HW_CLK_MIN_FREQ 4689
 PI_HW_CLK_MAX_FREQ 250000000
+PI_HW_CLK_MAX_FREQ_2711 375000000
 . .
 
 count::
@@ -5229,10 +5342,10 @@ PI_MIN_WAVE_DATABITS 1
 PI_MAX_WAVE_DATABITS 32
 . .
 
-DMAchannel::0-14
+DMAchannel::0-15
 . .
 PI_MIN_DMA_CHANNEL 0
-PI_MAX_DMA_CHANNEL 14
+PI_MAX_DMA_CHANNEL 15
 . .
 
 double::
@@ -5616,7 +5729,7 @@ The port used to bind to the pigpio socket.  Defaults to 8888.
 pos::
 The position of an item.
 
-primaryChannel:: 0-14
+primaryChannel:: 0-15
 The DMA channel used to time the sampling of GPIO and to time servo and
 PWM pulses.
 
@@ -5661,12 +5774,13 @@ The hardware PWM dutycycle.
 PI_HW_PWM_RANGE 1000000
 . .
 
-PWMfreq::5-250K
+PWMfreq::1-125M (1-187.5M for the BCM2711)
 The hardware PWM frequency.
 
 . .
 PI_HW_PWM_MIN_FREQ 1
 PI_HW_PWM_MAX_FREQ 125000000
+PI_HW_PWM_MAX_FREQ_2711 187500000
 . .
 
 range::25-40000
@@ -6108,6 +6222,8 @@ PARAMS*/
 #define PI_CMD_EVM   115
 #define PI_CMD_EVT   116
 
+#define PI_CMD_PROCU 117
+
 /*DEF_E*/
 
 /*
@@ -6196,12 +6312,12 @@ after this command is issued.
 #define PI_BAD_PATHNAME     -23 // can't open pathname
 #define PI_NO_HANDLE        -24 // no handle available
 #define PI_BAD_HANDLE       -25 // unknown handle
-#define PI_BAD_IF_FLAGS     -26 // ifFlags > 3
-#define PI_BAD_CHANNEL      -27 // DMA channel not 0-14
-#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-14
+#define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
+#define PI_BAD_CHANNEL      -27 // DMA channel not 0-15
+#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-15
 #define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000
 #define PI_BAD_FIFO_COMMAND -29 // unrecognized fifo command
-#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
+#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-15
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 #define PI_INITIALISED      -32 // function called after gpioInitialise
 #define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
@@ -6268,9 +6384,9 @@ after this command is issued.
 #define PI_NOT_SERVO_GPIO   -93 // GPIO is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // GPIO has no hardware clock
 #define PI_NOT_HPWM_GPIO    -95 // GPIO has no hardware PWM
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 1-125M
+#define PI_BAD_HPWM_FREQ    -96 // invalid hardware PWM frequency
 #define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
-#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-250M
+#define PI_BAD_HCLK_FREQ    -98 // invalid hardware clock frequency
 #define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
 #define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
 #define PI_BAD_DATABITS    -101 // serial data bits not 1-32
@@ -6316,6 +6432,9 @@ after this command is issued.
 #define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 #define PI_BAD_EVENT_ID    -143 // bad event id
+#define PI_CMD_INTERRUPTED -144 // Used by Python
+#define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
+#define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
@@ -6335,16 +6454,20 @@ after this command is issued.
 #define PI_DEFAULT_DMA_CHANNEL             14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
+#define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
+#define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
+#define PI_DEFAULT_DMA_NOT_SET             15
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
-#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0xFFFFFFFF
+#define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_A_B2        0xFBC7CF9C
 #define PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS 0x0080480FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_ZERO        0x0080000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI2B        0x0080480FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_PI4B        0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
 #define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 

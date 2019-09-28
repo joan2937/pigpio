@@ -25,6 +25,7 @@ set(pigpio_INCLUDES     ${pigpio_INCLUDE_DIR})
 
 # Handle REQUIRED, QUIET, and version arguments 
 # and set the <packagename>_FOUND variable.
+include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(pigpio 
     DEFAULT_MSG 
     pigpio_INCLUDE_DIR pigpio_LIBRARY pigpiod_if_LIBRARY pigpiod_if2_LIBRARY)

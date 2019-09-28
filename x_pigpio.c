@@ -78,6 +78,7 @@ void t1()
    CHECK(1, 5, v, 0, 0, "read");
 
    gpioWrite(GPIO, PI_HIGH);
+   gpioDelay(1); /* 1 micro delay to let GPIO reach level reliably */
    v = gpioRead(GPIO);
    CHECK(1, 6, v, 1, 0, "write, read");
 }
@@ -856,7 +857,7 @@ int main(int argc, char *argv[])
 {
    int i, t, c, status;
 
-   char test[64];
+   char test[64]={0,};
 
    if (argc > 1)
    {

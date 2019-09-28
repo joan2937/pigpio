@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpiod.1
 ."
-.TH pigpiod 1 2012-2017 Linux "pigpio archive"
+.TH pigpiod 1 2012-2018 Linux "pigpio archive"
 .SH NAME
 pigpiod - A utility to start the pigpio library as a daemon.
 
@@ -75,6 +75,11 @@ Default enabled
 .
 .IP "\fB-l\fP"
 Disable remote socket interface.
+.
+Default enabled
+.
+.IP "\fB-m\fP"
+Disable alerts (sampling).
 .
 Default enabled
 .
@@ -265,4 +270,4 @@ A full channel only requires one DMA control block regardless of the length of a
 pig2vcd(1), pigs(1), pigpio(3), pigpiod_if(3), pigpiod_if2(3)
 .SH AUTHOR
 
-joan@abyz.co.uk
+joan@abyz.me.uk
