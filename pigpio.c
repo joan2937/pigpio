@@ -4721,9 +4721,6 @@ int spiClose(unsigned handle)
 
 int spiRead(unsigned handle, char *buf, unsigned count)
 {
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
-
    CHECK_INITED;
 
    if (handle >= PI_SPI_SLOTS)
@@ -4736,6 +4733,9 @@ int spiRead(unsigned handle, char *buf, unsigned count)
       SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
 
    spiGo(spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
 
    return count;
 }

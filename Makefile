@@ -8,20 +8,24 @@ RANLIB       = $(CROSS_PREFIX)ranlib
 SIZE         = $(CROSS_PREFIX)size
 STRIP        = $(CROSS_PREFIX)strip
 SHLIB        = $(CC) -shared
+STLIB        = $(AR) rcs
 STRIPLIB     = $(STRIP) --strip-unneeded
 
 CFLAGS	+= -O3 -Wall -pthread
 
 LIB1     = libpigpio.so
+LIBST1   = libpigpio.a
 OBJ1     = pigpio.o command.o
 
 LIB2     = libpigpiod_if.so
+LIBST2   = libpigpiod_if.a
 OBJ2     = pigpiod_if.o command.o
 
 LIB3     = libpigpiod_if2.so
+LIBST3   = libpigpiod_if2.a
 OBJ3     = pigpiod_if2.o command.o
 
-LIB      = $(LIB1) $(LIB2) $(LIB3)
+LIB      = $(LIB1) $(LIB2) $(LIB3) $(LIBST1) $(LIBST2) $(LIBST3)
 
 ALL     = $(LIB) x_pigpio x_pigpiod_if x_pigpiod_if2 pig2vcd pigpiod pigs
 
@@ -86,6 +90,9 @@ install:	$(ALL)
 	install -m 0755 libpigpio.so      $(DESTDIR)$(libdir)
 	install -m 0755 libpigpiod_if.so  $(DESTDIR)$(libdir)
 	install -m 0755 libpigpiod_if2.so $(DESTDIR)$(libdir)
+	install -m 0755 libpigpio.a      $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if.a  $(DESTDIR)$(libdir)
+	install -m 0755 libpigpiod_if2.a $(DESTDIR)$(libdir)
 	install -m 0755 -d                $(DESTDIR)$(bindir)
 	install -m 0755 pig2vcd           $(DESTDIR)$(bindir)
 	install -m 0755 pigpiod           $(DESTDIR)$(bindir)
@@ -105,6 +112,9 @@ uninstall:
 	rm -f $(DESTDIR)$(libdir)/libpigpio.so
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.so
 	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.so
+	rm -f $(DESTDIR)$(libdir)/libpigpio.a
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if.a
+	rm -f $(DESTDIR)$(libdir)/libpigpiod_if2.a
 	rm -f $(DESTDIR)$(bindir)/pig2vcd
 	rm -f $(DESTDIR)$(bindir)/pigpiod
 	rm -f $(DESTDIR)$(bindir)/pigs
@@ -119,15 +129,24 @@ $(LIB1):	$(OBJ1)
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
+$(LIBST1):	$(OBJ1)
+	$(STLIB) $(LIBST1) $(OBJ1)
+
 $(LIB2):	$(OBJ2)
 	$(SHLIB) -o $(LIB2) $(OBJ2)
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
 
+$(LIBST2):	$(OBJ2)
+	$(STLIB) $(LIBST2) $(OBJ2)
+
 $(LIB3):	$(OBJ3)
 	$(SHLIB) -o $(LIB3) $(OBJ3)
 	$(STRIPLIB) $(LIB3)
 	$(SIZE)     $(LIB3)
+
+$(LIBST3):	$(OBJ3)
+	$(STLIB) $(LIBST3) $(OBJ3)
 
 # generated using gcc -MM *.c
 

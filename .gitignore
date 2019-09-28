@@ -11,3 +11,7 @@ __pycache__
 build
 dist
 *.egg-info
+Makefile.sgb
+libpigpio.a
+libpigpiod_if.a
+libpigpiod_if2.a
