@@ -375,12 +375,13 @@ bit 0 READ_LAST_NOT_SET_ERROR
 
 /* DMA CS Control and Status bits */
 #define DMA_CHANNEL_RESET       (1<<31)
+#define DMA_CHANNEL_ABORT       (1<<30)
 #define DMA_WAIT_ON_WRITES      (1<<28)
 #define DMA_PANIC_PRIORITY(x) ((x)<<20)
 #define DMA_PRIORITY(x)       ((x)<<16)
 #define DMA_INTERRUPT_STATUS    (1<< 2)
 #define DMA_END_FLAG            (1<< 1)
-#define DMA_ACTIVATE            (1<< 0)
+#define DMA_ACTIVE              (1<< 0)
 
 /* DMA control block "info" field bits */
 #define DMA_NO_WIDE_BURSTS          (1<<26)
@@ -7848,13 +7849,22 @@ static void initClock(int mainClock)
    myGpioDelay(2000);
 }
 
+static void initKillDMA(volatile uint32_t *dmaAddr)
+{
+   dmaAddr[DMA_CS] = DMA_CHANNEL_ABORT;
+   dmaAddr[DMA_CS] = 0;
+   dmaAddr[DMA_CS] = DMA_CHANNEL_RESET;
+
+   dmaAddr[DMA_CONBLK_AD] = 0;
+}
+
 /* ----------------------------------------------------------------------- */
 
 static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
 {
    DBG(DBG_STARTUP, "");
 
-   dmaAddr[DMA_CS] = DMA_CHANNEL_RESET;
+   initKillDMA(dmaAddr);
 
    dmaAddr[DMA_CS] = DMA_INTERRUPT_STATUS | DMA_END_FLAG;
 
@@ -7870,7 +7880,7 @@ static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
    dmaAddr[DMA_CS] = DMA_WAIT_ON_WRITES    |
                      DMA_PANIC_PRIORITY(8) |
                      DMA_PRIORITY(8)       |
-                     DMA_ACTIVATE;
+                     DMA_ACTIVE;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -8632,8 +8642,11 @@ void gpioTerminate(void)
 
    /* reset DMA */
 
-   if (dmaReg != MAP_FAILED) dmaIn[DMA_CS] = DMA_CHANNEL_RESET;
-   if (dmaReg != MAP_FAILED) dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
+   if (dmaReg != MAP_FAILED)
+   {
+      initKillDMA(dmaIn);
+      initKillDMA(dmaOut);
+   }
 
 #ifndef EMBEDDED_IN_VM
    if ((gpioCfg.internals & PI_CFG_STATS) &&
@@ -9688,11 +9701,7 @@ int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
       PWMClockInited = 0;
    }
 
-   if (wave_mode < PI_WAVE_MODE_ONE_SHOT_SYNC)
-   {
-      dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-      dmaOut[DMA_CONBLK_AD] = 0;
-   }
+   if (wave_mode < PI_WAVE_MODE_ONE_SHOT_SYNC) initKillDMA(dmaOut);
 
    p = rawWaveCBAdr(waveInfo[wave_id].topCB);
 
@@ -9935,8 +9944,8 @@ int gpioWaveChain(char *buf, unsigned bufSize)
       PWMClockInited = 0;
    }
 
-   dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-   dmaOut[DMA_CONBLK_AD] = 0;
+   initKillDMA(dmaOut);
+
    waveEndPtr = NULL;
    endPtr = NULL;
 
@@ -10257,8 +10266,7 @@ int gpioWaveTxStop(void)
 
    CHECK_INITED;
 
-   dmaOut[DMA_CS] = DMA_CHANNEL_RESET;
-   dmaOut[DMA_CONBLK_AD] = 0;
+   initKillDMA(dmaOut);
 
    waveEndPtr = NULL;
 

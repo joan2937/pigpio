@@ -63,10 +63,12 @@ void t1()
    CHECK(1, 1, v, 0, 0, "set mode, get mode");
 
    gpioSetPullUpDown(GPIO, PI_PUD_UP);
+   gpioDelay(1); /* 1 micro delay to let GPIO reach level reliably */
    v = gpioRead(GPIO);
    CHECK(1, 2, v, 1, 0, "set pull up down, read");
 
    gpioSetPullUpDown(GPIO, PI_PUD_DOWN);
+   gpioDelay(1); /* 1 micro delay to let GPIO reach level reliably */
    v = gpioRead(GPIO);
    CHECK(1, 3, v, 0, 0, "set pull up down, read");
 
