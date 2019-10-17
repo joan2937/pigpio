@@ -106,9 +106,9 @@ install:	$(ALL)
 	if which python2; then python2 setup.py install $(PYINSTALLARGS); fi
 	if which python3; then python3 setup.py install $(PYINSTALLARGS); fi
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man1
-	install -m 0644 *.1                            $(DESTDIR)$(mandir)/man1
+	install -m 0644 p*.1                           $(DESTDIR)$(mandir)/man1
 	install -m 0755 -d                             $(DESTDIR)$(mandir)/man3
-	install -m 0644 *.3                            $(DESTDIR)$(mandir)/man3
+	install -m 0644 p*.3                           $(DESTDIR)$(mandir)/man3
 ifeq ($(DESTDIR),)
 	ldconfig
 endif
@@ -136,19 +136,19 @@ ifeq ($(DESTDIR),)
 endif
 
 $(LIB1):	$(OBJ1)
-	$(SHLIB) -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB1).$(SOVERSION) -o $(LIB1).$(SOVERSION) $(OBJ1)
 	ln -fs $(LIB1).$(SOVERSION) $(LIB1)
 	$(STRIPLIB) $(LIB1)
 	$(SIZE)     $(LIB1)
 
 $(LIB2):	$(OBJ2)
-	$(SHLIB) -Wl,-soname,$(LIB2).$(SOVERSION) -o $(LIB2).$(SOVERSION) $(OBJ2)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB2).$(SOVERSION) -o $(LIB2).$(SOVERSION) $(OBJ2)
 	ln -fs $(LIB2).$(SOVERSION) $(LIB2)
 	$(STRIPLIB) $(LIB2)
 	$(SIZE)     $(LIB2)
 
 $(LIB3):	$(OBJ3)
-	$(SHLIB) -Wl,-soname,$(LIB3).$(SOVERSION) -o $(LIB3).$(SOVERSION) $(OBJ3)
+	$(SHLIB) -pthread -Wl,-soname,$(LIB3).$(SOVERSION) -o $(LIB3).$(SOVERSION) $(OBJ3)
 	ln -fs $(LIB3).$(SOVERSION) $(LIB3)
 	$(STRIPLIB) $(LIB3)
 	$(SIZE)     $(LIB3)

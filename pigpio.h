@@ -13,7 +13,6 @@ of the public at large and to the detriment of our heirs and
 successors. We intend this dedication to be an overt act of
 relinquishment in perpetuity of all present and future rights to this
 software under copyright law.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -31,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 68
+#define PIGPIO_VERSION 7101
 
 /*TEXT
 
@@ -611,13 +610,16 @@ typedef void *(gpioThreadFunc_t) (void *);
 /* hardware PWM */
 
 #define PI_HW_PWM_MIN_FREQ 1
-#define PI_HW_PWM_MAX_FREQ 125000000
+#define PI_HW_PWM_MAX_FREQ      125000000
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
 #define PI_HW_PWM_RANGE 1000000
 
 /* hardware clock */
 
-#define PI_HW_CLK_MIN_FREQ 4689
-#define PI_HW_CLK_MAX_FREQ 250000000
+#define PI_HW_CLK_MIN_FREQ       4689
+#define PI_HW_CLK_MIN_FREQ_2711 13184
+#define PI_HW_CLK_MAX_FREQ      250000000
+#define PI_HW_CLK_MAX_FREQ_2711 375000000
 
 #define PI_NOTIFY_SLOTS  32
 
@@ -831,10 +833,10 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CLOCK_PWM 0
 #define PI_CLOCK_PCM 1
 
-/* DMA channel: 0-14 */
+/* DMA channel: 0-15, 15 is unset */
 
 #define PI_MIN_DMA_CHANNEL 0
-#define PI_MAX_DMA_CHANNEL 14
+#define PI_MAX_DMA_CHANNEL 15
 
 /* port */
 
@@ -2880,6 +2882,9 @@ This function provides a low-level interface to the
 SPI/I2C Slave peripheral.  This peripheral allows the
 Pi to act as a slave device on an I2C or SPI bus.
 
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -3980,7 +3985,7 @@ Frequencies above 30MHz are unlikely to work.
 
 . .
    gpio: see description
-clkfreq: 0 (off) or 4689-250000000 (250M)
+clkfreq: 0 (off) or 4689-250M (13184-375M for the BCM2711)
 . .
 
 Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
@@ -4025,7 +4030,7 @@ main clock defaults to PCM but may be overridden by a call to
 
 . .
    gpio: see description
-PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
 . .
 
@@ -4052,12 +4057,12 @@ The GPIO must be one of the following.
 . .
 
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by PWMfreq.
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
-There will only be a million steps for a PWMfreq of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 D*/
@@ -4745,8 +4750,7 @@ D*/
 
 
 /*F*/
-int gpioCfgDMAchannels(
-   unsigned primaryChannel, unsigned secondaryChannel);
+int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
 
@@ -4757,8 +4761,14 @@ This function is only effective if called before [*gpioInitialise*].
 secondaryChannel: 0-14
 . .
 
-The default setting is to use channel 14 for the primary channel and
-channel 6 for the secondary channel.
+The default setting depends on whether the Pi has a BCM2711 chip or
+not (currently only the Pi4B has a BCM2711).
+
+The default setting for a non-BCM2711 is to use channel 14 for the
+primary channel and channel 6 for the secondary channel.
+
+The default setting for a BCM2711 is to use channel 7 for the
+primary channel and channel 6 for the secondary channel.
 
 The secondary channel is only used for the transmission of waves.
 
@@ -5305,13 +5315,14 @@ char::
 
 A single character, an 8 bit quantity able to store 0-255.
 
-clkfreq::4689-250M
+clkfreq::4689-250M (13184-375M for the BCM2711)
 
 The hardware clock frequency.
 
 . .
 PI_HW_CLK_MIN_FREQ 4689
 PI_HW_CLK_MAX_FREQ 250000000
+PI_HW_CLK_MAX_FREQ_2711 375000000
 . .
 
 count::
@@ -5331,10 +5342,10 @@ PI_MIN_WAVE_DATABITS 1
 PI_MAX_WAVE_DATABITS 32
 . .
 
-DMAchannel::0-14
+DMAchannel::0-15
 . .
 PI_MIN_DMA_CHANNEL 0
-PI_MAX_DMA_CHANNEL 14
+PI_MAX_DMA_CHANNEL 15
 . .
 
 double::
@@ -5718,7 +5729,7 @@ The port used to bind to the pigpio socket.  Defaults to 8888.
 pos::
 The position of an item.
 
-primaryChannel:: 0-14
+primaryChannel:: 0-15
 The DMA channel used to time the sampling of GPIO and to time servo and
 PWM pulses.
 
@@ -5763,12 +5774,13 @@ The hardware PWM dutycycle.
 PI_HW_PWM_RANGE 1000000
 . .
 
-PWMfreq::5-250K
+PWMfreq::1-125M (1-187.5M for the BCM2711)
 The hardware PWM frequency.
 
 . .
 PI_HW_PWM_MIN_FREQ 1
 PI_HW_PWM_MAX_FREQ 125000000
+PI_HW_PWM_MAX_FREQ_2711 187500000
 . .
 
 range::25-40000
@@ -6301,11 +6313,11 @@ after this command is issued.
 #define PI_NO_HANDLE        -24 // no handle available
 #define PI_BAD_HANDLE       -25 // unknown handle
 #define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
-#define PI_BAD_CHANNEL      -27 // DMA channel not 0-14
-#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-14
+#define PI_BAD_CHANNEL      -27 // DMA channel not 0-15
+#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-15
 #define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000
 #define PI_BAD_FIFO_COMMAND -29 // unrecognized fifo command
-#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-6
+#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-15
 #define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
 #define PI_INITIALISED      -32 // function called after gpioInitialise
 #define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
@@ -6372,9 +6384,9 @@ after this command is issued.
 #define PI_NOT_SERVO_GPIO   -93 // GPIO is not in use for servo pulses
 #define PI_NOT_HCLK_GPIO    -94 // GPIO has no hardware clock
 #define PI_NOT_HPWM_GPIO    -95 // GPIO has no hardware PWM
-#define PI_BAD_HPWM_FREQ    -96 // hardware PWM frequency not 1-125M
+#define PI_BAD_HPWM_FREQ    -96 // invalid hardware PWM frequency
 #define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
-#define PI_BAD_HCLK_FREQ    -98 // hardware clock frequency not 4689-250M
+#define PI_BAD_HCLK_FREQ    -98 // invalid hardware clock frequency
 #define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
 #define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
 #define PI_BAD_DATABITS    -101 // serial data bits not 1-32
@@ -6421,6 +6433,8 @@ after this command is issued.
 #define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
 #define PI_BAD_EVENT_ID    -143 // bad event id
 #define PI_CMD_INTERRUPTED -144 // Used by Python
+#define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
+#define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
@@ -6440,6 +6454,9 @@ after this command is issued.
 #define PI_DEFAULT_DMA_CHANNEL             14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
+#define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
+#define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
+#define PI_DEFAULT_DMA_NOT_SET             15
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
@@ -6450,6 +6467,7 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_ZERO        0x0080000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI2B        0x0080480FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
+#define PI_DEFAULT_UPDATE_MASK_PI4B        0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
 #define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 

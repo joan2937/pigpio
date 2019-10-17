@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 13
+#define PIGPIOD_IF2_VERSION 15
 
 /*TEXT
 
@@ -1049,7 +1049,7 @@ Frequencies above 30MHz are unlikely to work.
 . .
        pi: >=0 (as returned by [*pigpio_start*]).
      gpio: see description
-frequency: 0 (off) or 4689-250000000 (250M)
+frequency: 0 (off) or 4689-250M (13184-375M for the BCM2711)
 . .
 
 Returns 0 if OK, otherwise PI_NOT_PERMITTED, PI_BAD_GPIO,
@@ -1096,7 +1096,7 @@ daemon is started (option -t).
 . .
      pi: >=0 (as returned by [*pigpio_start*]).
    gpio: see descripton
-PWMfreq: 0 (off) or 1-125000000 (125M)
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
 PWMduty: 0 (off) to 1000000 (1M)(fully on)
 . .
 
@@ -1124,12 +1124,12 @@ The GPIO must be one of the following.
 . .
 
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by PWMfreq.
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
 
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
-There will only be a million steps for a PWMfreq of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 D*/
@@ -3402,6 +3402,9 @@ This function provides a low-level interface to the
 SPI/I2C Slave peripheral.  This peripheral allows the
 Pi to act as a slave device on an I2C or SPI bus.
 
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -3521,6 +3524,9 @@ D*/
 int bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer);
 /*D
 This function allows the Pi to act as a slave I2C device.
+
+This function is not available on the BCM2711 (e.g.as
+used in the Pi4B).
 
 The data bytes (if any) are written to the BSC transmit
 FIFO and the bytes in the BSC receive FIFO are returned.
@@ -3743,7 +3749,7 @@ typedef void (*CBFuncEx_t)
 char::
 A single character, an 8 bit quantity able to store 0-255.
 
-clkfreq::4689-250000000 (250M)
+clkfreq::4689-250M (13184-375M for the BCM2711)
 The hardware clock frequency.
 
 count::
@@ -4047,12 +4053,13 @@ The hardware PWM dutycycle.
 #define PI_HW_PWM_RANGE 1000000
 . .
 
-PWMfreq::1-125000000 (125M)
+PWMfreq::1-125M (1-187.5M for the BCM2711)
 The hardware PWM frequency.
 
 . .
 #define PI_HW_PWM_MIN_FREQ 1
 #define PI_HW_PWM_MAX_FREQ 125000000
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
 . .
 
 range::25-40000

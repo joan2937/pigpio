@@ -543,6 +543,10 @@ This command performs a BSC I2C/SPI slave transfer as defined by
 \fBbctl\fP with data \fBbvs\fP.
 
 .br
+This function is not available on the BCM2711 (e.g. as
+used in the Pi4B).
+
+.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -1701,11 +1705,11 @@ $ pigs hp 19 100 200000 # 20% dutycycle
 .br
 
 .br
-$ pigs hp 19 125000001 100000
+$ pigs hp 19 400000000 100000
 .br
 -96
 .br
-ERROR: hardware PWM frequency not 1-125M
+ERROR: invalid hardware PWM frequency
 .br
 
 .EE
@@ -1741,14 +1745,14 @@ The GPIO must be one of the following.
 
 .br
 The actual number of steps beween off and fully on is the
-integral part of 250 million divided by \fBpf\fP.
+integral part of 250M/\fBpf\fP (375M/\fBpf\fP for the BCM2711).
 
 .br
-The actual frequency set is 250 million / steps.
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
 
 .br
-There will only be a million steps for a \fBpf\fP of 250.
-Lower frequencies will have more steps and higher
+There will only be a million steps for a \fBpf\fP of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
 frequencies will have fewer steps.  \fBpdc\fP is
 automatically scaled to take this into account.
 
@@ -5121,7 +5125,7 @@ The command expects a SPI channel.
 
 .br
 
-.IP "\fBcf\fP - hardware clock frequency (4689-250M)" 0
+.IP "\fBcf\fP - hardware clock frequency (4689-250M, 13184-375M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
@@ -5404,7 +5408,7 @@ The command expects a dutycycle.
 
 .br
 
-.IP "\fBpf\fP - hardware PWM frequency (1-125M)" 0
+.IP "\fBpf\fP - hardware PWM frequency (1-125M, 1-187.5M for the BCM2711)" 0
 The command expects a frequency.
 
 .br
@@ -5751,11 +5755,36 @@ Each script has
 .br
 .SS Commands
 .br
-All the normal pigs commands may be used within a script.  However
-commands which return more than an integer will be of little use.
+Many pigpio commands may be used within a script.  However
+some commands do not work within the script model as designed and
+are not permitted.
 
 .br
-The following commands are only legal within a script.
+The following commands are not permitted within a script:
+
+.br
+File - FL FO FR FW
+
+.br
+I2C - BI2CZ I2CPK I2CRD I2CRI I2CRK I2CWD I2CWI I2CWK I2CZ
+
+.br
+Misc - BSCX CF1 CF2 SHELL
+
+.br
+Script control - PARSE PROC PROCD PROCP PROCR PROCS PROCU
+
+.br
+Serial - SERO SERR SERW SLR
+
+.br
+SPI - BSPIO BSPIX SPIR SPIW SPIX
+
+.br
+Waves - WVAG WVAS WVCHA WVGO WVGOR
+
+.br
+The following commands are only permitted within a script:
 
 .br
 

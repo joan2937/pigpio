@@ -26,7 +26,7 @@ For more information, please refer to <http://unlicense.org/>
 */
 
 /*
-This version is for pigpio version 67+
+This version is for pigpio version 69+
 */
 
 #include <stdio.h>
@@ -233,8 +233,9 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
               */
          if (r < 0)
          {
-            printf("%d", r);
+            printf("%d\n", r);
             report(PIGS_SCRIPT_ERR, "ERROR: %s", cmdErrStr(r));
+            break;
          }
 
          p = (uint32_t *)response_buf;
@@ -300,7 +301,7 @@ int main(int argc , char *argv[])
    int sock, command;
    int args, idx, i, pp, l, len;
    cmdCmd_t cmd;
-   uint32_t p[CMD_P_ARR];
+   uintptr_t p[CMD_P_ARR];
    cmdCtlParse_t ctl;
    cmdScript_t s;
    char v[CMD_MAX_EXTENSION];
