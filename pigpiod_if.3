@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii pigpiod_if.3
 ."
-.TH pigpiod_if 3 2012-2018 Linux "pigpio archive"
+.TH pigpiod_if 3 2012-2019 Linux "pigpio archive"
 .SH NAME
 pigpiod_if - A C library to interface to the pigpio daemon.
 
@@ -175,6 +175,342 @@ All the functions which return an int return < 0 on error
 
 .br
 
+.br
+
+.SH OVERVIEW
+
+.br
+.SS ESSENTIAL
+.br
+
+.br
+pigpio_start               Connects to the pigpio daemon
+.br
+pigpio_stop                Disconnects from the pigpio daemon
+.br
+.SS BEGINNER
+.br
+
+.br
+set_mode                   Set a GPIO mode
+.br
+get_mode                   Get a GPIO mode
+.br
+
+.br
+set_pull_up_down           Set/clear GPIO pull up/down resistor
+.br
+
+.br
+gpio_read                  Read a GPIO
+.br
+gpio_write                 Write a GPIO
+.br
+
+.br
+set_PWM_dutycycle          Start/stop PWM pulses on a GPIO
+.br
+get_PWM_dutycycle          Get the PWM dutycycle in use on a GPIO
+.br
+
+.br
+set_servo_pulsewidth       Start/stop servo pulses on a GPIO
+.br
+get_servo_pulsewidth       Get the servo pulsewidth in use on a GPIO
+.br
+
+.br
+callback                   Create GPIO level change callback
+.br
+callback_ex                Create GPIO level change callback
+.br
+callback_cancel            Cancel a callback
+.br
+wait_for_edge              Wait for GPIO level change
+.br
+.SS INTERMEDIATE
+.br
+
+.br
+gpio_trigger               Send a trigger pulse to a GPIO.
+.br
+
+.br
+set_watchdog               Set a watchdog on a GPIO.
+.br
+
+.br
+set_PWM_range              Configure PWM range for a GPIO
+.br
+get_PWM_range              Get configured PWM range for a GPIO
+.br
+
+.br
+set_PWM_frequency          Configure PWM frequency for a GPIO
+.br
+get_PWM_frequency          Get configured PWM frequency for a GPIO
+.br
+
+.br
+read_bank_1                Read all GPIO in bank 1
+.br
+read_bank_2                Read all GPIO in bank 2
+.br
+
+.br
+clear_bank_1               Clear selected GPIO in bank 1
+.br
+clear_bank_2               Clear selected GPIO in bank 2
+.br
+
+.br
+set_bank_1                 Set selected GPIO in bank 1
+.br
+set_bank_2                 Set selected GPIO in bank 2
+.br
+
+.br
+start_thread               Start a new thread
+.br
+stop_thread                Stop a previously started thread
+.br
+.SS ADVANCED
+.br
+
+.br
+get_PWM_real_range         Get underlying PWM range for a GPIO
+.br
+
+.br
+notify_open                Request a notification handle
+.br
+notify_begin               Start notifications for selected GPIO
+.br
+notify_pause               Pause notifications
+.br
+notify_close               Close a notification
+.br
+
+.br
+bb_serial_read_open        Opens a GPIO for bit bang serial reads
+.br
+bb_serial_read             Reads bit bang serial data from a GPIO
+.br
+bb_serial_read_close       Closes a GPIO for bit bang serial reads
+.br
+bb_serial_invert           Invert serial logic (1 invert, 0 normal)
+.br
+
+.br
+hardware_clock             Start hardware clock on supported GPIO
+.br
+hardware_PWM               Start hardware PWM on supported GPIO
+.br
+
+.br
+set_glitch_filter         Set a glitch filter on a GPIO
+.br
+set_noise_filter          Set a noise filter on a GPIO
+.br
+.SS SCRIPTS
+.br
+
+.br
+store_script               Store a script
+.br
+run_script                 Run a stored script
+.br
+script_status              Get script status and parameters
+.br
+stop_script                Stop a running script
+.br
+delete_script              Delete a stored script
+.br
+.SS WAVES
+.br
+
+.br
+wave_clear                 Deletes all waveforms
+.br
+
+.br
+wave_add_new               Starts a new waveform
+.br
+wave_add_generic           Adds a series of pulses to the waveform
+.br
+wave_add_serial            Adds serial data to the waveform
+.br
+
+.br
+wave_create                Creates a waveform from added data
+.br
+wave_delete                Deletes one or more waveforms
+.br
+
+.br
+wave_send_once             Transmits a waveform once
+.br
+wave_send_repeat           Transmits a waveform repeatedly
+.br
+
+.br
+wave_chain                 Transmits a chain of waveforms
+.br
+
+.br
+wave_tx_busy               Checks to see if the waveform has ended
+.br
+wave_tx_stop               Aborts the current waveform
+.br
+
+.br
+wave_get_micros            Length in microseconds of the current waveform
+.br
+wave_get_high_micros       Length of longest waveform so far
+.br
+wave_get_max_micros        Absolute maximum allowed micros
+.br
+
+.br
+wave_get_pulses            Length in pulses of the current waveform
+.br
+wave_get_high_pulses       Length of longest waveform so far
+.br
+wave_get_max_pulses        Absolute maximum allowed pulses
+.br
+
+.br
+wave_get_cbs               Length in cbs of the current waveform
+.br
+wave_get_high_cbs          Length of longest waveform so far
+.br
+wave_get_max_cbs           Absolute maximum allowed cbs
+.br
+.SS I2C
+.br
+
+.br
+i2c_open                   Opens an I2C device
+.br
+i2c_close                  Closes an I2C device
+.br
+
+.br
+i2c_write_quick            smbus write quick
+.br
+i2c_write_byte             smbus write byte
+.br
+i2c_read_byte              smbus read byte
+.br
+i2c_write_byte_data        smbus write byte data
+.br
+i2c_write_word_data        smbus write word data
+.br
+i2c_read_byte_data         smbus read byte data
+.br
+i2c_read_word_data         smbus read word data
+.br
+i2c_process_call           smbus process call
+.br
+i2c_write_block_data       smbus write block data
+.br
+i2c_read_block_data        smbus read block data
+.br
+i2c_block_process_call     smbus block process call
+.br
+
+.br
+i2c_write_i2c_block_data   smbus write I2C block data
+.br
+i2c_read_i2c_block_data    smbus read I2C block data
+.br
+
+.br
+i2c_read_device            Reads the raw I2C device
+.br
+i2c_write_device           Writes the raw I2C device
+.br
+
+.br
+i2c_zip                    Performs multiple I2C transactions
+.br
+
+.br
+bb_i2c_open                Opens GPIO for bit banging I2C
+.br
+bb_i2c_close               Closes GPIO for bit banging I2C
+.br
+bb_i2c_zip                 Performs multiple bit banged I2C transactions
+.br
+.SS SPI
+.br
+
+.br
+spi_open                   Opens a SPI device
+.br
+spi_close                  Closes a SPI device
+.br
+
+.br
+spi_read                   Reads bytes from a SPI device
+.br
+spi_write                  Writes bytes to a SPI device
+.br
+spi_xfer                   Transfers bytes with a SPI device
+.br
+.SS SERIAL
+.br
+
+.br
+serial_open                Opens a serial device
+.br
+serial_close               Closes a serial device
+.br
+
+.br
+serial_write_byte          Writes a byte to a serial device
+.br
+serial_read_byte           Reads a byte from a serial device
+.br
+serial_write               Writes bytes to a serial device
+.br
+serial_read                Reads bytes from a serial device
+.br
+
+.br
+serial_data_available      Returns number of bytes ready to be read
+.br
+.SS CUSTOM
+.br
+
+.br
+custom_1                   User custom function 1
+.br
+custom_2                   User custom function 2
+.br
+.SS UTILITIES
+.br
+
+.br
+get_current_tick           Get current tick (microseconds)
+.br
+
+.br
+get_hardware_revision      Get hardware revision
+.br
+get_pigpio_version         Get the pigpio version
+.br
+pigpiod_if_version         Get the pigpiod_if version
+.br
+
+.br
+pigpio_error               Get a text description of an error code.
+.br
+
+.br
+time_sleep                 Sleeps for a float number of seconds
+.br
+time_time                  Float number of seconds since the epoch
 .br
 .SH FUNCTIONS
 

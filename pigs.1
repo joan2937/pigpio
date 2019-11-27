@@ -2,7 +2,7 @@
 ." Process this file with
 ." groff -man -Tascii foo.1
 ."
-.TH pigs 1 2012-2018 Linux "pigpio archive"
+.TH pigs 1 2012-2019 Linux "pigpio archive"
 .SH NAME
 pigs - command line socket access to the pigpio daemon.
 
@@ -28,8 +28,8 @@ or
 
 
 .br
-The socket and pipe interfaces allow control of the GPIO by passing
-messages to the running pigpio library.
+The socket and pipe interfaces allow control of the Pi's GPIO by
+passing messages to the running pigpio library.
 
 .br
 The normal way to start the pigpio library would be as a daemon during boot.
@@ -41,10 +41,6 @@ sudo pigpiod
 .br
 
 .EE
-
-.br
-pigs is a program and internally uses the socket interface to pigpio
-whereas /dev/pigpio uses the pipe interface.
 
 .br
 .SS Features
@@ -80,7 +76,11 @@ ALL GPIO are identified by their Broadcom number.
 .br
 .SS Usage
 .br
-pigs and the socket interface share the same commands and are invoked in
+pigs is a program and internally uses the socket interface to pigpio
+whereas /dev/pigpio uses the pipe interface.
+
+.br
+pigs and the pipe interface share the same commands and are invoked in
 a similar fashion from the command line.
 
 .br
@@ -241,6 +241,372 @@ $ pigs -x slr 4 100
 .EE
 
 .br
+
+.SH OVERVIEW
+.SS BASIC
+.B M/MODES g m 
+Set GPIO mode 
+.P
+.B MG/MODEG g 
+Get GPIO mode 
+.P
+.B PUD g p 
+Set GPIO pull up/down 
+.P
+.B R/READ g 
+Read GPIO level  
+.P
+.B W/WRITE g L 
+Write GPIO level 
+.P
+.SS PWM (overrides servo commands on same GPIO)
+.B P/PWM u v 
+Set GPIO PWM value      
+.P
+.B PFS u v 
+Set GPIO PWM frequency  
+.P
+.B PRS u v 
+Set GPIO PWM range      
+.P
+.B GDC u 
+Get GPIO PWM dutycycle  
+.P
+.B PFG u 
+Get GPIO PWM frequency  
+.P
+.B PRG u 
+Get GPIO PWM range      
+.P
+.B PRRG u 
+Get GPIO PWM real range 
+.P
+.SS Servo (overrides PWM commands on same GPIO)
+.B S/SERVO u v 
+Set GPIO servo pulsewidth 
+.P
+.B GPW u 
+Get GPIO servo pulsewidth 
+.P
+.SS INTERMEDIATE
+.B TRIG u pl L 
+Send a trigger pulse 
+.P
+.B WDOG u v 
+Set GPIO watchdog    
+.P
+.B BR1  
+Read bank 1 GPIO               
+.P
+.B BR2  
+Read bank 2 GPIO               
+.P
+.B BC1 bits 
+Clear specified GPIO in bank 1 
+.P
+.B BC2 bits 
+Clear specified GPIO in bank 2 
+.P
+.B BS1 bits 
+Set specified GPIO in bank 1   
+.P
+.B BS2 bits 
+Set specified GPIO in bank 2   
+.P
+.SS ADVANCED
+.B NO  
+Request a notification 
+.P
+.B NC h 
+Close notification     
+.P
+.B NB h bits 
+Start notification     
+.P
+.B NP h 
+Pause notification     
+.P
+.B HC g cf 
+Set hardware clock frequency 
+.P
+.B HP g pf pdc 
+Set hardware PWM frequency and dutycycle 
+.P
+.B FG u stdy 
+Set a glitch filter on a GPIO  
+.P
+.B FN u stdy actv 
+Set a noise filter on a GPIO   
+.P
+.B PADS pad padma 
+Set pad drive strength 
+.P
+.B PADG pad 
+Get pad drive strength 
+.P
+.B SHELL name str 
+Execute a shell command 
+.P
+.SS Custom
+.B CF1 uvs 
+Custom function 1 
+.P
+.B CF2 uvs 
+Custom function 2 
+.P
+.SS Events
+.B EVM h bits 
+Set events to monitor 
+.P
+.B EVT event 
+Trigger event         
+.P
+.SS Scripts
+.B PROC t 
+Store script                     
+.P
+.B PROCR sid pars 
+Run script                       
+.P
+.B PROCU sid pars 
+Set script parameters            
+.P
+.B PROCP sid 
+Get script status and parameters 
+.P
+.B PROCS sid 
+Stop script                      
+.P
+.B PROCD sid 
+Delete script                    
+.P
+.B PARSE t 
+Validate script                  
+.P
+.SS I2C
+.B I2CO ib id if 
+Open I2C bus and device with flags 
+.P
+.B I2CC h 
+Close I2C handle                   
+.P
+.B I2CWQ h bit 
+smb Write Quick: write bit 
+.P
+.B I2CRS h 
+smb Read Byte: read byte   
+.P
+.B I2CWS h bv 
+smb Write Byte: write byte 
+.P
+.B I2CRB h r 
+smb Read Byte Data: read byte from register 
+.P
+.B I2CWB h r bv 
+smb Write Byte Data: write byte to register 
+.P
+.B I2CRW h r 
+smb Read Word Data: read word from register 
+.P
+.B I2CWW h r wv 
+smb Write Word Data: write word to register 
+.P
+.B I2CRK h r 
+smb Read Block Data: read data from register 
+.P
+.B I2CWK h r bvs 
+smb Write Block Data: write data to register 
+.P
+.B I2CWI h r bvs 
+smb Write I2C Block Data                          
+.P
+.B I2CRI h r num 
+smb Read I2C Block Data: read bytes from register 
+.P
+.B I2CRD h num 
+i2c Read device  
+.P
+.B I2CWD h bvs 
+i2c Write device 
+.P
+.B I2CPC h r wv 
+smb Process Call: exchange register with word             
+.P
+.B I2CPK h r bvs 
+smb Block Process Call: exchange data bytes with register 
+.P
+.B I2CZ h bvs 
+Performs multiple I2C transactions 
+.P
+.SS I2C BIT BANG
+.B BI2CO sda scl b 
+Open bit bang I2C  
+.P
+.B BI2CC sda 
+Close bit bang I2C 
+.P
+.B BI2CZ sda bvs 
+I2C bit bang multiple transactions 
+.P
+.SS I2C/SPI SLAVE
+.B BSCX bctl bvs 
+BSC I2C/SPI transfer 
+.P
+.SS SERIAL
+.B SERO dev b sef 
+Open serial device dev at baud b with flags 
+.P
+.B SERC h 
+Close serial handle                         
+.P
+.B SERRB  
+Read byte from serial handle  
+.P
+.B SERWB h bv 
+Write byte to serial handle   
+.P
+.B SERR h num 
+Read bytes from serial handle 
+.P
+.B SERW h bvs 
+Write bytes to serial handle  
+.P
+.B SERDA h 
+Check for serial data ready to read 
+.P
+.SS SERIAL BIT BANG (read only)
+.B SLRO u b db 
+Open GPIO for bit bang serial data     
+.P
+.B SLRC u 
+Close GPIO for bit bang serial data    
+.P
+.B SLRI u v 
+Sets bit bang serial data logic levels 
+.P
+.B SLR u num 
+Read bit bang serial data from GPIO    
+.P
+.SS SPI
+.B SPIO c b spf 
+SPI open channel at baud b with flags 
+.P
+.B SPIC h 
+SPI close handle                    
+.P
+.B SPIR h num 
+SPI read bytes from handle          
+.P
+.B SPIW h bvs 
+SPI write bytes to handle           
+.P
+.B SPIX h bvs 
+SPI transfer bytes to handle        
+.P
+.SS SPI BIT BANG
+.B BSPIO cs miso mosi sclk b spf 
+Open bit bang SPI      
+.P
+.B BSPIC cs 
+Close bit bang SPI    
+.P
+.B BSPIX cs bvs 
+SPI bit bang transfer 
+.P
+.SS FILES
+.B FO file mode 
+Open a file in mode            
+.P
+.B FC h 
+Close file handle              
+.P
+.B FR h num 
+Read bytes from file handle    
+.P
+.B FW h bvs 
+Write bytes to file handle     
+.P
+.B FS h num from 
+Seek to file handle position   
+.P
+.B FL pat num 
+List files which match pattern 
+.P
+.SS WAVES
+.B WVCLR  
+Clear all waveforms 
+.P
+.B WVNEW  
+Initialise a new waveform    
+.P
+.B WVAG trips 
+Add generic pulses to waveform 
+.P
+.B WVAS u b db sb o bvs 
+Add serial data to waveform    
+.P
+.B WVCRE  
+Create a waveform   
+.P
+.B WVDEL wid 
+Delete selected waveform 
+.P
+.B WVTX wid 
+Transmits waveform once       
+.P
+.B WVTXM wid wmde 
+Transmits waveform using mode 
+.P
+.B WVTXR wid 
+Transmits waveform repeatedly 
+.P
+.B WVCHA bvs 
+Transmits a chain of waveforms 
+.P
+.B WVTAT  
+Returns the current transmitting waveform 
+.P
+.B WVBSY  
+Check if waveform is being transmitted 
+.P
+.B WVHLT  
+Stop waveform 
+.P
+.B WVSC ws 
+Get waveform DMA CB stats    
+.P
+.B WVSM ws 
+Get waveform time stats      
+.P
+.B WVSP ws 
+Get waveform pulse stats     
+.P
+.SS UTILITIES
+.B H/HELP  
+Display command help        
+.P
+.B HWVER  
+Get hardware version        
+.P
+.B MICS v 
+Microseconds delay          
+.P
+.B MILS v 
+Milliseconds delay          
+.P
+.B PIGPV  
+Get pigpio library version  
+.P
+.B T/TICK  
+Get current tick            
+.P
+.SS CONFIGURATION
+.B CGI  
+Configuration get internals 
+.P
+.B CSI v 
+Configuration set internals 
+.P
 
 .SH COMMANDS
 
@@ -541,6 +907,23 @@ ERROR: no permission to update one or more GPIO
 .br
 This command performs a BSC I2C/SPI slave transfer as defined by
 \fBbctl\fP with data \fBbvs\fP.
+
+.br
+This function provides a low-level interface to the SPI/I2C Slave
+peripheral on the BCM chip.
+
+.br
+This peripheral allows the Pi to act as a hardware slave device
+on an I2C or SPI bus.
+
+.br
+This is not a bit bang version and as such is OS timing
+independent. The bus timing is handled directly by the chip.
+
+.br
+The output process is simple. You simply append data to the FIFO
+buffer on the chip.  This works like a queue, you add data to the
+queue and the master removes it.
 
 .br
 This function is not available on the BCM2711 (e.g. as
@@ -1974,7 +2357,7 @@ $ pigs i2crb 0 0
 
 .br
 
-.IP "\fBI2CRD h num\fP - i2c Read bytes"
+.IP "\fBI2CRD h num\fP - i2c Read device"
 .IP "" 4
 
 .br
@@ -2146,7 +2529,7 @@ $ pigs i2cwb 0 10 0x54
 
 .br
 
-.IP "\fBI2CWD h bvs\fP - i2c Write data"
+.IP "\fBI2CWD h bvs\fP - i2c Write device"
 .IP "" 4
 
 .br

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 7102
+#define PIGPIO_VERSION 7103
 
 /*TEXT
 
@@ -71,8 +71,6 @@ ALL GPIO are identified by their Broadcom number.
 The PWM and servo pulses are timed using the DMA and PWM peripherals.
 
 This use was inspired by Richard Hirst's servoblaster kernel module.
-
-See [[https://github.com/richardghirst/PiBits/tree/master/ServoBlaster]]
 
 *Usage*
 
@@ -117,7 +115,7 @@ ESSENTIAL
 gpioInitialise             Initialise library
 gpioTerminate              Stop library
 
-BEGINNER
+BASIC
 
 gpioSetMode                Set a GPIO mode
 gpioGetMode                Get a GPIO mode
@@ -127,29 +125,29 @@ gpioSetPullUpDown          Set/clear GPIO pull up/down resistor
 gpioRead                   Read a GPIO
 gpioWrite                  Write a GPIO
 
+PWM_(overrides_servo_commands_on_same_GPIO)
+
 gpioPWM                    Start/stop PWM pulses on a GPIO
+gpioSetPWMfrequency        Configure PWM frequency for a GPIO
+gpioSetPWMrange            Configure PWM range for a GPIO
+
 gpioGetPWMdutycycle        Get dutycycle setting on a GPIO
+gpioGetPWMfrequency        Get configured PWM frequency for a GPIO
+gpioGetPWMrange            Get configured PWM range for a GPIO
+
+gpioGetPWMrealRange        Get underlying PWM range for a GPIO
+
+Servo_(overrides_PWM_commands_on_same_GPIO)
 
 gpioServo                  Start/stop servo pulses on a GPIO
+
 gpioGetServoPulsewidth     Get pulsewidth setting on a GPIO
-
-gpioDelay                  Delay for a number of microseconds
-
-gpioSetAlertFunc           Request a GPIO level change callback
-
-gpioSetTimerFunc           Request a regular timed callback
 
 INTERMEDIATE
 
-gpioTrigger                Send a trigger pulse to a GPIO.
+gpioTrigger                Send a trigger pulse to a GPIO
 
-gpioSetWatchdog            Set a watchdog on a GPIO.
-
-gpioSetPWMrange            Configure PWM range for a GPIO
-gpioGetPWMrange            Get configured PWM range for a GPIO
-
-gpioSetPWMfrequency        Configure PWM frequency for a GPIO
-gpioGetPWMfrequency        Get configured PWM frequency for a GPIO
+gpioSetWatchdog            Set a watchdog on a GPIO
 
 gpioRead_Bits_0_31         Read all GPIO in bank 1
 gpioRead_Bits_32_53        Read all GPIO in bank 2
@@ -160,14 +158,34 @@ gpioWrite_Bits_32_53_Clear Clear selected GPIO in bank 2
 gpioWrite_Bits_0_31_Set    Set selected GPIO in bank 1
 gpioWrite_Bits_32_53_Set   Set selected GPIO in bank 2
 
+gpioSetAlertFunc           Request a GPIO level change callback
+gpioSetAlertFuncEx         Request a GPIO change callback, extended
+
+gpioSetTimerFunc           Request a regular timed callback
+gpioSetTimerFuncEx         Request a regular timed callback, extended
+
 gpioStartThread            Start a new thread
 gpioStopThread             Stop a previously started thread
 
 ADVANCED
 
-gpioGetPWMrealRange        Get underlying PWM range for a GPIO
+gpioNotifyOpen             Request a notification handle
+gpioNotifyClose            Close a notification
+gpioNotifyOpenWithSize     Request a notification with sized pipe
+gpioNotifyBegin            Start notifications for selected GPIO
+gpioNotifyPause            Pause notifications
 
-gpioSetAlertFuncEx         Request a GPIO change callback, extended
+gpioHardwareClock          Start hardware clock on supported GPIO
+
+gpioHardwarePWM            Start hardware PWM on supported GPIO
+
+gpioGlitchFilter           Set a glitch filter on a GPIO
+gpioNoiseFilter            Set a noise filter on a GPIO
+
+gpioSetPad                 Sets a pads drive strength
+gpioGetPad                 Gets a pads drive strength
+
+shell                      Executes a shell command
 
 gpioSetISRFunc             Request a GPIO interrupt callback
 gpioSetISRFuncEx           Request a GPIO interrupt callback, extended
@@ -178,31 +196,20 @@ gpioSetSignalFuncEx        Request a signal callback, extended
 gpioSetGetSamplesFunc      Requests a GPIO samples callback
 gpioSetGetSamplesFuncEx    Requests a GPIO samples callback, extended
 
-gpioSetTimerFuncEx         Request a regular timed callback, extended
+Custom
 
-gpioNotifyOpen             Request a notification handle
-gpioNotifyOpenWithSize     Request a notification handle with sized pipe
-gpioNotifyBegin            Start notifications for selected GPIO
-gpioNotifyPause            Pause notifications
-gpioNotifyClose            Close a notification
+gpioCustom1                User custom function 1
+gpioCustom2                User custom function 2
 
-gpioSerialReadOpen         Opens a GPIO for bit bang serial reads
-gpioSerialReadInvert       Configures normal/inverted for serial reads
-gpioSerialRead             Reads bit bang serial data from a GPIO
-gpioSerialReadClose        Closes a GPIO for bit bang serial reads
+Events
 
-gpioHardwareClock          Start hardware clock on supported GPIO
-gpioHardwarePWM            Start hardware PWM on supported GPIO
+eventMonitor               Sets the events to monitor
+eventSetFunc               Request an event callback
+eventSetFuncEx             Request an event callback, extended
 
-gpioGlitchFilter           Set a glitch filter on a GPIO
-gpioNoiseFilter            Set a noise filter on a GPIO
+eventTrigger               Trigger an event
 
-gpioGetPad                 Gets a pads drive strength
-gpioSetPad                 Sets a pads drive strength
-
-shell                      Executes a shell command
-
-SCRIPTS
+Scripts
 
 gpioStoreScript            Store a script
 gpioRunScript              Run a stored script
@@ -210,6 +217,101 @@ gpioUpdateScript           Set a scripts parameters
 gpioScriptStatus           Get script status and parameters
 gpioStopScript             Stop a running script
 gpioDeleteScript           Delete a stored script
+
+I2C
+
+i2cOpen                    Opens an I2C device
+i2cClose                   Closes an I2C device
+
+i2cWriteQuick              SMBus write quick
+
+i2cReadByte                SMBus read byte
+i2cWriteByte               SMBus write byte
+
+i2cReadByteData            SMBus read byte data
+i2cWriteByteData           SMBus write byte data
+
+i2cReadWordData            SMBus read word data
+i2cWriteWordData           SMBus write word data
+
+i2cReadBlockData           SMBus read block data
+i2cWriteBlockData          SMBus write block data
+
+i2cReadI2CBlockData        SMBus read I2C block data
+i2cWriteI2CBlockData       SMBus write I2C block data
+
+i2cReadDevice              Reads the raw I2C device
+i2cWriteDevice             Writes the raw I2C device
+
+i2cProcessCall             SMBus process call
+i2cBlockProcessCall        SMBus block process call
+
+i2cSwitchCombined          Sets or clears the combined flag
+
+i2cSegments                Performs multiple I2C transactions
+
+i2cZip                     Performs multiple I2C transactions
+
+I2C_BIT_BANG
+
+bbI2COpen                  Opens GPIO for bit banging I2C
+bbI2CClose                 Closes GPIO for bit banging I2C
+
+bbI2CZip                   Performs bit banged I2C transactions
+
+I2C/SPI_SLAVE
+
+bscXfer                    I2C/SPI as slave transfer
+
+SERIAL
+
+serOpen                    Opens a serial device
+serClose                   Closes a serial device
+
+serReadByte                Reads a byte from a serial device
+serWriteByte               Writes a byte to a serial device
+
+serRead                    Reads bytes from a serial device
+serWrite                   Writes bytes to a serial device
+
+serDataAvailable           Returns number of bytes ready to be read
+
+SERIAL_BIT_BANG_(read_only)
+
+gpioSerialReadOpen         Opens a GPIO for bit bang serial reads
+gpioSerialReadClose        Closes a GPIO for bit bang serial reads
+
+gpioSerialReadInvert       Configures normal/inverted for serial reads
+
+gpioSerialRead             Reads bit bang serial data from a GPIO
+
+SPI
+
+spiOpen                    Opens a SPI device
+spiClose                   Closes a SPI device
+
+spiRead                    Reads bytes from a SPI device
+spiWrite                   Writes bytes to a SPI device
+spiXfer                    Transfers bytes with a SPI device
+
+SPI_BIT_BANG
+
+bbSPIOpen                  Opens GPIO for bit banging SPI
+bbSPIClose                 Closes GPIO for bit banging SPI
+
+bbSPIXfer                  Performs bit banged SPI transactions
+
+FILES
+
+fileOpen                   Opens a file
+fileClose                  Closes a file
+
+fileRead                   Reads bytes from a file
+fileWrite                  Writes bytes to a file
+
+fileSeek                   Seeks to a position within a file
+
+fileList                   List files which match a pattern
 
 WAVES
 
@@ -229,9 +331,14 @@ gpioWaveChain              Transmits a chain of waveforms
 gpioWaveTxAt               Returns the current transmitting waveform
 
 gpioWaveTxBusy             Checks to see if the waveform has ended
+
 gpioWaveTxStop             Aborts the current waveform
 
-gpioWaveGetMicros          Length in microseconds of the current waveform
+gpioWaveGetCbs             Length in CBs of the current waveform
+gpioWaveGetHighCbs         Length of longest waveform so far
+gpioWaveGetMaxCbs          Absolute maximum allowed CBs
+
+gpioWaveGetMicros          Length in micros of the current waveform
 gpioWaveGetHighMicros      Length of longest waveform so far
 gpioWaveGetMaxMicros       Absolute maximum allowed micros
 
@@ -239,110 +346,9 @@ gpioWaveGetPulses          Length in pulses of the current waveform
 gpioWaveGetHighPulses      Length of longest waveform so far
 gpioWaveGetMaxPulses       Absolute maximum allowed pulses
 
-gpioWaveGetCbs             Length in control blocks of the current waveform
-gpioWaveGetHighCbs         Length of longest waveform so far
-gpioWaveGetMaxCbs          Absolute maximum allowed control blocks
-
-I2C
-
-i2cOpen                    Opens an I2C device
-i2cClose                   Closes an I2C device
-
-i2cWriteQuick              SMBus write quick
-i2cWriteByte               SMBus write byte
-i2cReadByte                SMBus read byte
-i2cWriteByteData           SMBus write byte data
-i2cWriteWordData           SMBus write word data
-i2cReadByteData            SMBus read byte data
-i2cReadWordData            SMBus read word data
-i2cProcessCall             SMBus process call
-i2cWriteBlockData          SMBus write block data
-i2cReadBlockData           SMBus read block data
-i2cBlockProcessCall        SMBus block process call
-
-i2cWriteI2CBlockData       SMBus write I2C block data
-i2cReadI2CBlockData        SMBus read I2C block data
-
-i2cReadDevice              Reads the raw I2C device
-i2cWriteDevice             Writes the raw I2C device
-
-i2cSwitchCombined          Sets or clears the combined flag
-
-i2cSegments                Performs multiple I2C transactions
-
-i2cZip                     Performs multiple I2C transactions
-
-bbI2COpen                  Opens GPIO for bit banging I2C
-bbI2CClose                 Closes GPIO for bit banging I2C
-bbI2CZip                   Performs multiple bit banged I2C transactions
-
-SPI
-
-spiOpen                    Opens a SPI device
-spiClose                   Closes a SPI device
-
-spiRead                    Reads bytes from a SPI device
-spiWrite                   Writes bytes to a SPI device
-spiXfer                    Transfers bytes with a SPI device
-
-bbSPIOpen                  Opens GPIO for bit banging SPI
-bbSPIClose                 Closes GPIO for bit banging SPI
-bbSPIXfer                  Performs multiple bit banged SPI transactions
-
-I2C/SPI_SLAVE
-
-bscXfer                    I2C/SPI as slave transfer
-
-SERIAL
-
-serOpen                    Opens a serial device
-serClose                   Closes a serial device
-
-serReadByte                Reads a byte from a serial device
-serWriteByte               Writes a byte to a serial device
-serRead                    Reads bytes from a serial device
-serWrite                   Writes bytes to a serial device
-
-serDataAvailable           Returns number of bytes ready to be read
-
-FILES
-
-fileOpen                   Opens a file
-fileClose                  Closes a file
-fileRead                   Reads bytes from a file
-fileWrite                  Writes bytes to a file
-fileSeek                   Seeks to a position within a file
-fileList                   List files which match a pattern
-
-EVENTS
-
-eventMonitor               Sets the events to monitor
-eventSetFunc               Request an event callback
-eventSetFuncEx             Request an event callback, extended
-eventTrigger               Trigger an event
-
-CONFIGURATION
-
-gpioCfgBufferSize          Configure the GPIO sample buffer size
-gpioCfgClock               Configure the GPIO sample rate
-gpioCfgDMAchannel          Configure the DMA channel (DEPRECATED)
-gpioCfgDMAchannels         Configure the DMA channels
-gpioCfgPermissions         Configure the GPIO access permissions
-gpioCfgInterfaces          Configure user interfaces
-gpioCfgSocketPort          Configure socket port
-gpioCfgMemAlloc            Configure DMA memory allocation mode
-gpioCfgNetAddr             Configure allowed network addresses
-
-gpioCfgInternals           Configure miscellaneous internals (DEPRECATED)
-gpioCfgGetInternals        Get internal configuration settings
-gpioCfgSetInternals        Set internal configuration settings
-
-CUSTOM
-
-gpioCustom1                User custom function 1
-gpioCustom2                User custom function 2
-
 UTILITIES
+
+gpioDelay                  Delay for a number of microseconds
 
 gpioTick                   Get current tick (microseconds)
 
@@ -357,6 +363,22 @@ gpioSleep                  Sleep for specified time
 
 time_sleep                 Sleeps for a float number of seconds
 time_time                  Float number of seconds since the epoch
+
+CONFIGURATION
+
+gpioCfgBufferSize          Configure the GPIO sample buffer size
+gpioCfgClock               Configure the GPIO sample rate
+gpioCfgDMAchannel          Configure the DMA channel (DEPRECATED)
+gpioCfgDMAchannels         Configure the DMA channels
+gpioCfgPermissions         Configure the GPIO access permissions
+gpioCfgInterfaces          Configure user interfaces
+gpioCfgSocketPort          Configure socket port
+gpioCfgMemAlloc            Configure DMA memory allocation mode
+gpioCfgNetAddr             Configure allowed network addresses
+
+gpioCfgInternals           Configure misc. internals (DEPRECATED)
+gpioCfgGetInternals        Get internal configuration settings
+gpioCfgSetInternals        Set internal configuration settings
 
 EXPERT
 
@@ -2878,9 +2900,18 @@ D*/
 /*F*/
 int bscXfer(bsc_xfer_t *bsc_xfer);
 /*D
-This function provides a low-level interface to the
-SPI/I2C Slave peripheral.  This peripheral allows the
-Pi to act as a slave device on an I2C or SPI bus.
+This function provides a low-level interface to the SPI/I2C Slave
+peripheral on the BCM chip.
+
+This peripheral allows the Pi to act as a hardware slave device
+on an I2C or SPI bus.
+
+This is not a bit bang version and as such is OS timing
+independent. The bus timing is handled directly by the chip.
+
+The output process is simple. You simply append data to the FIFO
+buffer on the chip.  This works like a queue, you add data to the
+queue and the master removes it.
 
 This function is not available on the BCM2711 (e.g. as
 used in the Pi4B).
@@ -2906,8 +2937,9 @@ typedef struct
 } bsc_xfer_t;
 . .
 
-To start a transfer set control (see below) and copy the bytes to
-be sent (if any) to txBuf and set the byte count in txCnt.
+To start a transfer set control (see below), copy the bytes to
+be added to the transmit FIFO (if any) to txBuf and set txCnt to
+the number of copied bytes.
 
 Upon return rxCnt will be set to the number of received bytes placed
 in rxBuf.
