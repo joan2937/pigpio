@@ -234,33 +234,10 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
-static int pigpioOpenSocket(char *addr, char *port)
+static int pigpioOpenSocket(char *addrStr, char *portStr)
 {
    int sock, err, opt;
    struct addrinfo hints, *res, *rp;
-   const char *addrStr, *portStr;
-
-   if (!addr)
-   {
-      addrStr = getenv(PI_ENVADDR);
-
-      if ((!addrStr) || (!strlen(addrStr)))
-      {
-         addrStr = PI_DEFAULT_SOCKET_ADDR_STR;
-      }
-   }
-   else addrStr = addr;
-
-   if (!port)
-   {
-      portStr = getenv(PI_ENVPORT);
-
-      if ((!portStr) || (!strlen(portStr)))
-      {
-         portStr = PI_DEFAULT_SOCKET_PORT_STR;
-      }
-   }
-   else portStr = port;
 
    memset (&hints, 0, sizeof (hints));
 
@@ -713,11 +690,6 @@ int pigpio_start(char *addrStr, char *portStr)
    int pi;
    int *userdata;
 
-   if ((!addrStr) || (strlen(addrStr) == 0))
-   {
-      addrStr = "localhost";
-   }
-
    for (pi=0; pi<MAX_PI; pi++)
    {
       if (!gPiInUse[pi]) break;
@@ -726,6 +698,26 @@ int pigpio_start(char *addrStr, char *portStr)
    if (pi >= MAX_PI) return pigif_too_many_pis;
 
    gPiInUse[pi] = 1;
+
+   if ((!addrStr)  || (!strlen(addrStr)))
+   {
+      addrStr = getenv(PI_ENVADDR);
+
+      if ((!addrStr) || (!strlen(addrStr)))
+      {
+         addrStr = PI_DEFAULT_SOCKET_ADDR_STR;
+      }
+   }
+
+   if ((!portStr) || (!strlen(portStr)))
+   {
+      portStr = getenv(PI_ENVPORT);
+
+      if ((!portStr) || (!strlen(portStr)))
+      {
+         portStr = PI_DEFAULT_SOCKET_PORT_STR;
+      }
+   }
 
    pthread_mutex_init(&gCmdMutex[pi], NULL);
 

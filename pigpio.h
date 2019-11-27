@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 7103
+#define PIGPIO_VERSION 7104
 
 /*TEXT
 
@@ -6491,7 +6491,7 @@ after this command is issued.
 #define PI_DEFAULT_DMA_NOT_SET             15
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
-#define PI_DEFAULT_SOCKET_ADDR_STR         "127.0.0.1"
+#define PI_DEFAULT_SOCKET_ADDR_STR         "localhost"
 #define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_A_B2        0xFBC7CF9C
