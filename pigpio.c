@@ -5087,51 +5087,33 @@ int serDataAvailable(unsigned handle)
 static int chooseBestClock
    (clkInf_t *clkInf, unsigned f, unsigned numc, unsigned *cf)
 {
-   int c, valid, offby, offby2, best_offby;
-   uint32_t div;
-   uint64_t frac;
+   int c, valid;
+   double fdiv, offby, best_offby;
+   unsigned div, frac;
 
    valid = 0;
    best_offby = 0;
 
    for (c=0; c<numc; c++)
    {
-      div = cf[c] / f;
+      fdiv = (double)cf[c] / (double)f;
+      if (f < PI_MASH_MAX_FREQ)
+      {
+         fdiv += (0.5 / 4096.0);
+         div = fdiv;
+         frac = (fdiv - div) * 4096.0;
+      }
+      else
+      {
+         fdiv += 0.5;
+         div = fdiv;
+         frac = 0;
+      }
 
       if ((div > 1) && (div < 4096))
       {
-         if (f < PI_MASH_MAX_FREQ)
-         {
-            frac = cf[c] - (div * f);
-            frac = (frac * 4096) / f;
-            offby = cf[c] - (div * f) - ((frac * f) / 4096);
-            if (frac < 4095)
-            {
-               offby2 = cf[c] - (div * f) - (((frac+1) * f) / 4096);
-               if (offby2 < 0) offby2 = -offby2;
-               if (offby2 < offby)
-               {
-                  offby = offby2;
-                  frac++;
-               }
-            }
-         }
-         else
-         {
-            frac = 0;
-            offby = cf[c] - (div * f);
-            if (div < 4095)
-            {
-               offby2 = cf[c] - ((div+1) * f);
-               if (offby2 < 0) offby2 = -offby2;
-               if (offby2 < offby)
-               {
-                  offby = offby2;
-                  div++;
-               }
-            }
-         }
-
+         offby = f - (cf[c] / (div + (frac / 4096.0)));
+         if (offby < 0) offby = - offby;
          if ((!valid) || (offby <= best_offby))
          {
             valid = 1;
