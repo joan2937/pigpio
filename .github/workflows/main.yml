@@ -1,0 +1,42 @@
+name: build docker image
+
+on: [push]
+
+jobs:
+  build:
+    name: build images and push
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: install qemu
+        run: docker run --rm --privileged hypriot/qemu-register
+
+      - name: checkout
+        uses: actions/checkout@v1
+
+      - name: login to docker hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: install buildx
+        run: |
+          mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
+          curl --silent -L "https://github.com/docker/buildx/releases/download/v0.3.0/buildx-v0.3.0.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+          chmod a+x ~/.docker/cli-plugins/docker-buildx
+          docker buildx create --use
+
+      - name: display head_ref
+        run: echo ${GITHUB_HEAD_REF}
+
+      - name: build image and push to hub
+        if: github.head_ref == 'refs/heads/master'
+        run: |
+          docker buildx build --push \
+            --platform linux/arm/v7,linux/arm64/v8 \
+            -t $GITHUB_REPOSITORY:latest \
+            .
+
+      - name: build image
+        if: github.head_ref != 'refs/heads/master'
+        run: |
+          docker buildx build --platform linux/arm/v7,linux/arm64/v8  .
