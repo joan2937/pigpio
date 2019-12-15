@@ -4487,7 +4487,7 @@ int main(int argc, char *argv[])
    if (gpioInitialise() < 0) return 1;
 
    // assumes /opt/pigpio/access contains the following line
-   // /ram/*.c r
+   // /ram/ *.c r
 
    handle = fileOpen("/ram/pigpio.c", PI_FILE_READ);
 
