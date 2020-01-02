@@ -13582,8 +13582,8 @@ unsigned gpioHardwareRevision(void)
                   }
                }
             }
+            fclose(filp);
          }
-         fclose(filp);
       }
 
       if (rev == 0)
