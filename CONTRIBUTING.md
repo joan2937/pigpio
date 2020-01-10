@@ -19,3 +19,40 @@ a screen shot of the output from the test scripts.
 
 In addition, you *should* provide updated or additional scripts that at least test the 'happy' paths of your code changes.  For 
 larger changes the additional test cases will be considered mandatory.
+
+Beginning 2020, this repo will follow a dual branch model: `master` is the stable branch that people use in production. A second branch, `develop`, is the first branch to receive merges from bug fixes and new features.  Only after we consider `develop` stable we merge it into the `master` branch and release the changes with a tagged version.
+
+Adhering to the following process is the best way to get your work included in the project:
+
+- Fork the project, clone your fork, and configure the remotes:
+```
+# Clone your fork of the repo into the current directory
+git clone https://github.com/<your-username>/pigio.git
+
+# Navigate to the newly cloned directory
+cd pigpio
+
+# Assign the original repo to a remote called "upstream"
+git remote add upstream https://github.com/joan2937/pigpio.git
+```
+- If you cloned a while ago, get the latest changes from upstream:
+```
+git checkout develop
+git pull upstream develop
+```
+- Create a new topic branch (off the develop branch) to contain your feature, change, or fix:
+```
+git checkout -b <topic-branch-name>
+```
+- Commit your changes.
+
+- Locally merge (or rebase) the upstream dev branch into your topic branch:
+```
+git pull [--rebase] upstream develop
+```
+- Push your topic branch up to your fork:
+```
+git push origin <topic-branch-name>
+```
+- Open a Pull Request with a clear title and description.  See [creating a pull request from a fork](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork).
+Make sure the base branch drop down menu is selecting 'develop'.
