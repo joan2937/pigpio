@@ -8292,7 +8292,7 @@ int initInitialise(void)
             }
             server6.sin6_port = htons(port);
 
-            int opt;
+            int opt = 1;
             setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
             if (bind(fdSock,(struct sockaddr *)&server6, sizeof(server6)) < 0)
                SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
@@ -8307,7 +8307,7 @@ int initInitialise(void)
             SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
          else
          {
-           int opt;
+           int opt = 1;
            setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
          }
          server.sin_family = AF_INET;
