@@ -8159,7 +8159,8 @@ static void initReleaseResources(void)
 
 int initInitialise(void)
 {
-   int rev, i, model;
+   int i;
+   unsigned rev, model;
    struct sockaddr_in server;
    struct sockaddr_in6 server6;
    char * portStr;
@@ -8207,13 +8208,27 @@ int initInitialise(void)
          7=Unknown
          8=Pi3B
          9=Zero
+         12=Zero W
+         13=Pi3B+
+         14=Pi3A+
+         17=Pi4B
          */
          if      (model <  2) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
          else if (model <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
          else if (model == 4) gpioMask = PI_DEFAULT_UPDATE_MASK_PI2B;
-         else if (model == 6) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-         else if (model == 8) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
-         else if (model == 9) gpioMask = PI_DEFAULT_UPDATE_MASK_ZERO;
+
+         else if (model == 6
+               || model ==10
+               || model ==16) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+
+         else if (model == 8
+               || model ==13
+               || model ==14) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
+
+         else if (model == 9
+               || model ==12) gpioMask = PI_DEFAULT_UPDATE_MASK_ZERO;
+
+         else if (model ==17) gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
          else                 gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
       }
 
@@ -13431,13 +13446,14 @@ W  warranty void if either bit is set
 
 S  0=old (bits 0-22 are revision number) 1=new (following fields apply)
 
-M  0=256 1=512 2=1024
+M  0=256 1=512 2=1024 3=2GB 4=4GB
 
-B  0=Sony 1=Egoman 2=Embest 3=Unknown 4=Embest
+B  0=Sony 1=Egoman 2=Embest 3=Sony Japan 4=Embest 5=Stadium
 
-P  0=2835, 1=2836, 2=2837
+P  0=2835, 1=2836, 2=2837 3=2711
 
-T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=Compute Module 7=Unknown 8=Pi3B 9=Zero
+T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=CM1 8=Pi3B 9=Zero a=CM3 c=Zero W
+   d=3B+ e=3A+ 10=CM3+ 11=4B
 
 R  PCB board revision
 
@@ -13455,157 +13471,119 @@ unsigned gpioHardwareRevision(void)
 
    if (rev) return rev;
 
-   piCores = 0;
-
    filp = fopen ("/proc/cpuinfo", "r");
+
 
    if (filp != NULL)
    {
       while (fgets(buf, sizeof(buf), filp) != NULL)
       {
-         if (piCores == 0)
-         {
-            if (!strncasecmp("model name", buf, 10))
-            {
-               if (strstr (buf, "ARMv6") != NULL)
-               {
-                  piCores = 1;
-                  pi_peri_phys = 0x20000000;
-                  pi_dram_bus  = 0x40000000;
-                  pi_mem_flag  = 0x0C;
-               }
-               else if (strstr (buf, "ARMv7") != NULL)
-               {
-                  piCores = 4;
-                  pi_peri_phys = 0x3F000000;
-                  pi_dram_bus  = 0xC0000000;
-                  pi_mem_flag  = 0x04;
-               }
-               else if (strstr (buf, "ARMv8") != NULL)
-               {
-                  piCores = 4;
-                  pi_peri_phys = 0x3F000000;
-                  pi_dram_bus  = 0xC0000000;
-                  pi_mem_flag  = 0x04;
-               }
-            }
-         }
-
-         if (!strncasecmp("hardware\t: BCM", buf, 14))
-         {
-            int bcmno = atoi(buf+14);
-            if ((bcmno == 2708) ||
-                (bcmno == 2709) ||
-                (bcmno == 2710) ||
-                (bcmno == 2835) ||
-                (bcmno == 2836) ||
-                (bcmno == 2837))
-            {
-              pi_ispi = 1;
-            }
-         }
-
          if (!strncasecmp("revision\t:", buf, 10))
          {
             if (sscanf(buf+10, "%x%c", &rev, &term) == 2)
             {
                if (term != '\n') rev = 0;
-               else rev &= 0xFFFFFF; /* mask out warranty bit */
-               switch (rev&0xFFF0)  /* just interested in BCM model */
-               {
-                  case 0x3110: /* Pi4B */
-                     piCores = 4;
-                     pi_peri_phys = 0xFE000000;
-                     pi_dram_bus  = 0xC0000000;
-                     pi_mem_flag  = 0x04;
-                     pi_is_2711   = 1;
-                     pi_ispi      = 1;
-                     clk_osc_freq = CLK_OSC_FREQ_2711;
-                     clk_plld_freq = CLK_PLLD_FREQ_2711;
-                     hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
-                     hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
-                     hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
-
-                     fclose(filp);
-                     if (!gpioMaskSet)
-                     {
-                        gpioMaskSet = 1;
-                        gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
-                     }
-                     return rev;
-                     break;
-               }
             }
          }
       }
-
       fclose(filp);
+   }
 
-      /*
-         Raspberry pi 3 running arm64 don't put all the
-         information we need in /proc/cpuinfo, but we can
-         get it elsewhere.
-      */
+   /* (some) arm64 operating systems get revision number here  */
 
-      if (!pi_ispi)
+   if (rev == 0)
+   {
+      DBG(DBG_USER, "searching /proc/device-tree for revision");
+      filp = fopen ("/proc/device-tree/system/linux,revision", "r");
+
+      if (filp != NULL)
       {
-         filp = fopen ("/proc/device-tree/model", "r");
-         if (filp != NULL)
+         uint32_t tmp;
+         if (fread(&tmp,1 , 4, filp) == 4)
          {
-            if (fgets(buf, sizeof(buf), filp) != NULL)
-            {
-               if (!strncmp("Raspberry Pi 3", buf, 14)) 
-               {
-                  pi_ispi = 1;
-                  piCores = 4;
-                  pi_peri_phys = 0x3F000000;
-                  pi_dram_bus  = 0xC0000000;
-                  pi_mem_flag  = 0x04;
-               }
-               else if (!strncmp("Raspberry Pi 4 Model B", buf, 22))
-               {
-                  pi_ispi      = 1;
-                  piCores      = 4;
-                  pi_peri_phys = 0xFE000000;
-                  pi_dram_bus  = 0xC0000000;
-                  pi_mem_flag  = 0x04;
-                  pi_is_2711   = 1;
-                  clk_osc_freq = CLK_OSC_FREQ_2711;
-                  clk_plld_freq = CLK_PLLD_FREQ_2711;
-                  hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
-                  hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
-                  hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
-                  if (!gpioMaskSet)
-                  {
-                     gpioMaskSet = 1;
-                     gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
-                  }
-               }
-            }
-            fclose(filp);
+            /*
+               for some reason the value returned by reading
+               this /proc entry seems to be big endian,
+               convert it.
+            */
+            rev = ntohl(tmp);
+            rev &= 0xFFFFFF; /* mask out warranty bit */
          }
       }
+      fclose(filp);
+   }
 
-      if (rev == 0)
+   piCores = 0;
+   pi_ispi = 0;
+   rev &= 0xFFFFFF; /* mask out warranty bit */
+
+   /* Decode revision code */
+
+   if ((rev & 0x800000) == 0) /* old rev code */
+   {
+      if (rev < 16) /* all BCM2835 */
       {
-         filp = fopen ("/proc/device-tree/system/linux,revision", "r");
-         if (filp != NULL)
-         {
-            uint32_t tmp;
-            if (fread(&tmp,1 , 4, filp) == 4)
-            {
-               /*
-                  for some reason the value returned by reading
-                  this /proc entry seems to be big endian,
-                  convert it.
-               */
-               rev = ntohl(tmp);
-               rev &= 0xFFFFFF; /* mask out warranty bit */
-            }
-         }
-         fclose(filp);
+         pi_ispi = 1;
+         piCores = 1;
+         pi_peri_phys = 0x20000000;
+         pi_dram_bus  = 0x40000000;
+         pi_mem_flag  = 0x0C;
+      }
+      else
+      {
+         DBG(DBG_ALWAYS, "unknown revision=%x", rev);
+         rev = 0;
       }
    }
+   else /* new rev code */
+   {
+      switch ((rev >> 12) & 0xF)  /* just interested in BCM model */
+      {
+
+         case 0x0:   /* BCM2835 */
+            pi_ispi = 1;
+            piCores = 1;
+            pi_peri_phys = 0x20000000;
+            pi_dram_bus  = 0x40000000;
+            pi_mem_flag  = 0x0C;
+            break;
+
+         case 0x1:   /* BCM2836 */
+         case 0x2:   /* BCM2837 */
+            pi_ispi = 1;
+            piCores = 4;
+            pi_peri_phys = 0x3F000000;
+            pi_dram_bus  = 0xC0000000;
+            pi_mem_flag  = 0x04;
+            break;
+
+         case 0x3:   /* BCM2711 */
+            pi_ispi = 1;
+            piCores = 4;
+            pi_peri_phys = 0xFE000000;
+            pi_dram_bus  = 0xC0000000;
+            pi_mem_flag  = 0x04;
+            pi_is_2711   = 1;
+            clk_osc_freq = CLK_OSC_FREQ_2711;
+            clk_plld_freq = CLK_PLLD_FREQ_2711;
+            hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
+            hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
+            hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
+            break;
+
+         default:
+            DBG(DBG_ALWAYS, "unknown rev code (%x)", rev);
+            rev=0;
+            pi_ispi = 0;
+            break;
+      }
+   }
+
+   DBG(DBG_USER, "revision=%x", rev);
+   DBG(DBG_USER, "pi_peri_phys=%x", pi_peri_phys);
+   DBG(DBG_USER, "pi_dram_bus=%x", pi_dram_bus);
+   DBG(DBG_USER, "pi_mem_flag=%x", pi_mem_flag);
+
    return rev;
 }
 
