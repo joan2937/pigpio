@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 7303 */
+/* pigpio version 74 */
 
 /* include ------------------------------------------------------- */
 
