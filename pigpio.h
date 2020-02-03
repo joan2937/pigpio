@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 7303
+#define PIGPIO_VERSION 74
 
 /*TEXT
 
