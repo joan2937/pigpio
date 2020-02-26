@@ -4768,7 +4768,7 @@ int spiClose(unsigned handle)
    if (spiInfo[handle].state != PI_SPI_OPENED)
       SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   spiInfo[handle].state = PI_I2C_CLOSED;
+   spiInfo[handle].state = PI_SPI_CLOSED;
 
    if (!spiAnyOpen(spiInfo[handle].flags))
       spiTerm(spiInfo[handle].flags); /* terminate on last close */
