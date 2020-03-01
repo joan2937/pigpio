@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #include "pigpio.h"
 
-#define PIGPIOD_IF2_VERSION 16
+#define PIGPIOD_IF2_VERSION 17
 
 /*TEXT
 
@@ -3352,6 +3352,37 @@ tick        32 bit   The number of microseconds since boot
                      WARNING: this wraps around from
                      4294967295 to 0 roughly every 72 minutes
 . .
+
+The GPIO are sampled at a rate set when the pigpio daemon
+is started (default 5 us).
+
+The number of samples per second is given in the following table.
+
+. .
+              samples
+              per sec
+
+         1  1,000,000
+         2    500,000
+sample   4    250,000
+rate     5    200,000
+(us)     8    125,000
+        10    100,000
+. .
+
+GPIO level changes shorter than the sample rate may be missed.
+
+The daemon software which generates the callbacks is triggered
+1000 times per second.  The callbacks will be called once per
+level change since the last time they were called.
+i.e. The callbacks will get all level changes but there will
+be a latency.
+
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use [*gpio_read*].
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
 D*/
 
 /*F*/
@@ -3442,9 +3473,6 @@ The output process is simple. You simply append data to the FIFO
 buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -3486,11 +3514,19 @@ less than requested if the FIFO already contained untransmitted data).
 Note that the control word sets the BSC mode.  The BSC will stay in
 that mode until a different control word is sent.
 
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
-When a zero control word is received GPIO 18-21 will be reset
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 18  @ 19  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 18   @ 19   @ 20   @ 21
+
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 10  @ 11  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 10   @ 11   @ 9    @ 8
+
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 control consists of the following bits.
@@ -3598,8 +3634,7 @@ If there was an error the status will be less than zero
 (and will contain the error code).
 
 Note that an i2c_address of 0 may be used to close
-the BSC device and reassign the used GPIO (18/19)
-as inputs.
+the BSC device and reassign the used GPIO as inputs.
 D*/
 
 /*F*/

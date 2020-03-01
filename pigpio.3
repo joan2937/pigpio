@@ -1683,6 +1683,15 @@ will be a latency.
 .br
 
 .br
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use \fBgpioRead\fP.
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
+
+.br
+
+.br
 The tick value is the time stamp of the sample in microseconds, see
 \fBgpioTick\fP for more details.
 
@@ -4182,12 +4191,6 @@ queue and the master removes it.
 .br
 
 .br
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-.br
-
-.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -4249,14 +4252,37 @@ that mode until a different control word is sent.
 .br
 
 .br
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
 .br
 
 .br
-When a zero control word is received GPIO 18-21 will be reset
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   18    19    -      -      -      -
+.br
+SPI   -     -     18     19     20     21
+.br
+
+.br
+
+.br
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+.br
+
+.br
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   10    11    -      -      -      -
+.br
+SPI   -     -     10     11     9      8
+.br
+
+.br
+
+.br
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 .br
