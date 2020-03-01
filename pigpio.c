@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 74 */
+/* pigpio version 75 */
 
 /* include ------------------------------------------------------- */
 
@@ -10730,35 +10730,69 @@ int bbI2CZip(
 
 void bscInit(int mode)
 {
+   int sda, scl, miso, ce;
+
    bscsReg[BSC_CR]=0; /* clear device */
    bscsReg[BSC_RSR]=0; /* clear underrun and overrun errors */
    bscsReg[BSC_SLV]=0; /* clear I2C slave address */
    bscsReg[BSC_IMSC]=0xf; /* mask off all interrupts */
    bscsReg[BSC_ICR]=0x0f; /* clear all interrupts */
 
-   gpioSetMode(BSC_SDA_MOSI, PI_ALT3);
-   gpioSetMode(BSC_SCL_SCLK, PI_ALT3);
+   if (pi_is_2711)
+   {
+      sda = BSC_SDA_MOSI_2711;
+      scl = BSC_SCL_SCLK_2711;
+      miso = BSC_MISO_2711;
+      ce = BSC_CE_N_2711;
+   }
+   else
+   {
+      sda = BSC_SDA_MOSI;
+      scl = BSC_SCL_SCLK;
+      miso = BSC_MISO;
+      ce = BSC_CE_N;
+   }
+
+   gpioSetMode(sda, PI_ALT3);
+   gpioSetMode(scl, PI_ALT3);
 
    if (mode > 1) /* SPI uses all GPIO */
    {
-      gpioSetMode(BSC_MISO, PI_ALT3);
-      gpioSetMode(BSC_CE_N, PI_ALT3);
+      gpioSetMode(miso, PI_ALT3);
+      gpioSetMode(ce, PI_ALT3);
    }
 }
 
 void bscTerm(int mode)
 {
+   int sda, scl, miso, ce;
+
    bscsReg[BSC_CR] = 0; /* clear device */
    bscsReg[BSC_RSR]=0; /* clear underrun and overrun errors */
    bscsReg[BSC_SLV]=0; /* clear I2C slave address */
 
-   gpioSetMode(BSC_SDA_MOSI, PI_INPUT);
-   gpioSetMode(BSC_SCL_SCLK, PI_INPUT);
+   if (pi_is_2711)
+   {
+      sda = BSC_SDA_MOSI_2711;
+      scl = BSC_SCL_SCLK_2711;
+      miso = BSC_MISO_2711;
+      ce = BSC_CE_N_2711;
+   }
+   else
+   {
+      sda = BSC_SDA_MOSI;
+      scl = BSC_SCL_SCLK;
+      miso = BSC_MISO;
+      ce = BSC_CE_N;
+   }
+
+   gpioSetMode(sda, PI_INPUT);
+   gpioSetMode(scl, PI_INPUT);
 
    if (mode > 1)
    {
-      gpioSetMode(BSC_MISO, PI_INPUT);
-      gpioSetMode(BSC_CE_N, PI_INPUT);
+      gpioSetMode(miso, PI_INPUT);
+      gpioSetMode(ce, PI_INPUT);
    }
 }
 
@@ -10778,9 +10812,6 @@ int bscXfer(bsc_xfer_t *xfer)
 
    CHECK_INITED;
 
-   if (pi_is_2711)
-      SOFT_ERROR(PI_NOT_ON_BCM2711, "SPI/BSC slave not available on BCM2711");
-
    eventAlert[PI_EVENT_BSC].ignore = 1;
 
    if (xfer->control)
@@ -10794,7 +10825,7 @@ int bscXfer(bsc_xfer_t *xfer)
 
       if (mode > bscMode)
       {
-         bscInit(bscMode);
+         bscInit(mode);
          bscMode = mode;
       }
    }
