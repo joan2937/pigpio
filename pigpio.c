@@ -3130,24 +3130,27 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL, int size)
       }
    }
 
-   /* pad the wave */
-   botCB = *CB + NUM_WAVE_CBS / size - 1;
-   botOOL = *BOOL + NUM_WAVE_OOL / size - 1;
-   //topOOL = *TOOL - (NUM_WAVE_OOL / size / 8);
+   if (size)
+   {
+      /* pad the wave */
 
-   /* link the last CB to end of wave */
+      botCB = *CB + NUM_WAVE_CBS / size - 1;
+      botOOL = *BOOL + NUM_WAVE_OOL / size - 1;
+      //topOOL =   //Fix:  Ignore topOOL, flags not supported.
 
-   p->next = waveCbPOadr(botCB);
-   
-   /* add dummy cb at end of DMA */
-   
-   p = rawWaveCBAdr(botCB++);
-   p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
-   p->src    = waveOOLPOadr(botOOL++);
-   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-   p->length = 4;
-   p->next   = 0;
+      /* link the last CB to end of wave */
 
+      p->next = waveCbPOadr(botCB);
+
+      /* add dummy cb at end of DMA */
+
+      p = rawWaveCBAdr(botCB++);
+      p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
+      p->src    = waveOOLPOadr(botOOL++);
+      p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
+      p->length = 4;
+      p->next   = 0;
+   }
 
    if (p != NULL)
    {
