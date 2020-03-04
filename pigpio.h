@@ -1933,7 +1933,7 @@ D*/
 
 
 /*F*/
-int gpioWaveCreate(void);
+int gpioWaveCreate(int);
 /*D
 This function creates a waveform from the data provided by the prior
 calls to the [*gpioWaveAdd**] functions.  Upon success a wave id
