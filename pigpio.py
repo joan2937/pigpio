@@ -2257,7 +2257,7 @@ class pi():
       else:
          return 0
 
-   def wave_create(self, size):
+   def wave_create(self):
       """
       Creates a waveform from the data provided by the prior calls
       to the [*wave_add_**] functions.
@@ -2302,7 +2302,7 @@ class pi():
       wid = pi.wave_create()
       ...
       """
-      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCRE, size, 0))
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCRE, 0, 0))
 
    def wave_delete(self, wave_id):
       """
