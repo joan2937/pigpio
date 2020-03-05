@@ -1986,6 +1986,43 @@ Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 D*/
 
+int gpioWaveCreatePad(int percent);
+/*D
+This function creates a waveform like wave_create but pads the consumed
+resources. Where percent gives the percentage of the resources to use (in terms
+of the theoretical maximum, not the current amount free). This allows the reuse 
+of deleted waves while a transmission is active. Upon success a wave id
+greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
+PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+. .
+pi: >=0 (as returned by [*pigpio_start*]).
+. .
+
+The data provided by the [*wave_add_**] functions is consumed by this
+function.
+
+As many waveforms may be created as there is space available. The
+wave id is passed to [*wave_send_**] to specify the waveform to transmit.
+
+A usage would be the creation of two waves where one is filled while the other
+is beeing transmitted. Each wave is assigned 50% of the available resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+Step 1. [*wave_clear*] to clear all waveforms and added data.
+
+Step 2. [*wave_add_**] calls to supply the waveform data.
+
+Step 3. [*wave_create_and_pad*] to create a 50% padded waveform and get a unique id
+
+Step 4. [*wave_send_**] with the id of the waveform to transmit.
+
+Repeat steps 2-4 as needed always waiting for the active waveform to be transmitted
+before marking it as deleted.
+
+Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
+PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
+D*/
 
 /*F*/
 int gpioWaveDelete(unsigned wave_id);
@@ -6271,6 +6308,7 @@ PARAMS*/
 #define PI_CMD_EVT   116
 
 #define PI_CMD_PROCU 117
+#define PI_CMD_WVCAP 118
 
 /*DEF_E*/
 

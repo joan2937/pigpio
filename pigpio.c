@@ -2432,7 +2432,7 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_WVCLR: res = gpioWaveClear(); break;
 
-      case PI_CMD_WVCRE: res = gpioWaveCreate(p[1]); break;
+      case PI_CMD_WVCRE: res = gpioWaveCreate(); break;
 
       case PI_CMD_WVDEL: res = gpioWaveDelete(p[1]); break;
 
@@ -2992,7 +2992,7 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
 /* ----------------------------------------------------------------------- */
 
-static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL, int size)
+static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
 {
    int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
 
@@ -3128,28 +3128,6 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL, int size)
             p->next = waveCbPOadr(botCB);
          }
       }
-   }
-
-   if (size)
-   {
-      /* pad the wave */
-
-      botCB = *CB + NUM_WAVE_CBS / size - 1;
-      botOOL = *BOOL + NUM_WAVE_OOL / size - 1;
-      //topOOL =   //Fix:  Ignore topOOL, flags not supported.
-
-      /* link the last CB to end of wave */
-
-      p->next = waveCbPOadr(botCB);
-
-      /* add dummy cb at end of DMA */
-
-      p = rawWaveCBAdr(botCB++);
-      p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
-      p->src    = waveOOLPOadr(botOOL++);
-      p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-      p->length = 4;
-      p->next   = 0;
    }
 
    if (p != NULL)
@@ -9574,7 +9552,7 @@ int rawWaveAddSPI(
 
 /* ----------------------------------------------------------------------- */
 
-int gpioWaveCreate(int size)  // Fix: Make variadic.
+int gpioWaveCreate(void)
 {
    int i, wid;
    int numCB, numBOOL, numTOOL;
@@ -9588,14 +9566,7 @@ int gpioWaveCreate(int size)  // Fix: Make variadic.
 
    /* What resources are needed? */
 
-   if (size == 0)
-      waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
-
-   else {
-      numCB = NUM_WAVE_CBS / size;
-      numBOOL = NUM_WAVE_OOL / size;
-      numTOOL = 0;  // ignore TOOL, ie, no flags support
-   }
+   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
 
    wid = -1;
 
@@ -9648,7 +9619,7 @@ int gpioWaveCreate(int size)  // Fix: Make variadic.
    BOOL = waveInfo[wid].botOOL;
    TOOL = waveInfo[wid].topOOL;
 
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, size);
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL);
 
    /* Sanity check. */
 
@@ -9661,9 +9632,6 @@ int gpioWaveCreate(int size)  // Fix: Make variadic.
          numBOOL, BOOL-waveInfo[wid].botOOL,
          numTOOL, waveInfo[wid].topOOL-TOOL);
    }
-
-   DBG(DBG_USER, "Wave Stats: wid=%d CBs %d BOOL %d TOOL %d", wid,
-      numCB, numBOOL, numTOOL);
 
    waveInfo[wid].deleted = 0;
 
