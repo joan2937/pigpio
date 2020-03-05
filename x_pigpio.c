@@ -391,7 +391,7 @@ To the lascivious pleasing of a lute.\n\
    e = gpioWaveAddGeneric(4, wf);
    CHECK(5, 2, e, 4, 0, "pulse, wave add generic");
 
-   wid = gpioWaveCreate(0);
+   wid = gpioWaveCreate();
    e = gpioWaveTxSend(wid, PI_WAVE_MODE_REPEAT);
    if (e < 14) CHECK(5, 3, e,  9, 0, "wave tx repeat");
    else        CHECK(5, 3, e, 19, 0, "wave tx repeat");
@@ -413,7 +413,7 @@ To the lascivious pleasing of a lute.\n\
    e = gpioWaveAddSerial(GPIO, BAUD, 8, 2, 5000000, strlen(TEXT), TEXT);
    CHECK(5, 7, e, 3405, 0, "wave clear, wave add serial");
 
-   wid = gpioWaveCreate(0);
+   wid = gpioWaveCreate();
    e = gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
    if (e < 6964) CHECK(5, 8, e, 6811, 0, "wave tx start");
    else          CHECK(5, 8, e, 7116, 0, "wave tx start");
