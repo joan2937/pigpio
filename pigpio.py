@@ -2325,7 +2325,7 @@ class pi():
       wave id is passed to [*wave_send_**] to specify the waveform to transmit.
 
       A usage would be the creation of two waves where one is filled while the other
-      is beeing transmitted. Each wave is assigned 50% of the available resources.
+      is being transmitted. Each wave is assigned 50% of the available resources.
       This buffer structure allows the transmission of infinite wave sequences.
 
       Step 1. [*wave_clear*] to clear all waveforms and added data.

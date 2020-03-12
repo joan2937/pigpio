@@ -694,7 +694,7 @@ int cmdParse(
       case 112: /* BI2CC FC  GDC  GPW  I2CC  I2CRB
                    MG  MICS  MILS  MODEG  NC  NP  PADG PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
-                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
+                   WVCAP WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
 
                    One positive parameter.
                 */
