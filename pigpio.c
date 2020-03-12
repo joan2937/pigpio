@@ -2434,7 +2434,26 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_WVCRE: res = gpioWaveCreate(); break;
 
-      case PI_CMD_WVCAP: res = gpioWaveCreatePad(p[1]); break;
+      case PI_CMD_WVCAP:
+         /* Make WVCAP variadic */
+         if (p[3] == 4)
+         {
+            memcpy(&tmp3, buf, 4); /* percent TOOL */
+            res = gpioWaveCreatePad(p[1], p[2], tmp3); /* rawWaveAdd* usage */
+            break;
+         }
+         if (p[2] && p[3]==0)
+         {
+            res = gpioWaveCreatePad(p[1], p[2], 0);
+            break;
+         }
+         if (p[2]==0 && p[3]==0)
+         {
+            res = gpioWaveCreatePad(p[1], p[1], 0); /* typical usage */
+            break;
+         }
+         res = PI_BAD_WAVE_ID; // FIX?
+         break;
 
       case PI_CMD_WVDEL: res = gpioWaveDelete(p[1]); break;
 
@@ -2994,7 +3013,8 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
 /* ----------------------------------------------------------------------- */
 
-static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL, int size)
+static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
+                    int numCB, int numBOOL, int numTOOL)
 {
    int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
 
@@ -3132,19 +3152,19 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL, int size)
       }
    }
 
-   if (size)
+   if (numCB)
    {
-      /* pad the wave */
+      /* Pad the wave */
 
-      botCB = *CB + size - 1;
-      botOOL = *BOOL + size - 1;
-      //topOOL =   //Fix:  Ignore topOOL, flags not supported.
+      botCB = *CB + numCB - 1;
+      botOOL = *BOOL + numBOOL - 1;
+      topOOL = *TOOL - numTOOL;
 
-      /* link the last CB to end of wave */
+      /* Link the last CB to end of wave */
 
       p->next = waveCbPOadr(botCB);
 
-      /* add dummy cb at end of DMA */
+      /* Insert sentinel CB at end of DMA */
 
       p = rawWaveCBAdr(botCB++);
       p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
@@ -9643,7 +9663,7 @@ int gpioWaveCreate(void)
    BOOL = waveInfo[wid].botOOL;
    TOOL = waveInfo[wid].topOOL;
 
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, 0);
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, 0, 0, 0);
 
    /* Sanity check. */
 
@@ -9673,23 +9693,43 @@ int gpioWaveCreate(void)
    return wid;
 }
 
-int gpioWaveCreatePad(int percent)  // Fix: Make variadic.
+int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
 {
    int i, wid;
    int numCB, numBOOL, numTOOL;
    int CB, BOOL, TOOL;
 
-   DBG(DBG_USER, "");
+   DBG(DBG_USER, "%d, %d, %d", pctCB, pctBOOL, pctTOOL);
 
    CHECK_INITED;
+
+   if (pctCB < 0 || pctCB > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctCB=(%d)", pctCB);
+   if (pctBOOL < 0 || pctBOOL > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctBOOL=(%d)", pctCB);
+   if (pctTOOL < 0 || pctTOOL > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctTOOL=(%d)", pctCB);
 
    if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
 
    /* What resources are needed? */
+   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
 
-   numCB = (NUM_WAVE_CBS * percent) / 100;
-   numBOOL = (NUM_WAVE_OOL * percent) /100;
-   numTOOL = 0;  // ignore TOOL, ie, no flags support
+   /* Amount of pad required */
+   CB = (NUM_WAVE_CBS - PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE -1) * pctCB / 100;
+   BOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE -1) * pctBOOL /100;
+   TOOL = (NUM_WAVE_OOL * pctTOOL) / 100;
+
+   /* Reject if wave is too big */
+   if (numCB >= CB) return PI_TOO_MANY_CBS;
+   if (numBOOL >= BOOL) return PI_I2C_WRITE_FAILED; // Fix
+   if (numTOOL > TOOL) return PI_I2C_READ_FAILED; // Fix
+
+   /* Set the padding */
+   numCB = CB;
+   numBOOL = BOOL;
+   numTOOL = TOOL;
+
 
    wid = -1;
 
@@ -9742,7 +9782,7 @@ int gpioWaveCreatePad(int percent)  // Fix: Make variadic.
    BOOL = waveInfo[wid].botOOL;
    TOOL = waveInfo[wid].topOOL;
 
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, numCB);
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, numCB, numBOOL, numTOOL);
 
    /* Sanity check. */
 
