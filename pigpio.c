@@ -9722,8 +9722,8 @@ int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
 
    /* Reject if wave is too big */
    if (numCB >= CB) return PI_TOO_MANY_CBS;
-   if (numBOOL >= BOOL) return PI_I2C_WRITE_FAILED; // Fix
-   if (numTOOL > TOOL) return PI_I2C_READ_FAILED; // Fix
+   if (numBOOL >= BOOL) return PI_TOO_MANY_OOL;
+   if (numTOOL > TOOL) return PI_TOO_MANY_OOL;
 
    /* Set the padding */
    numCB = CB;
