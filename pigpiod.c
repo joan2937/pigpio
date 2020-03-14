@@ -54,6 +54,7 @@ This program starts the pigpio library as a daemon.
 static unsigned bufferSizeMilliseconds = PI_DEFAULT_BUFFER_MILLIS;
 static unsigned clockMicros            = PI_DEFAULT_CLK_MICROS;
 static unsigned clockPeripheral        = PI_DEFAULT_CLK_PERIPHERAL;
+static unsigned testClockPeripheral    = PI_DEFAULT_CLK_TEST_PERIPHERAL;
 static unsigned ifFlags                = PI_DEFAULT_IF_FLAGS;
 static int      foreground             = PI_DEFAULT_FOREGROUND;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_NOT_SET;
@@ -107,6 +108,7 @@ void usage()
       "   -p value,   socket port, 1024-32000,           default 8888\n" \
       "   -s value,   sample rate, 1, 2, 4, 5, 8, or 10, default 5\n" \
       "   -t value,   clock peripheral, 0=PWM 1=PCM,     default PCM\n" \
+      "   -T value    test clock peripheral, 0=OFF 1=ON, default ON\n" \
       "   -v, -V,     display pigpio version and exit\n" \
       "   -x mask,    GPIO which may be updated,         default board GPIO\n" \
       "EXAMPLE\n" \
@@ -163,7 +165,7 @@ static void initOpts(int argc, char *argv[])
    uint32_t addr;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:mp:s:t:x:vV")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:mp:s:t:T:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -263,6 +265,13 @@ static void initOpts(int argc, char *argv[])
             else fatal("invalid -t option (%d)", i);
             break;
 
+         case 'T':
+            i = getNum(optarg, &err);
+            if ((i >= 0) && (i <= 1))
+               testClockPeripheral = i;
+            else fatal("invalid -T option (%d)", i);
+            break;
+
          case 'v':
          case 'V':
             printf("%d\n", PIGPIO_VERSION);
@@ -304,14 +313,44 @@ void terminate(int signum)
 }
 
 
+static void clockSkewWarning(int retClockTest, float ratio)
+{
+   if (retClockTest < 0)
+      fprintf(stderr, "gpioTestClockTiming() measurement failed!\n");
+   else if (retClockTest) {
+      fprintf(stderr, "*** WARNING ***: %s clock is skewed! measured clock ratio is %.3f\n"
+         , (clockPeripheral ? "PCM":"PWM"), ratio);
+      if (clockPeripheral)
+         fprintf(stderr, "PCM clock might interfere with sound output. try using PWM clock (option '-t 0')\n");
+   }
+}
+
+
 int main(int argc, char **argv)
 {
    pid_t pid;
-   int flags;
+   int flags, retClockTest = 0;
+   float ratio = 1.0F;
 
    /* check command line parameters */
 
    initOpts(argc, argv);
+
+   if (testClockPeripheral) {
+
+      /* partially configure library and start library for testing */
+      gpioCfgBufferSize(bufferSizeMilliseconds);
+      gpioCfgClock(clockMicros, clockPeripheral, 0);
+      gpioCfgDMAchannels(DMAprimaryChannel, DMAsecondaryChannel);
+      if (gpioInitialise()< 0) fatal("Can't initialise pigpio library");
+
+      /* do the test - before forking, that stderr output isn't from daemon process */
+      retClockTest = gpioTestClockTiming( PI_DEFAULT_CLK_TEST_DURATION_MS, &ratio );
+      clockSkewWarning(retClockTest, ratio);
+
+      /* free all resources */
+      gpioTerminate();
+   }
 
    if (!foreground) {
       /* Fork off the parent process */
@@ -392,6 +431,10 @@ int main(int argc, char **argv)
 
       gpioSetSignalFunc(SIGHUP, terminate);
       gpioSetSignalFunc(SIGTERM, terminate);
+
+      /* repeat clock warning for log */
+      if (testClockPeripheral)
+         clockSkewWarning(retClockTest, ratio);
 
       /* sleep forever */
 

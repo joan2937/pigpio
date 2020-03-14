@@ -9688,6 +9688,61 @@ int gpioWaveTxStart(unsigned wave_mode)
 
 /* ----------------------------------------------------------------------- */
 
+int gpioTestClockTiming(unsigned duration_millis, float *ratio)
+{
+   gpioPulse_t pulse[2];
+   uint32_t t0, t1, diffTick, expectedDelta;
+   int k, ret, wave_id;
+   float local_ratio;
+
+   if (ratio)
+      *ratio = 0.0F;
+
+   CHECK_INITED;
+
+   gpioWaveClear();
+
+   for ( k = 0; k < 2; ++k ) {
+      pulse[k].gpioOn = 0;
+      pulse[k].gpioOff = 0;
+      pulse[k].usDelay = 500U * duration_millis;
+   }
+
+   ret = gpioWaveAddNew();
+   if (ret)
+      SOFT_ERROR(ret, "error at gpioWaveAddNew() in gpioTestClockTiming()");
+
+   ret = gpioWaveAddGeneric(2, pulse);
+   if (ret != 2)
+      SOFT_ERROR(ret, "error at gpioWaveAddGeneric() in gpioTestClockTiming()");
+
+   wave_id = gpioWaveCreate();
+   if (wave_id < 0)
+      SOFT_ERROR(wave_id, "error at gpioWaveCreate() in gpioTestClockTiming()");
+
+   ret = gpioWaveTxSend(wave_id, PI_WAVE_MODE_ONE_SHOT );
+   if (ret <= 0)
+      SOFT_ERROR(ret, "error at gpioWaveTxSend() in gpioTestClockTiming()");
+
+   t0 = gpioTick();
+   while ( gpioWaveTxBusy() )
+      gpioDelay(500);
+   t1 = gpioTick();
+
+   gpioWaveClear();
+
+   diffTick = t1 - t0;
+   expectedDelta = 2 * pulse[0].usDelay;
+
+   local_ratio = (float)(diffTick) / (float)(expectedDelta);
+   if (ratio)
+      *ratio = local_ratio;
+   return ( (1.0F - PI_DEFAULT_CLK_TEST_TOLERANCE) < local_ratio
+         && (1.0F + PI_DEFAULT_CLK_TEST_TOLERANCE) > local_ratio ) ? 0 : 1;
+}
+
+/* ----------------------------------------------------------------------- */
+
 int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode)
 {
    rawCbs_t *p=NULL;

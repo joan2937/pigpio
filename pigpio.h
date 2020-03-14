@@ -2001,6 +2001,15 @@ D*/
 
 
 /*F*/
+int gpioTestClockTiming(unsigned duration_millis, float *ratio);
+/*D
+This functions tests clock timing - as used e.g. in [*gpioWaveTxSend*].
+
+Returns 0 if OK, negative values indicate error.
+On Success, the measured ratio is written into the pointer argument.
+D*/
+
+/*F*/
 int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode);
 /*D
 This function transmits the waveform with id wave_id.  The mode
@@ -6481,6 +6490,9 @@ after this command is issued.
 #define PI_DEFAULT_BUFFER_MILLIS           120
 #define PI_DEFAULT_CLK_MICROS              5
 #define PI_DEFAULT_CLK_PERIPHERAL          PI_CLOCK_PCM
+#define PI_DEFAULT_CLK_TEST_PERIPHERAL     1
+#define PI_DEFAULT_CLK_TEST_DURATION_MS    50
+#define PI_DEFAULT_CLK_TEST_TOLERANCE      0.05
 #define PI_DEFAULT_IF_FLAGS                0
 #define PI_DEFAULT_FOREGROUND              0
 #define PI_DEFAULT_DMA_CHANNEL             14
