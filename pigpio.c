@@ -396,6 +396,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define DMA_DEST_WIDTH              (1<< 5)
 #define DMA_DEST_INC                (1<< 4)
 #define DMA_WAIT_RESP               (1<< 3)
+#define DMA_TDMODE                  (1<< 1)
 
 #define DMA_DEBUG_READ_ERR           (1<<2)
 #define DMA_DEBUG_FIFO_ERR           (1<<1)
@@ -664,6 +665,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 /* --------------------------------------------------------------- */
 
 #define NORMAL_DMA (DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+#define TWO_BEAT_DMA (DMA_TDMODE | DMA_BURST_LENGTH(1))
 
 #define TIMED_DMA(x) (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
 
@@ -2998,8 +3000,7 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
    for (i=0; i<numWaves; i++)
    {
-      if (waves[i].gpioOn)                 {numCB++; numBOOL++;}
-      if (waves[i].gpioOff)                {numCB++; numBOOL++;}
+      if (waves[i].gpioOn || waves[i].gpioOff) {numCB++; numBOOL++;}
       if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
       if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
 
@@ -3018,7 +3019,7 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
 {
    int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
 
-   int status;
+   int status, s_stride;
 
    rawCbs_t *p=NULL;
 
@@ -3062,7 +3063,22 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
 
    for (i=0; i<numWaves; i++)
    {
-      if (waves[i].gpioOn)
+      if (waves[i].gpioOn && waves[i].gpioOff)
+      /* Use 2-beat burst */
+      {
+         p = rawWaveCBAdr(botCB++);
+
+         p->info   = TWO_BEAT_DMA;
+         p->src    = waveOOLPOadr(botOOL);
+         waveSetOOL(botOOL++, waves[i].gpioOn);
+         s_stride = waveOOLPOadr(botOOL) - p->src;
+         waveSetOOL(botOOL++, waves[i].gpioOff);
+         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
+         p->length = (2<<16) + 4;         // 2 transfers of 4 bytes each
+         p->stride = (12<<16) + s_stride; // d_stride = (GPCLR0-GPSET0)*4 = 12
+         p->next   = waveCbPOadr(botCB);
+      }
+      if (waves[i].gpioOn && !waves[i].gpioOff)
       {
          waveSetOOL(botOOL, waves[i].gpioOn);
 
@@ -3074,8 +3090,7 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
          p->length = 4;
          p->next   = waveCbPOadr(botCB);
       }
-
-      if (waves[i].gpioOff)
+      if (waves[i].gpioOff && !waves[i].gpioOn)
       {
          waveSetOOL(botOOL, waves[i].gpioOff);
 
@@ -3087,7 +3102,6 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
          p->length = 4;
          p->next   = waveCbPOadr(botCB);
       }
-
       if (waves[i].flags & WAVE_FLAG_READ)
       {
          p = rawWaveCBAdr(botCB++);
@@ -3368,9 +3382,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
       cbs += waveDelayCBs(tDelay);
 
-      if (out[outPos].gpioOn) cbs++; /* one cb if gpio on */
-
-      if (out[outPos].gpioOff) cbs++; /* one cb if gpio off */
+      if (out[outPos].gpioOn || out[outPos].gpioOff) cbs++;
 
       if (out[outPos].flags & WAVE_FLAG_READ)
       {
