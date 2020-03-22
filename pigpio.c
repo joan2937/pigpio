@@ -9645,10 +9645,10 @@ int gpioWaveCreate(void)
    {
       /* Are there enough spare resources? */
 
-      if ((numCB+waveOutBotCB) >= NUM_WAVE_CBS)
+      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
          return PI_TOO_MANY_CBS;
 
-      if ((numBOOL+waveOutBotOOL) >= (waveOutTopOOL-numTOOL))
+      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
          return PI_TOO_MANY_OOL;
 
       if (wid >= PI_MAX_WAVES)
@@ -9718,9 +9718,9 @@ int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
    if (pctCB < 0 || pctCB > 100)
       SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctCB=(%d)", pctCB);
    if (pctBOOL < 0 || pctBOOL > 100)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctBOOL=(%d)", pctCB);
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctBOOL=(%d)", pctBOOL);
    if (pctTOOL < 0 || pctTOOL > 100)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctTOOL=(%d)", pctCB);
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctTOOL=(%d)", pctTOOL);
 
    if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
 
@@ -9728,13 +9728,13 @@ int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
    waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
 
    /* Amount of pad required */
-   CB = (NUM_WAVE_CBS - PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE -1) * pctCB / 100;
-   BOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE -1) * pctBOOL /100;
-   TOOL = (NUM_WAVE_OOL * pctTOOL) / 100;
+   CB = (NUM_WAVE_CBS - PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE) * pctCB / 100;
+   BOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctBOOL /100;
+   TOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctTOOL /100;
 
    /* Reject if wave is too big */
-   if (numCB >= CB) return PI_TOO_MANY_CBS;
-   if (numBOOL >= BOOL) return PI_TOO_MANY_OOL;
+   if (numCB > CB) return PI_TOO_MANY_CBS;
+   if (numBOOL > BOOL) return PI_TOO_MANY_OOL;
    if (numTOOL > TOOL) return PI_TOO_MANY_OOL;
 
    /* Set the padding */
@@ -9764,10 +9764,10 @@ int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
    {
       /* Are there enough spare resources? */
 
-      if ((numCB+waveOutBotCB) >= NUM_WAVE_CBS)
+      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
          return PI_TOO_MANY_CBS;
 
-      if ((numBOOL+waveOutBotOOL) >= (waveOutTopOOL-numTOOL))
+      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
          return PI_TOO_MANY_OOL;
 
       if (wid >= PI_MAX_WAVES)
@@ -9808,7 +9808,7 @@ int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
          numTOOL, waveInfo[wid].topOOL-TOOL);
    }
 
-   DBG(DBG_USER, "Wave Stats: wid=%d CBs %d BOOL %d TOOL %d", wid,
+   DBG(DBG_USER, "Wave padding: wid=%d CBs %d BOOL %d TOOL %d", wid,
       numCB, numBOOL, numTOOL);
 
    waveInfo[wid].deleted = 0;
