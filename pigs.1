@@ -926,10 +926,6 @@ buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
 .br
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-.br
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -950,12 +946,31 @@ For I2C use a control word of (I2C address << 16) + 0x305.
 E.g. to talk as I2C slave with address 0x13 use 0x130305.
 
 .br
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
 .br
-When a zero control word is received GPIO 18-21 will be reset
+
+.EX
+      SDA   SCL   MOSI   SCLK   MISO   CE
+I2C   18    19    -      -      -      -
+SPI   -     -     18     19     20     21
+
+.EE
+
+.br
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+.br
+
+.EX
+      SDA   SCL   MOSI   SCLK   MISO   CE
+I2C   10    11    -      -      -      -
+SPI   -     -     10     11     9      8
+
+.EE
+
+.br
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 .br
@@ -1031,7 +1046,8 @@ TB      transmit busy
 .EE
 
 .br
-This example assumes that GPIO 2/3 are connected to GPIO 18/19.
+This example assumes that GPIO 2/3 are connected to GPIO 18/19
+(GPIO 10/11 on the BCM2711).
 
 .br
 

@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 74
+#define PIGPIO_VERSION 75
 
 /*TEXT
 
@@ -797,6 +797,11 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define BSC_MISO     20
 #define BSC_CE_N     21
 
+#define BSC_SDA_MOSI_2711 10
+#define BSC_SCL_SCLK_2711 11
+#define BSC_MISO_2711      9
+#define BSC_CE_N_2711      8
+
 /* Longest busy delay */
 
 #define PI_MAX_BUSY_DELAY 100
@@ -1438,6 +1443,12 @@ The thread which calls the alert functions is triggered nominally
 once per level change since the last time the thread was activated.
 i.e. The active alert functions will get all level changes but there
 will be a latency.
+
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use [*gpioRead*].
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
 
 The tick value is the time stamp of the sample in microseconds, see
 [*gpioTick*] for more details.
@@ -2913,9 +2924,6 @@ The output process is simple. You simply append data to the FIFO
 buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
 I can't get SPI to work properly.  I tried with a
 control word of 0x303 and swapped MISO and MOSI.
 
@@ -2947,11 +2955,19 @@ in rxBuf.
 Note that the control word sets the BSC mode.  The BSC will stay in
 that mode until a different control word is sent.
 
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
-When a zero control word is received GPIO 18-21 will be reset
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 18  @ 19  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 18   @ 19   @ 20   @ 21
+
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 10  @ 11  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 10   @ 11   @ 9    @ 8
+
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 The returned function value is the status of the transfer (see below).
