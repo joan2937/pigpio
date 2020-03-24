@@ -1,0 +1,150 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>LDR example</title>
+</head>
+<body>
+<p>The following code shows a method of reading analogue sensors on
+the digital input only Pi.&nbsp; A Light Dependent Resistor (LDR)
+varies its resistance according to the incident light
+intensisty.</p>
+<h3>SETUP</h3>
+<img src="images/LDR-fritz.png" alt="fritzing diagram" style=
+"width: 200px; height: 300px;" align="left" hspace="10">The LDR
+used is a Cadmium Sulphide device with a 1MOhm dark resistance and
+2-4KOhm at 100 lux.&nbsp; The capacitor is a 104
+ceramic.<span itemprop="name"><br>
+<br>
+One end of the capacitor is connected to Pi ground.<br>
+<br>
+One end of the LDR is connected to Pi 3V3.<br>
+<br>
+The other ends of the capacitor and LDR are connected to a spare
+gpio.</span><br>
+<p>Here P1-1 is used for 3V3, P1-20 is used for ground, and gpio 18
+(P1-12) is used for the gpio.<br clear="all"></p>
+<p><img src="images/LDR-photo.jpg" style=
+"width: 500px; height: 667px;" alt="photo of set-up"></p>
+<h3>CODE</h3>
+<code>#include &lt;stdio.h&gt;<br>
+<br>
+#include &lt;pigpio.h&gt;<br>
+<br>
+/*
+-----------------------------------------------------------------------<br>
+
+<br>
+&nbsp;&nbsp; 3V3 ----- Light Dependent Resistor --+-- Capacitor
+----- Ground<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++-- gpio<br>
+<br>
+<br>
+&nbsp; cc -o LDR LDR.c -lpigpio -lpthread -lrt<br>
+&nbsp; sudo ./LDR<br>
+<br>
+*/<br>
+<br>
+#define LDR 18<br>
+<br>
+/* forward declaration */<br>
+<br>
+void alert(int pin, int level, uint32_t tick);<br>
+<br>
+int main (int argc, char *argv[])<br>
+{<br>
+&nbsp;&nbsp; if (gpioInitialise()&lt;0) return 1;<br>
+<br>
+&nbsp;&nbsp; gpioSetAlertFunc(LDR, alert); /* call alert when LDR
+changes state */<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp; while (1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioSetMode(LDR, PI_OUTPUT); /*
+drain capacitor */<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioWrite(LDR, PI_OFF);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(200); /* 50 micros is
+enough, 200 is overkill */<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioSetMode(LDR, PI_INPUT); /* start
+capacitor recharge */<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(10000); /* nominal 100
+readings per second */<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; gpioTerminate();<br>
+}<br>
+<br>
+void alert(int pin, int level, uint32_t tick)<br>
+{<br>
+&nbsp;&nbsp; static uint32_t inited = 0;<br>
+&nbsp;&nbsp; static uint32_t lastTick, firstTick;<br>
+<br>
+&nbsp;&nbsp; uint32_t diffTick;<br>
+<br>
+&nbsp;&nbsp; if (inited)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; diffTick = tick - lastTick;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lastTick = tick;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (level == 1) printf("%u %d\ ",
+tick-firstTick, diffTick);<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; inited = 1;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; firstTick = tick;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lastTick = firstTick;<br>
+&nbsp;&nbsp; }<br>
+}<br></code>
+<h3>BUILD</h3>
+<code>cc -o LDR LDR.c -lpigpio -lrt -lpthread<br></code>
+<h3>RUN</h3>
+<code>sudo ./LDR &gt;LDR.dat &amp;</code><br>
+<br>
+While the program is running you can capture the waveform using the
+notification feature built in to pigpio.&nbsp; Issue the following
+commands on the Pi.<br>
+<br>
+<code>pigs no<br>
+pig2vcd&nbsp; &lt;/dev/pigpio0 &gt;LDR.vcd &amp;<br>
+pigs nb 0 0x40000 # set bit for gpio 18<br></code>
+<p>Change the light falling on the LDR for a few seconds (e.g.
+shine a torch on it or shade it with your hands).<br></p>
+<code>pigs nc 0</code><br>
+<p>The file LDR.vcd will contain the captured waveform, which can
+be viewed using GTKWave.</p>
+<p>Overview</p>
+<img src="images/LDR-wave-1.png" style=
+"width: 600px; height: 100px;" alt="LDR waveform 1"><br>
+<p>Reading circa every 10ms<br></p>
+<img src="images/LDR-wave-2.png" style=
+"width: 600px; height: 100px;" alt="LDR waveform 2"><br>
+<p>One reading, circa 400us<br></p>
+<img src="images/LDR-wave-3.png" style=
+"width: 600px; height: 100px;" alt="LDR waveform 3"><br>
+<p>The file LDR.dat will contain pairs of timestamps and recharge
+time (in us).&nbsp; The following&nbsp; script will convert the
+timestamps into seconds.<span style=
+"font-style: italic;"><br></span></p>
+<p><code>awk '{print $1/1000000, $2}' LDR.dat
+&gt;LDR-secs.dat</code></p>
+<p>Gnuplot is a useful tool to graph data.<br></p>
+plot [14:24] 'LDR-secs.dat' with lines title 'LDR'
+<p>Gnuplot readings 14-24 seconds<br></p>
+<p><img src="images/LDR-gnup-1.png" style=
+"width: 600px; height: 321px;" alt="gnuplot 1"></p>
+plot [18:21] 'LDR-secs.dat' with lines title 'LDR'<br>
+<br>
+Gnuplot readings 18-21 seconds
+<p><img src="images/LDR-gnup-2.png" style=
+"width: 600px; height: 321px;" alt="Gnuplot 2"></p>
+</body>
+</html>

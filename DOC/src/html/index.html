@@ -1,0 +1,662 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="content-type">
+<title>pigpio</title>
+</head>
+<body>
+pigpio is a library for the Raspberry which allows control of the
+General Purpose Input Outputs (GPIO).&nbsp; pigpio works on all
+versions of the Pi.
+<p><b>At the moment pigpio on the Pi4B is experimental. I am not
+sure if the DMA channels being used are safe. The Pi4B defaults are
+primary channel 7, secondary channel 6. If these channels do not
+work you will have to experiment. You can set the channels used by
+the pigpio daemon by invoking it with the -d and -e options, e.g.
+<small>sudo pigpiod -d 5 -e 8</small> to specify primary 5,
+secondary 8.</b></p>
+<p><a href="download.html">Download</a><br></p>
+<h3>Features<br></h3>
+<ul>
+<li>
+<p>hardware timed sampling and time-stamping of GPIO 0-31 every 5
+us<br></p>
+</li>
+<li>
+<p>hardware timed PWM on all of GPIO 0-31<br></p>
+</li>
+<li>
+<p>hardware timed servo pulses on all of GPIO 0-31</p>
+</li>
+<li>
+<p>callbacks on GPIO 0-31 level change (time accurate to a few
+us)</p>
+</li>
+<li>
+<p>notifications via pipe on GPIO 0-31 level change<br></p>
+</li>
+<li>
+<p>callbacks at timed intervals</p>
+</li>
+<li>
+<p>reading/writing all of the GPIO in a bank (0-31, 32-53) as a
+single operation</p>
+</li>
+<li>
+<p>GPIO reading, writing, modes, and internal pulls<br></p>
+</li>
+<li>
+<p>socket and pipe interfaces for the bulk of the functionality</p>
+</li>
+<li>
+<p>waveforms to generate GPIO level changes (time accurate to a few
+us)</p>
+</li>
+<li>
+<p>software serial links using any user GPIO</p>
+</li>
+<li>
+<p>rudimentary permission control through the socket and pipe
+interfaces<br></p>
+</li>
+<li>creating and running scripts on the pigpio daemon</li>
+</ul>
+<h3>General</h3>
+The pigpio <a href="cif.html">library</a> is written in the C
+programming language.<br>
+<br>
+The <a href="pigpiod.html">pigpio daemon</a> offers a <a href=
+"sif.html">socket</a> and <a href="pif.html">pipe</a> interface to
+the underlying C library.<br>
+<br>
+A <a href="pdif2.html">C library</a> and a <a href=
+"python.html">Python module</a> allow control of the GPIO via the
+pigpio daemon.<br>
+<br>
+There is third party support for a number of <a href=
+"index.html#Other_Languages">other languages</a>.&nbsp;
+<h3>piscope</h3>
+<p><a href="piscope.html">piscope</a> is a logic analyser (digital
+waveform viewer).<br></p>
+piscope is a GTK+3 application and uses pigpio to provide raw GPIO
+level data.&nbsp; piscope may be run on a Pi or on any machine
+capable of compiling a GTK+3 application.
+<h3><a name="GPIO" id="GPIO"></a>GPIO</h3>
+<p><span style="font-weight: bold;">ALL GPIO</span> are identified
+by their <span style="font-weight: bold;">Broadcom
+number</span>.&nbsp; See <a href=
+"http://elinux.org/RPi_Low-level_peripherals#General_Purpose_Input.2FOutput_.28GPIO.29">
+elinux.org</a><br></p>
+There are 54 GPIO in total, arranged in two banks.<br>
+<p>Bank 1 contains GPIO 0-31.&nbsp; Bank 2 contains GPIO
+32-53.<br></p>
+For all types of Pi it is safe to read all the GPIO. If you try to
+write a system GPIO or change its mode you can crash the Pi or
+corrupt the data on the SD card.<br>
+<br>
+There are several types of board, each with different expansion
+headers, giving physical access to different GPIO.&nbsp;
+<ul>
+<li><a href="#Type_1">Type 1</a> - Model B (original model)</li>
+<li><a href="#Type_2">Type 2</a> - Model A, B (revision 2)</li>
+<li><a href="#Type_3">Type 3</a> - Model A+, B+, Pi Zero, Pi2B,
+Pi3B</li>
+<li><a href="#CM">Compute Module</a> - Compute Module</li>
+</ul>
+<h4><a name="Type_1" id="Type_1"></a>Type 1 - Model B (original
+model)</h4>
+<ul>
+<li>26 pin header (P1).</li>
+</ul>
+<ul>
+<li>Hardware revision numbers of 2 and 3.</li>
+</ul>
+<ul>
+<li>User GPIO 0-1, 4, 7-11, 14-15, 17-18, 21-25.</li>
+</ul>
+<table summary="" style="width: 60%; text-align: left;"
+cellspacing="0" cellpadding="0" border="0">
+<tbody>
+<tr>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+<br></td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SDA</td>
+<td style="text-align: center;">0<br></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SCL</td>
+<td style="text-align: center;">1<br></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">TXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">RXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">ce1</td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">ce0</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">13</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-<br></td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">MOSI</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;">MISO</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">SCLK</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">CE0</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">CE1</td>
+</tr>
+</tbody>
+</table>
+<br>
+<h4><a name="Type_2" id="Type_2"></a>Type 2 - Model A, B (revision
+2)</h4>
+26 pin header (P1) and an additional 8 pin header (P5).
+<ul>
+<li>Hardware revision numbers of 4, 5, 6 (B), 7, 8, 9 (A), and 13,
+14, 15 (B).</li>
+</ul>
+<ul>
+<li>User GPIO 2-4, 7-11, 14-15, 17-18, 22-25, 27-31.<br></li>
+</ul>
+<table summary="" style="width: 60%; text-align: left;"
+cellspacing="0" cellpadding="0" border="0">
+<tbody>
+<tr>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+<br></td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SDA</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SCL</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">TXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">RXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">ce1</td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">ce0</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">27</td>
+<td style="text-align: center;">13</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-<br></td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">MOSI</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;">MISO</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">SCLK</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">CE0</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">CE1</td>
+</tr>
+</tbody>
+</table>
+<br>
+<table summary="" style="width: 60%; text-align: left;"
+cellspacing="0" cellpadding="0" border="0">
+<tbody>
+<tr>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+<br></td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">5V<br></td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">3V3</td>
+</tr>
+<tr>
+<td style="text-align: center;">SDA<br></td>
+<td style="text-align: center;">28</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">29</td>
+<td style="text-align: center;">SCL</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">30</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">31</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground<br></td>
+<td style="text-align: center;">-<br></td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">-<br></td>
+<td style="text-align: center;">Ground</td>
+</tr>
+</tbody>
+</table>
+<br>
+<h4><a name="Type_3" id="Type_3"></a>Type 3 - Model A+, B+, Pi
+Zero, Pi Zero W, Pi2B, Pi3B, Pi4B<br></h4>
+<ul>
+<li>40 pin expansion header (J8).</li>
+</ul>
+<ul>
+<li>Hardware revision numbers of 16 or greater.</li>
+</ul>
+<ul>
+<li>User GPIO 2-27 (0 and 1 are reserved).<br></li>
+</ul>
+<table summary="" style="width: 60%; text-align: left;"
+cellspacing="0" cellpadding="0" border="0">
+<tbody>
+<tr>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+<br></td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style="font-weight: bold; text-align: center;">pin</td>
+<td style=
+"vertical-align: top; font-weight: bold; text-align: center;">
+GPIO</td>
+<td style="font-weight: bold; text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SDA</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">5V</td>
+</tr>
+<tr>
+<td style="text-align: center;">SCL</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">TXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">RXD</td>
+</tr>
+<tr>
+<td style="text-align: center;">ce1</td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">ce0</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">27</td>
+<td style="text-align: center;">13</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">3V3</td>
+<td style="text-align: center;">-<br></td>
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">MOSI</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;">MISO</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">22</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;">SCLK</td>
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">23</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">CE0</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">CE1</td>
+</tr>
+<tr>
+<td style="text-align: center;">ID_SD</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">27</td>
+<td style="text-align: center;">28</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">ID_SC</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">29</td>
+<td style="text-align: center;">30</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">31</td>
+<td style="text-align: center;">32</td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;"><br></td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">13</td>
+<td style="text-align: center;">33</td>
+<td style="text-align: center;">34</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">Ground</td>
+</tr>
+<tr>
+<td style="text-align: center;">miso</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: center;">35</td>
+<td style="text-align: center;">36</td>
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">ce2</td>
+</tr>
+<tr>
+<td style="text-align: center;"><br></td>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;">37</td>
+<td style="text-align: center;">38</td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">mosi</td>
+</tr>
+<tr>
+<td style="text-align: center;">Ground</td>
+<td style="text-align: center;">-</td>
+<td style="text-align: center;">39</td>
+<td style="text-align: center;">40</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">sclk</td>
+</tr>
+</tbody>
+</table>
+<br>
+<h4><a name="CM" id="CM"></a>Compute Module</h4>
+<p>All 54 GPIO may be physically accessed.&nbsp; Some are reserved
+for system use - refer to the Compute Module documentation.<br></p>
+<p>Only GPIO 0-31 are supported for hardware timed sampling, PWM,
+servo pulses, alert callbacks, waves, and software serial
+links.<br></p>
+<h3><a name="Other_Languages" id="Other_Languages"></a>Other
+Languages</h3>
+<p>There are several third party projects which provide wrappers
+for pigpio.<br></p>
+<p>Some I am aware of are:<br></p>
+<ul>
+<li><a href="https://github.com/skvamme/pigpio">Erlang</a>
+(skvamme)</li>
+<li><a href="https://github.com/mattjlewis/pigpioj">Java</a> JNI
+wrapper around the pigpio C library (mattlewis)</li>
+<li><a href="https://github.com/mattjlewis/diozero">Java</a> via
+diozero, a high level wrapper around pigpio, Pi4J, wiringPi etc
+(mattlewis)</li>
+<li><a href="https://github.com/nkolban/jpigpio">Java</a>
+(nkolban)</li>
+<li><a href=
+"https://github.com/unosquare/pigpio-dotnet">.NET/mono</a>
+(unosquare)</li>
+<li><a href="https://github.com/fivdi/pigpio">Node.js</a>
+(fivdi)</li>
+<li><a href="https://metacpan.org/pod/RPi::PIGPIO">Perl</a> (Gligan
+Calin Horea)</li>
+<li><a href=
+"https://github.com/nak1114/ruby-extension-pigpio">Ruby</a>
+(Nak)</li>
+<li><a href=
+"https://github.com/vasmalltalk/pigpio-vast">Smalltalk</a>(Instantiations)</li>
+<li><a href=
+"https://github.com/UBogun/Xojo-pigpio">Xojo</a>(UBogun)</li>
+</ul>
+<hr style="width: 100%; height: 2px;">
+<p><font size="-2">The PWM and servo pulses are timed using the DMA
+and PWM/PCM peripherals.&nbsp; This use was inspired by Richard
+Hirst's <a href="https://github.com/richardghirst/PiBits" target=
+"_blank">servoblaster</a> kernel module.</font></p>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>IR remote example</title>
+</head>
+<body>
+<p>The following code shows one way to read an infrared remote
+control device (the sort used in TVs and stereo systems).</p>
+<h3>SETUP</h3>
+<img alt="fritzing diagram" style="width: 200px; height: 317px;"
+src="images/ir-fritz.png" align="left" hspace="10">The device used
+is a <span itemprop="name">SFH5110 (IR Receiver for remote control,
+carrier 38 kHz).<br>
+<br></span> Pin 1 (left from front) may be connected to any spare
+gpio.&nbsp; Here it's connected via a 4K7 current limiting
+resistor.&nbsp; This isn't really needed as the device has an
+internal 23K resistor in-line.&nbsp; It does no harm though.<br>
+<br>
+Pin 2 should be connected to a Pi ground pin.<br>
+<br>
+Pin 3 should be connected to a Pi 5V pin.<br>
+<p>Here pin 1 to gpio7 (P1-26) via a 4K7 resistor, pin 2 to ground
+(P1-14), and pin 3 to 5V (P1-2).<br clear="all"></p>
+<p><img src="images/ir-photo.jpg" style=
+"width: 500px; height: 500px;" alt="photo of set-up"></p>
+<h3>CODE</h3>
+<code>#include &lt;stdio.h&gt;<br>
+<br>
+#include &lt;pigpio.h&gt;<br>
+<br>
+#define IR_PIN 7<br>
+<br>
+#define OUTSIDE_CODE 0<br>
+#define INSIDE_CODE&nbsp; 1<br>
+<br>
+#define MIN_MESSAGE_GAP 3000<br>
+#define MAX_MESSAGE_END 3000<br>
+<br>
+#define MAX_TRANSITIONS 500<br>
+<br>
+/*<br>
+&nbsp;&nbsp; using the FNV-1a
+hash&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>
+
+&nbsp;&nbsp; from
+http://isthe.com/chongo/tech/comp/fnv/#FNV-param<br>
+*/<br>
+<br>
+#define FNV_PRIME_32 16777619<br>
+#define FNV_BASIS_32 2166136261U<br>
+<br>
+static volatile uint32_t ir_hash = 0;<br>
+<br>
+typedef struct<br>
+{<br>
+&nbsp;&nbsp; int state;<br>
+&nbsp;&nbsp; int count;<br>
+&nbsp;&nbsp; int level;<br>
+&nbsp;&nbsp; uint16_t micros[MAX_TRANSITIONS];<br>
+} decode_t;<br>
+<br>
+/* forward declarations */<br>
+<br>
+void&nbsp;&nbsp;&nbsp;&nbsp; alert(int gpio, int level, uint32_t
+tick);<br>
+uint32_t getHash(decode_t * decode);<br>
+void&nbsp;&nbsp;&nbsp;&nbsp; updateState(decode_t * decode, int
+level, uint32_t micros);<br>
+<br>
+int main(int argc, char * argv[])<br>
+{<br>
+&nbsp;&nbsp; if (gpioInitialise()&lt;0)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return 1 ;<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; /* IR pin as input */<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(IR_PIN, PI_INPUT);<br>
+<br>
+&nbsp;&nbsp; /* 5ms max gap after last pulse */<br>
+<br>
+&nbsp;&nbsp; gpioSetWatchdog(IR_PIN, 5);<br>
+<br>
+&nbsp;&nbsp; /* monitor IR level changes */<br>
+<br>
+&nbsp;&nbsp; gpioSetAlertFunc(IR_PIN, alert);<br>
+<br>
+&nbsp;&nbsp; while (1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (ir_hash)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /* non-zero means
+new decode */<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("ir code is
+%u\ ", ir_hash);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ir_hash = 0;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(100000); /* check remote
+10 times per second */<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; gpioTerminate();<br>
+}<br>
+<br>
+void alert(int gpio, int level, uint32_t tick)<br>
+{<br>
+&nbsp;&nbsp; static int inited = 0;<br>
+<br>
+&nbsp;&nbsp; static decode_t activeHigh, activeLow;<br>
+<br>
+&nbsp;&nbsp; static uint32_t lastTick;<br>
+<br>
+&nbsp;&nbsp; uint32_t diffTick;<br>
+<br>
+&nbsp;&nbsp; if (!inited)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; inited = 1;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; activeHigh.state = OUTSIDE_CODE;
+activeHigh.level = PI_LOW;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; activeLow.state&nbsp; =
+OUTSIDE_CODE; activeLow.level&nbsp; = PI_HIGH;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lastTick = tick;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return;<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; diffTick = tick - lastTick;<br>
+<br>
+&nbsp;&nbsp; if (level != PI_TIMEOUT) lastTick = tick;<br>
+<br>
+&nbsp;&nbsp; updateState(&amp;activeHigh, level, diffTick);<br>
+&nbsp;&nbsp; updateState(&amp;activeLow, level, diffTick);<br>
+}<br>
+<br>
+void updateState(decode_t * decode, int level, uint32_t micros)<br>
+{<br>
+&nbsp;&nbsp; /*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; We are dealing with active high as
+well as active low<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remotes.&nbsp; Abstract the common
+functionality.<br>
+&nbsp;&nbsp; */<br>
+<br>
+&nbsp;&nbsp; if (decode-&gt;state == OUTSIDE_CODE)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (level == decode-&gt;level)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (micros &gt;
+MIN_MESSAGE_GAP)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+decode-&gt;state = INSIDE_CODE;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+decode-&gt;count = 0;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (micros &gt; MAX_MESSAGE_END)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /* end of message
+*/<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /* ignore if last
+code not consumed */<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (!ir_hash)
+ir_hash = getHash(decode);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; decode-&gt;state =
+OUTSIDE_CODE;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+(decode-&gt;count &lt; (MAX_TRANSITIONS-1))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+if (level != PI_TIMEOUT)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+decode-&gt;micros[decode-&gt;count++] = micros;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br>
+}<br>
+<br>
+int compare(unsigned int oldval, unsigned int newval)<br>
+{<br>
+&nbsp;&nbsp; if&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (newval &lt; (oldval
+* 0.75)) {return 1;}<br>
+&nbsp;&nbsp; else if (oldval &lt; (newval * 0.75)) {return 2;}<br>
+&nbsp;&nbsp;
+else&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+{return 4;}<br>
+}<br>
+<br>
+uint32_t getHash(decode_t * decode)<br>
+{<br>
+&nbsp;&nbsp; /* use FNV-1a */<br>
+<br>
+&nbsp;&nbsp; uint32_t hash;<br>
+&nbsp;&nbsp; int i, value;<br>
+<br>
+&nbsp;&nbsp; if (decode-&gt;count &lt; 6) {return 0;}<br>
+<br>
+&nbsp;&nbsp; hash = FNV_BASIS_32;<br>
+<br>
+&nbsp;&nbsp; for (i=0; i&lt;(decode-&gt;count-2); i++)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; value =
+compare(decode-&gt;micros[i], decode-&gt;micros[i+2]);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hash = hash ^ value;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hash = (hash * FNV_PRIME_32);<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; return hash;<br>
+}<br></code>
+<h3>BUILD</h3>
+<code>cc -o ir_remote ir_remote.c -lpigpio -lrt
+-lpthread<br></code>
+<h3>RUN</h3>
+<code>sudo ./ir_remote</code><br>
+<p>A hash code is formed from the level transitions detected during
+a remote key press.&nbsp; This is likely to be unique over multiple
+remotes and keys.</p>
+<p>While the program is running you can capture the waveform using
+the notification feature built in to pigpio.&nbsp; Issue the
+following commands on the Pi.</p>
+<code>pigs no<br>
+pig2vcd&nbsp; &lt;/dev/pigpio0 &gt;ir.vcd &amp;<br>
+pigs nb 0 0x80 # set bits for gpios 7 (0x80)<br></code>
+<p>Press a few different remotes and keys.&nbsp; Then enter<br></p>
+<code>pigs nc 0</code><br>
+<p>The file ir.vcd will contain the captured waveform, which can be
+viewed using GTKWave.</p>
+<p>Overview</p>
+<img src="images/ir-wave-1.png" style=
+"width: 600px; height: 100px;" alt="ir remote waveform 1"><br>
+<p>Remote A typical waveform</p>
+<img src="images/ir-wave-2.png" style=
+"width: 600px; height: 100px;" alt="ir remote waveform 2"><br>
+<p>Remote B typical waveform</p>
+<img style="width: 600px; height: 100px;" alt=
+"ir remote waveform 3" src="images/ir-wave-3.png">
+</body>
+</html>

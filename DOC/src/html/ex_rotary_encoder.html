@@ -1,0 +1,185 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Rotary encoder sample</title>
+</head>
+<body>
+<p>The following code shows one way to read an incremental
+mechanical rotary enoder (the sort used for volume control in audio
+systems).&nbsp; These rotary encoders have two switches A and B
+which return a quadrature output, i.e. they are 90 degrees out of
+phase.</p>
+<h3>SETUP</h3>
+<img alt="fritzing diagram" style="width: 200px; height: 300px;"
+src="images/re-fritz.png" align="left" hspace="10">The common
+(centre) terminal should be connected to a Pi ground.
+<p>The A and B terminals may be connected to any spare gpios.</p>
+<p>Here A to gpio18 (P1-12), common to ground (P1-20), B to gpio7
+(P1-26).<br clear="all"></p>
+<p><img src="images/re-photo.jpg" style=
+"width: 400px; height: 300px;" alt="photo of set-up"></p>
+<h3>CODE</h3>
+<code>#include &lt;stdio.h&gt;<br>
+<br>
+#include &lt;pigpio.h&gt;<br>
+<br>
+/*<br>
+&nbsp;&nbsp; Rotary encoder connections:<br>
+<br>
+&nbsp;&nbsp; Encoder A&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; - gpio
+18&nbsp;&nbsp; (pin P1-12)<br>
+&nbsp;&nbsp; Encoder B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; - gpio
+7&nbsp;&nbsp;&nbsp; (pin P1-26)<br>
+&nbsp;&nbsp; Encoder Common - Pi ground (pin P1-20)<br>
+*/<br>
+<br>
+#define ENCODER_A 18<br>
+#define ENCODER_B&nbsp; 7<br>
+<br>
+static volatile int encoderPos;<br>
+<br>
+/* forward declaration */<br>
+<br>
+void encoderPulse(int gpio, int lev, uint32_t tick);<br>
+<br>
+int main(int argc, char * argv[])<br>
+{<br>
+&nbsp;&nbsp; int pos=0;<br>
+<br>
+&nbsp;&nbsp; if (gpioInitialise()&lt;0) return 1;<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(ENCODER_A, PI_INPUT);<br>
+&nbsp;&nbsp; gpioSetMode(ENCODER_B, PI_INPUT);<br>
+<br>
+&nbsp;&nbsp; /* pull up is needed as encoder common is grounded
+*/<br>
+<br>
+&nbsp;&nbsp; gpioSetPullUpDown(ENCODER_A, PI_PUD_UP);<br>
+&nbsp;&nbsp; gpioSetPullUpDown(ENCODER_B, PI_PUD_UP);<br>
+<br>
+&nbsp;&nbsp; encoderPos = pos;<br>
+<br>
+&nbsp;&nbsp; /* monitor encoder level changes */<br>
+<br>
+&nbsp;&nbsp; gpioSetAlertFunc(ENCODER_A, encoderPulse);<br>
+&nbsp;&nbsp; gpioSetAlertFunc(ENCODER_B, encoderPulse);<br>
+<br>
+&nbsp;&nbsp; while (1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (pos != encoderPos)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; pos =
+encoderPos;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("pos=%d\ ",
+pos);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(20000); /* check pos 50
+times per second */<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; gpioTerminate();<br>
+}<br>
+<br>
+void encoderPulse(int gpio, int level, uint32_t tick)<br>
+{<br>
+&nbsp;&nbsp; /*<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp; A&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; +-----
+1<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp; B&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |<br>
+&nbsp;&nbsp; ----+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---------+&nbsp; 1<br>
+<br>
+&nbsp;&nbsp; */<br>
+<br>
+&nbsp;&nbsp; static int levA=0, levB=0, lastGpio = -1;<br>
+<br>
+&nbsp;&nbsp; if (gpio == ENCODER_A) levA = level; else levB =
+level;<br>
+<br>
+&nbsp;&nbsp; if (gpio != lastGpio) /* debounce */<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lastGpio = gpio;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if ((gpio == ENCODER_A) &amp;&amp;
+(level == 0))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (!levB)
+++encoderPos;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else if ((gpio == ENCODER_B)
+&amp;&amp; (level == 1))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (levA)
+--encoderPos;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br>
+}<br></code>
+<h3>BUILD</h3>
+<code>cc -o rotary_encoder rotary_encoder.c -lpigpio -lrt
+-lpthread<br></code>
+<h3>RUN</h3>
+<code>sudo ./rotary_encoder</code><br>
+<p>While the program is running you can capture the waveform using
+the notification feature built in to pigpio.&nbsp; Issue the
+following commands on the Pi.</p>
+<code>pigs no<br>
+pig2vcd&nbsp; &lt;/dev/pigpio0 &gt;re.vcd &amp;<br>
+pigs nb 0 0x40080 # set bits for gpios 7 (0x80) and 18
+(0x40000)<br></code>
+<p>Twiddle the rotary encoder forwards and backwards for a few
+seconds.&nbsp; Then enter<br></p>
+<code>pigs nc 0</code><br>
+<p>The file re.vcd will contain the captured waveform, which can be
+viewed using GTKWave.</p>
+<br>
+Overview<br>
+<br>
+<img src="images/re-wave-1.png" style=
+"width: 600px; height: 100px;" alt=
+"rotary encoder waveform overview"><br>
+<br>
+Detail of switch bounce.&nbsp; Contact A bounces for circa 700 us
+before completing the level transition<br>
+<br>
+<img src="images/re-wave-2.png" style=
+"width: 600px; height: 100px;" alt=
+"rotary encoder waveform detail"><br>
+</body>
+</html>

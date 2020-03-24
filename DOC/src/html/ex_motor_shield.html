@@ -1,0 +1,254 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Arduino motor shield example</title>
+</head>
+<body>
+The following example demonstrates the use of an Arduino shield
+from the Rasperry Pi.<br>
+<br>
+The shield used is a clone of the Adafruit motor shield.&nbsp; See
+<a href="http://shieldlist.org/adafruit/motor">shieldlist.org</a>
+for details.<br>
+<br>
+For the demonstration DC motors 3 and 4 are being driven forwards
+and backwards with changing speeds (speeds are controlled via
+PWM).<br>
+<br>
+Seven connections are made between the Pi and the shield.&nbsp;
+Four to latch the motor states (latch, enable, data, clock); Two to
+control motor speed (PWM 3 and 4); and ground.<br>
+<br>
+The code used was ported from the Adafruit Arduino code and
+converted to use the pigpio library.&nbsp; Only the DC motor code
+was ported.<br>
+<br>
+A video of the shield in use is available at <a href=
+"http://youtu.be/Z_l3C246oVI">youtube.com</a><br>
+<code><br>
+#include &lt;stdio.h&gt;</code> <code><br>
+<br>
+#include &lt;pigpio.h&gt;<br>
+<br>
+/*<br>
+&nbsp;&nbsp; This code may be used to drive the Adafruit (or
+clones) Motor Shield.<br>
+<br>
+&nbsp;&nbsp; The code as written only supports DC motors.<br>
+<br>
+&nbsp;&nbsp; http://shieldlist.org/adafruit/motor<br>
+<br>
+&nbsp;&nbsp; The shield pinouts are<br>
+<br>
+&nbsp;&nbsp; D12 MOTORLATCH<br>
+&nbsp;&nbsp; D11 PMW motor 1<br>
+&nbsp;&nbsp; D10 Servo 1<br>
+&nbsp;&nbsp; D9&nbsp; Servo 2<br>
+&nbsp;&nbsp; D8&nbsp; MOTORDATA<br>
+<br>
+&nbsp;&nbsp; D7&nbsp; MOTORENABLE<br>
+&nbsp;&nbsp; D6&nbsp; PWM motor 4<br>
+&nbsp;&nbsp; D5&nbsp; PWM motor 3<br>
+&nbsp;&nbsp; D4&nbsp; MOTORCLK<br>
+&nbsp;&nbsp; D3&nbsp; PWM motor 2<br>
+<br>
+&nbsp;&nbsp; The motor states (forward, backward, brake, release)
+are encoded using the<br>
+&nbsp;&nbsp; MOTOR_ latch pins.&nbsp; This saves four gpios.<br>
+*/<br>
+<br>
+typedef unsigned char uint8_t;<br>
+<br>
+#define BIT(bit) (1 &lt;&lt; (bit))<br>
+<br>
+/* assign gpios to drive the shield pins */<br>
+<br>
+/*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Shield&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pi */<br>
+<br>
+#define MOTORLATCH&nbsp; 14<br>
+#define MOTORCLK&nbsp;&nbsp;&nbsp; 24<br>
+#define MOTORENABLE 25<br>
+#define MOTORDATA&nbsp;&nbsp; 15<br>
+<br>
+#define MOTOR_3_PWM&nbsp; 7<br>
+#define MOTOR_4_PWM&nbsp; 8<br>
+<br>
+/*<br>
+&nbsp;&nbsp; The only other connection needed between the Pi and
+the shield<br>
+&nbsp;&nbsp; is ground to ground. I used Pi P1-6 to shield gnd
+(next to D13).<br>
+*/<br>
+<br>
+/* assignment of motor states to latch */<br>
+<br>
+#define MOTOR1_A 2<br>
+#define MOTOR1_B 3<br>
+#define MOTOR2_A 1<br>
+#define MOTOR2_B 4<br>
+#define MOTOR4_A 0<br>
+#define MOTOR4_B 6<br>
+#define MOTOR3_A 5<br>
+#define MOTOR3_B 7<br>
+<br>
+#define FORWARD&nbsp; 1<br>
+#define BACKWARD 2<br>
+#define BRAKE&nbsp;&nbsp;&nbsp; 3<br>
+#define RELEASE&nbsp; 4<br>
+<br>
+static uint8_t latch_state;<br>
+<br>
+void latch_tx(void)<br>
+{<br>
+&nbsp;&nbsp; unsigned char i;<br>
+<br>
+&nbsp;&nbsp; gpioWrite(MOTORLATCH, PI_LOW);<br>
+<br>
+&nbsp;&nbsp; gpioWrite(MOTORDATA, PI_LOW);<br>
+<br>
+&nbsp;&nbsp; for (i=0; i&lt;8; i++)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(10);&nbsp; // 10 micros
+delay<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioWrite(MOTORCLK, PI_LOW);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (latch_state &amp; BIT(7-i))
+gpioWrite(MOTORDATA, PI_HIGH);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+else&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+gpioWrite(MOTORDATA, PI_LOW);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioDelay(10);&nbsp; // 10 micros
+delay<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioWrite(MOTORCLK, PI_HIGH);<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; gpioWrite(MOTORLATCH, PI_HIGH);<br>
+}<br>
+<br>
+void init(void)<br>
+{<br>
+&nbsp;&nbsp; latch_state = 0;<br>
+<br>
+&nbsp;&nbsp; latch_tx();<br>
+<br>
+&nbsp;&nbsp; gpioWrite(MOTORENABLE, PI_LOW);<br>
+}<br>
+<br>
+void DCMotorInit(uint8_t num)<br>
+{<br>
+&nbsp;&nbsp; switch (num)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 1: latch_state &amp;=
+~BIT(MOTOR1_A) &amp; ~BIT(MOTOR1_B); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 2: latch_state &amp;=
+~BIT(MOTOR2_A) &amp; ~BIT(MOTOR2_B); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 3: latch_state &amp;=
+~BIT(MOTOR3_A) &amp; ~BIT(MOTOR3_B); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 4: latch_state &amp;=
+~BIT(MOTOR4_A) &amp; ~BIT(MOTOR4_B); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; default: return;<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; latch_tx();<br>
+<br>
+&nbsp;&nbsp; printf("Latch=%08X\ ", latch_state);<br>
+}<br>
+<br>
+void DCMotorRun(uint8_t motornum, uint8_t cmd)<br>
+{<br>
+&nbsp;&nbsp; uint8_t a, b;<br>
+<br>
+&nbsp;&nbsp; switch (motornum)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 1: a = MOTOR1_A; b = MOTOR1_B;
+break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 2: a = MOTOR2_A; b = MOTOR2_B;
+break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 3: a = MOTOR3_A; b = MOTOR3_B;
+break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 4: a = MOTOR4_A; b = MOTOR4_B;
+break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; default: return;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;<br>
+&nbsp;&nbsp; switch (cmd)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case FORWARD:&nbsp; latch_state
+|=&nbsp; BIT(a); latch_state &amp;= ~BIT(b); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case BACKWARD: latch_state &amp;=
+~BIT(a); latch_state |=&nbsp; BIT(b); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case RELEASE:&nbsp; latch_state
+&amp;= ~BIT(a); latch_state &amp;= ~BIT(b); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; default: return;<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; latch_tx();<br>
+<br>
+&nbsp;&nbsp; printf("Latch=%08X\ ", latch_state);<br>
+}<br>
+<br>
+int main (int argc, char *argv[])<br>
+{<br>
+&nbsp;&nbsp; int i;<br>
+<br>
+&nbsp;&nbsp; if (gpioInitialise()&lt;0) return 1;<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(MOTORLATCH,&nbsp; PI_OUTPUT);<br>
+&nbsp;&nbsp; gpioSetMode(MOTORENABLE, PI_OUTPUT);<br>
+&nbsp;&nbsp; gpioSetMode(MOTORDATA,&nbsp;&nbsp; PI_OUTPUT);<br>
+&nbsp;&nbsp; gpioSetMode(MOTORCLK,&nbsp;&nbsp;&nbsp;
+PI_OUTPUT);<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(MOTOR_3_PWM, PI_OUTPUT);<br>
+&nbsp;&nbsp; gpioSetMode(MOTOR_4_PWM, PI_OUTPUT);<br>
+<br>
+&nbsp;&nbsp; gpioPWM(MOTOR_3_PWM, 0);<br>
+&nbsp;&nbsp; gpioPWM(MOTOR_4_PWM, 0);<br>
+<br>
+&nbsp;&nbsp; init();<br>
+<br>
+&nbsp;&nbsp; for (i=60; i&lt;160; i+=20)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioPWM(MOTOR_3_PWM, i);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioPWM(MOTOR_4_PWM, 220-i);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(3, FORWARD);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(4, BACKWARD);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sleep(2);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(3, RELEASE);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(4, RELEASE);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sleep(2);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioPWM(MOTOR_4_PWM, i);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gpioPWM(MOTOR_3_PWM, 220-i);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(3, BACKWARD);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(4, FORWARD);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sleep(2);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(3, RELEASE);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DCMotorRun(4, RELEASE);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sleep(2);<br>
+&nbsp;&nbsp; }<br>
+<br>
+&nbsp;&nbsp; gpioPWM(MOTOR_4_PWM, 0);<br>
+&nbsp;&nbsp; gpioPWM(MOTOR_3_PWM, 0);<br>
+<br>
+&nbsp;&nbsp; DCMotorRun(3, RELEASE);<br>
+&nbsp;&nbsp; DCMotorRun(4, RELEASE);<br>
+<br>
+&nbsp;&nbsp; gpioTerminate();<br>
+}<br></code>
+</body>
+</html>

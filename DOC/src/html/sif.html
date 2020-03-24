@@ -1,0 +1,2004 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="content-type">
+<title>Socket interface</title>
+</head>
+<body>
+pigpio provides a socket interface to many of its functions.<br>
+<br>
+The socket interface is available whenever pigpio is running,
+either because it has been started as a daemon, or it has been
+linked in to a running user program.<br>
+<br>
+The socket interface can be disabled by the program which
+initialises the library.&nbsp; pigpiod offers the -k option to
+disable the socket interface.&nbsp; User programs should call
+<a href="cif.html#gpioCfgInterfaces">gpioCfgInterfaces</a> if they
+wish to disable the socket interface.<br>
+<br>
+pigpio listens for connections on port 8888 by default.&nbsp; This
+default may be overridden when pigpio starts by the <a href=
+"cif.html#gpioCfgSocketPort">gpioCfgSocketPort</a> function
+call.&nbsp; The pigpio daemon uses this function to provide an
+option to change the port number.<br>
+<br>
+The pigs utility is an example of using the socket interface from
+C.<span style="font-weight: bold;"><br></span>
+<h3><a name="Request" id="Request"></a>Request</h3>
+<p>pigpio expects messages of type <a href=
+"sif.html#cmdCmd_t">cmdCmd_t</a> immediately followed with an
+extension for a few commands.<br>
+<br>
+The caller should fill in cmd, p1, p2, p3/res, and any extension as
+needed.&nbsp; p3 will always be zero unless the command requires an
+extension in which case p3 will be the length in bytes of the
+extension.<br>
+<br>
+The <a href="sif.html#cmdCmd_t">cmdCmd_t</a> is echoed back with
+the result, if any, in p3/res, and an extension immediately
+afterwards for a few commands.<br></p>
+<table summary="" style="width: 80%;" cellspacing="2" cellpadding=
+"2" border="1">
+<tbody>
+<tr>
+<td style="font-weight: bold;">COMMAND</td>
+<td style="font-weight: bold;">cmd<br></td>
+<td style="font-weight: bold;">p1</td>
+<td style="font-weight: bold;">p2</td>
+<td style="font-weight: bold;">p3</td>
+<td style="font-weight: bold;">Extension<br></td>
+</tr>
+<tr>
+<td>MODES</td>
+<td>0</td>
+<td>gpio</td>
+<td>mode</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>MODEG</td>
+<td>1</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PUD</td>
+<td>2</td>
+<td>gpio</td>
+<td>pud</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>READ</td>
+<td>3</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WRITE</td>
+<td>4</td>
+<td>gpio</td>
+<td>level</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PWM</td>
+<td>5</td>
+<td>gpio</td>
+<td>dutycycle</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRS</td>
+<td>6</td>
+<td>gpio</td>
+<td>range</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PFS</td>
+<td>7</td>
+<td>gpio</td>
+<td>frequency</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERVO</td>
+<td>8</td>
+<td>gpio</td>
+<td>pulsewidth</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WDOG</td>
+<td>9</td>
+<td>gpio</td>
+<td>timeout</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BR1</td>
+<td>10</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BR2</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BC1</td>
+<td>12</td>
+<td>bits</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BC2</td>
+<td>13</td>
+<td>bits</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BS1</td>
+<td>14</td>
+<td>bits</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BS2</td>
+<td>15</td>
+<td>bits</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>TICK</td>
+<td>16</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>HWVER</td>
+<td>17</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NO</td>
+<td>18</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NB</td>
+<td>19</td>
+<td>handle</td>
+<td>bits</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NP</td>
+<td>20</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NC</td>
+<td>21</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRG</td>
+<td>22</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PFG</td>
+<td>23</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRRG</td>
+<td>24</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>HELP<br></td>
+<td>25</td>
+<td>N/A<br></td>
+<td>N/A<br></td>
+<td>N/A<br></td>
+<td>N/A<br></td>
+</tr>
+<tr>
+<td>PIGPV</td>
+<td>26</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVCLR</td>
+<td>27</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVAG</td>
+<td>28</td>
+<td>0</td>
+<td>0</td>
+<td>12*X</td>
+<td>gpioPulse_t pulse[X]</td>
+</tr>
+<tr>
+<td>WVAS</td>
+<td>29</td>
+<td>gpio</td>
+<td>baud</td>
+<td>12+X</td>
+<td>uint32_t databits<br>
+uint32_t stophalfbits<br>
+uint32_t offset<br>
+uint8_t data[X]</td>
+</tr>
+<tr>
+<td>N/A<br></td>
+<td>30</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>N/A<br></td>
+<td>31</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVBSY</td>
+<td>32</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVHLT</td>
+<td>33</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSM</td>
+<td>34</td>
+<td>subcmd</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSP</td>
+<td>35</td>
+<td>subcmd</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSC</td>
+<td>36</td>
+<td>subcmd</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>TRIG</td>
+<td>37</td>
+<td>gpio</td>
+<td>pulselen</td>
+<td>4</td>
+<td>uint32_t level</td>
+</tr>
+<tr>
+<td>PROC</td>
+<td>38</td>
+<td>0</td>
+<td>0</td>
+<td>X</td>
+<td>uint8_t text[X]</td>
+</tr>
+<tr>
+<td>PROCD</td>
+<td>39</td>
+<td>script_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PROCR</td>
+<td>40</td>
+<td>script_id</td>
+<td>0</td>
+<td>4*X<br></td>
+<td>uint32_t pars[X]<br></td>
+</tr>
+<tr>
+<td>PROCS</td>
+<td>41</td>
+<td>script_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SLRO</td>
+<td>42</td>
+<td>gpio</td>
+<td>baud</td>
+<td>4</td>
+<td>uint32_t databits<br></td>
+</tr>
+<tr>
+<td>SLR</td>
+<td>43</td>
+<td>gpio</td>
+<td>count</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SLRC</td>
+<td>44</td>
+<td>gpio</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PROCP</td>
+<td>45</td>
+<td>script_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>MICS</td>
+<td>46</td>
+<td>micros</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>MILS</td>
+<td>47</td>
+<td>millis</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PARSE</td>
+<td>48</td>
+<td>N/A</td>
+<td>N/A<br></td>
+<td>N/A<br></td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>WVCRE</td>
+<td>49</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVDEL</td>
+<td>50</td>
+<td>wave_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVTX</td>
+<td>51</td>
+<td>wave_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVTXR</td>
+<td>52</td>
+<td>wave_id</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVNEW</td>
+<td>53</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CO</td>
+<td>54</td>
+<td>bus</td>
+<td>device</td>
+<td>4</td>
+<td>uint32_t flags</td>
+</tr>
+<tr>
+<td>I2CC</td>
+<td>55</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRD</td>
+<td>56</td>
+<td>handle</td>
+<td>count</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWD</td>
+<td>57</td>
+<td>handle</td>
+<td>0</td>
+<td>X</td>
+<td>uint8_t data[X]</td>
+</tr>
+<tr>
+<td>I2CWQ</td>
+<td>58</td>
+<td>handle</td>
+<td>bit</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRS</td>
+<td>59</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWS</td>
+<td>60</td>
+<td>handle</td>
+<td>byte</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRB</td>
+<td>61</td>
+<td>handle</td>
+<td>register</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWB</td>
+<td>62</td>
+<td>handle</td>
+<td>register</td>
+<td>4</td>
+<td>uint32_t byte</td>
+</tr>
+<tr>
+<td>I2CRW</td>
+<td>63</td>
+<td>handle</td>
+<td>register</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWW</td>
+<td>64</td>
+<td>handle</td>
+<td>register</td>
+<td>4</td>
+<td>uint32_t word</td>
+</tr>
+<tr>
+<td>I2CRK</td>
+<td>65</td>
+<td>handle</td>
+<td>register<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWK</td>
+<td>66</td>
+<td>handle</td>
+<td>register<br></td>
+<td>X</td>
+<td>uint8_t bvs[X]<br></td>
+</tr>
+<tr>
+<td>I2CRI</td>
+<td>67</td>
+<td>handle</td>
+<td>register<br></td>
+<td>4</td>
+<td>uint32_t num<br></td>
+</tr>
+<tr>
+<td>I2CWI</td>
+<td>68</td>
+<td>handle</td>
+<td>register<br></td>
+<td>X<br></td>
+<td>uint8_t bvs[X]<br></td>
+</tr>
+<tr>
+<td>I2CPC</td>
+<td>69</td>
+<td>handle</td>
+<td>register<br></td>
+<td>4</td>
+<td>uint32_t word<br></td>
+</tr>
+<tr>
+<td>I2CPK</td>
+<td>70</td>
+<td>handle</td>
+<td>register<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>SPIO<br></td>
+<td>71</td>
+<td>channel</td>
+<td>baud</td>
+<td>4</td>
+<td>uint32_t flags</td>
+</tr>
+<tr>
+<td>SPIC</td>
+<td>72</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SPIR</td>
+<td>73</td>
+<td>handle</td>
+<td>count</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SPIW</td>
+<td>74</td>
+<td>handle</td>
+<td>0</td>
+<td>X</td>
+<td>uint8_t data[X]</td>
+</tr>
+<tr>
+<td>SPIX</td>
+<td>75</td>
+<td>handle</td>
+<td>0</td>
+<td>X</td>
+<td>uint8_t data[X]</td>
+</tr>
+<tr>
+<td>SERO</td>
+<td>76</td>
+<td>baud</td>
+<td>flags</td>
+<td>X</td>
+<td>uint8_t device[X]</td>
+</tr>
+<tr>
+<td>SERC</td>
+<td>77</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERRB</td>
+<td>78</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERWB</td>
+<td>79</td>
+<td>handle</td>
+<td>byte</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERR</td>
+<td>80</td>
+<td>handle</td>
+<td>count</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERW</td>
+<td>81</td>
+<td>handle</td>
+<td>0</td>
+<td>X</td>
+<td>uint8_t data[X]</td>
+</tr>
+<tr>
+<td>SERDA</td>
+<td>82</td>
+<td>handle</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">GDC<br></td>
+<td style="vertical-align: top;">83<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">GPW<br></td>
+<td style="vertical-align: top;">84<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">HC<br></td>
+<td style="vertical-align: top;">85<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">frequency<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">HP<br></td>
+<td style="vertical-align: top;">86<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">frequency<br></td>
+<td style="vertical-align: top;">4<br></td>
+<td style="vertical-align: top;">uint32_t dutycycle<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CF1<br></td>
+<td style="vertical-align: top;">87<br></td>
+<td style="vertical-align: top;">arg1<br></td>
+<td style="vertical-align: top;">arg2<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t argx[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CF2<br></td>
+<td style="vertical-align: top;">88<br></td>
+<td style="vertical-align: top;">arg1<br></td>
+<td style="vertical-align: top;">retMax<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t argx[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CC<br></td>
+<td style="vertical-align: top;">89<br></td>
+<td style="vertical-align: top;">sda<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CO<br></td>
+<td style="vertical-align: top;">90<br></td>
+<td style="vertical-align: top;">sda<br></td>
+<td style="vertical-align: top;">scl<br></td>
+<td style="vertical-align: top;">4<br></td>
+<td style="vertical-align: top;">uint32_t baud<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CZ<br></td>
+<td style="vertical-align: top;">91<br></td>
+<td style="vertical-align: top;">sda<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">I2CZ<br></td>
+<td style="vertical-align: top;">92<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVCHA<br></td>
+<td style="vertical-align: top;">93<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">SLRI<br></td>
+<td style="vertical-align: top;">94<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">invert<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CGI<br></td>
+<td style="vertical-align: top;">95<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CSI<br></td>
+<td style="vertical-align: top;">96<br></td>
+<td style="vertical-align: top;">config<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FG<br></td>
+<td style="vertical-align: top;">97<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">steady<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FN<br></td>
+<td style="vertical-align: top;">98<br></td>
+<td style="vertical-align: top;">gpio<br></td>
+<td style="vertical-align: top;">steady<br></td>
+<td style="vertical-align: top;">4<br></td>
+<td style="vertical-align: top;">uint32_t active<br></td>
+</tr>
+<tr>
+<td>NOIB</td>
+<td>99</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVTXM<br></td>
+<td style="vertical-align: top;">100<br></td>
+<td style="vertical-align: top;">wave_id<br></td>
+<td style="vertical-align: top;">mode<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVTAT<br></td>
+<td style="vertical-align: top;">101<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">PADS<br></td>
+<td style="vertical-align: top;">102<br></td>
+<td style="vertical-align: top;">pad<br></td>
+<td style="vertical-align: top;">strength<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">PADG<br></td>
+<td style="vertical-align: top;">103<br></td>
+<td style="vertical-align: top;">pad<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FO<br></td>
+<td style="vertical-align: top;">104<br></td>
+<td style="vertical-align: top;">mode<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t file[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FC<br></td>
+<td style="vertical-align: top;">105<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FR<br></td>
+<td style="vertical-align: top;">106<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">count<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FW<br></td>
+<td style="vertical-align: top;">107<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FS<br></td>
+<td style="vertical-align: top;">108<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">offset<br></td>
+<td style="vertical-align: top;">4<br></td>
+<td style="vertical-align: top;">uint32_t from<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FL<br></td>
+<td style="vertical-align: top;">109<br></td>
+<td style="vertical-align: top;">count<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t pattern[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">SHELL<br></td>
+<td style="vertical-align: top;">110<br></td>
+<td style="vertical-align: top;">len(name)<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">len(name)+<br>
+1+<br>
+len(string)<br></td>
+<td style="vertical-align: top;">uint8_t name[len(name)]<br>
+uint8_t null (0)<br>
+uint8_t string[len(string)]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIC<br></td>
+<td style="vertical-align: top;">111<br></td>
+<td style="vertical-align: top;">CS<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIO<br></td>
+<td style="vertical-align: top;">112<br></td>
+<td style="vertical-align: top;">CS<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">20<br></td>
+<td style="vertical-align: top;">uint32_t MISO<br>
+uint32_t MOSI<br>
+uint32_t SCLK<br>
+uint32_t baud<br>
+uint32_t spi_flags<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIX<br></td>
+<td style="vertical-align: top;">113<br></td>
+<td style="vertical-align: top;">CS<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSCX<br></td>
+<td style="vertical-align: top;">114<br></td>
+<td style="vertical-align: top;">control<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">EVM<br></td>
+<td style="vertical-align: top;">115<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">bits<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">EVT<br></td>
+<td style="vertical-align: top;">116<br></td>
+<td style="vertical-align: top;">event<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td valign="top">PROCU<br></td>
+<td valign="top">117<br></td>
+<td valign="top">script_id<br></td>
+<td valign="top">0<br></td>
+<td valign="top">4*X<br></td>
+<td valign="top">uint32_t pars[X]<br></td>
+</tr>
+</tbody>
+</table>
+<h3><a name="Response" id="Response"></a>Response</h3>
+<p>The response has cmd/p1/p2 as in the request.&nbsp; p3/res holds
+the return value.&nbsp; If the command returns additional values
+they will be in the immediately following extension.<br></p>
+Normally res should be treated as a 32 bit signed value and will be
+greater than or equal to zero.&nbsp; Upon failure res will be less
+than 0 and contains an error code.<br>
+<p>There are a few commands where the returned value should be
+treated as a 32 bit unsigned value.&nbsp; These commands can not
+fail.&nbsp; They are indicated with a * after the command
+name.<br></p>
+<p>Commands with an extension have the size of the extension in
+bytes returned in res (or &lt;0 on error as above).</p>
+<table summary="" style="width: 80%;" cellspacing="2" cellpadding=
+"2" border="1">
+<tbody>
+<tr>
+<td style="font-weight: bold;">COMMAND</td>
+<td style="font-weight: bold;">cmd<br></td>
+<td style="vertical-align: top; font-weight: bold;">p1<br></td>
+<td style="vertical-align: top; font-weight: bold;">p2<br></td>
+<td style="font-weight: bold;">res<br></td>
+<td style="font-weight: bold;">Extension<br></td>
+</tr>
+<tr>
+<td>MODES</td>
+<td>0</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>MODEG</td>
+<td>1</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>mode<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PUD</td>
+<td>2</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>READ</td>
+<td>3</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>level<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WRITE</td>
+<td>4</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PWM</td>
+<td>5</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRS</td>
+<td>6</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PFS</td>
+<td>7</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERVO</td>
+<td>8</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WDOG</td>
+<td>9</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BR1 *</td>
+<td>10</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>bits<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BR2 *</td>
+<td>11</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>bits<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BC1</td>
+<td>12</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BC2</td>
+<td>13</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BS1</td>
+<td>14</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>BS2</td>
+<td>15</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>TICK *<br></td>
+<td>16</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>tick<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>HWVER *<br></td>
+<td>17</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>version<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NO</td>
+<td>18</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>handle<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NB</td>
+<td>19</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NP</td>
+<td>20</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>NC</td>
+<td>21</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRG</td>
+<td>22</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>range<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PFG</td>
+<td>23</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>frequency<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PRRG</td>
+<td>24</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>real range<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>HELP</td>
+<td>25</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>N/A<br></td>
+<td>N/A<br></td>
+</tr>
+<tr>
+<td>PIGPV *<br></td>
+<td>26</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>version<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVCLR</td>
+<td>27</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVAG</td>
+<td>28</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave pulses<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVAS</td>
+<td>29</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave pulses<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>N/A<br></td>
+<td>30</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>-<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>N/A<br></td>
+<td>31</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>-<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVBSY</td>
+<td>32</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>busy (1) or not busy (0)<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVHLT</td>
+<td>33</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSM</td>
+<td>34</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave micros<br>
+wave micros - high<br>
+wave micros - max<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSP</td>
+<td>35</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave pulses<br>
+wave pulses - high<br>
+wave pulses - max<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVSC</td>
+<td>36</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave DMA CBs<br>
+wave DMA CBs - high<br>
+wave DMA CBs - max<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>TRIG</td>
+<td>37</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-</td>
+</tr>
+<tr>
+<td>PROC</td>
+<td>38</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>script id<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PROCD</td>
+<td>39</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PROCR</td>
+<td>40</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>script status<br></td>
+<td>-</td>
+</tr>
+<tr>
+<td>PROCS</td>
+<td>41</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SLRO</td>
+<td>42</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SLR</td>
+<td>43</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>SLRC</td>
+<td>44</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PROCP</td>
+<td>45</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>44</td>
+<td>uint32_t script_status<br>
+uint32_t pars[10]<br></td>
+</tr>
+<tr>
+<td>MICS</td>
+<td>46</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>MILS</td>
+<td>47</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>PARSE</td>
+<td>48</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>N/A<br></td>
+<td>-</td>
+</tr>
+<tr>
+<td>WVCRE</td>
+<td>49</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave id<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVDEL</td>
+<td>50</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVTX</td>
+<td>51</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave DMA CBs<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVTXR</td>
+<td>52</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>wave DMA CBs<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>WVNEW</td>
+<td>53</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CO</td>
+<td>54</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>handle</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CC</td>
+<td>55</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRD</td>
+<td>56</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>I2CWD</td>
+<td>57</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWQ</td>
+<td>58</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRS</td>
+<td>59</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>byte value<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWS</td>
+<td>60</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRB</td>
+<td>61</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>byte value<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWB</td>
+<td>62</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRW</td>
+<td>63</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>word value<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWW</td>
+<td>64</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRK</td>
+<td>65</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CWK</td>
+<td>66</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CRI</td>
+<td>67</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>I2CWI</td>
+<td>68</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CPC</td>
+<td>69</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>word value<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>I2CPK</td>
+<td>70</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>SPIO<br></td>
+<td>71</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>handle<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SPIC</td>
+<td>72</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SPIR</td>
+<td>73</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>SPIW</td>
+<td>74</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SPIX</td>
+<td>75</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X</td>
+<td>uint8_t data[X]</td>
+</tr>
+<tr>
+<td>SERO</td>
+<td>76</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>handle<br></td>
+<td>-</td>
+</tr>
+<tr>
+<td>SERC</td>
+<td>77</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERRB</td>
+<td>78</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>byte value<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERWB</td>
+<td>79</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERR</td>
+<td>80</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>X<br></td>
+<td>uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td>SERW</td>
+<td>81</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td>SERDA</td>
+<td>82</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>data ready count<br></td>
+<td>-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">GDC<br></td>
+<td style="vertical-align: top;">83<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">dutycycle<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">GPW<br></td>
+<td style="vertical-align: top;">84<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">pulsewidth<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">HC<br></td>
+<td style="vertical-align: top;">85<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">HP<br></td>
+<td style="vertical-align: top;">86<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CF1<br></td>
+<td style="vertical-align: top;">87<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">value<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CF2<br></td>
+<td style="vertical-align: top;">88<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t retBuf[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CC<br></td>
+<td style="vertical-align: top;">89<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CO<br></td>
+<td style="vertical-align: top;">90<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BI2CZ<br></td>
+<td style="vertical-align: top;">91<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">I2CZ<br></td>
+<td style="vertical-align: top;">92<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVCHA<br></td>
+<td style="vertical-align: top;">93<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">SLRI<br></td>
+<td style="vertical-align: top;">94<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CGI<br></td>
+<td style="vertical-align: top;">95<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">config<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">CSI<br></td>
+<td style="vertical-align: top;">96<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FG<br></td>
+<td style="vertical-align: top;">97<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FN<br></td>
+<td style="vertical-align: top;">98<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td>NOIB</td>
+<td>99</td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td>0</td>
+<td>-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVTXM<br></td>
+<td style="vertical-align: top;">100<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">wave DMA CBs<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">WVTAT<br></td>
+<td style="vertical-align: top;">101<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">wave id<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">PADS<br></td>
+<td style="vertical-align: top;">102<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">PADG<br></td>
+<td style="vertical-align: top;">103<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">strength<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FO<br></td>
+<td style="vertical-align: top;">104<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">handle<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FC<br></td>
+<td style="vertical-align: top;">105<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FR<br></td>
+<td style="vertical-align: top;">106<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FW<br></td>
+<td style="vertical-align: top;">107<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FS<br></td>
+<td style="vertical-align: top;">108<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">position<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">FL<br></td>
+<td style="vertical-align: top;">109<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t filenames[X]<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">SHELL<br></td>
+<td style="vertical-align: top;">110<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">exit status<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIC<br></td>
+<td style="vertical-align: top;">111<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIO<br></td>
+<td style="vertical-align: top;">112<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSPIX<br></td>
+<td style="vertical-align: top;">113<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X<br></td>
+<td style="vertical-align: top;">uint8_t data[X]</td>
+</tr>
+<tr>
+<td style="vertical-align: top;">BSCX<br></td>
+<td style="vertical-align: top;">114<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">X+4<br></td>
+<td style="vertical-align: top;">uint32_t status<br>
+uint8_t data[X]</td>
+</tr>
+<tr>
+<td style="vertical-align: top;">EVM<br></td>
+<td style="vertical-align: top;">115<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td style="vertical-align: top;">EVT<br></td>
+<td style="vertical-align: top;">116<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">-<br></td>
+<td style="vertical-align: top;">0<br></td>
+<td style="vertical-align: top;">-<br></td>
+</tr>
+<tr>
+<td valign="top">PROCU<br></td>
+<td valign="top">117<br></td>
+<td valign="top">-<br></td>
+<td valign="top">-<br></td>
+<td valign="top">0<br></td>
+<td valign="top">-<br></td>
+</tr>
+</tbody>
+</table>
+<code><br></code>
+<h3><a name="cmdCmd_t" id="cmdCmd_t"></a>cmdCmd_t</h3>
+<code>typedef struct<br>
+{<br>
+&nbsp;&nbsp; uint32_t cmd;<br>
+&nbsp;&nbsp; uint32_t p1;<br>
+&nbsp;&nbsp; uint32_t p2;<br>
+&nbsp;&nbsp; union<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; uint32_t p3;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; uint32_t ext_len;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; uint32_t res;<br>
+&nbsp;&nbsp; };<br>
+} cmdCmd_t;<br></code><br>
+</body>
+</html>

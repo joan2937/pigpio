@@ -1,0 +1,16 @@
+bin       various scripts to generate man pages and HTML
+
+dbase     defines the structure of the web documentation
+
+HTML      auto generated html web site
+
+makedoc   run to regenerate documentation
+
+MAN       auto generated man pages
+
+src/defs  edit to change pigs, pigpiod, pig2vcd, and examples docs
+
+src/html  edit to change the fairly invariant web pages
+          DO NOT ADD auto generated HTML to this directory
+
+tmp       stores temporary files, may be deleted

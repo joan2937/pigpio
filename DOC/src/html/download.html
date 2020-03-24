@@ -1,0 +1,66 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>download</title>
+</head>
+<body>
+If the pigpio daemon is running it should be killed (sudo killall
+pigpiod) before make install and restarted afterwards (sudo
+pigpiod).<br>
+<br>
+<span style="font-weight: bold;">The initial part of the make, the
+compilation of pigpio.c, takes 100 seconds on early model
+Pis.&nbsp; Be patient.&nbsp; The overall install takes just over 3
+minutes.</span><br style="font-weight: bold;">
+<h3>Download and install (V75)<br></h3>
+<code>wget https://github.com/joan2937/pigpio/archive/v75.zip<br>
+unzip v75.zip<br>
+cd pigpio-75<br>
+make<br>
+sudo make install<br></code><br>
+<br>
+If the Python part of the install fails it may be because you need
+the setup tools.<br>
+<br>
+<code>sudo apt install python-setuptools
+python3-setuptools<br></code><br>
+<br>
+<h3>To check the library</h3>
+These tests make extensive use of GPIO 25 (pin 22).&nbsp; Make sure
+nothing, or only a LED, is connected to the GPIO before running the
+tests.&nbsp; Most tests are statistical in nature and so may on
+occasion fail.&nbsp; Repeated failures on the same test or many
+failures in a group of tests indicate a problem.<br>
+<code><br>
+sudo ./x_pigpio # check C I/F<br>
+<br>
+sudo pigpiod&nbsp;&nbsp;&nbsp; # start daemon<br>
+<br>
+./x_pigpiod_if2 # check C&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; I/F to
+daemon<br>
+./x_pigpio.py&nbsp;&nbsp; # check Python I/F to daemon<br>
+./x_pigs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # check
+pigs&nbsp;&nbsp; I/F to daemon<br>
+./x_pipe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # check
+pipe&nbsp;&nbsp; I/F to daemon<br>
+<br>
+<br></code>
+<h3>To compile, link, and run a C program</h3>
+<code>gcc -Wall -pthread -o foobar foobar.c -lpigpio -lrt<br>
+sudo ./foobar</code><code><br></code><br>
+<h3>To start the pigpio daemon<br></h3>
+<code>sudo pigpiod<br></code>
+<h3>To stop the pigpio daemon<br></h3>
+<code>sudo killall pigpiod<br></code><br>
+<h3>github</h3>
+<code>git clone https://github.com/joan2937/pigpio</code><br>
+<h3>Raspbian (raspberrypi.org image)</h3>
+<p>This may not be the most recent version.&nbsp; You can check the
+version with the command pigpiod -v.<br></p>
+<code>sudo apt-get update<br>
+sudo apt-get install pigpio python-pigpio python3-pigpio</code><br>
+<br>
+</body>
+</html>

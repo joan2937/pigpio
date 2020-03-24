@@ -1,0 +1,164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Sonar ranger example</title>
+</head>
+<body>
+<p>The following code shows a method of reading a class of sonar
+rangers.&nbsp; These rangers requires a trigger pulse.&nbsp;
+Shortly after receiving a trigger they transmit a noise pulse and
+set the echo line high.&nbsp; When the echo is received the echo
+line is set low.<br></p>
+<h3>SETUP</h3>
+<img src="images/son-fritz.png" alt="fritzing diagram" style=
+"width: 200px; height: 600px;" align="left" hspace="10"><br>
+<br>
+<br>
+<br>
+<br>
+The ranger used is a SRF05 (check the pinouts, there are many
+variants).<br>
+<br>
+The fritzing diagram shows the back of the ranger, i.e. pin 1 is
+the rightmost.<br>
+<br>
+Pin 1 is 5V.<br>
+Pin 2 is the trigger line.<br>
+Pin 3 is the echo line.<br>
+Pin 4 is out (unused).<br>
+Pin 5 is ground.<br>
+<br clear="all">
+<p><img src="images/son-photo.jpg" style=
+"width: 500px; height: 376px;" alt="photo of set-up"></p>
+<h3>CODE</h3>
+<code>#include &lt;stdio.h&gt;<br>
+<br>
+#include &lt;pigpio.h&gt;<br>
+<br>
+/*<br>
+<br>
+P1&nbsp; Name&nbsp; gpio&nbsp;&nbsp;&nbsp; used for<br>
+<br>
+&nbsp;2&nbsp; 5V&nbsp;&nbsp;&nbsp; ---&nbsp;&nbsp;&nbsp;&nbsp;
+5V<br>
+&nbsp;6&nbsp; GND&nbsp;&nbsp; ---&nbsp;&nbsp;&nbsp;&nbsp;
+Ground<br>
+24&nbsp; CE0&nbsp;&nbsp; 8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Sonar echo<br>
+26&nbsp; CE1&nbsp;&nbsp; 7&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Sonar trigger<br>
+<br>
+*/<br>
+<br>
+#define SONAR_TRIGGER 7<br>
+#define SONAR_ECHO&nbsp;&nbsp;&nbsp; 8<br>
+<br>
+/* forward prototypes */<br>
+<br>
+void sonarTrigger(void);<br>
+<br>
+void sonarEcho(int gpio, int level, uint32_t tick);<br>
+<br>
+int main(int argc, char *argv[])<br>
+{<br>
+&nbsp;&nbsp; if (gpioInitialise()&lt;0) return 1;<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(SONAR_TRIGGER, PI_OUTPUT);<br>
+&nbsp;&nbsp; gpioWrite&nbsp; (SONAR_TRIGGER, PI_OFF);<br>
+<br>
+&nbsp;&nbsp; gpioSetMode(SONAR_ECHO,&nbsp;&nbsp;&nbsp;
+PI_INPUT);<br>
+<br>
+&nbsp;&nbsp; /* update sonar 20 times a second, timer #0 */<br>
+<br>
+&nbsp;&nbsp; gpioSetTimerFunc(0, 50, sonarTrigger); /* every 50ms
+*/<br>
+<br>
+&nbsp;&nbsp; /* monitor sonar echos */<br>
+<br>
+&nbsp;&nbsp; gpioSetAlertFunc(SONAR_ECHO, sonarEcho);<br>
+<br>
+&nbsp;&nbsp; while (1) sleep(1);<br>
+<br>
+&nbsp;&nbsp; gpioTerminate();<br>
+<br>
+&nbsp;&nbsp; return 0;<br>
+}<br>
+<br>
+void sonarTrigger(void)<br>
+{<br>
+&nbsp;&nbsp; /* trigger a sonar reading */<br>
+<br>
+&nbsp;&nbsp; gpioWrite(SONAR_TRIGGER, PI_ON);<br>
+<br>
+&nbsp;&nbsp; gpioDelay(10); /* 10us trigger pulse */<br>
+<br>
+&nbsp;&nbsp; gpioWrite(SONAR_TRIGGER, PI_OFF);<br>
+}<br>
+<br>
+void sonarEcho(int gpio, int level, uint32_t tick)<br>
+{<br>
+&nbsp;&nbsp; static uint32_t startTick, firstTick=0;<br>
+<br>
+&nbsp;&nbsp; int diffTick;<br>
+<br>
+&nbsp;&nbsp; if (!firstTick) firstTick = tick;<br>
+<br>
+&nbsp;&nbsp; if (level == PI_ON)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; startTick = tick;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else if (level == PI_OFF)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; diffTick = tick - startTick;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("%u %u\ ", tick-firstTick,
+diffTick);<br>
+&nbsp;&nbsp; }<br>
+}<br></code>
+<h3>BUILD</h3>
+<code>cc -o sonar sonar.c -lpigpio -lrt -lpthread<br></code>
+<h3>RUN</h3>
+<code>sudo ./sonar &gt;sonar.dat &amp;</code><br>
+<br>
+While the program is running you can capture the waveform using the
+notification feature built in to pigpio.&nbsp; Issue the following
+commands on the Pi.<br>
+<br>
+<code>pigs no<br>
+pig2vcd&nbsp; &lt;/dev/pigpio0 &gt;sonar.vcd &amp;<br>
+pigs nb 0 0x180 # set bits for gpios 7 and 8<br></code>
+<p>Move an object in front of the sonar ranger for a few
+seconds.<br></p>
+<code>pigs nc 0</code><br>
+<p>The file sonar.vcd will contain the captured waveform, which can
+be viewed using GTKWave.</p>
+<p>Overview</p>
+<img src="images/son-wave-1.png" style=
+"width: 600px; height: 100px;" alt="LDR waveform 1"><br>
+<p>Reading circa every 10ms<br></p>
+<img src="images/son-wave-2.png" style=
+"width: 600px; height: 100px;" alt="Sonar waveform 2"><br>
+<p>One reading, circa 400us<br></p>
+<img src="images/son-wave-3.png" style=
+"width: 600px; height: 100px;" alt="Sonar waveform 3"><br>
+<p>another</p>
+<img style="width: 600px; height: 100px;" alt="Sonar waveform 4"
+src="images/son-wave-4.png"><br>
+<p>The file sonar.dat will contain pairs of timestamps and echo
+length (in us).&nbsp; The following&nbsp; script will convert the
+timestamps into seconds.<span style=
+"font-style: italic;"><br></span></p>
+<p><code>awk '{print $1/1000000, $2}' sonar.dat
+&gt;sonar-secs.dat</code></p>
+<p>Gnuplot is a useful tool to graph data.<br></p>
+plot 'sonar-secs.dat' title 'Sonar'<br>
+<p><img src="images/son-gnup-1.png" style=
+"width: 600px; height: 321px;" alt="gnuplot 1"><br>
+&nbsp;plot [10:25] 'sonar-secs.dat' title 'Sonar'<br></p>
+<p><img src="images/son-gnup-2.png" style=
+"width: 600px; height: 321px;" alt="gnuplot 1"></p>
+</body>
+</html>
