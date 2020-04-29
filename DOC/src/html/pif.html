@@ -1,0 +1,30 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content="Bluefish 2.2.10" >
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Pipe interface</title>
+</head>
+<body>
+pigpio provides a pipe interface to many of its functions.<br>
+<br>
+The pipe interface is available whenever pigpio is running, either
+because it has been started as a daemon, or it has been linked in
+to a running user program.&nbsp; The pipe interface can be disabled
+by the program which initialises the library.&nbsp; pigpiod offers
+the -f option to disable the pipe interface.&nbsp; User programs
+should call <a href=
+"http://abyz.me.uk/rpi/pigpio/cif.html#gpioCfgInterfaces">gpioCfgInterfaces</a>
+if they wish to disable the pipe interface.<br>
+<br>
+pigpio listens for commands on pipe /dev/pigpio.&nbsp; The commands
+consist of a command identifier with, depending on the command,
+zero, one, or two parameters.&nbsp; The result, if any, may be read
+from pipe /dev/pigout.&nbsp; If any errors are detected a message
+will be written to pipe /dev/pigerr.<br>
+<br>
+<br>
+The format of the commands is identical to those used by <a href=
+"pigs.html">pigs</a>.
+</body>
+</html>

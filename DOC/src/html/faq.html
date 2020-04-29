@@ -1,0 +1,462 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content=
+"HTML Tidy for HTML5 for Linux version 5.6.0">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>faq</title>
+</head>
+<body>
+<a href="#Are_my_GPIO_broken">Are my GPIO broken?</a><br>
+<br>
+<a href="#Audio_is_broken">Audio is broken</a><br>
+<br>
+<a href="#Cant_initialise_pigpio_library">Can´t initialise pigpio
+library</a><br>
+<br>
+<a href="#Cant_lock_varrunpigpio.pid">Can´t lock
+var/run/pigpio.pid</a><br>
+<br>
+<a href="#Hello_World">Hello World!</a><br>
+<br>
+<a href="#make_fails">Clock skew, make fails</a><br>
+<br>
+<a href="#Have_I_fried_my_GPIO">Have I fried my GPIO?</a><br>
+<br>
+<a href="#How_do_I_debounce_inputs">How do I debounce
+inputs?</a><br>
+<br>
+<a href="#How_fast_is_SPI">How fast is SPI?</a><br>
+<br>
+<a href="#Library_update_fails">Library update didn't work</a><br>
+<br>
+<a href="#make_fails">make fails with clock skew</a><br>
+<br>
+<a href="#Porting_pigpio">Porting pigpio to another CPU/SoC</a><br>
+<br>
+<a href="#Sound_isnt_working">Sound isn't working</a><br>
+<br>
+<a href="#Library_update_fails">Symbol not found</a><br>
+<br>
+<a href="#What_is_I2C">What is I2C?</a><br>
+<br>
+<a href="#What_is_Serial">What is Serial?</a><br>
+<br>
+<a href="#What_is_SPI">What is SPI?</a><br>
+<br>
+<a href="#Which_library">Which library should I use?</a><br>
+<br>
+<h3><a name="Are_my_GPIO_broken" id="Are_my_GPIO_broken"></a>Are my
+GPIO broken?</h3>
+<p>See <a href="#Have_I_fried_my_GPIO">Have I fried my
+GPIO?</a><br></p>
+<h3><a name="Audio_is_broken" id="Audio_is_broken"></a>Audio is
+broken</h3>
+<p>See <a href="#Sound_isnt_working">Sound isn't
+working</a><br></p>
+<h3><a name="Cant_lock_varrunpigpio.pid" id=
+"Cant_lock_varrunpigpio.pid"></a>Can´t lock
+/var/run/pigpio.pid</h3>
+<p>See <a href=
+"#Cant_initialise_pigpio_library">Can´t_initialise_pigpio_library</a><br>
+</p>
+<h3><a name="Cant_initialise_pigpio_library" id=
+"Cant_initialise_pigpio_library"></a>Can´t initialise pigpio
+library</h3>
+<p>This message means the pigpio daemon is already running.<br></p>
+<p>The default daemon is called pigpiod and may be removed as
+follows.<br></p>
+Check that it is running with the command
+<p><code>ps aux | grep pigpiod</code></p>
+<p>Kill the daemon with<br></p>
+<p><code>sudo killall pigpiod</code></p>
+<p>If your own program is acting as the daemon it may be removed as
+follows.</p>
+<p>Find its process id (<span style=
+"font-style: italic;">pid</span>).<br></p>
+<p><code>cat /var/run/pigpio.pid</code><br></p>
+<p>Kill the program with<br></p>
+<p><code>sudo kill -9 <span style=
+"font-style: italic;">pid</span></code><br></p>
+If the above doesn't work do the following and try starting the
+daemon again
+<p><code>sudo rm /var/run/pigpio.pid<br></code></p>
+<p>To start the daemon do</p>
+<p><code>sudo pigpiod</code></p>
+<h3><a name="Have_I_fried_my_GPIO" id=
+"Have_I_fried_my_GPIO"></a>Have I fried my GPIO?</h3>
+<p>If you think you have damaged one or more GPIO you can carry out
+a diagnostic test.</p>
+<p>The test is a command line script called <a rel="nofollow"
+class="external text" href=
+"http://abyz.me.uk/rpi/pigpio/code/gpiotest.zip">gpiotest</a></p>
+For the duration of the test nothing must be connected to the GPIO
+(no LEDs, wires, ribbon cables etc.).
+<p>The test checks that each GPIO may be read and written and that
+the internal resistor pull-ups and pull-downs are functional.</p>
+<p>A <a rel="nofollow" class="external text" href=
+"https://www.youtube.com/watch?v=sCJFLKWaxHo&amp;feature=youtu.be">video</a>
+showing what happens to the GPIO during a test.</p>
+<p>A test with all GPIO okay.</p>
+<pre>This program checks the Pi's (user) gpios.
+
+The program reads and writes all the gpios.  Make sure NOTHING
+is connected to the gpios during this test.
+
+The program uses the pigpio daemon which must be running.
+
+To start the daemon use the command sudo pigpiod.
+
+Press the ENTER key to continue or ctrl-C to abort...
+
+Testing...
+Skipped non-user gpios: 0 1 28 29 30 31 
+Tested user gpios: 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18<br> 19 20 21 22 23 24 25 26 27 
+Failed user gpios: None
+</pre>
+<p>A test showing failed GPIO.</p>
+<pre>This program checks the Pi's (user) gpios.
+
+The program reads and writes all the gpios. Make sure NOTHING
+is connected to the gpios during this test.
+
+The program uses the pigpio daemon which must be running.
+
+To start the daemon use the command sudo pigpiod.
+
+Press the ENTER key to continue or ctrl-C to abort...
+
+Testing...
+Write 1 to gpio 17 failed.
+Pull up on gpio 17 failed.
+Write 1 to gpio 18 failed.
+Pull up on gpio 18 failed.
+Write 0 to gpio 23 failed.
+Pull down on gpio 23 failed.
+Write 0 to gpio 24 failed.
+Pull down on gpio 24 failed.
+Write 1 to gpio 27 failed.
+Pull up on gpio 27 failed.
+Skipped non-user gpios: 0 1 28 29 30 31
+Tested user gpios: 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18<br> 19 20 21 22 23 24 25 26 27
+Failed user gpios: 17 18 23 24 27
+</pre>
+<h3><a name="How_do_I_debounce_inputs" id=
+"How_do_I_debounce_inputs"></a>How do I debounce inputs?</h3>
+<p>Some devices like mechanical switches can generate multiple
+interrupts as they bounce between on and off.&nbsp; It is possible
+to debounce the inputs in hardware by the correct use of resistors
+and capacitors.<br></p>
+<p>In software use the glitch filter which ignores all events
+shorter than a set number of microseconds.&nbsp; C <a href=
+"cif.html#gpioGlitchFilter">gpioGlitchFilter</a>, Python <a href=
+"python.html#set_glitch_filter">set_glitch_filter</a>.<br></p>
+<h3><a name="How_fast_is_SPI" id="How_fast_is_SPI"></a>How fast is
+SPI?</h3>
+The SPI throughput in samples per second depends on a number of
+factors.<br>
+<br>
+<ul>
+<li>The SPI bit rate (transfer rate in bits per second)</li>
+</ul>
+<ul>
+<li>The number of bytes transferred per sample (a 12 bit ADC sample
+may require 3 bytes to transfer)</li>
+</ul>
+<ul>
+<li>The driver used</li>
+</ul>
+<p>Two of those factors are fixed, the variable is the driver
+used.</p>
+<p>The pigpio driver is considerably faster than the Linux SPI
+driver as is demonstrated by the following graphs.<br></p>
+<p>Each graph shows the SPI bit rate in bits per second along the
+horizontal axis.&nbsp; The samples per second achieved is shown on
+the vertical axis.&nbsp; Each graph contains plots assuming 1 to 5
+bytes per transfer.<br></p>
+<p>The source code used for the tests is <a href=
+"code/spi-driver-speed.c">spi-driver-speed.c</a> and <a href=
+"code/spi-pigpio-speed.c">spi-pigpio-speed.c</a><br></p>
+<p><img alt="spi-lnx-pibr1.png" src="images/spi-lnx-pibr1.png"></p>
+<hr>
+<p><img alt="spi-pig-pibr1.png" src="images/spi-pig-pibr1.png"></p>
+<hr>
+<p><img alt="spi-lnx-pi3b.png" src="images/spi-lnx-pi3b.png"></p>
+<hr>
+<p><img alt="spi-pig-pi3b.png" src="images/spi-pig-pi3b.png"></p>
+<h3><a name="Library_update_fails" id=
+"Library_update_fails"></a>Library update didn't work</h3>
+<p>pigpio places files in the following locations<br></p>
+<p>/usr/local/include (pigpio.h, pigpiod_if.h, pigpiod_if2.h)<br>
+/usr/local/lib (libpigpio.so, libpigpiod_if.so,
+libpigpiod_if2.so)<br>
+/usr/local/bin (pig2vcd, pigpiod, pigs)<br>
+/usr/local/man (man pages)<br></p>
+The raspberrypi.org image containing pigpio uses different
+locations.<br>
+<p>/usr/include (pigpio.h, pigpiod_if.h, pigpiod_if2.h)<br>
+/usr/lib (libpigpio.so, libpigpiod_if.so, libpigpiod_if2.so)<br>
+/usr/bin (pig2vcd, pigpiod, pigs)<br>
+/usr/man (man pages)<br></p>
+<p>Mostly this doesn't matter as the /usr/local directories will
+generally be earlier in the search path.&nbsp; The pigpio built
+includes, binaries, and manuals are normally found first.<br></p>
+<p>However the wrong libraries may be linked during the
+compilation.&nbsp; If this is the case remove the /usr/lib entries
+for libpigpio.so , libpigpiod_if.so, and libpigpiod_if2.so</p>
+<h3><a name="Hello_World" id="Hello_World"></a>Hello World!</h3>
+<p>The following examples show how to use the various components of
+the pigpio library.</p>
+<p>Each example shows how to read the level of a GPIO.</p>
+<h4>C</h4>
+read_cif.c
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;pigpio.h&gt;
+
+int main(int argc, char *argv[])
+{
+   int GPIO=4;
+   int level;
+
+   if (gpioInitialise() &lt; 0) return 1;
+
+   level = gpioRead(GPIO);
+
+   printf("GPIO %d is %d\n", GPIO, level);
+
+   gpioTerminate();
+}
+    </pre>
+<p>Build</p>
+<code>gcc -pthread -o read_cif read_cif.c -lpigpio</code>
+<p>Run</p>
+<code>sudo ./read_cif</code>
+<h4>C via pigpio daemon</h4>
+read_pdif.c
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;pigpiod_if2.h&gt;
+
+int main(int argc, char *argv[])
+{
+   int pi;
+   int GPIO=4;
+   int level;
+
+   pi = pigpio_start(0, 0); /* Connect to local Pi. */
+
+   if (pi &lt; 0)
+   {
+      printf("Can't connect to pigpio daemon\n");
+      return 1;
+   }
+
+   level = gpio_read(pi, GPIO);
+
+   printf("GPIO %d is %d\n", GPIO, level);
+
+   pigpio_stop(pi); /* Disconnect from local Pi. */
+   
+   return 0;
+}
+</pre>
+<p>Build</p>
+<code>gcc -pthread -o read_pdif read_pdif.c -lpigpiod_if2</code>
+<p>Run</p>
+<code>./read_pdif</code>
+<h4>Python</h4>
+read_gpio.py
+<pre>
+#!/usr/bin/env python
+
+import pigpio
+
+GPIO=4
+
+pi = pigpio.pi()
+if not pi.connected:
+   exit()
+
+level = pi.read(GPIO)
+
+print("GPIO {} is {}".format(GPIO, level))
+
+pi.stop()
+    </pre>
+<p>Run</p>
+<code>python read_gpio.py</code>
+<h4>pigs</h4>
+<pre>
+pigs r 4
+    </pre>
+<h4>pipe I/F</h4>
+<pre>
+echo "r 4" &gt;/dev/pigpio
+cat /dev/pigout
+    </pre>
+<h3><a name="make_fails" id="make_fails"></a>make fails with clock
+skew</h3>
+<p>If make fails with one of the following messages it is probably
+because the Pi's clock is wrong.<br></p>
+<p><code>make: Warning: File 'xxx' has modification time x s in the
+future<br>
+make: warning: Clock skew detected. Your build may be
+incomplete.</code></p>
+<p>make uses the current time to work out which files need to be
+rebuilt (a file is rebuilt if it depends on other files which have
+a later time-stamp).<br></p>
+<p>The solution is to make sure the system clock is correct.&nbsp;
+If the Pi is networked this will not normally be a problem.<br></p>
+<p>To set the date and time use the date command as in the
+following example.</p>
+<p><code>sudo date -d "2017-03-01 18:47:00"</code></p>
+<h3><a name="Porting_pigpio" id="Porting_pigpio"></a>Porting pigpio
+to another CPU/SoC</h3>
+<h3><a name="Sound_isnt_working" id="Sound_isnt_working"></a>Sound
+isn't working</h3>
+<p>The Pi contains two pieces of hardware, a PWM peripheral and a
+PCM peripheral, to generate sound.&nbsp; The PWM peripheral is
+normally used and generates medium quality audio out of the
+headphone jack.&nbsp; The PCM peripheral may be used by add-ons
+such as HATs and generates high quality audio.<br></p>
+<p>pigpio uses at least one of these peripherals during normal
+operation (for timing DMA transfers).&nbsp; pigpio will use both
+peripherals if waves or the hardware PWM function is used.<br></p>
+<p>By default pigpio uses the PCM peripheral leaving the PWM
+peripheral free for medium quality audio.<br></p>
+<p>You can change the default with a configuration option.&nbsp;
+For C use <a href="cif.html#gpioCfgClock">gpioCfgClock</a>, for the
+<a href="pigpiod.html">pigpio daemon</a> use the -t option.</p>
+<h3><a name="What_is_I2C" id="What_is_I2C"></a>What is I2C?</h3>
+<p>I2C is a data link between the Pi (master) and one or more
+slaves.</p>
+<p>Data may be sent and received but the Pi initiates all
+transfers.<br></p>
+<p>I2C is a medium speed link.&nbsp; On the Pi the default speed is
+100 kbps, but 400 kbps also works.<br></p>
+<p>I2C is implemented as a bus with two lines called<br></p>
+<ul>
+<li>SDA - for data</li>
+<li>SCL - for a clock</li>
+</ul>
+On the Pi bus 1 is used which uses GPIO 2 (pin 3) for SDA and GPIO
+3 (pin 5) for SCL.<br>
+<br>
+Only one slave device may be communicated with at a time.&nbsp;
+Each message from the Pi includes the slave to be addressed and
+whether a read or write is to be performed.<br>
+<br>
+When the Pi (master) wishes to talk to a slave it begins by issuing
+a start sequence on the I2C bus. A start sequence is one of two
+special sequences defined for the I2C bus, the other being the stop
+sequence. The start sequence and stop sequence are special in that
+these are the only places where the SDA (data line) is allowed to
+change while the SCL (clock line) is high. When data is being
+transferred, SDA must remain stable and not change whilst SCL is
+high. The start and stop sequences mark the beginning and end of a
+transaction with the slave device.<br>
+<br>
+<img style="width: 600px;" alt="I2C start and stop sequences" src=
+"images/faq-i2c-ss.png"><br>
+<br>
+Data is transferred in 8-bit bytes. The bytes are placed on the SDA
+line starting with the most significant bit. The SCL line is then
+pulsed high, then low. For every byte transferred, the device
+receiving the data sends back an acknowledge bit, so there are
+actually 9 SCL clock pulses to transfer each 8-bit byte of data. If
+the receiving device sends back a low ACK bit, then it has received
+the data and is ready to accept another byte. If it sends back a
+high then it is indicating it cannot accept any further data and
+the master should terminate the transfer by sending a stop
+sequence.<br>
+<br>
+<p><img style="width: 600px;" alt="I2C waveform" src=
+"images/faq-i2c.jpg"><br></p>
+<h3><a name="What_is_Serial" id="What_is_Serial"></a>What is
+Serial?</h3>
+<p>Serial is a data link between the Pi and one other
+device.<br></p>
+<p>Data may be sent and received.&nbsp; Either the Pi or the device
+can initiate a transfer.<br></p>
+<p>Serial is a low to medium speed link.&nbsp; On the Pi speeds of
+50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600,
+19200, 38400, 57600, 115200, and 230400 bps may be used.<br></p>
+<p>Serial is implemented with one line for transmit called TXD and
+one line for receive called RXD.<br></p>
+<p>If only receive or transmit are required the other line need not
+be connected.<br></p>
+<p>The Pi uses GPIO 14 (pin 8) for TXD and GPIO 15 (pin 10) for
+RXD.<br></p>
+<p>Data is normally transmitted in 8-bit bytes with a start bit,
+eight data bits, no parity, and one stop bit.&nbsp; This is
+represented as 8N1.&nbsp; The number of transmitted bits per second
+(bps) is called the baud rate.&nbsp;&nbsp; The time for each bit,
+<span style="font-style: italic;">1 / baud rate</span> seconds, is
+referred to as the bit period.<br></p>
+<p>The lines are in the high state when no data is being
+transmitted.&nbsp; The start of a byte is signalled by the line
+going low for one bit period (the start bit).&nbsp; The data bits
+are then sent least significant bit firsts (low if the bit is 0,
+high if the bit is 1).&nbsp; The data bits are followed by the
+optional parity bit.&nbsp; Finally the line is set high for at
+least the number of stop bit periods.&nbsp; The line will stay high
+if there are no more bytes to be transmitted.<br></p>
+<p><img style="width: 600px;" alt="Serial waveform" src=
+"images/faq-serial.jpg"><br></p>
+<h3><a name="What_is_SPI" id="What_is_SPI"></a>What is SPI?</h3>
+<p>SPI is a data link between the Pi (master) and one or more
+slaves.</p>
+<p>Data may be sent and received but the Pi initiates all
+transfers.<br></p>
+<p>SPI is a medium to high speed link.&nbsp; On the Pi speeds of 32
+kbps to 8 Mbps may be used.<br></p>
+<p>SPI is implemented as a bus with three lines called<br></p>
+<ul>
+<li>MOSI - for data from the Pi to the slave</li>
+<li>MISO - for data from the slave to the Pi</li>
+<li>SCLK - for a clock</li>
+</ul>
+Only one slave device may be communicated with at a time.&nbsp; An
+additional line per slave called slave select is used to identify
+the slave to be addressed.
+<p>The Pi has two SPI buses<br></p>
+<ol>
+<li>the main SPI bus
+<ul>
+<li>MOSI GPIO 10 (pin 19)</li>
+<li>MISO GPIO 9 (pin 21)</li>
+<li>SCLK GPIO 11 (pin 23)</li>
+<li>Slave selects</li>
+<li style="list-style: none; display: inline">
+<ul>
+<li>CE0 GPIO 8 (pin 24)</li>
+<li>CE1 GPIO 7 (pin 26)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>the auxiliary SPI bus
+<ul>
+<li>MOSI GPIO 20 (pin 38)</li>
+<li>MISO GPIO 19 (pin 35)</li>
+<li>SCLK GPIO 21 (pin 40)</li>
+<li>Slave selects</li>
+<li style="list-style: none; display: inline">
+<ul>
+<li>CE0 GPIO 18 (pin 12)</li>
+<li>CE1 GPIO 17 (pin 11)</li>
+<li>CE2 GPIO 16 (pin 36)<br></li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p><img style="width: 600px;" alt="SPI waveform" src=
+"images/faq-spi.jpg"><br></p>
+<p><br></p>
+<h3><a name="Which_library" id="Which_library"></a>Which library
+should I use?</h3>
+<p><br></p>
+</body>
+</html>
