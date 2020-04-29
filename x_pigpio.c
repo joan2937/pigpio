@@ -459,6 +459,51 @@ To the lascivious pleasing of a lute.\n\
 
    c = gpioWaveGetMaxCbs();
    CHECK(5, 21, c, 25016, 0, "wave get max cbs");
+
+   /* waveCreatePad tests */
+   gpioWaveTxStop();
+   gpioWaveClear();
+   gpioSetAlertFunc(GPIO, t5cbf);
+
+   e = gpioWaveAddGeneric(2, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000}
+         });
+   wid = gpioWaveCreatePad(50, 50, 0);
+   CHECK(5, 22, wid, 0, 0, "wave create pad, count==1, wid==");
+
+   e = gpioWaveAddGeneric(4, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000}
+         });
+   wid = gpioWaveCreatePad(50, 50, 0);
+   CHECK(5, 23, wid, 1, 0, "wave create pad, count==2, wid==");
+
+   c = gpioWaveDelete(0);
+   CHECK(5, 24, c, 0, 0, "delete wid==0 success");
+
+   e = gpioWaveAddGeneric(6, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000}
+         });
+   c = gpioWaveCreate();
+   CHECK(5, 25, c, -67, 0, "No more CBs using wave create");
+   wid = gpioWaveCreatePad(50, 50, 0);
+   CHECK(5, 26, wid, 0, 0, "wave create pad, count==3, wid==");
+
+   t5_count = 0;
+   e = gpioWaveChain((char[]) {1,0}, 2);
+   CHECK(5, 27, e,  0, 0, "wave chain [1,0]");
+   while (gpioWaveTxBusy()) time_sleep(0.1);
+   CHECK(5, 28, t5_count, 5, 1, "callback count==");
+
+   gpioSetAlertFunc(GPIO, NULL);
 }
 
 int t6_count;

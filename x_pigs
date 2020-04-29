@@ -308,3 +308,23 @@ if [[ $s -ge 310 ]]; then echo "WVSP-b ok"; else echo "WVSP-b fail ($s)"; fi
 s=$(pigs wvsp 2)
 if [[ $s = 12000 ]]; then echo "WVSP-c ok"; else echo "WVSP-c fail ($s)"; fi
 
+s=$(pigs wvclr )
+s=$(pigs wvag 16 0 5000000 0 16 5000000)
+wid=$(pigs wvcap 50)
+if [[ $wid = 0 ]]; then echo "WVCAP-a ok"; else echo "WVCAP-a fail ($wid)"; fi
+
+s=$(pigs wvag 16 0 5000000 0 16 5000000 16 0 5000000 0 16 5000000)
+wid=$(pigs wvcap 50)
+if [[ $wid = 1 ]]; then echo "WVCAP-b ok"; else echo "WVCAP-b fail ($wid)"; fi
+
+s=$(pigs wvdel 0)
+if [[ $s == "" ]]; then echo "WVCAP-c ok"; else echo "WVCAP-c fail ($s)"; fi
+
+s=$(pigs wvag 16 0 5000000 0 16 5000000 16 0 5000000 0 16 5000000 16 0 5000000 0 16 5000000)
+# Show WVCRE fails
+wid=$(pigs wvcre)
+if [[ $wid = -67 ]]; then echo "WVCAP-d ok"; else echo "WVCAP-d fail ($wid)"; fi
+# but that WVCAP ok
+wid=$(pigs wvcap 50)
+if [[ $wid = 0 ]]; then echo "WVCAP-e ok"; else echo "WVCAP-e fail ($wid)"; fi
+

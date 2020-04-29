@@ -953,6 +953,9 @@ int wave_add_serial(
 int wave_create(int pi)
    {return pigpio_command(pi, PI_CMD_WVCRE, 0, 0, 1);}
 
+int wave_create_and_pad(int pi, int percent)
+   {return pigpio_command(pi, PI_CMD_WVCAP, percent, 0, 1);}
+
 int wave_delete(int pi, unsigned wave_id)
    {return pigpio_command(pi, PI_CMD_WVDEL, wave_id, 0, 1);}
 

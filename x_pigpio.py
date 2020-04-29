@@ -483,6 +483,47 @@ To the lascivious pleasing of a lute.
    e = pi.wave_delete(0)
    CHECK(5, 33, e, 0, 0, "wave delete")
 
+   # wave_create_and_pad tests 
+   t5cb = pi.callback(GPIO, pigpio.FALLING_EDGE, t5cbf)
+   pi.wave_clear()
+
+   pi.wave_add_generic([pigpio.pulse(1<<GPIO, 0,  10000),
+                        pigpio.pulse(0, 1<<GPIO,  30000)])
+   wid = pi.wave_create_and_pad(50)
+   CHECK(5, 34, wid, 0, 0, "wave create and pad, wid==")
+
+   pi.wave_add_generic([pigpio.pulse(1<<GPIO, 0,  10000),
+                        pigpio.pulse(0, 1<<GPIO,  30000),
+                        pigpio.pulse(1<<GPIO, 0,  60000),
+                        pigpio.pulse(0, 1<<GPIO, 100000)])
+   wid = pi.wave_create_and_pad(50)
+   CHECK(5, 35, wid, 1, 0, "wave create and pad, wid==")
+
+   c = pi.wave_delete(0);
+   CHECK(5, 36, c, 0, 0, "delete wid==0 success");
+   
+   pi.wave_add_generic([pigpio.pulse(1<<GPIO, 0,  10000),
+                        pigpio.pulse(0, 1<<GPIO,  30000),
+                        pigpio.pulse(1<<GPIO, 0,  60000),
+                        pigpio.pulse(0, 1<<GPIO, 100000),
+                        pigpio.pulse(1<<GPIO, 0,  60000),
+                        pigpio.pulse(0, 1<<GPIO, 100000)])
+   pigpio.exceptions = False
+   c = pi.wave_create()
+   CHECK(5, 37, c, -67, 0, "No more CBs using wave create")
+   pigpio.exceptions = True
+
+   wid = pi.wave_create_and_pad(50)
+   CHECK(5, 38, wid, 0, 0, "wave create pad, count==3, wid==")
+
+   t5_count = 0;
+   e = pi.wave_chain([1,0])
+   CHECK(5, 39, e,  0, 0, "wave chain [1,0]")
+   while pi.wave_tx_busy():
+      time.sleep(0.2)
+   CHECK(5, 40, t5_count, 10, 1, "callback count==")
+
+
    t5cb.cancel()
 
 t6_count=0
