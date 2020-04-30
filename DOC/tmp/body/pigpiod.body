@@ -1,0 +1,51 @@
+pigpiod is a utility which launches the pigpio library as a daemon.<br>
+<br>
+Once launched the pigpio library runs in the background accepting commands from the pipe and socket interfaces.<br>
+<br>
+The pigpiod utility requires sudo privileges to launch the library but thereafter the pipe and socket commands may be issued by normal users.<br>
+<br>
+pigpiod accepts the following configuration options<br>
+<br>
+<table border="1" cellpadding="2" cellspacing="2"><tbody><tr><td><b>-a value</b></td><td>DMA memory allocation mode</td><td>0=AUTO, 1=PMAP, 2=MBOX</td><td>Default AUTO
+</td></tr><tr><td><b>-b value</b></td><td>GPIO sample buffer size in milliseconds</td><td>100-10000</td><td>Default 120
+</td></tr><tr><td><b>-c value</b></td><td>Library internal settings</td><td></td><td>Default 0
+</td></tr><tr><td><b>-d value</b></td><td>Primary DMA channel</td><td>0-14</td><td>Default 14
+</td></tr><tr><td><b>-e value</b></td><td>Secondary DMA channel</td><td>0-14</td><td>Default 6.  Preferably use one of DMA channels 0 to 6 for the secondary channel
+</td></tr><tr><td><b>-f</b></td><td>Disable fifo interface</td><td></td><td>Default enabled
+</td></tr><tr><td><b>-g</b></td><td>Run in foreground (do not fork)</td><td></td><td>Default disabled
+</td></tr><tr><td><b>-k</b></td><td>Disable local and remote socket interface</td><td></td><td>Default enabled
+</td></tr><tr><td><b>-l</b></td><td>Disable remote socket interface</td><td></td><td>Default enabled
+</td></tr><tr><td><b>-m</b></td><td>Disable alerts (sampling)</td><td></td><td>Default enabled
+</td></tr><tr><td><b>-n IP address</b></td><td>Allow IP address to use the socket interface</td><td>Name (e.g. paul) or dotted quad (e.g. 192.168.1.66)</td><td>If the -n option is not used all addresses are allowed (unless overridden by the -k or -l options).  Multiple -n options are allowed.  If -k has been used -n has no effect.  If -l has been used only -n localhost has any effect
+</td></tr><tr><td><b>-p value</b></td><td>Socket port</td><td>1024-32000</td><td>Default 8888
+</td></tr><tr><td><b>-s value</b></td><td>Sample rate</td><td>1, 2, 4, 5, 8, or 10 microseconds</td><td>Default 5
+</td></tr><tr><td><b>-t value</b></td><td>Clock peripheral</td><td>0=PWM 1=PCM</td><td>Default PCM.  pigpio uses one or both of PCM and PWM.  If PCM is used then PWM is available for audio.  If PWM is used then PCM is available for audio.  If waves or hardware PWM are used neither PWM nor PCM will be available for audio.
+</td></tr><tr><td><b>-v -V</b></td><td>Display pigpio version and exit</td><td></td><td>
+</td></tr><tr><td><b>-x mask</b></td><td>GPIO which may be updated</td><td>A 54 bit mask with (1&lt;&lt;n) set if the user may update GPIO #n</td><td>Default is the set of user GPIO for the board revision.  Use -x -1 to allow all GPIO
+</td></tr></tbody></table><h3>Example</h3><code>sudo&nbsp;pigpiod&nbsp;-s&nbsp;2&nbsp;-b&nbsp;200&nbsp;-f<br></code><br><br>Launch the pigpio library with a sample rate of 2 microseconds and a 200 millisecond buffer.  Disable the fifo interface.
+<h3>Permissions</h3>pigpio provides a rudimentary permissions system for commands issued via the socket and pipe interfaces.
+<br><br>All GPIO may be read.
+<br><br>Only the user GPIO for the board type or those specified by the -x option may be updated.
+<br><br><code>Type&nbsp;1&nbsp;boards&nbsp;0x03E6CF93&nbsp;(26&nbsp;pin&nbsp;header)<br>Type&nbsp;2&nbsp;boards&nbsp;0xFBC6CF9C&nbsp;(26&nbsp;pin&nbsp;+&nbsp;8&nbsp;pin&nbsp;header)<br>Type&nbsp;3&nbsp;boards&nbsp;0x0FFFFFFC&nbsp;(40&nbsp;pin&nbsp;header)<br></code><br><br>In this context an update includes the following:
+<br><br>GPIO mode set<br>
+GPIO pull/up down<br>
+GPIO write<br>
+GPIO set PWM (including range and frequency)<br>
+GPIO set servo
+<br><br>In addition the bank clear and set commands, and the wave commands will only
+affect updateable GPIO.
+<h3>Exceptions</h3>The following exceptions are made for particular models.
+<br><br><b>Models A and B</b><br><br>The green activity LED (GPIO 16) may be written.<br>
+<br><b>Models A+ and B+</b><br><br>The green activity LED (GPIO 47) may be written.<br>
+The red power LED (GPIO 35) may be written.<br>
+The high USB power mode (GPIO 38) may be written.<br>
+<br><b>Pi Zero</b><br><br>The green activity LED (GPIO 47) may be written.<br>
+<br><b>Pi2B</b><br><br>The green activity LED (GPIO 47) may be written.<br>
+The red power LED (GPIO 35) may be written.<br>
+The high USB power mode (GPIO 38) may be written.<br>
+<br><b>Pi3B</b><br><br>The green activity LED and the red power LED are not writable.<br>
+The USB power mode is fixed at 1.2 amps (high power).<br>
+<h3>DMA Channels</h3>The secondary channel is only used for the transmission of waves.
+<br><br>If possible use one of channels 0 to 6 for the secondary channel (a full channel).
+<br><br>A full channel only requires one DMA control block regardless of the length of a pulse delay.  Channels 7 to 14 (lite channels) require one DMA control block for each 16383 microseconds of delay.  I.e. a 10 second pulse delay requires one control block on a full channel and 611 control blocks on a lite channel.
+<br><br>

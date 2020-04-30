@@ -320,6 +320,7 @@ WVAG trips     :: Add generic pulses to waveform :: gpioWaveAddGeneric
 WVAS u b db sb o bvs :: Add serial data to waveform    :: gpioWaveAddSerial
 
 WVCRE          :: Create a waveform   :: gpioWaveCreate
+WVCAP          :: Create a waveform of fixed size  :: gpioWaveCreatePad
 WVDEL wid      :: Delete selected waveform :: gpioWaveDelete
 
 WVTX wid       :: Transmits waveform once       :: gpioWaveTxSend
@@ -2781,6 +2782,49 @@ $ pigs wvcre
 $ pigs wvcre
 -69
 ERROR: attempt to create an empty waveform
+...
+
+WVCAP ::
+
+Similar to WVCRE, this command creates a waveform but pads the consumed
+resources to a fixed size, specified as a percent of total resource.
+Padded waves of equal size can be re-cycled efficiently allowing newly
+created waves to re-use the resources of deleted waves of the same dimension.
+
+Upon success a wave id (>=0) is returned.  On error a negative status
+code will be returned.
+
+The data provided by the [*WVAG*] and [*WVAS*] commands are
+consumed by this command.
+
+As many waveforms may be created as there is space available.
+The wave id is passed to [*WVTX*] or [*WVTXR*] to specify the
+waveform to transmit.
+
+Normal usage would be
+
+Step 1. [*WVCLR*] to clear all waveforms and added data.
+
+Step 2. [*WVAG*]/[*WVAS*] calls to supply the waveform data.
+
+Step 3. [*WVCAP*] to create a waveform of a uniform size.
+
+Step 4. [*WVTX*] or [*WVTXR*] with the id of the waveform to transmit.
+
+Repeat steps 2 - 4 as needed.
+
+Step 5. Any wave id can now be deleted and another wave of the same size
+        can be created in its place.
+
+...
+# Create a wave that consumes 50% of the total resource:
+
+$ pigs wvag 16 0 5000000 0 16 5000000
+2
+$ pigs wvcap 50
+0
+$ pigs wvtx 0
+11918
 ...
 
 WVDEL ::

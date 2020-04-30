@@ -322,6 +322,7 @@ gpioWaveAddGeneric         Adds a series of pulses to the waveform
 gpioWaveAddSerial          Adds serial data to the waveform
 
 gpioWaveCreate             Creates a waveform from added data
+gpioWaveCreatePad          Creates a waveform of fixed size from added data
 gpioWaveDelete             Deletes a waveform
 
 gpioWaveTxSend             Transmits a waveform
@@ -1986,15 +1987,17 @@ Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 D*/
 
+
+/*F*/
 int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL);
 /*D
-Similar to gpioWaveCreate(), this function creates a waveform but pads the consumed
+Similar to [*gpioWaveCreate*], this function creates a waveform but pads the consumed
 resources. Padded waves of equal dimension can be re-cycled efficiently allowing
 newly created waves to re-use the resources of deleted waves of the same dimension.
 
 . .
 pctCB: 0-100, the percent of all DMA control blocks to consume.
-pctBOOL: 0-100, the percent of On-Off-Level (OOL) buffer to consume for wave output.
+pctBOOL: 0-100, percent On-Off-Level (OOL) buffer to consume for wave output.
 pctTOOL: 0-100, the percent of OOL buffer to consume for wave input (flags).
 . .
 
@@ -2008,16 +2011,24 @@ A usage would be the creation of two waves where one is filled while the other
 is being transmitted. Each wave is assigned 50% of the resources.
 This buffer structure allows the transmission of infinite wave sequences.
 
-Step 1. [*gpioWaveClear*] to clear all waveforms and added data.
+...
+  // get firstWaveChunk, somehow
+  gpioWaveAddGeneric(firstWaveChunk);
+  wid = gpioWaveCreatePad(50, 50, 0);
+  gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
+  // get nextWaveChunk
 
-Step 2. [*gpioWaveAdd*] calls to supply the waveform data.
+  while (nextWaveChunk) {
+     gpioWaveAddGeneric(nextWaveChunk);
+     nextWid = gpioWaveCreatePad(50, 50, 0);
+     gpioWaveTxSend(nextWid, PI_WAVE_MODE_ONE_SHOT_SYNC);
+     while(gpioWaveTxAt() == wid) time_sleep(0.1);
+     gpioWaveDelete(wid);
+     wid = nextWid;
+     // get nextWaveChunk
+  }
+...
 
-Step 3. gpioWaveCreatePad(50,50,0) to create a 50% padded waveform and get a unique id
-
-Step 4. [*gpioWaveTxSend*] with the wave id and PI_WAVE_MODE_ONE_SHOT_SYNC.
-
-Repeat steps 2-4 as needed always waiting for the active waveform to be transmitted
-before marking it as deleted.
 D*/
 
 /*F*/

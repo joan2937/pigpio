@@ -1,0 +1,246 @@
+
+." Process this file with
+." groff -man -Tascii pig2vcd.1
+."
+.TH pig2vcd 1 2012-2020 Linux "pigpio archive"
+.SH NAME
+pig2vd - A utility to convert pigpio notifications to VCD.
+
+.SH SYNOPSIS
+
+pig2vcd </dev/pigpioXX >file.VCD
+.SH DESCRIPTION
+
+
+.ad l
+
+.nh
+pig2vcd is a utility which reads notifications on stdin and writes the
+output as a Value Change Dump (VCD) file on stdout.
+
+.br
+
+.br
+The VCD file can be viewed using GTKWave.
+
+.br
+
+.br
+.SS Notifications
+.br
+
+.br
+Notifications consist of 12 bytes with the following binary format.
+
+.br
+
+.br
+
+.EX
+typedef struct
+.br
+{
+.br
+   uint16_t seqno;
+.br
+   uint16_t flags;
+.br
+   uint32_t tick;
+.br
+   uint32_t level;
+.br
+} gpioReport_t;
+.br
+
+.EE
+
+.br
+
+.br
+seqno: starts at 0 each time the handle is opened and then increments by one for each report.
+
+.br
+
+.br
+flags: two flags are defined, PI_NTFY_FLAGS_WDOG and PI_NTFY_FLAGS_ALIVE. If bit 5 is set (PI_NTFY_FLAGS_WDOG) then bits 0-4 of the flags indicate a gpio which has had a watchdog timeout; if bit 6 is set (PI_NTFY_FLAGS_ALIVE) this indicates a keep alive signal on the pipe/socket and is sent once a minute in the absence of other notification activity.
+
+.br
+
+.br
+tick: the number of microseconds since system boot. It wraps around after 1h12m.
+
+.br
+
+.br
+level: indicates the level of each gpio. If bit 1<<x is set then gpio x is high. pig2vcd takes these notifications and outputs a text format VCD.
+
+.br
+
+.br
+.SS VCD format
+.br
+
+.br
+The VCD starts with a header.
+
+.br
+
+.br
+
+.EX
+$date 2013-05-31 18:49:36 $end
+.br
+$version pig2vcd V1 $end
+.br
+$timescale 1 us $end
+.br
+$scope module top $end
+.br
+$var wire 1 A 0 $end
+.br
+$var wire 1 B 1 $end
+.br
+$var wire 1 C 2 $end
+.br
+$var wire 1 D 3 $end
+.br
+$var wire 1 E 4 $end
+.br
+$var wire 1 F 5 $end
+.br
+$var wire 1 G 6 $end
+.br
+$var wire 1 H 7 $end
+.br
+$var wire 1 I 8 $end
+.br
+$var wire 1 J 9 $end
+.br
+$var wire 1 K 10 $end
+.br
+$var wire 1 L 11 $end
+.br
+$var wire 1 M 12 $end
+.br
+$var wire 1 N 13 $end
+.br
+$var wire 1 O 14 $end
+.br
+$var wire 1 P 15 $end
+.br
+$var wire 1 Q 16 $end
+.br
+$var wire 1 R 17 $end
+.br
+$var wire 1 S 18 $end
+.br
+$var wire 1 T 19 $end
+.br
+$var wire 1 U 20 $end
+.br
+$var wire 1 V 21 $end
+.br
+$var wire 1 W 22 $end
+.br
+$var wire 1 X 23 $end
+.br
+$var wire 1 Y 24 $end
+.br
+$var wire 1 Z 25 $end
+.br
+$var wire 1 a 26 $end
+.br
+$var wire 1 b 27 $end
+.br
+$var wire 1 c 28 $end
+.br
+$var wire 1 d 29 $end
+.br
+$var wire 1 e 30 $end
+.br
+$var wire 1 f 31 $end
+.br
+$upscope $end
+.br
+$enddefinitions $end
+.br
+
+.EE
+
+.br
+
+.br
+The header defines gpio identifiers and their name.  Each gpio identifier
+must be unique.  pig2vcd arbitrarily uses 'A' through 'Z' for gpios 0
+through 25, and 'a' through 'f' for gpios 26 through 31.
+The corresponding names are 0 through 31.
+.br
+
+.br
+
+.br
+The VCD file may be edited to give a frendlier name, e.g. 8 could be
+changed to ENCODER_A if an encoder switch A is connected to gpio 8.
+
+.br
+
+.br
+Following the header pig2vcd takes notifications and outputs a timestamp
+followed by a list of one or more gpios which have changed state.
+The timestamp consists of a '#' followed by the microsecond tick.
+The state lines contain the new state followed by the gpio identifier.
+
+.br
+
+.br
+
+.EX
+#1058747
+.br
+0H
+.br
+0I
+.br
+#1059012
+.br
+1H
+.br
+#1079777
+.br
+1I
+.br
+#1079782
+.br
+0I
+.br
+#1079852
+.br
+1I
+.br
+#1079857
+.br
+0I
+.br
+0H
+.br
+#1165113
+.br
+1H
+.br
+#1165118
+.br
+0H
+.br
+#1165153
+.br
+1H
+.br
+
+.EE
+
+.SH SEE ALSO
+
+pigpiod(1), pigs(1), pigpio(3), pigpiod_if(3), pigpiod_if2(3)
+.SH AUTHOR
+
+joan@abyz.me.uk
