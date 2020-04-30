@@ -568,18 +568,16 @@ specified delay between the pulse and the next.
 <br><br>Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 <h3><a name="wave_create_and_pad"></a><a href="#int"><small>int</small></a> wave_create_and_pad<small>(<a href="#int">int</a> <a href="#pi">pi</a>, <a href="#int">int</a> <a href="#percent">percent</a>)</small></h3>
-This function creates a waveform like wave_create but pads the consumed
+This function creates a waveform like <a href="#wave_create">wave_create</a> but pads the consumed
 resources. Where percent gives the percentage of the resources to use (in terms
 of the theoretical maximum, not the current amount free). This allows the reuse<br>
-of deleted waves while a transmission is active. Upon success a wave id
-greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
-PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
-<br><br><code>pi:&nbsp;&gt;=0&nbsp;(as&nbsp;returned&nbsp;by&nbsp;<a href="#pigpio_start">pigpio_start</a>).<br></code><br><br>The data provided by the <a href="#wave_add_*">wave_add_*</a> functions are consumed by this
+of deleted waves while a transmission is active.
+<br><br><code>pi:&nbsp;&gt;=0&nbsp;(as&nbsp;returned&nbsp;by&nbsp;<a href="#pigpio_start">pigpio_start</a>).<br>percent:&nbsp;0-100,&nbsp;size&nbsp;of&nbsp;waveform&nbsp;as&nbsp;percentage&nbsp;of&nbsp;maximum&nbsp;available.<br></code><br><br>The data provided by the <a href="#wave_add_*">wave_add_*</a> functions are consumed by this
 function.
 <br><br>As many waveforms may be created as there is space available. The
 wave id is passed to <a href="#wave_send_*">wave_send_*</a> to specify the waveform to transmit.
 <br><br>A usage would be the creation of two waves where one is filled while the other
-is beeing transmitted. Each wave is assigned 50% of the available resources.
+is being transmitted. Each wave is assigned 50% of the resources.
 This buffer structure allows the transmission of infinite wave sequences.
 <br><br>Normal usage:
 <br><br>Step 1. <a href="#wave_clear">wave_clear</a> to clear all waveforms and added data.
@@ -1388,6 +1386,8 @@ The mA which may be drawn from each GPIO whilst still guaranteeing the
 high and low levels.
 <h3><a name="*param">*param</a></h3>
 An array of script parameters.
+<h3><a name="percent">percent</a>: 0-100</h3>
+The size of waveform as percentage of maximum available.
 <h3><a name="pi">pi</a></h3>
 An integer defining a connected Pi.  The value is returned by
 <a href="#pigpio_start">pigpio_start</a> upon success.
@@ -1515,7 +1515,7 @@ A 16-bit word value.
 <table><tr>
 <td style="width: 200px"><div style="text-align: left;"><small>&copy; 2012-2020</small></div></td>
 <td style="width: 350px"><div style="text-align: center;">e-mail: pigpio @ abyz.me.uk</div></td>
-<td style="width: 200px"><div style="text-align: right;"><small>Updated: 29/04/2020</small></div></td>
+<td style="width: 200px"><div style="text-align: right;"><small>Updated: 30/04/2020</small></div></td>
 </tr></table>
 </td>
 </table>

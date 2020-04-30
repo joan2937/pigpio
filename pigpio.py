@@ -2312,12 +2312,12 @@ class pi():
       resources. Where percent gives the percentage of the resources to use
       (in terms of the theoretical maximum, not the current amount free).
       This allows the reuse of deleted waves while a transmission is active.
-      
+
       Upon success a wave id greater than or equal to 0 is returned, otherwise
       PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
 
       . .
-      pi: >=0 (as returned by [*pigpio_start*]).
+      percent: 0-100, size of waveform as percentage of maximum available.
       . .
 
       The data provided by the [*wave_add_**] functions are consumed by this
@@ -2326,10 +2326,10 @@ class pi():
       As many waveforms may be created as there is space available. The
       wave id is passed to [*wave_send_**] to specify the waveform to transmit.
 
-      A usage would be the creation of two waves where one is filled while the other
-      is being transmitted. Each wave is assigned 50% of the available resources.
+      A usage would be the creation of two waves where one is filled while the
+      other is being transmitted.  Each wave is assigned 50% of the resources.
       This buffer structure allows the transmission of infinite wave sequences.
-      
+
       Normal usage:
 
       Step 1. [*wave_clear*] to clear all waveforms and added data.
@@ -2341,12 +2341,12 @@ class pi():
       Step 4. [*wave_send_**] with the id of the waveform to transmit.
 
       Repeat steps 2-4 as needed.
-      
+
       Step 5. Any wave id can now be deleted and another wave of the same size
               can be created in its place.
-      
+
       ...
-      wid = pi.wave_create(50)
+      wid = pi.wave_create_and_pad(50)
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCAP, percent, 0))
@@ -5629,6 +5629,9 @@ def xref():
    When scripts are started they can receive up to 10 parameters
    to define their operation.
 
+   percent:: 0-100
+   The size of waveform as percentage of maximum available.
+   
    port:
    The port used by the pigpio daemon, defaults to 8888.
 

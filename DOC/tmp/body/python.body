@@ -989,12 +989,12 @@ resources. Where percent gives the percentage of the resources to use
 This allows the reuse of deleted waves while a transmission is active.
 <br><br>Upon success a wave id greater than or equal to 0 is returned, otherwise
 PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
-<br><br><code>pi:&nbsp;&gt;=0&nbsp;(as&nbsp;returned&nbsp;by&nbsp;<a href="#pigpio_start">pigpio_start</a>).<br></code><br><br>The data provided by the <a href="#wave_add_*">wave_add_*</a> functions are consumed by this
+<br><br><code>percent:&nbsp;0-100,&nbsp;size&nbsp;of&nbsp;waveform&nbsp;as&nbsp;percentage&nbsp;of&nbsp;maximum&nbsp;available.<br></code><br><br>The data provided by the <a href="#wave_add_*">wave_add_*</a> functions are consumed by this
 function.
 <br><br>As many waveforms may be created as there is space available. The
 wave id is passed to <a href="#wave_send_*">wave_send_*</a> to specify the waveform to transmit.
-<br><br>A usage would be the creation of two waves where one is filled while the other
-is being transmitted. Each wave is assigned 50% of the available resources.
+<br><br>A usage would be the creation of two waves where one is filled while the
+other is being transmitted.  Each wave is assigned 50% of the resources.
 This buffer structure allows the transmission of infinite wave sequences.
 <br><br>Normal usage:
 <br><br>Step 1. <a href="#wave_clear">wave_clear</a> to clear all waveforms and added data.
@@ -1004,7 +1004,7 @@ This buffer structure allows the transmission of infinite wave sequences.
 <br><br>Repeat steps 2-4 as needed.
 <br><br>Step 5. Any wave id can now be deleted and another wave of the same size
         can be created in its place.
-<br><br><b><small>Example</small></b><br><br><code>wid&nbsp;=&nbsp;pi.wave_create(50)<br></code><h3><a name="wave_delete">wave_delete<small>(<a href="#wave_id">wave_id</a>)</small></h3>
+<br><br><b><small>Example</small></b><br><br><code>wid&nbsp;=&nbsp;pi.wave_create_and_pad(50)<br></code><h3><a name="wave_delete">wave_delete<small>(<a href="#wave_id">wave_id</a>)</small></h3>
 This function deletes the waveform with id wave_id.
 <br><br><b><small>Parameters</small></b><br><br><samp>wave_id:=&nbsp;&gt;=0&nbsp;(as&nbsp;returned&nbsp;by&nbsp;a&nbsp;prior&nbsp;call&nbsp;to&nbsp;<a href="#wave_create">wave_create</a>).<br></samp><br><br>Wave ids are allocated in order, 0, 1, 2, etc.
 <br><br>The wave is flagged for deletion.  The resources used by the wave
@@ -1170,6 +1170,7 @@ being currently defined.
 high and low levels.
 <h3><a name="params"></a>params: 32 bit number</h3>When scripts are started they can receive up to 10 parameters
 to define their operation.
+<h3><a name="percent"></a>percent: : 0-100</h3>The size of waveform as percentage of maximum available.
 <h3><a name="port"></a>port: </h3>The port used by the pigpio daemon, defaults to 8888.
 <h3><a name="pstring"></a>pstring: </h3>The string to be passed to a <a href="#shell">shell</a> script to be executed.
 <h3><a name="pud"></a>pud: 0-2</h3><code>PUD_DOWN&nbsp;=&nbsp;1<br>PUD_OFF&nbsp;=&nbsp;0<br>PUD_UP&nbsp;=&nbsp;2<br></code><h3><a name="pulse_len"></a>pulse_len: 1-100</h3>The length of the trigger pulse in microseconds.

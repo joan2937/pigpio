@@ -5804,6 +5804,15 @@ high and low levels.
 *param::
 An array of script parameters.
 
+pctBOOL:: 0-100
+percent On-Off-Level (OOL) buffer to consume for wave output.
+
+pctCB:: 0-100
+the percent of all DMA control blocks to consume.
+
+pctTOOL:: 0-100
+the percent of OOL buffer to consume for wave input (flags).
+
 pi_i2c_msg_t::
 . .
 typedef struct

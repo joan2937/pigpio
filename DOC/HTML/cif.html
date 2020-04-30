@@ -1715,6 +1715,12 @@ The mA which may be drawn from each GPIO whilst still guaranteeing the
 high and low levels.
 <h3><a name="*param">*param</a></h3>
 An array of script parameters.
+<h3><a name="pctBOOL">pctBOOL</a>: 0-100</h3>
+percent On-Off-Level (OOL) buffer to consume for wave output.
+<h3><a name="pctCB">pctCB</a>: 0-100</h3>
+the percent of all DMA control blocks to consume.
+<h3><a name="pctTOOL">pctTOOL</a>: 0-100</h3>
+the percent of OOL buffer to consume for wave input (flags).
 <h3><a name="pi_i2c_msg_t">pi_i2c_msg_t</a></h3>
 <code>typedef&nbsp;struct<br>{<br>&nbsp;&nbsp;&nbsp;uint16_t&nbsp;addr;&nbsp;&nbsp;//&nbsp;slave&nbsp;address<br>&nbsp;&nbsp;&nbsp;uint16_t&nbsp;flags;<br>&nbsp;&nbsp;&nbsp;uint16_t&nbsp;len;&nbsp;&nbsp;&nbsp;//&nbsp;msg&nbsp;length<br>&nbsp;&nbsp;&nbsp;uint8_t&nbsp;&nbsp;*buf;&nbsp;&nbsp;//&nbsp;pointer&nbsp;to&nbsp;msg&nbsp;data<br>}&nbsp;pi_i2c_msg_t;<br></code><h3><a name="port">port</a>: 1024-32000</h3>
 The port used to bind to the pigpio socket.  Defaults to 8888.
@@ -1873,7 +1879,7 @@ A 16-bit word value.
 <table><tr>
 <td style="width: 200px"><div style="text-align: left;"><small>&copy; 2012-2020</small></div></td>
 <td style="width: 350px"><div style="text-align: center;">e-mail: pigpio @ abyz.me.uk</div></td>
-<td style="width: 200px"><div style="text-align: right;"><small>Updated: 29/04/2020</small></div></td>
+<td style="width: 200px"><div style="text-align: right;"><small>Updated: 30/04/2020</small></div></td>
 </tr></table>
 </td>
 </table>

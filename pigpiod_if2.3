@@ -2395,13 +2395,11 @@ PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 
 .IP "\fBint wave_create_and_pad(int pi, int percent)\fP"
 .IP "" 4
-This function creates a waveform like wave_create but pads the consumed
+This function creates a waveform like \fBwave_create\fP but pads the consumed
 resources. Where percent gives the percentage of the resources to use (in terms
 of the theoretical maximum, not the current amount free). This allows the reuse
 .br
-of deleted waves while a transmission is active. Upon success a wave id
-greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
-PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+of deleted waves while a transmission is active.
 
 .br
 
@@ -2409,6 +2407,8 @@ PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
 
 .EX
 pi: >=0 (as returned by \fBpigpio_start\fP).
+.br
+percent: 0-100, size of waveform as percentage of maximum available.
 .br
 
 .EE
@@ -2429,7 +2429,7 @@ wave id is passed to \fBwave_send_*\fP to specify the waveform to transmit.
 
 .br
 A usage would be the creation of two waves where one is filled while the other
-is beeing transmitted. Each wave is assigned 50% of the available resources.
+is being transmitted. Each wave is assigned 50% of the resources.
 This buffer structure allows the transmission of infinite wave sequences.
 
 .br
@@ -7494,6 +7494,13 @@ high and low levels.
 
 .IP "\fB*param\fP" 0
 An array of script parameters.
+
+.br
+
+.br
+
+.IP "\fBpercent\fP: 0-100" 0
+The size of waveform as percentage of maximum available.
 
 .br
 

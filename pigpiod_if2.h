@@ -1376,15 +1376,14 @@ D*/
 /*F*/
 int wave_create_and_pad(int pi, int percent);
 /*D
-This function creates a waveform like wave_create but pads the consumed
+This function creates a waveform like [*wave_create*] but pads the consumed
 resources. Where percent gives the percentage of the resources to use (in terms
 of the theoretical maximum, not the current amount free). This allows the reuse 
-of deleted waves while a transmission is active. Upon success a wave id
-greater than or equal to 0 is returned, otherwise PI_EMPTY_WAVEFORM,
-PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+of deleted waves while a transmission is active.
 
 . .
 pi: >=0 (as returned by [*pigpio_start*]).
+percent: 0-100, size of waveform as percentage of maximum available.
 . .
 
 The data provided by the [*wave_add_**] functions are consumed by this
@@ -1394,7 +1393,7 @@ As many waveforms may be created as there is space available. The
 wave id is passed to [*wave_send_**] to specify the waveform to transmit.
 
 A usage would be the creation of two waves where one is filled while the other
-is beeing transmitted. Each wave is assigned 50% of the available resources.
+is being transmitted. Each wave is assigned 50% of the resources.
 This buffer structure allows the transmission of infinite wave sequences.
 
 Normal usage:
@@ -4127,6 +4126,9 @@ high and low levels.
 
 *param::
 An array of script parameters.
+
+percent:: 0-100
+The size of waveform as percentage of maximum available.
 
 pi::
 An integer defining a connected Pi.  The value is returned by

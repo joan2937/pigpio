@@ -2786,7 +2786,7 @@ ERROR: attempt to create an empty waveform
 
 WVCAP ::
 
-Similar to WVCRE, this command creates a waveform but pads the consumed
+Similar to [*WVCRE*], this command creates a waveform but pads the consumed
 resources to a fixed size, specified as a percent of total resource.
 Padded waves of equal size can be re-cycled efficiently allowing newly
 created waves to re-use the resources of deleted waves of the same dimension.
