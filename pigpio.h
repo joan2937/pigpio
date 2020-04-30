@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 75
+#define PIGPIO_VERSION 76
 
 /*TEXT
 
@@ -322,6 +322,7 @@ gpioWaveAddGeneric         Adds a series of pulses to the waveform
 gpioWaveAddSerial          Adds serial data to the waveform
 
 gpioWaveCreate             Creates a waveform from added data
+gpioWaveCreatePad          Creates a waveform of fixed size from added data
 gpioWaveDelete             Deletes a waveform
 
 gpioWaveTxSend             Transmits a waveform
@@ -1986,6 +1987,49 @@ Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 D*/
 
+
+/*F*/
+int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL);
+/*D
+Similar to [*gpioWaveCreate*], this function creates a waveform but pads the consumed
+resources. Padded waves of equal dimension can be re-cycled efficiently allowing
+newly created waves to re-use the resources of deleted waves of the same dimension.
+
+. .
+pctCB: 0-100, the percent of all DMA control blocks to consume.
+pctBOOL: 0-100, percent On-Off-Level (OOL) buffer to consume for wave output.
+pctTOOL: 0-100, the percent of OOL buffer to consume for wave input (flags).
+. .
+
+Upon success a wave id greater than or equal to 0 is returned, otherwise
+PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+Waveform data provided by [*gpioWaveAdd**] and [*rawWaveAdd**] functions are
+consumed by this function.
+
+A usage would be the creation of two waves where one is filled while the other
+is being transmitted. Each wave is assigned 50% of the resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+...
+  // get firstWaveChunk, somehow
+  gpioWaveAddGeneric(firstWaveChunk);
+  wid = gpioWaveCreatePad(50, 50, 0);
+  gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
+  // get nextWaveChunk
+
+  while (nextWaveChunk) {
+     gpioWaveAddGeneric(nextWaveChunk);
+     nextWid = gpioWaveCreatePad(50, 50, 0);
+     gpioWaveTxSend(nextWid, PI_WAVE_MODE_ONE_SHOT_SYNC);
+     while(gpioWaveTxAt() == wid) time_sleep(0.1);
+     gpioWaveDelete(wid);
+     wid = nextWid;
+     // get nextWaveChunk
+  }
+...
+
+D*/
 
 /*F*/
 int gpioWaveDelete(unsigned wave_id);
@@ -5760,6 +5804,15 @@ high and low levels.
 *param::
 An array of script parameters.
 
+pctBOOL:: 0-100
+percent On-Off-Level (OOL) buffer to consume for wave output.
+
+pctCB:: 0-100
+the percent of all DMA control blocks to consume.
+
+pctTOOL:: 0-100
+the percent of OOL buffer to consume for wave input (flags).
+
 pi_i2c_msg_t::
 . .
 typedef struct
@@ -6271,6 +6324,7 @@ PARAMS*/
 #define PI_CMD_EVT   116
 
 #define PI_CMD_PROCU 117
+#define PI_CMD_WVCAP 118
 
 /*DEF_E*/
 

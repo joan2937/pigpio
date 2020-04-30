@@ -584,6 +584,8 @@ gpioWaveAddSerial          Adds serial data to the waveform
 .br
 gpioWaveCreate             Creates a waveform from added data
 .br
+gpioWaveCreatePad          Creates a waveform of fixed size from added data
+.br
 gpioWaveDelete             Deletes a waveform
 .br
 
@@ -2661,6 +2663,89 @@ specified delay between the pulse and the next.
 .br
 Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
+
+.IP "\fBint gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)\fP"
+.IP "" 4
+Similar to \fBgpioWaveCreate\fP, this function creates a waveform but pads the consumed
+resources. Padded waves of equal dimension can be re-cycled efficiently allowing
+newly created waves to re-use the resources of deleted waves of the same dimension.
+
+.br
+
+.br
+
+.EX
+pctCB: 0-100, the percent of all DMA control blocks to consume.
+.br
+pctBOOL: 0-100, percent On-Off-Level (OOL) buffer to consume for wave output.
+.br
+pctTOOL: 0-100, the percent of OOL buffer to consume for wave input (flags).
+.br
+
+.EE
+
+.br
+
+.br
+Upon success a wave id greater than or equal to 0 is returned, otherwise
+PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+.br
+
+.br
+Waveform data provided by \fBgpioWaveAdd*\fP and \fBrawWaveAdd*\fP functions are
+consumed by this function.
+
+.br
+
+.br
+A usage would be the creation of two waves where one is filled while the other
+is being transmitted. Each wave is assigned 50% of the resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+  // get firstWaveChunk, somehow
+.br
+  gpioWaveAddGeneric(firstWaveChunk);
+.br
+  wid = gpioWaveCreatePad(50, 50, 0);
+.br
+  gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
+.br
+  // get nextWaveChunk
+.br
+
+.br
+  while (nextWaveChunk) {
+.br
+     gpioWaveAddGeneric(nextWaveChunk);
+.br
+     nextWid = gpioWaveCreatePad(50, 50, 0);
+.br
+     gpioWaveTxSend(nextWid, PI_WAVE_MODE_ONE_SHOT_SYNC);
+.br
+     while(gpioWaveTxAt() == wid) time_sleep(0.1);
+.br
+     gpioWaveDelete(wid);
+.br
+     wid = nextWid;
+.br
+     // get nextWaveChunk
+.br
+  }
+.br
+
+.EE
+
+.br
+
+.br
 
 .IP "\fBint gpioWaveDelete(unsigned wave_id)\fP"
 .IP "" 4
@@ -9484,6 +9569,27 @@ An array of script parameters.
 
 .br
 
+.IP "\fBpctBOOL\fP: 0-100" 0
+percent On-Off-Level (OOL) buffer to consume for wave output.
+
+.br
+
+.br
+
+.IP "\fBpctCB\fP: 0-100" 0
+the percent of all DMA control blocks to consume.
+
+.br
+
+.br
+
+.IP "\fBpctTOOL\fP: 0-100" 0
+the percent of OOL buffer to consume for wave input (flags).
+
+.br
+
+.br
+
 .IP "\fBpi_i2c_msg_t\fP" 0
 
 .EX
@@ -10635,6 +10741,8 @@ A 16-bit word value.
 
 .br
 #define PI_CMD_PROCU 117
+.br
+#define PI_CMD_WVCAP 118
 .br
 
 .br

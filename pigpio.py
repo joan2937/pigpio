@@ -288,6 +288,7 @@ wave_add_generic          Adds a series of pulses to the waveform
 wave_add_serial           Adds serial data to the waveform
 
 wave_create               Creates a waveform from added data
+wave_create_and_pad       Creates a waveform of fixed size from added data
 wave_delete               Deletes a waveform
 
 wave_send_once            Transmits a waveform once
@@ -571,6 +572,7 @@ _PI_CMD_EVM  =115
 _PI_CMD_EVT  =116
 
 _PI_CMD_PROCU=117
+_PI_CMD_WVCAP=118
 
 # pigpio error numbers
 
@@ -2303,6 +2305,51 @@ class pi():
       ...
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCRE, 0, 0))
+
+   def wave_create_and_pad(self, percent):
+      """
+      This function creates a waveform like [*wave_create*] but pads the consumed
+      resources. Where percent gives the percentage of the resources to use
+      (in terms of the theoretical maximum, not the current amount free).
+      This allows the reuse of deleted waves while a transmission is active.
+
+      Upon success a wave id greater than or equal to 0 is returned, otherwise
+      PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+      . .
+      percent: 0-100, size of waveform as percentage of maximum available.
+      . .
+
+      The data provided by the [*wave_add_**] functions are consumed by this
+      function.
+
+      As many waveforms may be created as there is space available. The
+      wave id is passed to [*wave_send_**] to specify the waveform to transmit.
+
+      A usage would be the creation of two waves where one is filled while the
+      other is being transmitted.  Each wave is assigned 50% of the resources.
+      This buffer structure allows the transmission of infinite wave sequences.
+
+      Normal usage:
+
+      Step 1. [*wave_clear*] to clear all waveforms and added data.
+
+      Step 2. [*wave_add_**] calls to supply the waveform data.
+
+      Step 3. [*wave_create_and_pad*] to create a waveform of uniform size.
+
+      Step 4. [*wave_send_**] with the id of the waveform to transmit.
+
+      Repeat steps 2-4 as needed.
+
+      Step 5. Any wave id can now be deleted and another wave of the same size
+              can be created in its place.
+
+      ...
+      wid = pi.wave_create_and_pad(50)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCAP, percent, 0))
 
    def wave_delete(self, wave_id):
       """
@@ -5582,6 +5629,9 @@ def xref():
    When scripts are started they can receive up to 10 parameters
    to define their operation.
 
+   percent:: 0-100
+   The size of waveform as percentage of maximum available.
+   
    port:
    The port used by the pigpio daemon, defaults to 8888.
 

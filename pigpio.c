@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 75 */
+/* pigpio version 76 */
 
 /* include ------------------------------------------------------- */
 
@@ -396,6 +396,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 #define DMA_DEST_WIDTH              (1<< 5)
 #define DMA_DEST_INC                (1<< 4)
 #define DMA_WAIT_RESP               (1<< 3)
+#define DMA_TDMODE                  (1<< 1)
 
 #define DMA_DEBUG_READ_ERR           (1<<2)
 #define DMA_DEBUG_FIFO_ERR           (1<<1)
@@ -664,6 +665,7 @@ bit 0 READ_LAST_NOT_SET_ERROR
 /* --------------------------------------------------------------- */
 
 #define NORMAL_DMA (DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+#define TWO_BEAT_DMA (DMA_TDMODE | DMA_BURST_LENGTH(1))
 
 #define TIMED_DMA(x) (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
 
@@ -2434,6 +2436,27 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
 
       case PI_CMD_WVCRE: res = gpioWaveCreate(); break;
 
+      case PI_CMD_WVCAP:
+         /* Make WVCAP variadic */
+         if (p[3] == 4)
+         {
+            memcpy(&tmp3, buf, 4); /* percent TOOL */
+            res = gpioWaveCreatePad(p[1], p[2], tmp3); /* rawWaveAdd* usage */
+            break;
+         }
+         if (p[2] && p[3]==0)
+         {
+            res = gpioWaveCreatePad(p[1], p[2], 0);
+            break;
+         }
+         if (p[2]==0 && p[3]==0)
+         {
+            res = gpioWaveCreatePad(p[1], p[1], 0); /* typical usage */
+            break;
+         }
+         res = PI_BAD_WAVE_ID; // FIX?
+         break;
+
       case PI_CMD_WVDEL: res = gpioWaveDelete(p[1]); break;
 
       case PI_CMD_WVGO:  res = gpioWaveTxStart(PI_WAVE_MODE_ONE_SHOT); break;
@@ -2977,8 +3000,7 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
    for (i=0; i<numWaves; i++)
    {
-      if (waves[i].gpioOn)                 {numCB++; numBOOL++;}
-      if (waves[i].gpioOff)                {numCB++; numBOOL++;}
+      if (waves[i].gpioOn || waves[i].gpioOff) {numCB++; numBOOL++;}
       if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
       if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
 
@@ -2992,11 +3014,12 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
 /* ----------------------------------------------------------------------- */
 
-static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
+static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
+                    int numCB, int numBOOL, int numTOOL)
 {
    int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
 
-   int status;
+   int status, s_stride;
 
    rawCbs_t *p=NULL;
 
@@ -3040,7 +3063,22 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
 
    for (i=0; i<numWaves; i++)
    {
-      if (waves[i].gpioOn)
+      if (waves[i].gpioOn && waves[i].gpioOff)
+      /* Use 2-beat burst */
+      {
+         p = rawWaveCBAdr(botCB++);
+
+         p->info   = TWO_BEAT_DMA;
+         p->src    = waveOOLPOadr(botOOL);
+         waveSetOOL(botOOL++, waves[i].gpioOn);
+         s_stride = waveOOLPOadr(botOOL) - p->src;
+         waveSetOOL(botOOL++, waves[i].gpioOff);
+         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
+         p->length = (2<<16) + 4;         // 2 transfers of 4 bytes each
+         p->stride = (12<<16) + s_stride; // d_stride = (GPCLR0-GPSET0)*4 = 12
+         p->next   = waveCbPOadr(botCB);
+      }
+      if (waves[i].gpioOn && !waves[i].gpioOff)
       {
          waveSetOOL(botOOL, waves[i].gpioOn);
 
@@ -3052,8 +3090,7 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
          p->length = 4;
          p->next   = waveCbPOadr(botCB);
       }
-
-      if (waves[i].gpioOff)
+      if (waves[i].gpioOff && !waves[i].gpioOn)
       {
          waveSetOOL(botOOL, waves[i].gpioOff);
 
@@ -3065,7 +3102,6 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
          p->length = 4;
          p->next   = waveCbPOadr(botCB);
       }
-
       if (waves[i].flags & WAVE_FLAG_READ)
       {
          p = rawWaveCBAdr(botCB++);
@@ -3128,6 +3164,28 @@ static int wave2Cbs(unsigned wave_mode, int *CB, int *BOOL, int *TOOL)
             p->next = waveCbPOadr(botCB);
          }
       }
+   }
+
+   if (numCB)
+   {
+      /* Pad the wave */
+
+      botCB = *CB + numCB - 1;
+      botOOL = *BOOL + numBOOL - 1;
+      topOOL = *TOOL - numTOOL;
+
+      /* Link the last CB to end of wave */
+
+      p->next = waveCbPOadr(botCB);
+
+      /* Insert sentinel CB at end of DMA */
+
+      p = rawWaveCBAdr(botCB++);
+      p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
+      p->src    = waveOOLPOadr(botOOL++);
+      p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
+      p->length = 4;
+      p->next   = 0;
    }
 
    if (p != NULL)
@@ -3324,9 +3382,7 @@ int rawWaveAddGeneric(unsigned numIn1, rawWave_t *in1)
 
       cbs += waveDelayCBs(tDelay);
 
-      if (out[outPos].gpioOn) cbs++; /* one cb if gpio on */
-
-      if (out[outPos].gpioOff) cbs++; /* one cb if gpio off */
+      if (out[outPos].gpioOn || out[outPos].gpioOff) cbs++;
 
       if (out[outPos].flags & WAVE_FLAG_READ)
       {
@@ -9566,7 +9622,7 @@ int gpioWaveCreate(void)
 
    /* What resources are needed? */
 
-   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
+      waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
 
    wid = -1;
 
@@ -9589,10 +9645,10 @@ int gpioWaveCreate(void)
    {
       /* Are there enough spare resources? */
 
-      if ((numCB+waveOutBotCB) >= NUM_WAVE_CBS)
+      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
          return PI_TOO_MANY_CBS;
 
-      if ((numBOOL+waveOutBotOOL) >= (waveOutTopOOL-numTOOL))
+      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
          return PI_TOO_MANY_OOL;
 
       if (wid >= PI_MAX_WAVES)
@@ -9619,7 +9675,7 @@ int gpioWaveCreate(void)
    BOOL = waveInfo[wid].botOOL;
    TOOL = waveInfo[wid].topOOL;
 
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL);
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, 0, 0, 0);
 
    /* Sanity check. */
 
@@ -9632,6 +9688,9 @@ int gpioWaveCreate(void)
          numBOOL, BOOL-waveInfo[wid].botOOL,
          numTOOL, waveInfo[wid].topOOL-TOOL);
    }
+
+   DBG(DBG_USER, "Wave Stats: wid=%d CBs %d BOOL %d TOOL %d", wid,
+      numCB, numBOOL, numTOOL);
 
    waveInfo[wid].deleted = 0;
 
@@ -9646,6 +9705,124 @@ int gpioWaveCreate(void)
    return wid;
 }
 
+int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)
+{
+   int i, wid;
+   int numCB, numBOOL, numTOOL;
+   int CB, BOOL, TOOL;
+
+   DBG(DBG_USER, "%d, %d, %d", pctCB, pctBOOL, pctTOOL);
+
+   CHECK_INITED;
+
+   if (pctCB < 0 || pctCB > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctCB=(%d)", pctCB);
+   if (pctBOOL < 0 || pctBOOL > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctBOOL=(%d)", pctBOOL);
+   if (pctTOOL < 0 || pctTOOL > 100)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctTOOL=(%d)", pctTOOL);
+
+   if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
+
+   /* What resources are needed? */
+   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
+
+   /* Amount of pad required */
+   CB = (NUM_WAVE_CBS - PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE) * pctCB / 100;
+   BOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctBOOL /100;
+   TOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctTOOL /100;
+
+   /* Reject if wave is too big */
+   if (numCB > CB) return PI_TOO_MANY_CBS;
+   if (numBOOL > BOOL) return PI_TOO_MANY_OOL;
+   if (numTOOL > TOOL) return PI_TOO_MANY_OOL;
+
+   /* Set the padding */
+   numCB = CB;
+   numBOOL = BOOL;
+   numTOOL = TOOL;
+
+
+   wid = -1;
+
+   /* Is there an exact fit with a deleted wave. */
+
+   for (i=0; i<waveOutCount; i++)
+   {
+      if (waveInfo[i].deleted             &&
+         (waveInfo[i].numCB   == numCB)   &&
+         (waveInfo[i].numBOOL == numBOOL) &&
+         (waveInfo[i].numTOOL == numTOOL))
+      {
+         /* Reuse the deleted waves resources. */
+         wid = i;
+         break;
+      }
+   }
+
+   if (wid == -1)
+   {
+      /* Are there enough spare resources? */
+
+      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
+         return PI_TOO_MANY_CBS;
+
+      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
+         return PI_TOO_MANY_OOL;
+
+      if (wid >= PI_MAX_WAVES)
+         return PI_NO_WAVEFORM_ID;
+
+      wid = waveOutCount++;
+
+      waveInfo[wid].botCB  = waveOutBotCB;
+      waveInfo[wid].topCB  = waveOutBotCB + numCB -1;
+      waveInfo[wid].botOOL = waveOutBotOOL;
+      waveInfo[wid].topOOL = waveOutTopOOL;
+      waveInfo[wid].numCB = numCB;
+      waveInfo[wid].numBOOL = numBOOL;
+      waveInfo[wid].numTOOL = numTOOL;
+
+      waveOutBotCB += numCB;
+      waveOutBotOOL += numBOOL;
+      waveOutTopOOL -= numTOOL;
+   }
+
+   /* Must be room if got this far. */
+
+   CB   = waveInfo[wid].botCB;
+   BOOL = waveInfo[wid].botOOL;
+   TOOL = waveInfo[wid].topOOL;
+
+   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, numCB, numBOOL, numTOOL);
+
+   /* Sanity check. */
+
+   if ( (numCB   != (CB-waveInfo[wid].botCB))    ||
+        (numBOOL != (BOOL-waveInfo[wid].botOOL)) ||
+        (numTOOL != (waveInfo[wid].topOOL-TOOL)) )
+   {
+      DBG(DBG_ALWAYS, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
+         numCB,   CB-waveInfo[wid].botCB,
+         numBOOL, BOOL-waveInfo[wid].botOOL,
+         numTOOL, waveInfo[wid].topOOL-TOOL);
+   }
+
+   DBG(DBG_USER, "Wave padding: wid=%d CBs %d BOOL %d TOOL %d", wid,
+      numCB, numBOOL, numTOOL);
+
+   waveInfo[wid].deleted = 0;
+
+   /* Consume waves. */
+
+   wfc[0] = 0;
+   wfc[1] = 0;
+   wfc[2] = 0;
+
+   wfcur = 0;
+
+   return wid;
+}
 /* ----------------------------------------------------------------------- */
 
 int gpioWaveDelete(unsigned wave_id)
