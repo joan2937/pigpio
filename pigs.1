@@ -548,8 +548,8 @@ Add serial data to waveform
 .B WVCRE  
 Create a waveform   
 .P
-.B WVCAP  
-Create a waveform of fixed size  
+.B WVCAP percent 
+Create a waveform of fixed size 
 .P
 .B WVDEL wid 
 Delete selected waveform 
@@ -5142,27 +5142,20 @@ ERROR: attempt to create an empty waveform
 
 .br
 
-.IP "\fBWVCAP \fP - Create a waveform of fixed size"
+.IP "\fBWVCAP percent\fP - Create a waveform of fixed size"
 .IP "" 4
 
 .br
-Similar to \fBWVCRE\fP, this command creates a waveform but pads the consumed
-resources to a fixed size, specified as a percent of total resource.
-Padded waves of equal size can be re-cycled efficiently allowing newly
-created waves to re-use the resources of deleted waves of the same dimension.
+Create a waveform of fixed size. Similar to \fBWVCRE\fP, this command creates a waveform but pads the consumed resources to a fixed size, specified as a \fBpercent\fP of the total resources. Padded waves of equal size can be re-cycled efficiently allowing newly created waves to re-use the resources of deleted waves of the same dimension.
 
 .br
-Upon success a wave id (>=0) is returned.  On error a negative status
-code will be returned.
+Upon success a wave id (>=0) is returned. On error a negative status code will be returned.
 
 .br
-The data provided by the \fBWVAG\fP and \fBWVAS\fP commands are
-consumed by this command.
+The data provided by the \fBWVAG\fP and \fBWVAS\fP commands are consumed by this command.
 
 .br
-As many waveforms may be created as there is space available.
-The wave id is passed to \fBWVTX\fP or \fBWVTXR\fP to specify the
-waveform to transmit.
+As many waveforms may be created as there is space available. The wave id is passed to \fBWVTX\fP or \fBWVTXR\fP to specify the waveform to transmit.
 
 .br
 Normal usage would be
@@ -5183,8 +5176,10 @@ Step 4. \fBWVTX\fP or \fBWVTXR\fP with the id of the waveform to transmit.
 Repeat steps 2 - 4 as needed.
 
 .br
-Step 5. Any wave id can now be deleted and another wave of the same size
-        can be created in its place.
+Step 5. Any wave id can now be deleted and another wave of the same size can be created in its place.
+
+.br
+Example
 
 .br
 
@@ -5878,6 +5873,13 @@ must match an entry in /opt/pigpio/access.
 
 .IP "\fBpdc\fP - hardware PWM dutycycle (0-1000000)" 0
 The command expects a dutycycle.
+
+.br
+
+.IP "\fBpercent\fP - percent (1-100)" 0
+The percent of wave resources to allocate to a wave.  It can be useful
+to create waves of fixed sizes to prevent wave fragmentation (where
+there are plenty of resources but not a large enough contiguous space).
 
 .br
 

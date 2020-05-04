@@ -13,4 +13,10 @@ build
 dist
 *.egg-info
 wavepad_jitter.py
+# DOC files
+DOC/dbase/pigpio.sqlite.*
+DOC/tmp
+DOC/MAN/*
+!DOC/MAN/README*
+DOC/HTML/*.html
 
