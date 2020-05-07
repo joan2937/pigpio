@@ -501,6 +501,13 @@ gpioHardwareRevision
 
 Related code.
 
+?4|https://pypi.org/project/nrf24/|2020-04-20|NRF24
+Python Package Index (Pypi) NRF24 module.
+pip install nrf24
+
+?4|https://github.com/bjarne-hansen/py-nrf24|2020-04-20|NRF24
+Code and example usage of the Pypi NRF24 module.  Cleaned up and added support for reading from multiple pipes using open_reading_pipe(pipe, address) and open_writing_pipe(address) in order to be more "compatible" with the way NRF24 is used on Arduinos.
+
 ?4|https://github.com/stripcode/pigpio-stepper-motor|2016-08-12|Stepper Motor
 Stepper motor code.
 
