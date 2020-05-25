@@ -19,6 +19,7 @@ import struct
 import pigpio
 
 GPIO=25
+GPIO2=24
 
 def STRCMP(r, s):
 
@@ -1007,6 +1008,26 @@ def td():
    CHECK(13, 13, e, 0, 0, "wave delete")
 
    tdcb.cancel()
+
+   # test erroneous callback when initializing glitch filter
+   # this is much more likely to occur when testing with a remote connection
+   pi.set_mode(GPIO, pigpio.INPUT)
+   pi.set_mode(GPIO2, pigpio.INPUT)
+   pi.set_pull_up_down(GPIO, pigpio.PUD_UP)
+   pi.set_pull_up_down(GPIO2, pigpio.PUD_UP)
+   # wait long enough for gpio to get in a steady state
+   time.sleep(0.5)
+   pi.set_glitch_filter(GPIO, 0.1*1E6)
+   tdcb1 = pi.callback(GPIO, pigpio.EITHER_EDGE)
+   pi.set_glitch_filter(GPIO2, 0.1*1E6)
+   tdcb2 = pi.callback(GPIO2, pigpio.EITHER_EDGE)
+   # wait for possible callbacks
+   time.sleep(0.5)
+   tally = tdcb1.tally() + tdcb2.tally()
+   CHECK(13, 14, tally, 0, 0, "glitch filter, callback, tally")
+
+   tdcb1.cancel()
+   tdcb2.cancel()
 
 parser = argparse.ArgumentParser(description="test the Python I/F to the pigpio daemon")
 parser.add_argument("tests", nargs="?",
