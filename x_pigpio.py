@@ -11,6 +11,7 @@
 #* many failures in a group of tests indicate a problem.    *
 #************************************************************
 
+import argparse
 import sys
 import time
 import struct
@@ -1007,17 +1008,26 @@ def td():
 
    tdcb.cancel()
 
-if len(sys.argv) > 1:
+parser = argparse.ArgumentParser(description="test the Python I/F to the pigpio daemon")
+parser.add_argument("tests", nargs="?",
+                    help="tests to run, e.g. 0123456789d")
+parser.add_argument("-a", "--address", default=None,
+                    help="IP address or hostname of Pi on which to run tests")
+args = parser.parse_args()
+
+if args.tests is None:
+   tests = "0123456789d"
+else:
    tests = ""
-   for C in sys.argv[1]:
+   for C in args.tests:
       c = C.lower()
       if c not in tests:
          tests += c
 
+if args.address is None:
+   pi = pigpio.pi()
 else:
-   tests = "0123456789d"
-
-pi = pigpio.pi()
+   pi = pigpio.pi(args.address)
 
 if pi.connected:
    print("Connected to pigpio daemon.")
