@@ -950,6 +950,7 @@ typedef struct
    uint32_t nfRBitV;
 
    uint32_t gfSteadyUs;
+   uint8_t  gfInitialised;
    uint32_t gfTick;
    uint32_t gfLBitV;
    uint32_t gfRBitV;
@@ -5683,7 +5684,7 @@ unsigned alert_delays[]=
 static void alertGlitchFilter(gpioSample_t *sample, int numSamples)
 {
    int i, j, diff;
-   uint32_t steadyUs, changedTick, RBitV, LBitV;
+   uint32_t steadyUs, changedTick, RBitV, LBitV, initialised;
    uint32_t bit, bitV;
 
    for (i=0; i<=PI_MAX_USER_GPIO; i++)
@@ -5692,6 +5693,17 @@ static void alertGlitchFilter(gpioSample_t *sample, int numSamples)
 
       if (monitorBits & bit & gFilterBits)
       {
+         initialised = gpioAlert[i].gfInitialised;
+         if (!initialised && numSamples > 0)
+         {
+           /* Initialise filter with first sample */
+           bitV = sample[0].level & bit;
+           gpioAlert[i].gfRBitV = bitV;
+           gpioAlert[i].gfLBitV = bitV;
+           gpioAlert[i].gfTick = sample[0].tick;
+           gpioAlert[i].gfInitialised = 1;
+         }
+
          steadyUs    = gpioAlert[i].gfSteadyUs;
          RBitV       = gpioAlert[i].gfRBitV;
          LBitV       = gpioAlert[i].gfLBitV;
@@ -12333,18 +12345,8 @@ int gpioGlitchFilter(unsigned gpio, unsigned steady)
 
    if (steady)
    {
-      gpioAlert[gpio].gfTick  = systReg[SYST_CLO];
-
-      if (gpioRead_Bits_0_31() & (1<<gpio))
-      {
-         gpioAlert[gpio].gfLBitV = (1<<gpio);
-         gpioAlert[gpio].gfRBitV = 0 ;
-      }
-      else
-      {
-         gpioAlert[gpio].gfLBitV = 0 ;
-         gpioAlert[gpio].gfRBitV = (1<<gpio);
-      }
+      /* Initialise values next time we process alerts */
+      gpioAlert[gpio].gfInitialised = 0;
    }
 
    gpioAlert[gpio].gfSteadyUs = steady;
