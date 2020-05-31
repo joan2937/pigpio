@@ -3000,7 +3000,9 @@ static void waveCBsOOLs(int *numCBs, int *numBOOLs, int *numTOOLs)
 
    for (i=0; i<numWaves; i++)
    {
-      if (waves[i].gpioOn || waves[i].gpioOff) {numCB++; numBOOL++;}
+      if (waves[i].gpioOn)                 {numBOOL++;}
+      if (waves[i].gpioOff)                {numBOOL++;}
+      if (waves[i].gpioOn || waves[i].gpioOff) {numCB++;}
       if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
       if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
 
