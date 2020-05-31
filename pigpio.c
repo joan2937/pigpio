@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 7602 */
+/* pigpio version 76 */
 
 /* include ------------------------------------------------------- */
 
@@ -5621,7 +5621,7 @@ static void sigHandler(int signum)
             default:
                DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
                gpioTerminate();
-               _exit();
+               exit(-1);
          }
       }
    }
@@ -5631,7 +5631,7 @@ static void sigHandler(int signum)
 
       DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
       gpioTerminate();
-      _exit();
+      exit(-1);
    }
 }
 
