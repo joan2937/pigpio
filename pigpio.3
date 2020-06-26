@@ -190,6 +190,24 @@ error PI_INITIALISED.
 .br
 
 .br
+If you intend to rely on signals sent to your application, you should
+turn off the internal signal handling as show in this example:
+
+.EX
+int cfg = gpioCfgGetInternals();
+.br
+cfg |= PI_CFG_NOSIGHANDLER;  // (1<<10)
+.br
+gpioCfgSetInternals(cfg);
+.br
+int status = gpioInitialise();
+.br
+
+.EE
+
+.br
+
+.br
 
 .SH OVERVIEW
 
@@ -689,8 +707,6 @@ gpioCfgMemAlloc            Configure DMA memory allocation mode
 gpioCfgNetAddr             Configure allowed network addresses
 .br
 
-.br
-gpioCfgInternals           Configure misc. internals (DEPRECATED)
 .br
 gpioCfgGetInternals        Get internal configuration settings
 .br
@@ -3026,7 +3042,7 @@ int main(int argc, char *argv[])
 .IP "\fBint gpioWaveTxAt(void)\fP"
 .IP "" 4
 This function returns the id of the waveform currently being
-transmitted.
+transmitted using \fBgpioWaveTxSend\fP.  Chained waves are not supported.
 
 .br
 
@@ -7896,22 +7912,6 @@ numSockAddr: 0-256 (0 means all addresses allowed)
 
 .EE
 
-.IP "\fBint gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)\fP"
-.IP "" 4
-Used to tune internal settings.
-
-.br
-
-.br
-
-.EX
-cfgWhat: see source code
-.br
- cfgVal: see source code
-.br
-
-.EE
-
 .IP "\fBuint32_t gpioCfgGetInternals(void)\fP"
 .IP "" 4
 This function returns the current library internal configuration
@@ -7931,6 +7931,10 @@ cfgVal: see source code
 .br
 
 .EE
+
+.br
+
+.br
 
 .IP "\fBint gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned argc)\fP"
 .IP "" 4
