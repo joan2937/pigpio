@@ -2466,7 +2466,7 @@ class pi():
    def wave_tx_at(self):
       """
       Returns the id of the waveform currently being
-      transmitted.
+      transmitted using [*wave_send**].  Chained waves are not supported.
 
       Returns the waveform id or one of the following special
       values:
