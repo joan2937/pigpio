@@ -12,7 +12,9 @@ __pycache__
 build
 dist
 *.egg-info
-wavepad_jitter.py
+
+tmp/
+
 # DOC files
 DOC/dbase/pigpio.sqlite.*
 DOC/tmp
