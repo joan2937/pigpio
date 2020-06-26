@@ -2181,7 +2181,7 @@ D*/
 int gpioWaveTxAt(void);
 /*D
 This function returns the id of the waveform currently being
-transmitted.
+transmitted using [*gpioWaveTxSend*].  Chained waves are not supported.
 
 Returns the waveform id or one of the following special values:
 
