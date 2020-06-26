@@ -2610,7 +2610,7 @@ $ pigs wvas 7 38400 8 2 0 0x41 0x42
 WVTAT ::
 
 This command returns the id of the waveform currently
-being transmitted.
+being transmitted.  Chained waves are not supported.
 
 Returns the waveform id or one of the following special
 values:

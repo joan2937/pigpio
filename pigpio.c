@@ -14002,44 +14002,6 @@ int gpioCfgSetInternals(uint32_t cfgVal)
    return 0;
 }
 
-int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)
-{
-   int retVal = PI_BAD_CFG_INTERNAL;
-
-   DBG(DBG_USER, "cfgWhat=%u, cfgVal=%d", cfgWhat, cfgVal);
-
-   switch(cfgWhat)
-   {
-      case 562484977:
-
-         if (cfgVal) gpioCfg.internals |= PI_CFG_STATS;
-         else gpioCfg.internals &= (~PI_CFG_STATS);
-
-         DBG(DBG_ALWAYS, "show stats is %u", cfgVal);
-
-         retVal = 0;
-
-         break;
-
-      case 984762879:
-
-         if ((cfgVal >= DBG_ALWAYS) && (cfgVal <= DBG_MAX_LEVEL))
-         {
-            
-            gpioCfg.dbgLevel = cfgVal;
-            gpioCfg.internals = (gpioCfg.internals & (~0xF)) | cfgVal;
-
-            DBG(DBG_ALWAYS, "Debug level is %u", cfgVal);
-
-            retVal = 0;
-         }
-
-         break;
-   }
-
-   return retVal;
-}
-
 
 /* include any user customisations */
 
