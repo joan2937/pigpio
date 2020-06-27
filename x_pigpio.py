@@ -1028,6 +1028,8 @@ def td():
 
    tdcb1.cancel()
    tdcb2.cancel()
+   pi.set_glitch_filter(GPIO, 0)
+   pi.set_glitch_filter(GPIO2, 0)
 
 parser = argparse.ArgumentParser(description="test the Python I/F to the pigpio daemon")
 parser.add_argument("tests", nargs="?",
