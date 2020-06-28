@@ -30,7 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 76
+#define PIGPIO_VERSION 77
 
 /*TEXT
 
@@ -105,6 +105,16 @@ return error PI_NOT_INITIALISED.
 
 If the library is initialised the [*gpioCfg**] functions will return
 error PI_INITIALISED.
+
+If you intend to rely on signals sent to your application, you should
+turn off the internal signal handling as shown in this example:
+
+. .
+int cfg = gpioCfgGetInternals();
+cfg |= PI_CFG_NOSIGHANDLER;  // (1<<10)
+gpioCfgSetInternals(cfg);
+int status = gpioInitialise();
+. .
 
 TEXT*/
 
@@ -377,7 +387,6 @@ gpioCfgSocketPort          Configure socket port
 gpioCfgMemAlloc            Configure DMA memory allocation mode
 gpioCfgNetAddr             Configure allowed network addresses
 
-gpioCfgInternals           Configure misc. internals (DEPRECATED)
 gpioCfgGetInternals        Get internal configuration settings
 gpioCfgSetInternals        Set internal configuration settings
 
@@ -2181,7 +2190,7 @@ D*/
 int gpioWaveTxAt(void);
 /*D
 This function returns the id of the waveform currently being
-transmitted.
+transmitted using [*gpioWaveTxSend*].  Chained waves are not supported.
 
 Returns the waveform id or one of the following special values:
 
@@ -4976,18 +4985,6 @@ D*/
 
 
 /*F*/
-int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal);
-/*D
-Used to tune internal settings.
-
-. .
-cfgWhat: see source code
- cfgVal: see source code
-. .
-D*/
-
-
-/*F*/
 uint32_t gpioCfgGetInternals(void);
 /*D
 This function returns the current library internal configuration
@@ -5003,6 +5000,7 @@ settings.
 . .
 cfgVal: see source code
 . .
+
 D*/
 
 

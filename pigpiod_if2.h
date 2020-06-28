@@ -1609,7 +1609,7 @@ D*/
 int wave_tx_at(int pi);
 /*D
 This function returns the id of the waveform currently being
-transmitted.
+transmitted by [*wave_send**].  Chained waves are not supported.
 
 . .
 pi: >=0 (as returned by [*pigpio_start*]).

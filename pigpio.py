@@ -2466,7 +2466,7 @@ class pi():
    def wave_tx_at(self):
       """
       Returns the id of the waveform currently being
-      transmitted.
+      transmitted using [*wave_send**].  Chained waves are not supported.
 
       Returns the waveform id or one of the following special
       values:
@@ -5055,7 +5055,7 @@ class pi():
       by calling the tally function.  The count may be reset to zero
       by calling the reset_tally function.
 
-      The callback may be cancelled by calling the event_cancel function.
+      The callback may be canceled by calling the cancel function.
 
       An event may have multiple callbacks (although I can't think of
       a reason to do so).
@@ -5072,7 +5072,7 @@ class pi():
 
       cb2.reset_tally()
 
-      cb1.event_cancel() # To cancel callback cb1.
+      cb1.cancel() # To cancel callback cb1.
       ...
       """
 
