@@ -107,7 +107,8 @@ If the library is initialised the [*gpioCfg**] functions will return
 error PI_INITIALISED.
 
 If you intend to rely on signals sent to your application, you should
-turn off the internal signal handling as show in this example:
+turn off the internal signal handling as shown in this example:
+
 . .
 int cfg = gpioCfgGetInternals();
 cfg |= PI_CFG_NOSIGHANDLER;  // (1<<10)
