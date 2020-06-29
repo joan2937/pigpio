@@ -13733,8 +13733,8 @@ unsigned gpioHardwareRevision(void)
             rev = ntohl(tmp);
             rev &= 0xFFFFFF; /* mask out warranty bit */
          }
+         fclose(filp);
       }
-      fclose(filp);
    }
 
    piCores = 0;
