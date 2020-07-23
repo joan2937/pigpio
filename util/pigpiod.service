@@ -4,6 +4,7 @@ Description=Pigpio daemon
 [Service]
 Type=forking
 ExecStart=/usr/bin/pigpiod
+KillSignal=SIGKILL
 
 [Install]
 WantedBy=multi-user.target
