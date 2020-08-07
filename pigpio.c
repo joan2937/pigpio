@@ -1219,7 +1219,7 @@ typedef struct
 /* initialise once then preserve */
 
 static volatile uint32_t piCores       = 0;
-static volatile uint32_t pi_peri_phys  = 0x20000000;
+static volatile uint64_t pi_peri_phys  = 0x20000000;
 static volatile uint32_t pi_dram_bus   = 0x40000000;
 static volatile uint32_t pi_mem_flag   = 0x0C;
 static volatile uint32_t pi_ispi       = 0;
@@ -7329,9 +7329,9 @@ static int initGrabLockFile(void)
 
 /* ----------------------------------------------------------------------- */
 
-static uint32_t * initMapMem(int fd, uint32_t addr, uint32_t len)
+static uint32_t * initMapMem(int fd, uint64_t addr, uint32_t len)
 {
-    return (uint32_t *) mmap(0, len,
+    return (uint32_t *) mmap64(0, len,
        PROT_READ|PROT_WRITE|PROT_EXEC,
        MAP_SHARED|MAP_LOCKED,
        fd, addr);
@@ -13782,9 +13782,35 @@ unsigned gpioHardwareRevision(void)
             break;
 
          case 0x3:   /* BCM2711 */
+            DBG(DBG_USER, "searching /proc/device-tree/soc/ranges for peri base");
+            filp = fopen ("/proc/device-tree/soc/ranges", "r");
+
+            if (filp != NULL)
+            {
+               uint32_t tmp[3];
+               if (fread(&tmp, 4, 3, filp) == 3)
+               {
+                  pi_peri_phys = (uint64_t)ntohl(tmp[1]) << 32 | (uint64_t)ntohl(tmp[2]);
+               }
+
+               if (pi_peri_phys == 0x47c000000) /* high peri mode soc range returns main peri base instead of I/O peri base */
+               {
+                  pi_peri_phys = 0x47e000000; /* change to I/O peri base */
+               }
+            }
+
+            fclose(filp);
+
+            if ((pi_peri_phys != 0xFE000000) && (pi_peri_phys != 0x47E000000))
+            {
+               DBG(DBG_ALWAYS, "unknown peri base (%"PRIx64")", pi_peri_phys);
+               rev=0;
+               pi_ispi = 0;
+               break;
+            }
+
             pi_ispi = 1;
             piCores = 4;
-            pi_peri_phys = 0xFE000000;
             pi_dram_bus  = 0xC0000000;
             pi_mem_flag  = 0x04;
             pi_is_2711   = 1;
@@ -13804,7 +13830,7 @@ unsigned gpioHardwareRevision(void)
    }
 
    DBG(DBG_USER, "revision=%x", rev);
-   DBG(DBG_USER, "pi_peri_phys=%x", pi_peri_phys);
+   DBG(DBG_USER, "pi_peri_phys=%"PRIx64, pi_peri_phys);
    DBG(DBG_USER, "pi_dram_bus=%x", pi_dram_bus);
    DBG(DBG_USER, "pi_mem_flag=%x", pi_mem_flag);
 
