@@ -13797,9 +13797,9 @@ unsigned gpioHardwareRevision(void)
                {
                   pi_peri_phys = 0x47e000000; /* change to I/O peri base */
                }
-            }
 
-            fclose(filp);
+               fclose(filp);
+            }
 
             if ((pi_peri_phys != 0xFE000000) && (pi_peri_phys != 0x47E000000))
             {
