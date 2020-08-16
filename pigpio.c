@@ -13221,6 +13221,8 @@ int fileApprove(char *filename)
    buffer[0] = 0;
    match[0] = 0;
 
+   if (myPathBad(filename)) return PI_FILE_NONE;
+
    f = fopen("/opt/pigpio/access", "r");
 
    if (!f) return PI_FILE_NONE;
