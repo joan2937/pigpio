@@ -52,7 +52,7 @@ Examples of C pigpio programs.
 
 If your program is called foobar.c then build with
 
-gcc -Wall -pthread -o foobar foobar.c -lpigpio -lrt
+gcc -Wall -o foobar foobar.c -lpigpio
 
 ?3|freq_count_1|2014-08-20|Frequency Counter 1
 A program showing how to use the <a href="cif.html#gpioSetAlertFunc">gpioSetAlertFunc</a> function to set a callback for GPIO state changes.  A frequency count is generated for each monitored GPIO (frequencies up to 500kHz with a sample rate of 1&mu;s).
@@ -74,6 +74,9 @@ A program to display readings from the (I2C) PCF8591.
 
 ?3|pot_cap_charge_c|2014-03-14|Pot + Capacitor Recharge Timing
 Function to time capacitor charging (through a resistance).  The time can be used to estimate the resistance.
+
+?3|pps_c|2020-07-28|Pulse Per Second generator
+A program to generate a pulse on a GPIO every x seconds (1<=x<=60).  The pulse is synced with the wall time second boundary.
 
 ?3|rotary_encoder_c|2015-10-03|Rotary Encoder
 Function to decode a mechanical rotary encoder.
