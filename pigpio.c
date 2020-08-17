@@ -1572,6 +1572,9 @@ int myPathBad(char *name)
    in_part = 0;
    last_char_dot = 0;
 
+   if (strstr(name, "..")) return 1;
+   if (strstr(name, "\\.")) return 1;
+
    len = strlen(name);
 
    for (i=0; i<len; i++)
