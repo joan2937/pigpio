@@ -1288,7 +1288,7 @@ int i2c_process_call(int pi, unsigned handle, unsigned reg, uint32_t val)
    ext[0].ptr = &val;
 
    return pigpio_command_ext
-      (pi, PI_CMD_I2CPK, handle, reg, 4, 1, ext, 1);
+      (pi, PI_CMD_I2CPC, handle, reg, 4, 1, ext, 1);
 }
 
 int i2c_write_block_data(
