@@ -13282,7 +13282,7 @@ int fileOpen(char *file, unsigned mode)
 {
    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    int fd=-1;
-   int i, slot, oflag, omode;
+   int i, slot, oflag, omode, pmode, rmode;
    struct stat statbuf;
 
    DBG(DBG_USER, "file=%s mode=%d", file, mode);
@@ -13294,8 +13294,14 @@ int fileOpen(char *file, unsigned mode)
         ((mode & PI_FILE_RW) == 0) )
       SOFT_ERROR(PI_BAD_FILE_MODE, "bad mode (%d)", mode);
 
-   if ((fileApprove(file) & mode) == PI_FILE_NONE)
+   pmode = fileApprove(file); // 0=NONE, 1=READ, 2=WRITE, 3=RW
+   rmode = mode & PI_FILE_RW; // 0=NONE, 1=READ, 2=WRITE, 3=RW
+
+   if (((pmode & rmode) != rmode) || (rmode == PI_FILE_NONE))
       SOFT_ERROR(PI_NO_FILE_ACCESS, "no permission to access file (%s)", file);
+
+   if ((mode > 3) && ((mode & PI_FILE_WRITE) == 0))
+      SOFT_ERROR(PI_NO_FILE_ACCESS, "no permission to write file (%s)", file);
 
    slot = -1;
 
@@ -13320,7 +13326,6 @@ int fileOpen(char *file, unsigned mode)
 
    if (mode & PI_FILE_APPEND)
    {
-      mode |= PI_FILE_WRITE;
       oflag |= O_APPEND;
    }
 
@@ -13332,7 +13337,6 @@ int fileOpen(char *file, unsigned mode)
 
    if (mode & PI_FILE_TRUNC)
    {
-      mode |= PI_FILE_WRITE;
       oflag |= O_TRUNC;
    }
 
@@ -13517,7 +13521,7 @@ int fileList(char *fpat,  char *buf, unsigned count)
 
    CHECK_INITED;
 
-   if (fileApprove(fpat) == PI_FILE_NONE)
+   if ((fileApprove(fpat) & PI_FILE_READ) != PI_FILE_READ)
       SOFT_ERROR(PI_NO_FILE_ACCESS, "no permission to access file (%s)", fpat);
 
    bufpos = 0;
