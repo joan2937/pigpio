@@ -7335,7 +7335,7 @@ static int initGrabLockFile(void)
 static uint32_t * initMapMem(int fd, uint32_t addr, uint32_t len)
 {
     return (uint32_t *) mmap(0, len,
-       PROT_READ|PROT_WRITE|PROT_EXEC,
+       PROT_READ|PROT_WRITE,
        MAP_SHARED|MAP_LOCKED,
        fd, addr);
 }
