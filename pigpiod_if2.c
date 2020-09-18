@@ -234,7 +234,7 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
-static int pigpioOpenSocket(char *addrStr, char *portStr)
+static int pigpioOpenSocket(const char *addrStr, const char *portStr)
 {
    int sock, err, opt;
    struct addrinfo hints, *res, *rp;
@@ -685,7 +685,7 @@ void stop_thread(pthread_t *pth)
    }
 }
 
-int pigpio_start(char *addrStr, char *portStr)
+int pigpio_start(const char *addrStr, const char *portStr)
 {
    int pi;
    int *userdata;
