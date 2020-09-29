@@ -331,7 +331,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.46"
+VERSION = "1.78"  # sync minor number to pigpio library version
 
 exceptions = True
 
