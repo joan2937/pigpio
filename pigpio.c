@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 77 */
+/* pigpio version 78 */
 
 /* include ------------------------------------------------------- */
 
@@ -7335,7 +7335,7 @@ static int initGrabLockFile(void)
 static uint32_t * initMapMem(int fd, uint32_t addr, uint32_t len)
 {
     return (uint32_t *) mmap(0, len,
-       PROT_READ|PROT_WRITE|PROT_EXEC,
+       PROT_READ|PROT_WRITE,
        MAP_SHARED|MAP_LOCKED,
        fd, addr);
 }
@@ -13742,8 +13742,8 @@ unsigned gpioHardwareRevision(void)
             rev = ntohl(tmp);
             rev &= 0xFFFFFF; /* mask out warranty bit */
          }
+         fclose(filp);
       }
-      fclose(filp);
    }
 
    piCores = 0;
