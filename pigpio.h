@@ -3071,7 +3071,7 @@ pages 165-166 of the Broadcom peripherals document for full
 details.
 
 SSSSS @ number of bytes successfully copied to transmit FIFO
-RRRRR @ number of bytes in receieve FIFO
+RRRRR @ number of bytes in receive FIFO
 TTTTT @ number of bytes in transmit FIFO
 RB    @ receive busy
 TE    @ transmit FIFO empty
