@@ -3863,24 +3863,6 @@ param is an array of up to 10 parameters which may be referenced in
 the script as p0 to p9.
 D*/
 
-/*F*/
-int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
-/*D
-This function runs a stored script.
-
-. .
-script_id: >=0, as returned by [*gpioStoreScript*]
-   numPar: 0-10, the number of parameters
-    param: an array of parameters
-. .
-
-The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
-PI_TOO_MANY_PARAM.
-
-param is an array of up to 10 parameters which may be referenced in
-the script as p0 to p9.
-D*/
-
 
 
 /*F*/
