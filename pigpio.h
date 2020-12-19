@@ -27,6 +27,7 @@ For more information, please refer to <http://unlicense.org/>
 #ifndef PIGPIO_H
 #define PIGPIO_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <pthread.h>
 
