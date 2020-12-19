@@ -4116,7 +4116,7 @@ int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
    i2cInfo[slot].addr = i2cAddr;
    i2cInfo[slot].flags = i2cFlags;
    i2cInfo[slot].funcs = funcs;
-   i2cInfo[i].state = PI_I2C_OPENED;
+   i2cInfo[slot].state = PI_I2C_OPENED;
 
    return slot;
 }
