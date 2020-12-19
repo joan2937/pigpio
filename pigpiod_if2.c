@@ -2122,5 +2122,5 @@ int wait_for_event(int pi, unsigned event, double timeout)
 }
 
 int event_trigger(int pi, unsigned event)
-   {return pigpio_command(pi, PI_CMD_EVM, event, 0, 1);}
+   {return pigpio_command(pi, PI_CMD_EVT, event, 0, 1);}
 
