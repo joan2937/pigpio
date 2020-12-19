@@ -12488,8 +12488,11 @@ int gpioSetTimerFunc(unsigned id, unsigned millis, gpioTimerFunc_t f)
    if (id > PI_MAX_TIMER)
       SOFT_ERROR(PI_BAD_TIMER, "bad timer id (%d)", id);
 
-   if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
-      SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
+   if (f)
+   {
+      if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
+         SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
+   }
 
    intGpioSetTimerFunc(id, millis, f, 0, NULL);
 
