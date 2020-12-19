@@ -568,7 +568,8 @@ Return the PWM dutycycle in use on a GPIO.
 user_gpio: 0-31.
 . .
 
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+Returns current PWM dutycycle if OK,
+otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 For normal PWM the dutycycle will be out of the defined range
 for the GPIO (see [*get_PWM_range*]).
