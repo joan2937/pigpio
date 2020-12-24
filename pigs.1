@@ -929,10 +929,6 @@ buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
 .br
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
-.br
 The command sets the BSC mode and writes any data \fBbvs\fP
 to the BSC transmit FIFO.  It returns the data count (at least 1
 for the status word), the status word, followed by any data bytes
@@ -956,7 +952,7 @@ GPIO used for models other than those based on the BCM2711.
 .EX
       SDA   SCL   MOSI   SCLK   MISO   CE
 I2C   18    19    -      -      -      -
-SPI   -     -     18     19     20     21
+SPI   -     -     20     19     18     21
 
 .EE
 
@@ -968,7 +964,7 @@ GPIO used for models based on the BCM2711 (e.g. the Pi4B).
 .EX
       SDA   SCL   MOSI   SCLK   MISO   CE
 I2C   10    11    -      -      -      -
-SPI   -     -     10     11     9      8
+SPI   -     -     9      11     10     8
 
 .EE
 
@@ -1135,6 +1131,57 @@ $ pigs bscx 0x130305 22 33 44 55 66
 $ pigs i2crd 0 5
 .br
 5 22 33 44 55 66
+.br
+
+.EE
+
+.br
+The BSC slave in SPI mode deserializes data from the MOSI pin into its receiver/
+FIFO when the LSB of the first byte is a 0.  No data is output on the MISO pin.
+When the LSB of the first byte on MOSI is a 1, the transmitter/FIFO data is
+serialized onto the MISO pin while all other data on the MOSI pin is ignored.
+
+.br
+The BK bit of the BSC control register is non-functional when in the SPI mode.
+The transmitter along with its FIFO can be dequeued by successively disabling
+and re-enabling the TE bit on the BSC control register while in SPI mode.
+
+.br
+This example demonstrates a SPI master talking to the BSC as SPI slave:
+Requires SPI master SCLK / MOSI / MISO / CE GPIO are connected to
+BSC peripheral GPIO 11   / 9    / 10   / 8 respectively, on a Pi4B (BCM2711).
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspio 15 26 13 14 10000 0 # open bit-bang spi master on random gpio
+.br
+
+.br
+$ pigs bscx 0x303 # start BSC as SPI slave, both rx and tx enabled
+.br
+1 18
+.br
+
+.br
+$ pigs bspix 15 0 0xd 0xe 0xa 0xd # write 0xdead to BSC
+.br
+5 0 0 0 0 0
+.br
+
+.br
+$ pigs bscx 0x303 0xb 0xe 0xe 0xf # place 0xbeef in BSC tx FIFO, read rx FIFO
+.br
+5 262338 13 14 10 13
+.br
+
+.br
+$ pigs bspix 15 1 0 0 0 0 # read four bytes from BSC
+.br
+5 0 11 14 14 15
 .br
 
 .EE
