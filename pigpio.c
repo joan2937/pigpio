@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 78 */
+/* pigpio version 7802 */
 
 /* include ------------------------------------------------------- */
 
@@ -10924,7 +10924,7 @@ int bbI2CZip(
 
 void bscInit(int mode)
 {
-   int sda, scl, miso, ce;
+   int sda, scl, mosi, miso, ce;
 
    bscsReg[BSC_CR]=0; /* clear device */
    bscsReg[BSC_RSR]=0; /* clear underrun and overrun errors */
@@ -10934,32 +10934,39 @@ void bscInit(int mode)
 
    if (pi_is_2711)
    {
-      sda = BSC_SDA_MOSI_2711;
+      sda = BSC_SDA_2711;
       scl = BSC_SCL_SCLK_2711;
+      mosi = BSC_MOSI_2711;
       miso = BSC_MISO_2711;
       ce = BSC_CE_N_2711;
    }
    else
    {
-      sda = BSC_SDA_MOSI;
+      sda = BSC_SDA;
       scl = BSC_SCL_SCLK;
+      mosi = BSC_MOSI;
       miso = BSC_MISO;
       ce = BSC_CE_N;
    }
 
-   gpioSetMode(sda, PI_ALT3);
-   gpioSetMode(scl, PI_ALT3);
 
    if (mode > 1) /* SPI uses all GPIO */
    {
+      gpioSetMode(scl, PI_ALT3);
+      gpioSetMode(mosi, PI_ALT3);
       gpioSetMode(miso, PI_ALT3);
       gpioSetMode(ce, PI_ALT3);
+   }
+   else
+   {
+      gpioSetMode(scl, PI_ALT3);
+      gpioSetMode(sda, PI_ALT3);
    }
 }
 
 void bscTerm(int mode)
 {
-   int sda, scl, miso, ce;
+   int sda, scl, mosi, miso, ce;
 
    bscsReg[BSC_CR] = 0; /* clear device */
    bscsReg[BSC_RSR]=0; /* clear underrun and overrun errors */
@@ -10967,26 +10974,34 @@ void bscTerm(int mode)
 
    if (pi_is_2711)
    {
-      sda = BSC_SDA_MOSI_2711;
+      sda = BSC_SDA_2711;
       scl = BSC_SCL_SCLK_2711;
+      mosi = BSC_MOSI_2711;
       miso = BSC_MISO_2711;
       ce = BSC_CE_N_2711;
    }
    else
    {
-      sda = BSC_SDA_MOSI;
+      sda = BSC_SDA;
       scl = BSC_SCL_SCLK;
+      mosi = BSC_MOSI;
       miso = BSC_MISO;
       ce = BSC_CE_N;
    }
 
-   gpioSetMode(sda, PI_INPUT);
-   gpioSetMode(scl, PI_INPUT);
 
    if (mode > 1)
    {
+      gpioSetMode(scl, PI_INPUT);
+      gpioSetMode(mosi, PI_INPUT);
       gpioSetMode(miso, PI_INPUT);
       gpioSetMode(ce, PI_INPUT);
+   }
+   else
+   {
+      gpioSetMode(sda, PI_INPUT);
+      gpioSetMode(scl, PI_INPUT);
+
    }
 }
 
