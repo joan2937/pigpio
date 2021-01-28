@@ -13772,7 +13772,7 @@ unsigned gpioHardwareRevision(void)
 
    if ((rev & 0x800000) == 0) /* old rev code */
    {
-      if (rev < 0x0016) /* all BCM2835 */
+      if ((rev > 0) && (rev < 0x0016)) /* all BCM2835 */
       {
          pi_ispi = 1;
          piCores = 1;
