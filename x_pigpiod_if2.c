@@ -77,6 +77,10 @@ void t1(int pi)
    gpio_write(pi, GPIO, PI_HIGH);
    v = gpio_read(pi, GPIO);
    CHECK(1, 6, v, 1, 0, "write, read");
+
+   v = pigpio_start(PI_DEFAULT_SOCKET_ADDR_STR, PI_DEFAULT_SOCKET_PORT_STR);
+   CHECK(1, 7, v, 31, 100, "pigpio_start with non-default arguments");
+   pigpio_stop(v);
 }
 
 int t2_count=0;

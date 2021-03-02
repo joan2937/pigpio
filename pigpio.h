@@ -27,10 +27,11 @@ For more information, please refer to <http://unlicense.org/>
 #ifndef PIGPIO_H
 #define PIGPIO_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 78
+#define PIGPIO_VERSION 79
 
 /*TEXT
 
@@ -802,14 +803,16 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* BSC GPIO */
 
-#define BSC_SDA_MOSI 18
+#define BSC_SDA      18
+#define BSC_MOSI     20
 #define BSC_SCL_SCLK 19
-#define BSC_MISO     20
+#define BSC_MISO     18
 #define BSC_CE_N     21
 
-#define BSC_SDA_MOSI_2711 10
+#define BSC_SDA_2711      10
+#define BSC_MOSI_2711      9
 #define BSC_SCL_SCLK_2711 11
-#define BSC_MISO_2711      9
+#define BSC_MISO_2711     10
 #define BSC_CE_N_2711      8
 
 /* Longest busy delay */
@@ -2977,9 +2980,6 @@ The output process is simple. You simply append data to the FIFO
 buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
 The function sets the BSC mode, writes any data in
 the transmit buffer to the BSC transmit FIFO, and
 copies any data in the BSC receive FIFO to the
@@ -3012,13 +3012,13 @@ GPIO used for models other than those based on the BCM2711.
 
     @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
 I2C @ 18  @ 19  @ -    @ -    @ -    @ -
-SPI @ -   @ -   @ 18   @ 19   @ 20   @ 21
+SPI @ -   @ -   @ 20   @ 19   @ 18   @ 21
 
 GPIO used for models based on the BCM2711 (e.g. the Pi4B).
 
     @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
 I2C @ 10  @ 11  @ -    @ -    @ -    @ -
-SPI @ -   @ -   @ 10   @ 11   @ 9    @ 8
+SPI @ -   @ -   @ 9    @ 11   @ 10   @ 8
 
 When a zero control word is received the used GPIO will be reset
 to INPUT mode.
@@ -3071,7 +3071,7 @@ pages 165-166 of the Broadcom peripherals document for full
 details.
 
 SSSSS @ number of bytes successfully copied to transmit FIFO
-RRRRR @ number of bytes in receieve FIFO
+RRRRR @ number of bytes in receive FIFO
 TTTTT @ number of bytes in transmit FIFO
 RB    @ receive busy
 TE    @ transmit FIFO empty
@@ -3098,6 +3098,17 @@ if (status >= 0)
    // process transfer
 }
 ...
+
+The BSC slave in SPI mode deserializes data from the MOSI pin into its
+receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+transmitter/FIFO data is serialized onto the MISO pin while all other data
+on the MOSI pin is ignored.
+
+The BK bit of the BSC control register is non-functional when in the SPI
+mode.  The transmitter along with its FIFO can be dequeued by successively
+disabling and re-enabling the TE bit on the BSC control register while in
+SPI mode.
 D*/
 
 /*F*/
@@ -3843,24 +3854,6 @@ The function returns a script id if the script is valid,
 otherwise PI_BAD_SCRIPT.
 D*/
 
-
-/*F*/
-int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
-/*D
-This function runs a stored script.
-
-. .
-script_id: >=0, as returned by [*gpioStoreScript*]
-   numPar: 0-10, the number of parameters
-    param: an array of parameters
-. .
-
-The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
-PI_TOO_MANY_PARAM.
-
-param is an array of up to 10 parameters which may be referenced in
-the script as p0 to p9.
-D*/
 
 /*F*/
 int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);

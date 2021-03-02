@@ -3604,9 +3604,6 @@ class pi():
       buffer on the chip.  This works like a queue, you add data to the
       queue and the master removes it.
 
-      I can't get SPI to work properly.  I tried with a
-      control word of 0x303 and swapped MISO and MOSI.
-
       The function sets the BSC mode, writes any data in
       the transmit buffer to the BSC transmit FIFO, and
       copies any data in the BSC receive FIFO to the
@@ -3627,13 +3624,13 @@ class pi():
 
           @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
       I2C @ 18  @ 19  @ -    @ -    @ -    @ -
-      SPI @ -   @ -   @ 18   @ 19   @ 20   @ 21
+      SPI @ -   @ -   @ 20   @ 19   @ 18   @ 21
 
       GPIO used for models based on the BCM2711 (e.g. the Pi4B).
 
           @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
       I2C @ 10  @ 11  @ -    @ -    @ -    @ -
-      SPI @ -   @ -   @ 10   @ 11   @ 9    @ 8
+      SPI @ -   @ -   @ 9    @ 11   @ 10   @ 8
 
       When a zero control word is received the used GPIO will be reset
       to INPUT mode.
@@ -3677,7 +3674,7 @@ class pi():
       details.
 
       SSSSS @ number of bytes successfully copied to transmit FIFO
-      RRRRR @ number of bytes in receieve FIFO
+      RRRRR @ number of bytes in receive FIFO
       TTTTT @ number of bytes in transmit FIFO
       RB    @ receive busy
       TE    @ transmit FIFO empty
@@ -3688,6 +3685,50 @@ class pi():
 
       ...
       (status, count, data) = pi.bsc_xfer(0x330305, "Hello!")
+      ...
+
+      The BSC slave in SPI mode deserializes data from the MOSI pin into its
+      receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+      the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+      transmitter/FIFO data is serialized onto the MISO pin while all other data
+      on the MOSI pin is ignored.
+
+      The BK bit of the BSC control register is non-functional when in the SPI
+      mode.  The transmitter along with its FIFO can be dequeued by successively
+      disabling and re-enabling the TE bit on the BSC control register while in
+      SPI mode.
+
+      This example demonstrates a SPI master talking to the BSC as SPI slave:
+      Requires SPI master SCLK / MOSI / MISO / CE GPIO are connected to
+      BSC peripheral GPIO 11   / 9    / 10   / 8 respectively, on a Pi4B (BCM2711).
+
+      ...
+      #!/usr/bin/env python
+
+      import pigpio
+
+      # Choose some random GPIO for the bit-bang SPI master
+      CE=15
+      MISO=26
+      MOSI=13
+      SCLK=14
+
+      pi = pigpio.pi()
+      if not pi.connected:
+         exit()
+
+      pi.bb_spi_open(CE, MISO, MOSI, SCLK, 10000, 0) # open SPI master
+      pi.bsc_xfer(0x303, []) # start BSC as SPI slave
+      pi.bb_spi_xfer(CE, '\0' + 'hello') # write 'hello' to BSC
+      status, count, bsc_data = pi.bsc_xfer(0x303, 'world')
+      print bsc_data # hello
+      count, spi_data = pi.bb_spi_xfer(CE, [1,0,0,0,0,0])
+      print spi_data # world
+
+      pi.bsc_xfer(0, [])
+      pi.bb_spi_close(CE)
+
+      pi.stop()
       ...
       """
       # I p1 control
@@ -3715,9 +3756,6 @@ class pi():
    def bsc_i2c(self, i2c_address, data=[]):
       """
       This function allows the Pi to act as a slave I2C device.
-
-      This function is not available on the BCM2711 (e.g. as
-      used in the Pi4B).
 
       The data bytes (if any) are written to the BSC transmit
       FIFO and the bytes in the BSC receive FIFO are returned.

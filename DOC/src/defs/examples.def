@@ -511,6 +511,13 @@ pip install nrf24
 ?4|https://github.com/bjarne-hansen/py-nrf24|2020-04-20|NRF24
 Code and example usage of the Pypi NRF24 module.  Cleaned up and added support for reading from multiple pipes using open_reading_pipe(pipe, address) and open_writing_pipe(address) in order to be more "compatible" with the way NRF24 is used on Arduinos.
 
+?4|https://github.com/paulvee/pigpio-serial-bb-examples|2020-11-16|bit bang serial RX
+Example code showing how to use the bit banged serial links.
+
+One example shows how to read the serial data from an Arduino based counter, that sends results every 1,000 or 10,000 seconds.
+
+Another example shows how to parse into sentences the NMEA stream coming from a U-Blox GPS module.
+
 ?4|https://github.com/stripcode/pigpio-stepper-motor|2016-08-12|Stepper Motor
 Stepper motor code.
 

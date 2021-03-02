@@ -234,7 +234,7 @@ static int pigpio_command_ext
    return cmd.res;
 }
 
-static int pigpioOpenSocket(char *addrStr, char *portStr)
+static int pigpioOpenSocket(const char *addrStr, const char *portStr)
 {
    int sock, err, opt;
    struct addrinfo hints, *res, *rp;
@@ -685,7 +685,7 @@ void stop_thread(pthread_t *pth)
    }
 }
 
-int pigpio_start(char *addrStr, char *portStr)
+int pigpio_start(const char *addrStr, const char *portStr)
 {
    int pi;
    int *userdata;
@@ -2122,5 +2122,5 @@ int wait_for_event(int pi, unsigned event, double timeout)
 }
 
 int event_trigger(int pi, unsigned event)
-   {return pigpio_command(pi, PI_CMD_EVM, event, 0, 1);}
+   {return pigpio_command(pi, PI_CMD_EVT, event, 0, 1);}
 

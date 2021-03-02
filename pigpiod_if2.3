@@ -716,7 +716,7 @@ No value is returned.
 .br
 The thread to be stopped should have been started with \fBstart_thread\fP.
 
-.IP "\fBint pigpio_start(char *addrStr, char *portStr)\fP"
+.IP "\fBint pigpio_start(const char *addrStr, const char *portStr)\fP"
 .IP "" 4
 Connect to the pigpio daemon.  Reserving command and
 notification streams.
@@ -949,7 +949,8 @@ user_gpio: 0-31.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+Returns current PWM dutycycle if OK,
+otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 .br
 
@@ -6216,12 +6217,6 @@ queue and the master removes it.
 .br
 
 .br
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
-.br
-
-.br
 The function sets the BSC mode, writes any data in
 the transmit buffer to the BSC transmit FIFO, and
 copies any data in the BSC receive FIFO to the
@@ -6306,7 +6301,7 @@ GPIO used for models other than those based on the BCM2711.
 .br
 I2C   18    19    -      -      -      -
 .br
-SPI   -     -     18     19     20     21
+SPI   -     -     20     19     18     21
 .br
 
 .br
@@ -6321,7 +6316,7 @@ GPIO used for models based on the BCM2711 (e.g. the Pi4B).
 .br
 I2C   10    11    -      -      -      -
 .br
-SPI   -     -     10     11     9      8
+SPI   -     -     9      11     10     8
 .br
 
 .br
@@ -6417,7 +6412,7 @@ details.
 .br
 SSSSS   number of bytes successfully copied to transmit FIFO
 .br
-RRRRR   number of bytes in receieve FIFO
+RRRRR   number of bytes in receive FIFO
 .br
 TTTTT   number of bytes in transmit FIFO
 .br
@@ -6475,6 +6470,23 @@ if (status >= 0)
 .br
 
 .EE
+
+.br
+
+.br
+The BSC slave in SPI mode deserializes data from the MOSI pin into its
+receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+transmitter/FIFO data is serialized onto the MISO pin while all other data
+on the MOSI pin is ignored.
+
+.br
+
+.br
+The BK bit of the BSC control register is non-functional when in the SPI
+mode.  The transmitter along with its FIFO can be dequeued by successively
+disabling and re-enabling the TE bit on the BSC control register while in
+SPI mode.
 
 .IP "\fBint bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer)\fP"
 .IP "" 4
