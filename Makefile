@@ -25,7 +25,9 @@ OBJ3     = pigpiod_if2.o command.o
 
 LIB      = $(LIB1) $(LIB2) $(LIB3)
 
-ALL     = $(LIB) x_pigpio x_pigpiod_if x_pigpiod_if2 pig2vcd pigpiod pigs
+TESTS    = x_pigpio x_pigpiod_if x_pigpiod_if2 x_pigpio_clock
+
+ALL      = $(LIB) $(TESTS) pig2vcd pigpiod pigs
 
 LL1      = -L. -lpigpio -pthread -lrt
 
@@ -43,6 +45,47 @@ mandir = $(prefix)/man
 all:	$(ALL)
 
 lib:	$(LIB)
+
+test:	$(TESTS) pigpiod
+	$(warning 'make test' requires 'sudo')
+	@echo "*** WARNING ************************************************"
+	@echo "*                                                          *"
+	@echo "* Most tests make extensive use of gpio 25 (pin 22).       *"
+	@echo "* Ensure that either nothing or just a LED is connected to *"
+	@echo "* gpio 25 before running any of the tests.                 *"
+	@echo "*                                                          *"
+	@echo "************************************************************"
+	@echo ""
+	@echo "when prepared, run 'sudo make test-really'"
+	@echo ""
+	@echo "killing any running pigpiod"
+	-kill $(shell cat /var/run/pigpio.pid) 2>/dev/null
+	sleep 1
+	@echo ""
+	@echo "running test(s), which don't need any gpio pin"
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpio_clock
+
+
+test-really:	$(TESTS) pigpiod
+	$(warning 'make test' requires 'sudo')
+	echo "************************************************************"
+	echo "* Some tests are statistical in nature and so may on       *"
+	echo "* occasion fail.  Repeated failures on the same test or    *"
+	echo "* many failures in a group of tests indicate a problem.    *"
+	echo "************************************************************"
+	@echo "killing any running pigpiod"
+	-kill $(shell cat /var/run/pigpio.pid) 2>/dev/null
+	sleep 1
+	@echo ""
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpio_clock
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpio
+	export LD_LIBRARY_PATH=$$(pwd); ./pigpiod
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpiod_if  # test the C I/F to the pigpio daemon
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpiod_if2 # test the C I/F to the pigpio daemon
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigpio.py   # test the Python I/F to the pigpio daemon
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pigs        # test the socket I/F to the pigpio daemon
+	export LD_LIBRARY_PATH=$$(pwd); ./x_pipe        # test the pipe I/F to the pigpio daemon
+
 
 pigpio.o: pigpio.c pigpio.h command.h custom.cext
 	$(CC) $(CFLAGS) -fpic -c -o pigpio.o pigpio.c
@@ -64,6 +107,9 @@ x_pigpiod_if:	x_pigpiod_if.o $(LIB2)
 
 x_pigpiod_if2:	x_pigpiod_if2.o $(LIB3)
 	$(CC) -o x_pigpiod_if2 x_pigpiod_if2.o $(LL3)
+
+x_pigpio_clock:	x_pigpio_clock.o $(LIB1)
+	$(CC) -o x_pigpio_clock x_pigpio_clock.o $(LL1)
 
 pigpiod:	pigpiod.o $(LIB1)
 	$(CC) -o pigpiod pigpiod.o $(LL1)
