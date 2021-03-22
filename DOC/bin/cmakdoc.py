@@ -228,44 +228,67 @@ while True:
 
    elif line == "/*F*/\n":
       in_code = False
-      fdef=""
+      func_def=""
       line = get_line(f)
       at = FUNC
 
    elif line == "/*D\n":
       # Function definition should be complete.
-      fdef = fdef.replace("\n", " ")
+      func_def = func_def.replace("\n", " ")
 
-      while fdef.find("  ") != -1:
-         fdef = fdef.replace("  ", " ")
+      # Function definition should be complete.  Normalise definition
 
-      fdef = fdef.replace("( ", "(")
+      func_def = func_def.replace("\n", " ")
 
-      (rf, sep1, end1) = fdef.partition("(")
+      while func_def.find("  ") != -1:
+         func_def = func_def.replace("  ", " ")
+
+      func_def = func_def.replace("( ", "(")
+      func_def = func_def.replace(" (", "(")
+
+      (rf, sep1, end1) = func_def.partition("(")
       (parl, sep2, end2) = end1.partition(")")
       tps = parl.split(",")
       rf = rf.split(" ")
-      ret = rf[0]
-      func = rf[1]
+
+      if len(rf) > 2: # const
+         const = rf[0]+" "
+         ret = rf[1]
+         func = rf[2]
+      else:
+         const = ""
+         ret = rf[0]
+         func = rf[1]
 
       if ret not in param_used:
          param_used.append(ret)
 
       if man:
-         t = "\\fB" + ret + " " + func + "(" + parl + ")\\fP"
+         t = "\\fB" + const + ret + " " + func + "(" + parl + ")\\fP"
          emit("\n.IP \"{}\"\n.IP \"\" 4\n".format(t))
       else:
          emit("<h3><a name=\"{}\"></a><a href=\"#{}\"><small>{}</small></a> {}".
-            format(nostar(func), ret, ret,func))
+            format(nostar(func), ret, const + ret, func))
          emit("<small>(")
 
       x = 0
       for tp in tps:
          tp = tp.strip()
-         (t, sep3, p) = tp.partition(" ")
-         t = t.strip()
-         p = p.strip()
-         if (p != ""):
+         tp = tp.split()
+
+         if len(tp) < 2:
+            t=tp[0]
+            p=""
+         elif len(tp) == 2:
+            t = tp[0]
+            tf = tp[0]
+            p = tp[1]
+         else:
+            t = tp[-2]
+            tf = tp[-3] + " "+ tp[-2]
+            p = tp[-1]
+
+         if p != "":
             if p not in param_used:
                param_used.append(p)
             if t not in param_used:
@@ -284,7 +307,7 @@ while True:
             else:
 
                emit("<a href=\"#{}\">{}</a> <a href=\"#{}\">{}</a>".
-                  format(t, t, p, p))
+                  format(t, tf, p, p))
 
          else:
 
@@ -499,7 +522,7 @@ while True:
                   format(func.replace("_", " ")))
 
    elif at == FUNC:
-      fdef += line
+      func_def += line
 
    elif at == DESC:
       emit(line)
