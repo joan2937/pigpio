@@ -6,7 +6,7 @@ pigpio_m1="""
 .\" Process this file with
 .\" groff -man -Tascii pigpio.3
 .\"
-.TH pigpio 3 2012-2020 Linux "pigpio archive"
+.TH pigpio 3 2012-2021 Linux "pigpio archive"
 .SH NAME
 pigpio - A C library to manipulate the Pi's GPIO.\n
 .SH SYNOPSIS\n
@@ -21,7 +21,7 @@ pigpiod_if_m1="""
 .\" Process this file with
 .\" groff -man -Tascii pigpiod_if.3
 .\"
-.TH pigpiod_if 3 2012-2020 Linux "pigpio archive"
+.TH pigpiod_if 3 2012-2021 Linux "pigpio archive"
 .SH NAME
 pigpiod_if - A C library to interface to the pigpio daemon.\n
 .SH SYNOPSIS\n
@@ -36,7 +36,7 @@ pigpiod_if2_m1="""
 .\" Process this file with
 .\" groff -man -Tascii pigpiod_if2.3
 .\"
-.TH pigpiod_if2 3 2012-2020 Linux "pigpio archive"
+.TH pigpiod_if2 3 2012-2021 Linux "pigpio archive"
 .SH NAME
 pigpiod_if2 - A C library to interface to the pigpio daemon.\n
 .SH SYNOPSIS\n
@@ -51,7 +51,7 @@ pigpiod_m1="""
 .\" Process this file with
 .\" groff -man -Tascii pigpiod.1
 .\"
-.TH pigpiod 1 2012-2020 Linux "pigpio archive"
+.TH pigpiod 1 2012-2021 Linux "pigpio archive"
 .SH NAME
 pigpiod - A utility to start the pigpio library as a daemon.\n
 .SH SYNOPSIS\n
@@ -63,7 +63,7 @@ pig2vcd_m1="""
 .\" Process this file with
 .\" groff -man -Tascii pig2vcd.1
 .\"
-.TH pig2vcd 1 2012-2020 Linux "pigpio archive"
+.TH pig2vcd 1 2012-2021 Linux "pigpio archive"
 .SH NAME
 pig2vd - A utility to convert pigpio notifications to VCD.\n
 .SH SYNOPSIS\n
