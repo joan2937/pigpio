@@ -5623,21 +5623,21 @@ static void sigHandler(int signum)
             case SIGCHLD:
                /* Used to notify threads of events */
                break;
-
+/*
             default:
                DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
                gpioTerminate();
-               exit(-1);
+               exit(-1);*/
          }
       }
    }
    else
    {
       /* exit */
-
+/*
       DBG(DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
       gpioTerminate();
-      exit(-1);
+      exit(-1);*/
    }
 }
 
