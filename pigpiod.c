@@ -390,8 +390,8 @@ int main(int argc, char **argv)
 
       /* request SIGHUP/SIGTERM from libarary for termination */
 
-      gpioSetSignalFunc(SIGHUP, terminate);
-      gpioSetSignalFunc(SIGTERM, terminate);
+      //gpioSetSignalFunc(SIGHUP, terminate);
+      //gpioSetSignalFunc(SIGTERM, terminate);
 
       /* sleep forever */
 
