@@ -592,8 +592,8 @@ user_gpio: 0-31.
     range: 25-40000.
 . .
 
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYRANGE,
-or PI_NOT_PERMITTED.
+Returns the actual range for the current gpio frequency if OK, 
+otherwise PI_BAD_USER_GPIO, PI_BAD_DUTYRANGE, or PI_NOT_PERMITTED.
 
 Notes
 

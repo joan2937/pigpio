@@ -14023,6 +14023,7 @@ uint32_t gpioCfgGetInternals(void)
 
 int gpioCfgSetInternals(uint32_t cfgVal)
 {
+   if (libInitialised) return PI_INITIALISED;
    gpioCfg.internals = cfgVal;
    gpioCfg.dbgLevel = cfgVal & 0xF;
    gpioCfg.alertFreq = (cfgVal>>4) & 0xF;
