@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-/* pigpio version 79 */
+/* pigpio version 80 */
 
 /* include ------------------------------------------------------- */
 
@@ -12056,7 +12056,7 @@ int gpioNotifyOpenWithSize(int bufSize)
    gpioNotify[slot].pipe  = 1;
    gpioNotify[slot].max_emits  = MAX_EMITS;
    gpioNotify[slot].lastReportTick = gpioTick();
-   gpioNotify[i].state = PI_NOTIFY_OPENED;
+   gpioNotify[slot].state = PI_NOTIFY_OPENED;
 
    closeOrphanedNotifications(slot, fd);
 
