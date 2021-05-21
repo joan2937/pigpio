@@ -2078,6 +2078,9 @@ end of a cycle or finish before starting the new waveform.
 WARNING: bad things may happen if you delete the previous
 waveform before it has been synced to the new waveform.
 
+WARNING: bad things may happen if the same wave_id is queued
+more than once before it has finished sending.
+
 NOTE: Any hardware PWM started by [*gpioHardwarePWM*] will be cancelled.
 
 . .
