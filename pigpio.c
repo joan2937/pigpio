@@ -6067,7 +6067,7 @@ static void alertEmit(
                      newLevel = reportedLevel;
 
                   report[emit].seqno = seqno;
-                  report[emit].flags = 
+                  report[emit].flags =
                      PI_NTFY_FLAGS_EVENT | PI_NTFY_FLAGS_BIT(b);
                   report[emit].tick  = eTick;
                   report[emit].level = newLevel;
@@ -7395,7 +7395,7 @@ static int initPeripherals(void)
       else
          gpioCfg.DMAprimaryChannel = PI_DEFAULT_DMA_PRIMARY_CHANNEL;
    }
-      
+
    if (gpioCfg.DMAsecondaryChannel == PI_DEFAULT_DMA_NOT_SET)
    {
       if (pi_is_2711)
@@ -7403,7 +7403,7 @@ static int initPeripherals(void)
       else
          gpioCfg.DMAsecondaryChannel = PI_DEFAULT_DMA_SECONDARY_CHANNEL;
    }
-      
+
    dmaIn =  dmaReg + (gpioCfg.DMAprimaryChannel   * 0x40);
    dmaOut = dmaReg + (gpioCfg.DMAsecondaryChannel * 0x40);
 
@@ -7900,7 +7900,7 @@ static void initClock(int mainClock)
    }
 
    clkSrc  = CLK_CTL_SRC_PLLD;
-   clkDivI = clk_plld_freq / (10000000 / micros); /* 10 MHz - 1 MHz */ 
+   clkDivI = clk_plld_freq / (10000000 / micros); /* 10 MHz - 1 MHz */
    clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
    clkDivF = 0;
    clkMash = 0;
@@ -11423,7 +11423,7 @@ int bbSPIXfer(
    wfRx_lock(SCLK);
 
    bbSPIStart(w);
-     
+
    for (pos=0; pos < count; pos++)
    {
       outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
@@ -13722,10 +13722,16 @@ unsigned gpioHardwareRevision(void)
 
    if (rev) return rev;
 
-   filp = fopen ("/proc/cpuinfo", "r");
+   const char* env_rev_path = getenv("PIGPIO_REVISION_PATH");
 
+   if (env_rev_path == NULL)
+   {
+      env_rev_path = "/proc/cpuinfo";
+   }
 
-   if (filp != NULL)
+   filp = fopen (env_rev_path, "r");
+
+   if (filp != NULL && rev == 0)
    {
       while (fgets(buf, sizeof(buf), filp) != NULL)
       {
@@ -14033,4 +14039,3 @@ int gpioCfgSetInternals(uint32_t cfgVal)
 /* include any user customisations */
 
 #include "custom.cext"
-
