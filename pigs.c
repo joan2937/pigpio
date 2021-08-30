@@ -196,13 +196,13 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
             {
                ch = response_buf[i];
 
-               if (printFlags & PRINT_HEX) printf(" %hhx", ch);
+               if (printFlags & PRINT_HEX) printf(" %x", ch);
 
                else if (printFlags & PRINT_ASCII)
                {
                   if (isprint(ch) || (ch == '\n') || (ch == '\r'))
                      printf("%c", ch);
-                  else printf("\\x%02hhx", ch);
+                  else printf("\\x%02x", ch);
                }
                else printf(" %hhu", response_buf[i]);
             }
@@ -249,13 +249,13 @@ void print_result(int sock, int rv, cmdCmd_t cmd)
             {
                ch = response_buf[i];
 
-               if (printFlags & PRINT_HEX) printf(" %hhx", ch);
+               if (printFlags & PRINT_HEX) printf(" %x", ch);
 
                else if (printFlags & PRINT_ASCII)
                {
                   if (isprint(ch) || (ch == '\n') || (ch == '\r'))
                      printf("%c", ch);
-                  else printf("\\x%02hhx", ch);
+                  else printf("\\x%02x", ch);
                }
                else printf(" %hhu", response_buf[i]);
             }
