@@ -1240,6 +1240,9 @@ static uint32_t sockNetAddr[MAX_CONNECT_ADDRESSES];
 
 static int numSockNetAddr = 0;
 
+// apiMutex enforces atomic execution of an API on the socket interface
+static pthread_mutex_t apiMutex = PTHREAD_MUTEX_INITIALIZER;
+
 static uint32_t reportedLevel = 0;
 
 static int waveClockInited = 0;
@@ -1870,6 +1873,26 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
    bsc_xfer_t xfer;
    int masked;
    res = 0;
+   int protectedAPI;
+
+   switch (p[0])
+   {
+      /* Script APIs cannot be protected or they will deadlock. */
+      case PI_CMD_PROC:
+      case PI_CMD_PROCP:
+      case PI_CMD_PROCR:
+      case PI_CMD_PROCS:
+      case PI_CMD_PROCD:
+      case PI_CMD_PROCU:
+         protectedAPI = 0;
+         break;
+
+      default:
+         protectedAPI = 1;
+   }
+
+   if (protectedAPI)
+         pthread_mutex_lock(&apiMutex);
 
    switch (p[0])
    {
@@ -2516,6 +2539,10 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
          res = PI_UNKNOWN_COMMAND;
          break;
    }
+
+   if (protectedAPI)
+      pthread_mutex_unlock(&apiMutex);
+
 
    return res;
 }
