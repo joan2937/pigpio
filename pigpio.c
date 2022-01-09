@@ -7299,6 +7299,8 @@ static void initCheckLockFile(void)
    char str[20];
 
    fd = open(PI_LOCKFILE, O_RDONLY);
+   if(errno == ENOENT)
+      errno = 0; // reset if expected error occured
 
    if (fd != -1)
    {
