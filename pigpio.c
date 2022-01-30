@@ -8828,6 +8828,7 @@ static void stopHardwarePWM(void)
 int gpioSetMode(unsigned gpio, unsigned mode)
 {
    int reg, shift, old_mode;
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
    DBG(DBG_USER, "gpio=%d mode=%d", gpio, mode);
 
@@ -8838,6 +8839,8 @@ int gpioSetMode(unsigned gpio, unsigned mode)
 
    if (mode > PI_ALT3)
       SOFT_ERROR(PI_BAD_MODE, "gpio %d, bad mode (%d)", gpio, mode);
+
+   pthread_mutex_lock(&mutex);
 
    reg   =  gpio/10;
    shift = (gpio%10) * 3;
@@ -8852,6 +8855,8 @@ int gpioSetMode(unsigned gpio, unsigned mode)
    }
 
    gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
+
+   pthread_mutex_unlock(&mutex);
 
    return 0;
 }
