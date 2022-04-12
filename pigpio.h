@@ -1263,7 +1263,8 @@ Each GPIO can be independently set to one of 18 different PWM
 frequencies.
 
 The selectable frequencies depend upon the sample rate which
-may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5), set by
+[*gpioCfgClock*]
 
 The frequencies for each sample rate are:
 
