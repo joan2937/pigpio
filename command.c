@@ -201,7 +201,8 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_WVBSY, "WVBSY", 101, 2, 1}, // gpioWaveTxBusy
    {PI_CMD_WVCHA, "WVCHA", 197, 0, 0}, // gpioWaveChain
    {PI_CMD_WVCLR, "WVCLR", 101, 0, 1}, // gpioWaveClear
-   {PI_CMD_WVCRE, "WVCRE", 101, 2, 1}, // gpioWaveCreate
+   {PI_CMD_WVCRE, "WVCRE", 101, 2, 1}, // gpioWaveCreate 
+   {PI_CMD_WVCAP, "WVCAP", 112, 2, 1}, // gpioWaveCreatePad
    {PI_CMD_WVDEL, "WVDEL", 112, 0, 1}, // gpioWaveDelete
    {PI_CMD_WVGO,  "WVGO" , 101, 2, 0}, // gpioWaveTxStart
    {PI_CMD_WVGOR, "WVGOR", 101, 2, 0}, // gpioWaveTxStart
@@ -693,7 +694,7 @@ int cmdParse(
       case 112: /* BI2CC FC  GDC  GPW  I2CC  I2CRB
                    MG  MICS  MILS  MODEG  NC  NP  PADG PFG  PRG
                    PROCD  PROCP  PROCS  PRRG  R  READ  SLRC  SPIC
-                   WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
+                   WVCAP WVDEL  WVSC  WVSM  WVSP  WVTX  WVTXR  BSPIC
 
                    One positive parameter.
                 */

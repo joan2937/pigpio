@@ -1,0 +1,528 @@
+The following examples show various ways pigpio may be used to communicate with sensors via the GPIO.
+
+Although many are complete programs they are intended to be a starting point in producing your own code, not an end point.
+
+?0|Index
+
+?0|Hardware
+
+?0|Shell code
+
+?0|C code
+
+?0|C++ code
+
+?0|pigpiod_if2 code
+
+?0|Python code
+
+?0|Miscellaneous related code
+
+?0|External links
+
+?1|Hardware|Hardware
+
+A few practical examples of using pigpio with hardware.
+
+?2|ex_ir_remote|2013-06-09|IR Receiver
+Reading an infrared remote receiver.
+
+?2|ex_LDR|2013-06-09|Light Dependent Resistor
+Measuring brightness with a light dependent resistor (LDR). Improved methods of timing the start of the capacitor recharge are given for <a href="#C_pot_cap_charge_c">C</a> and <a href="#Python_pot_cap_py">Python</a>.
+
+?2|ex_motor_shield|2013-12-15|Motor Shield
+Using an Arduino motor shield.
+
+?2|ex_rotary_encoder|2013-06-09|Rotary Encoder
+Reading a rotary encoder.
+
+?2|ex_sonar_ranger|2013-06-10|Sonar Ranger
+Measuring range with a sonar ranger.
+
+?1|Shell|Shell code
+
+Examples of using pigpio with shell code.
+
+?3|gpiotest|2014-08-11|GPIO test
+This bash script tests the user GPIO. <a href="http://youtu.be/sCJFLKWaxHo">Video</a>
+
+?1|C|C code
+
+Examples of C pigpio programs.
+
+If your program is called foobar.c then build with
+
+gcc -Wall -o foobar foobar.c -lpigpio
+
+?3|freq_count_1|2014-08-20|Frequency Counter 1
+A program showing how to use the <a href="cif.html#gpioSetAlertFunc">gpioSetAlertFunc</a> function to set a callback for GPIO state changes.  A frequency count is generated for each monitored GPIO (frequencies up to 500kHz with a sample rate of 1&mu;s).
+
+?3|freq_count_2|2014-08-20|Frequency Counter 2
+A program showing how to use the <a href="cif.html#gpioSetGetSamplesFunc">gpioSetGetSamplesFunc</a> function to set a callback for accumulated GPIO state changes over the last millisecond.  A frequency count is generated for each monitored GPIO (frequencies up to 500kHz with a sample rate of 1&mu;s). Generally the method used is more complicated but more efficient than frequency counter 1.
+
+?3|hall|2014-06-13|Hall Effect Sensor
+Program to show status changes for a Hall effect sensor.
+
+?3|I2C_sniffer|2014-06-15|I2C Sniffer
+A program to passively sniff I2C transactions (100kHz bus maximum) and display the results.  This C program uses pigpio notifications.
+
+?3|ir_hasher_c|2015-02-25|IR Receiver
+Function to hash a code from an IR receiver (reading an IR remote control).
+
+?3|PCF8591|2014-08-26|PCF8591 YL-40
+A program to display readings from the (I2C) PCF8591.
+
+?3|pot_cap_charge_c|2014-03-14|Pot + Capacitor Recharge Timing
+Function to time capacitor charging (through a resistance).  The time can be used to estimate the resistance.
+
+?3|pps_c|2020-07-28|Pulse Per Second generator
+A program to generate a pulse on a GPIO every x seconds (1<=x<=60).  The pulse is synced with the wall time second boundary.
+
+?3|rotary_encoder_c|2015-10-03|Rotary Encoder
+Function to decode a mechanical rotary encoder.
+
+?3|rawMCP3008_c|2016-03-20|SPI bit bang MCP3008
+This program shows how to read multiple MCP3008 ADC simultaneously with accurately timed intervals.  One 10-bit channel of each ADC may be sampled at up to 25k samples per second.
+
+?3|rawMCP3202_c|2016-03-20|SPI bit bang MCP3202
+This program shows how to read multiple MCP3202 ADC simultaneously with accurately timed intervals.  One 12-bit channel of each ADC may be sampled at up to 25k samples per second.
+
+?3|rawMCP3XXX_c|2016-03-20|SPI bit bang MCP3008 and MCP3202
+This program shows how to read multiple MCP3008 and MCP3202 ADC simultaneously with accurately timed intervals.  One channel of each ADC may be sampled at up to 25k samples per second.  The 10-bit MCP3008 readings are multiplied by 4 so they have the same range (0-4095) as the 12-bit MCP3202.
+
+?3|servo_demo|2016-10-08|Servo Pulse Generator
+This program generates servo pulses on one or more GPIO.  Each connected servo is swept between 1000µs and 2000µs at a different speed.
+
+sudo ./servo_demo # Generate pulses on GPIO 4.
+
+sudo ./servo_demo 5 9 20 # Generate pulses on GPIO 5, 9, and 20.
+
+?4|code/spi-pigpio-speed.c|2016-11-06|SPI pigpio driver speed test
+This C code is used to benchmark the pigpio SPI driver on the Pi.  The code executes a given number of loops at a given baud rate and bytes per transfer.
+
+?3|wiegand_c|2013-12-30|Wiegand Reader
+Function to read a Wiegand Reader.
+
+?1|C++|C++ code
+
+Examples of C++ pigpio programs.
+
+If your program is called foobar.cpp then build with
+
+g++ -Wall -pthread -o foobar foobar.cpp -lpigpio -lrt
+
+?3|ir_hasher_cpp|2015-02-22|IR Receiver
+Class to hash a code from an IR receiver (reading an IR remote control).
+
+?3|rotary_encoder_cpp|2013-12-30|Rotary Encoder
+Class to decode a mechanical rotary encoder.
+
+?3|wiegand_cpp|2013-12-30|Wiegand Reader
+Class to read a Wiegand Reader.
+
+?1|pdif2|pigpiod_if2 code
+The pigpiod_if2 code examples are linked with libpigpiod_if2 and are written in C.
+
+The pigpiod_if2 library may be compiled and run on any Linux machine and allows control of the GPIO on one or more networked Pis.
+
+It should be possible to adapt the library to run on Macs and PCs.
+
+Each Pi needs the pigpio daemon to be running.  The pigpio daemon may be started with the command sudo pigpiod.
+
+?3|_433D|2015-11-17|433MHz Keyfob RX/TX
+Code to read and transmit 313 and 434 MHz key fob codes.  The codes to be read must use Manchester encoding.  The transmitted codes use Manchester encoding.
+
+./_433D -r10 # Print fob keycodes received on GPIO 10.
+
+./_433D -t5 8246184 # Transmit code on GPIO 5.
+
+./_433D -r10 -t5 8246184 # Transmit code on GPIO 5 then listen for codes
+
+./_433D -? for options.
+
+?3|DHTXXD|2016-02-16|DHT11/21/22/33/44 Sensor
+Code to read the DHT temperature and humidity sensors.  The sensor may be auto detected.  A DHT11 sensor may be read once per second.  The other sensors should not be read more often than once every three seconds.
+
+The code auto detects the DHT model and generally only the GPIO needs to be specified.
+
+./DHTXXD -g17 # Read a DHT connected to GPIO 17.
+
+./DHTXXD -g5 -i3 # Read a DHT connected to GPIO 5 every three seconds.
+
+./DHTXXD -? # for options.
+
+?3|RED|2015-11-18|Rotary Encoder
+Code to monitor a rotary encoder and show the position changes.  By default the detent changes are shown.  There is an option to show the four steps per detent instead.
+
+./RED -a7 -b8 -s30 # Show encoder on 7/8 detent changes for 30 seconds.
+
+./RED -a5 -b6 -m1 # Show encoder on 5/6 step changes forever.
+
+./RED -? # for options.
+
+?3|servo_demo_D|2016-10-08|Servo Pulse Generator
+This program generates servo pulses on one or more GPIO.  Each connected servo is swept between 1000µs and 2000µs at a different speed.
+
+./servo_demo_D # Generate pulses on GPIO 4.
+
+./servo_demo_D 5 9 20 # Generate pulses on GPIO 5, 9, and 20.
+
+?3|SRTED|2015-11-16|Sonar Ranger
+Code to read the SRF-04 and SRF-05 type of sonar rangers which use the trigger echo method of operation.  A 10 &mu;s trigger pulse initiates a series of high frequency sonar chirps.  The echo line then goes high and stays high until an echo from an object is received.  The echo high time is used to calculate the distance of the object.
+
+For a one-off reading only the trigger and echo GPIO need to be specified.
+
+./SRTED -t5 -e6 # Read a sonar ranger connected to GPIO 5/6.
+
+./SRTED -t11 -e5 -i0.1 # Read a sonar ranger connected to GPIO 11/5 every 0.1 seconds.
+
+./SRTED -? # for options.
+
+?3|tx_RED|2015-11-25|Transmit Rotary Encoder Test Signals
+Code to transmit quadrature signals to test rotary encoder software.
+
+tx_RED -aGPIO -bGPIO [options]
+
+tx_RED -? for options
+
+E.g.
+
+tx_RED -a5 -b6 -s20 -r-100
+
+?3|tx_WD|2015-11-25|Transmit Wiegand Test Signals
+Code to transmit Wiegand codes to test Wiegand decoder software.
+
+tx_WD -gGPIO -wGPIO [options] {code}+
+
+tx_WD -? for options
+
+E.g.
+
+tx_WD -g5 -w6 -s37 12345 67890 123 899999
+
+?3|WD|2015-11-25|Wiegand Reader
+Code to read a Wiegand Reader.
+
+./WD -g7 -w8 -s30 # Read Wiegand codes from GPIO 7/8 for 30 seconds.
+
+./WD -g5 -w6 # Read Wiegand codes from GPIO 5/6 forever.
+
+./WD -? # for options.
+
+?1|Python|Python code
+The Python code may be run on any Python machine and allows control of the GPIO on one or more networked Pis.
+
+The Python machine need not be a Pi, it may run Windows, Mac, Linux, anything as long as it supports Python.
+
+Each Pi needs the pigpio daemon to be running.  The pigpio daemon may be started with the command sudo pigpiod.
+
+?3|_433_py|2015-10-30|433MHz Keyfob RX/TX
+Classes to send and receive 433MHz wireless keyfob codes.  These keyfobs are widely used for remote control of devices.
+
+?3|_7_segment|2016-12-12|7-Segment LED Display Multiplexing
+Script to multiplex several 7-segment LED displays.  Each display has the segments a-g and the decimal point connected in parallel but has an individual enable GPIO (connected to the common anode or cathode).
+
+?3|test-APA102_py|2017-03-28|APA102 LED strip driver
+Script to drive an APA102 LED strip.  Three different methods are demonstrated - using spidev SPI (only works on the local Pi), pigpio SPI, and pigpio waves.  The SPI solutions only work with the dedicated SPI GPIO.  Waves may use any spare GPIO.  Four different examples are given including a LED strip clock.
+
+?3|BME280_py|2016-08-05|BME280 Sensor
+Class to read the relative humidity, temperature, and pressure from a BME280 sensor.  The sensor has both an I2C and a SPI interface which are both
+supported by the class.
+
+?4|code/DHT.py|2019-11-07|DHT11/21/22/33/44 Sensor
+Class to read the relative humidity and temperature from a DHT sensor.  It can automatically recognize the sensor type.
+
+The default script prints the reading from the specified DHT every 2 seconds.  E.g. ./DHT.py 22 27 displays the data for DHT connected to GPIO 22 and 27.
+
+The following data is printed for each DHT: timestamp, GPIO, status, temperature, and humidity.
+
+The timestamp is the number of seconds since the epoch (start of 1970).
+
+The status will be one of: 0 - a good reading, 1 - checksum failure, 2 - data had one or more invalid values, 3 - no response from sensor.
+
+?3|DHT22_py|2014-07-11|DHT22 AM2302 Sensor
+Class to read the relative humidity and temperature from a DHT22/AM2302 sensor.
+
+?3|DS18B20-1_py|2016-06-29|DS18B20 Temperature Sensor
+Script to read the temperature from any DS18B20 sensors connected to the 1-wire bus.
+
+To enable the 1-wire bus add the following line to /boot/config.txt and reboot.
+
+dtoverlay=w1-gpio
+
+By default you should connect the DS18B20 data line to GPIO 4 (pin 7).
+
+Connect 3V3 or 5V for power, ground to ground, 4k7 pull-up on data line to 3V3, and data line to GPIO 4.
+
+This script uses the file features of pigpio to access the remote file system.
+
+The following entry must be in /opt/pigpio/access.
+
+/sys/bus/w1/devices/28*/w1_slave r
+
+?3|PPD42NS_py|2015-11-22|Dust Sensor
+Class to read a Shinyei PPD42NS Dust Sensor, e.g. as used in the Grove dust sensor.
+
+?3|gpio_status_py|2014-06-12|GPIO Status
+Script to display the status of GPIO 0-31.
+
+?3|hall|2014-06-13|Hall Effect Sensor
+Program to show status changes for a Hall effect sensor.
+
+?3|HX711_py|2018-03-05|HX711 24-bit ADC
+Class to read the channels of a HX711 24-bit ADC.
+
+?3|i2c_ADXL345_py|2015-04-01|I2C ADXL345 Accelerometer
+Script to display the X, Y, and Z values read from an ADXL345 accelerometer.
+
+?3|i2c_HMC5883L_py|2015-04-01|I2C HMC5883L Magnetometer
+Script to display the X, Y, and Z values read from a HMC5883L Magnetometer (compass).
+
+?3|i2c_ITG3205_py|2015-04-01|I2C ITG3205 Gyroscope
+Script to display the X, Y, Z, and temperature values read from an ITG3205 gyroscope.
+
+?3|i2c_lcd_py|2016-04-20|I2C LCD Display
+Class to display text on a LCD character display.  The class supports the PCF8574T 8-bit I2C port expander connected to a HD44780 based LCD display.  These displays are commonly available in 16x2 and 20x4 character formats.
+
+?3|bsc_arduino_py|2016-10-31|I2C slave device
+This script demonstrates how to transfer messages from an Arduino acting as the I2C bus master to the Pi acting as an I2C slave device.
+
+?3|I2C_sniffer|2015-06-15|I2C Sniffer
+A program to passively sniff I2C transactions (100kHz bus maximum) and display the results.
+
+?3|i2c_sonar_py|2016-03-24|I2C Sonar
+A class to read up to 8 HC-SR04 sonar rangers connected to an MCP23017 port expander.
+
+?3|ir_hasher_py|2014-06-12|IR Receiver
+Class to hash a code from an IR receiver (reading an IR remote control).
+
+?3|irrp_py|2015-12-21|IR Record and Playback
+This script may be used to record and play back arbitrary IR codes.
+
+To record the GPIO connected to the IR receiver, a file for the recorded codes, and the codes to be recorded are given.
+
+E.g. ./irrp.py -r -g4 -fir-codes vol+ vol- 1 2 3 4 5 6 7 8 9 0
+
+To playback the GPIO connected to the IR transmitter, the file containing the recorded codes, and the codes to be played back are given.
+
+E.g. ./irrp.py -p -g18 -fir-codes 2 3 4
+
+./irrp.py -h # for options
+
+?3|kivy_GPIO_py|2016-12-11|Kivy GPIO control
+This example shows how to use Kivy to control a Pi's GPIO.  The GPIO may be configured as inputs, outputs, or to generate Servo or PWM pulses.  Kivy is an Open source Python library for rapid development of applications.
+
+?3|MAX6675_py|2016-05-02|MAX6675 SPI Temperature Sensor
+A script to read the temperature from a MAX6675 connected to a K-type thermocouple.  The MAX6675 supports readings in the range 0 - 1023.75 C.  Up to 4 readings may be made per second.
+
+?3|monitor_py|2016-09-17|Monitor GPIO
+Script to monitor GPIO for level changes.  By default all GPIO are monitored.  At a level change the GPIO, new level, and microseconds since the last change is printed.
+
+?3|morse_code_py|2015-06-17|Morse Code
+Script to transmit the morse code corresponding to a text string.
+
+?4|code/NRF24.py|2018-01-06|NRF24 radio transceiver
+Script to transmit and receive messages using the nRF24L01 radio transceiver.
+
+?3|PCA9685_py|2016-01-31|PCA9685 16 Channel PWM
+Class to control the 16 PWM channels of the I2C PCA9685. All channels use the same frequency.  The duty cycle or pulse width may be set independently for each channel.
+
+?3|PCF8591|2014-08-26|PCF8591 YL-40
+Script to display readings from the (I2C) PCF8591.
+
+?4|code/PPM.py|2016-02-19|PPM (Pulse Position Modulation) generation
+Script to generate PPM signals on a chosen GPIO.
+
+?4|code/PPM_to_servo.py|2019-10-09|PPM (Pulse Position Modulation) to servo pulses
+Script to read a PPM signal on a GPIO and generate the corresponding servo signals on chosen GPIO.
+
+?3|bench_1_py|2014-06-12|pigpio Benchmark
+Script to benchmark the pigpio Python module's performance.
+
+?3|pigpio_cgi_py|2015-05-04|pigpio CGI
+Script demonstrating how to access the pigpio daemon using CGI from a browser.  Instructions on how to use with Apache2 on the Pi are given in the comments.
+
+?3|playback_py|2016-12-23|Playback piscope recordings
+Script to playback GPIO data recorded in piscope format.
+
+To playback GPIO 4 to GPIO 4 from file data.piscope
+./playback.py data.piscope 4
+
+To playback GPIO 4 to GPIO 7 from file rec.txt
+./playback.py rec.txt 7=4
+
+?3|pot_cap_py|2016-09-26|Pot + Capacitor Recharge Timing
+Class to time capacitor charging (through a resistance).  The time can be used to estimate the resistance.
+
+?3|read_PWM_py|2015-12-08|PWM Monitor
+Class to monitor a PWM signal and calculate the frequency, pulse width, and duty cycle.
+
+?3|rotary_encoder_py|2014-06-12|Rotary Encoder
+Class to decode a mechanical rotary encoder.
+
+?3|read_RPM_py|2016-01-20|RPM Monitor
+Class to monitor speedometer pulses and calculate the RPM (Revolutions Per Minute).
+
+?3|Si7021_py|2016-05-07|Si7021 I2C Temperature and Humidity Sensor
+Class to read the temperature and relative humidity from a Si7021.
+
+?3|SPI_mon_py|2016-09-21|SPI Monitor
+A program to passively sniff SPI transactions and display the results.  The SPI rate should be limited to about 70kbps if using the default pigpio 5µs sampling rate.
+
+?3|servo_demo_py|2016-10-07|Servo Pulse Generator
+This script generates servo pulses on one or more GPIO.  Each connected servo is swept between 1000µs and 2000µs at a different speed.
+
+./servo_demo.py # Generate pulses on GPIO 4.
+
+./servo_demo.py 5 9 20 # Generate pulses on GPIO 5, 9, and 20.
+
+?3|sonar_trigger_echo_py|2014-06-12|Sonar Ranger
+Class to read sonar rangers with separate trigger and echo pins.
+
+?3|TCS3200_py|2015-07-03|TCS3200 Colour Sensor
+Class to read the TCS3200 colour sensor
+
+?3|vw|2015-10-31|Virtual Wire
+Class to send and receive radio messages compatible with the Virtual Wire library for Arduinos.  This library is commonly used with 313MHz and 434MHz radio tranceivers.
+
+?4|code/create_wave.py|2019-11-18|Wave create
+Script to generate waves from a template defined in a text file.
+
+You can also specify one of py, c, or pdif - the script output will then be a complete program to generate the wave (py for Python script, c for a C program, pdif for a C program using the pigpio daemon I/F).
+
+If none of py, c, or pdif are chosen the waveform will be generated for 30 seconds.
+
+Example text file
+
+# GPIO  levels
+23      11000001
+11      01110000
+12      00011100
+4       00000111
+
+To generate a pdif program with a bit time of 100 microseconds
+./create_wave.py wave_file 100 pdif >wave_pdif.c
+
+To just transmit the wave with a bit time of 50 microseconds
+./create_wave.py wave_file 50
+
+?3|wave_PWM_py|2016-03-19|Wave PWM 1
+Script to show how waves may be used to generate PWM at (one) arbitrary frequency on multiple GPIO.  For instance PWM at 10kHz may be generated with 100 steps between off and fully on.
+
+?3|wavePWM_py|2016-10-06|Wave PWM 2
+Class to generate PWM on multiple GPIO.  It is more flexible than the Wave PWM 1 example in that the start of the pulse within each cycle may be specified as well as the duty cycle.  The start and length of each pulse may be specified on a GPIO by GPIO basis in microseconds or as a fraction of the cycle time.  The class includes a __main__ to demostrate its ability to send servo pulses.
+
+?3|wiegand_py|2014-06-12|Wiegand Reader
+Class to read a Wiegand reader.
+
+?1|Misc|Miscellaneous related code
+
+The following code examples do not use pigpio.
+
+?3|adxl345_c|2014-03-12|ADXL345
+This C program reads x, y, and z accelerations from the ADXL345 via I2C address 0x53.
+
+?3|DS18B20_py|2016-04-25|DS18B20 Temperature Sensor
+This Python script reads the temperature from any DS18B20 sensors connected to the 1-wire bus.
+
+To enable the 1-wire bus add the following line to /boot/config.txt and reboot.
+
+dtoverlay=w1-gpio
+
+By default you should connect the DS18B20 data line to GPIO 4 (pin 7).
+
+Connect 3V3 or 5V for power, ground to ground, 4k7 pull-up on data line to 3V3, and data line to GPIO 4.
+
+?3|EasyAsPiServer|2014-09-15|Easy as Pi Server
+This Python class implements a simple server which allows broswer commands to be executed on the Pi.
+
+?3|minimal_clk|2015-05-20|Minimal Clock Access
+This C code sets GPIO 4 to a specified clock frequency.  The frequency can be set between 4.6875 kHz and 500 MHz (untested).  The clock can be preferentially set from one of the sources OSC (19.2MHz), HDMI (216MHz), PLLD (500MHz), or PLLC (1000MHz).  MASH can be set between 0 and 3.  MASH may not work properly for clock dividers less than 5.
+
+?3|minimal_gpio|2019-07-03|Minimal GPIO Access
+This C code has a minimal set of functions needed to control the GPIO and other Broadcom peripherals.  The program requires root privileges to run. See Tiny GPIO access for an alternative which controls the GPIO (but not the other peripherals) and does not require root access.
+
+The code has been updated for the BCM2711 (Pi4B).
+
+The following functions are provided.
+
+gpioInitialise
+gpioSetMode
+gpioGetMode
+gpioSetPullUpDown
+gpioRead
+gpioWrite
+gpioTrigger
+gpioReadBank1
+gpioReadBank2
+gpioClearBank1
+gpioClearBank2
+gpioSetBank1
+gpioSetBank2
+gpioHardwareRevision
+gpioTick
+
+?3|nanopulse_c|2014-01-29|Nanosecond Pulse Generation
+This C program uses the PWM peripheral to generate precisely timed pulses of very short duration.  Pulses as short as 4 nano seconds can be generated.
+
+?3|PCF8591-x|2014-08-26|PCF8591 YL-40
+C and Python code to read the (I2C) PCF8591.
+
+?4|code/spi-driver-speed.c|2016-11-06|SPI Linux driver speed test
+This C code is used to benchmark the Linux SPI driver on the Pi.  The code executes a given number of loops at a given baud rate and bytes per transfer.
+
+?3|tiny_gpio|2016-04-30|Tiny GPIO Access
+This C code has a minimal set of functions needed to control the GPIO without needing root privileges (it uses /dev/gpiomem to access the GPIO).
+
+You may need to change the permissions and ownership of /dev/gpiomem if they have not been correctly set up.
+
+sudo chown root:gpio /dev/gpiomem
+sudo chmod g+rw /dev/gpiomem
+
+The user (default pi) needs to be in the gpio group.
+
+sudo adduser pi gpio
+
+The following functions are provided.
+
+gpioInitialise
+gpioSetMode
+gpioGetMode
+gpioSetPullUpDown
+gpioRead
+gpioWrite
+gpioTrigger
+gpioReadBank1
+gpioReadBank2
+gpioClearBank1
+gpioClearBank2
+gpioSetBank1
+gpioSetBank2
+gpioHardwareRevision
+
+?1|External|External links
+
+Related code.
+
+?4|https://pypi.org/project/nrf24/|2020-04-20|NRF24
+Python Package Index (Pypi) NRF24 module.
+pip install nrf24
+
+?4|https://github.com/bjarne-hansen/py-nrf24|2020-04-20|NRF24
+Code and example usage of the Pypi NRF24 module.  Cleaned up and added support for reading from multiple pipes using open_reading_pipe(pipe, address) and open_writing_pipe(address) in order to be more "compatible" with the way NRF24 is used on Arduinos.
+
+?4|https://github.com/paulvee/pigpio-serial-bb-examples|2020-11-16|bit bang serial RX
+Example code showing how to use the bit banged serial links.
+
+One example shows how to read the serial data from an Arduino based counter, that sends results every 1,000 or 10,000 seconds.
+
+Another example shows how to parse into sentences the NMEA stream coming from a U-Blox GPS module.
+
+?4|https://github.com/stripcode/pigpio-stepper-motor|2016-08-12|Stepper Motor
+Stepper motor code.
+
+?4|https://github.com/choeffer/360pibot|2018-11-03|Parallax ActivityBot 360
+Python 3 implementation for programming a Parallax ActivityBot 360 Robot Kit with a Raspberry Pi.
+
+?1|Index|Index
+

@@ -1,0 +1,3508 @@
+INTRO
+
+The socket and pipe interfaces allow control of the Pi's GPIO by
+passing messages to the running pigpio library.
+
+The normal way to start the pigpio library would be as a daemon during boot.
+
+...
+sudo pigpiod
+...
+
+*Features*
+
+o hardware timed PWM on any of GPIO 0-31
+
+o hardware timed servo pulses on any of GPIO 0-31
+
+o reading/writing all of the GPIO in a bank as one operation
+
+o individually setting GPIO modes, reading and writing
+
+o notifications when any of GPIO 0-31 change state
+
+o the construction of output waveforms with microsecond timing
+
+o I2C, SPI, and serial link wrappers
+
+o creating and running scripts on the pigpio daemon
+
+*GPIO*
+
+ALL GPIO are identified by their Broadcom number.
+
+*Usage*
+
+pigs is a program and internally uses the socket interface to pigpio
+whereas /dev/pigpio uses the pipe interface.
+
+pigs and the pipe interface share the same commands and are invoked in
+a similar fashion from the command line.
+
+The pigpio library must be running, either by running a program linked
+with the library or starting the pigpio daemon (sudo pigpiod).
+
+pigs {command}+
+
+echo "{command}+" >/dev/pigpio
+
+pigs will show the result of the command on screen.
+
+The pigs process returns an exit status (which can be displayed with
+the command echo $?).
+
+...
+PIGS_OK            0
+PIGS_CONNECT_ERR 255
+PIGS_OPTION_ERR  254
+PIGS_SCRIPT_ERR  253 
+...
+
+The results of /dev/pigpio commands need to be read from /dev/pigout,
+e.g. cat /dev/pigout (try cat /dev/pigout& so that all subsequent
+results are shown on screen).
+
+In both cases if an error was detected a message will have been written
+to /dev/pigerr (try cat /dev/pigerr&).  This is likely to be more
+informative than the message returned by pigs or the error code
+returned by the pipe interface.
+
+Several commands may be entered on a line.  If present PROC and PARSE must
+be the last command on a line.
+
+E.g.
+
+...
+pigs w 22 1 mils 1000 w 22 0
+...
+
+is equivalent to
+
+...
+pigs w 22 1
+pigs mils 1000
+pigs w 22 0
+...
+
+and
+
+...
+echo "m 4 w w 4 0 mils 250 m 4 r r 4" >/dev/pigpio
+...
+
+is equivalent to
+
+...
+echo "m 4 w"    >/dev/pigpio
+echo "w 4 0"    >/dev/pigpio
+echo "mils 250" >/dev/pigpio
+echo "m 4 r"    >/dev/pigpio
+echo "r 4"      >/dev/pigpio
+...
+
+*Notes*
+
+The examples from now on will show the pigs interface but the same
+commands will also work on the pipe interface.
+
+pigs does not show the status of successful commands unless the
+command itself returns data.  The status (0) will be returned to
+pigs but will be discarded.
+
+The status/data of each command sent to the pipe interface should
+be read from /dev/pigout.
+
+When a command takes a number as a parameter it may be entered as hex
+(precede by 0x), octal (precede by 0), or decimal.
+
+E.g. 23 is 23 decimal, 0x100 is 256 decimal, 070 is 56 decimal.
+
+Some commands can return a variable number of data bytes.  By
+default this data is displayed as decimal.  The pigs -a option
+can be used to force the display as ASCII and the pigs -x
+option can be used to force the display as hex.
+
+E.g. assuming the transmitted serial data is the letters ABCDEONM
+
+...
+$ pigs slr 4 100
+8 65 66 67 68 69 79 78 77
+
+$ pigs -a slr 4 100
+8 ABCDEONM
+
+$ pigs -x slr 4 100
+8 41 42 43 44 45 4f 4e 4d
+...
+
+OVERVIEW
+
+BASIC
+
+M/MODES g m :: Set GPIO mode :: gpioSetMode
+MG/MODEG g  :: Get GPIO mode :: gpioGetMode
+
+PUD g p :: Set GPIO pull up/down :: gpioSetPullUpDown
+
+R/READ g    :: Read GPIO level  :: gpioRead
+W/WRITE g L :: Write GPIO level :: gpioWrite
+
+PWM (overrides servo commands on same GPIO)
+
+P/PWM u v :: Set GPIO PWM value      :: gpioPWM
+PFS u v   :: Set GPIO PWM frequency  :: gpioSetPWMfrequency
+PRS u v   :: Set GPIO PWM range      :: gpioSetPWMrange
+
+GDC u     :: Get GPIO PWM dutycycle  :: gpioGetPWMdutycycle
+PFG u     :: Get GPIO PWM frequency  :: gpioGetPWMfrequency
+PRG u     :: Get GPIO PWM range      :: gpioGetPWMrange
+
+PRRG u    :: Get GPIO PWM real range :: gpioGetPWMrealRange
+
+Servo (overrides PWM commands on same GPIO)
+
+S/SERVO u v :: Set GPIO servo pulsewidth :: gpioServo
+
+GPW u       :: Get GPIO servo pulsewidth :: gpioGetServoPulsewidth
+
+INTERMEDIATE
+
+TRIG u pl L :: Send a trigger pulse :: gpioTrigger
+
+WDOG u v    :: Set GPIO watchdog    :: gpioSetWatchdog
+
+BR1      :: Read bank 1 GPIO               :: gpioRead_Bits_0_31
+BR2      :: Read bank 2 GPIO               :: gpioRead_Bits_32_53
+
+BC1 bits :: Clear specified GPIO in bank 1 :: gpioWrite_Bits_0_31_Clear
+BC2 bits :: Clear specified GPIO in bank 2 :: gpioWrite_Bits_32_53_Clear
+
+BS1 bits :: Set specified GPIO in bank 1   :: gpioWrite_Bits_0_31_Set
+BS2 bits :: Set specified GPIO in bank 2   :: gpioWrite_Bits_32_53_Set
+
+ADVANCED
+
+NO        :: Request a notification :: gpioNotifyOpen
+NC h      :: Close notification     :: gpioNotifyClose
+NB h bits :: Start notification     :: gpioNotifyBegin
+NP h      :: Pause notification     :: gpioNotifyPause
+
+HC g cf     :: Set hardware clock frequency :: gpioHardwareClock
+
+HP g pf pdc :: Set hardware PWM frequency and dutycycle :: gpioHardwarePWM
+
+FG u stdy      :: Set a glitch filter on a GPIO  :: gpioGlitchFilter
+FN u stdy actv :: Set a noise filter on a GPIO   :: gpioNoiseFilter
+
+PADS pad padma :: Set pad drive strength :: gpioSetPad
+PADG pad       :: Get pad drive strength :: gpioGetPad
+
+SHELL name str :: Execute a shell command :: shell
+
+Custom
+
+CF1 uvs  :: Custom function 1 :: gpioCustom1
+CF2 uvs  :: Custom function 2 :: gpioCustom1
+
+Events
+
+EVM h bits :: Set events to monitor :: eventMonitor
+EVT event  :: Trigger event         :: eventTrigger
+
+Scripts
+
+PROC t         :: Store script                     :: gpioStoreScript
+PROCR sid pars :: Run script                       :: gpioRunScript
+PROCU sid pars :: Set script parameters            :: gpioUpdateScript
+PROCP sid      :: Get script status and parameters :: gpioScriptStatus
+PROCS sid      :: Stop script                      :: gpioStopScript
+PROCD sid      :: Delete script                    :: gpioDeleteScript
+
+PARSE t        :: Validate script                  :: gpioParseScript
+
+I2C
+
+I2CO ib id if :: Open I2C bus and device with flags :: i2cOpen
+I2CC h        :: Close I2C handle                   :: i2cClose
+
+I2CWQ h bit   :: smb Write Quick: write bit :: i2cWriteQuick
+
+I2CRS h       :: smb Read Byte: read byte   :: i2cReadByte
+I2CWS h bv    :: smb Write Byte: write byte :: i2cWriteByte
+
+I2CRB h r     :: smb Read Byte Data: read byte from register :: i2cReadByteData
+I2CWB h r bv  :: smb Write Byte Data: write byte to register :: i2cWriteByteData
+
+I2CRW h r     :: smb Read Word Data: read word from register :: i2cReadWordData
+I2CWW h r wv  :: smb Write Word Data: write word to register :: i2cWriteWordData
+
+I2CRK h r     :: smb Read Block Data: read data from register :: i2cReadBlockData
+I2CWK h r bvs :: smb Write Block Data: write data to register :: i2cWriteBlockData
+
+I2CWI h r bvs :: smb Write I2C Block Data                          :: i2cWriteI2CBlockData
+I2CRI h r num :: smb Read I2C Block Data: read bytes from register :: i2cReadI2CBlockData
+
+I2CRD h num   :: i2c Read device  :: i2cReadDevice
+I2CWD h bvs   :: i2c Write device :: i2cWriteDevice
+
+I2CPC h r wv  :: smb Process Call: exchange register with word             :: i2cProcessCall
+I2CPK h r bvs :: smb Block Process Call: exchange data bytes with register :: i2cBlockProcessCall
+
+I2CZ h bvs    :: Performs multiple I2C transactions :: i2cZip
+
+I2C BIT BANG
+
+BI2CO sda scl b :: Open bit bang I2C  :: bbI2COpen
+BI2CC sda       :: Close bit bang I2C :: bbI2CClose
+
+BI2CZ sda bvs   :: I2C bit bang multiple transactions :: bbI2CZip
+
+I2C/SPI SLAVE
+
+BSCX bctl bvs :: BSC I2C/SPI transfer :: bscXfer
+
+SERIAL
+
+SERO dev b sef :: Open serial device dev at baud b with flags :: serOpen
+SERC h         :: Close serial handle                         :: serClose
+
+SERRB          :: Read byte from serial handle  :: serReadByte
+SERWB h bv     :: Write byte to serial handle   :: serWriteByte
+
+SERR h num     :: Read bytes from serial handle :: serRead
+SERW h bvs     :: Write bytes to serial handle  :: serWrite
+
+SERDA h        :: Check for serial data ready to read :: serDataAvailable
+
+SERIAL BIT BANG (read only)
+
+SLRO u b db :: Open GPIO for bit bang serial data     :: gpioSerialReadOpen
+SLRC u      :: Close GPIO for bit bang serial data    :: gpioSerialReadClose
+
+SLRI u v    :: Sets bit bang serial data logic levels :: gpioSerialReadInvert
+
+SLR u num   :: Read bit bang serial data from GPIO    :: gpioSerialRead
+
+SPI
+
+SPIO c b spf :: SPI open channel at baud b with flags :: spiOpen
+SPIC h       :: SPI close handle                    :: spiClose
+
+SPIR h num   :: SPI read bytes from handle          :: spiRead
+SPIW h bvs   :: SPI write bytes to handle           :: spiWrite
+SPIX h bvs   :: SPI transfer bytes to handle        :: spiXfer
+
+SPI BIT BANG
+
+BSPIO cs miso mosi sclk b spf :: Open bit bang SPI      :: bbSPIOpen
+BSPIC cs                      ::  Close bit bang SPI    :: bbSPIClose
+
+BSPIX cs bvs                  ::  SPI bit bang transfer :: bbSPIXfer
+
+FILES
+
+FO file mode   :: Open a file in mode            :: fileOpen
+FC h           :: Close file handle              :: fileClose
+
+FR h num       :: Read bytes from file handle    :: fileRead
+FW h bvs       :: Write bytes to file handle     :: fileWrite
+
+FS h num from  :: Seek to file handle position   :: fileSeek
+
+FL pat num     :: List files which match pattern :: fileList
+
+WAVES
+
+WVCLR          :: Clear all waveforms :: gpioWaveClear
+
+WVNEW          :: Initialise a new waveform    :: gpioWaveAddNew
+WVAG trips     :: Add generic pulses to waveform :: gpioWaveAddGeneric
+WVAS u b db sb o bvs :: Add serial data to waveform    :: gpioWaveAddSerial
+
+WVCRE          :: Create a waveform   :: gpioWaveCreate
+WVCAP percent  :: Create a waveform of fixed size :: gpioWaveCreatePad
+WVDEL wid      :: Delete selected waveform :: gpioWaveDelete
+
+WVTX wid       :: Transmits waveform once       :: gpioWaveTxSend
+WVTXM wid wmde :: Transmits waveform using mode :: gpioWaveTxSend
+WVTXR wid      :: Transmits waveform repeatedly :: gpioWaveTxSend
+
+WVCHA bvs      :: Transmits a chain of waveforms :: gpioWaveChain
+
+WVTAT          :: Returns the current transmitting waveform :: gpioWaveTxAt
+
+WVBSY          :: Check if waveform is being transmitted :: gpioWaveTxBusy
+
+WVHLT          :: Stop waveform :: gpioWaveTxStop
+
+WVSC ws        :: Get waveform DMA CB stats    :: gpioWaveGetCbs
+WVSM ws        :: Get waveform time stats      :: gpioWaveGetMicros
+WVSP ws        :: Get waveform pulse stats     :: gpioWaveGetPulses
+
+UTILITIES
+
+H/HELP  :: Display command help        ::
+HWVER   :: Get hardware version        :: gpioHardwareRevision
+MICS v  :: Microseconds delay          :: gpioDelay
+MILS v  :: Milliseconds delay          :: gpioDelay
+PIGPV   :: Get pigpio library version  :: gpioVersion
+T/TICK  :: Get current tick            :: gpioTick
+
+CONFIGURATION
+
+CGI     :: Configuration get internals :: gpioCfgGetInternals
+CSI v   :: Configuration set internals :: gpioCfgSetInternals
+
+COMMANDS
+
+BC1 ::
+This command clears (sets low) the GPIO specified by [*bits*] in bank 1.
+Bank 1 consists of GPIO 0-31.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs bc1 0x400010 # clear GPIO 4 (1<<4) and 22 (1<<22)
+
+$ pigs bc1 32 # clear GPIO 5 (1<<5)
+-42
+ERROR: no permission to update one or more GPIO
+...
+
+BC2 ::
+This command clears (sets low) the GPIO specified by [*bits*] in bank 2.
+Bank 2 consists of GPIO 32-53.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs bc2 0x8000 # clear GPIO 47 (activity LED on A+/B+/Pi2/Pi3)
+
+$ pigs bc2 1 # clear GPIO 32 (first in bank 2)
+-42
+ERROR: no permission to update one or more GPIO
+...
+
+BI2CC ::
+This command signals that bit banging I2C on [*sda*] (and [*scl*]) is no
+longer required.
+
+...
+$ pigs bi2cc 5
+...
+
+BI2CO ::
+This command signals that GPIO [*sda*] and [*scl*] are to be used
+for bit banging I2C at [*b*] baud.
+
+Bit banging I2C allows for certain operations which are not possible
+with the standard I2C driver.
+
+o baud rates as low as 50 
+o repeated starts 
+o clock stretching 
+o I2C on any pair of spare GPIO
+
+The baud rate may be between 50 and 500000 bits per second.
+
+The GPIO used for SDA and SCL must have pull-ups to 3V3 connected.  As
+a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
+
+BI2CZ ::
+This function executes a sequence of bit banged I2C operations.  The
+operations to be performed are specified by the contents of [*bvs*]
+which contains the concatenated command codes and associated data.
+
+The following command codes are supported:
+
+Name    @ Cmd & Data   @ Meaning
+End     @ 0            @ No more commands
+Escape  @ 1            @ Next P is two bytes
+Start   @ 2            @ Start condition
+Stop    @ 3            @ Stop condition
+Address @ 4 P          @ Set I2C address to P
+Flags   @ 5 lsb msb    @ Set I2C flags to lsb + (msb << 8)
+Read    @ 6 P          @ Read P bytes of data
+Write   @ 7 P ...      @ Write P bytes of data
+
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+The address and flags default to 0.  The address and flags maintain
+their previous value until updated.
+
+No flags are currently defined.
+
+...
+Set address 0x53
+start, write 0x32, (re)start, read 6 bytes, stop
+Set address 0x1E
+start, write 0x03, (re)start, read 6 bytes, stop
+Set address 0x68
+start, write 0x1B, (re)start, read 8 bytes, stop
+End
+
+0x04 0x53
+0x02 0x07 0x01 0x32   0x02 0x06 0x06 0x03
+
+0x04 0x1E
+0x02 0x07 0x01 0x03   0x02 0x06 0x06 0x03
+
+0x04 0x68
+0x02 0x07 0x01 0x1B   0x02 0x06 0x08 0x03
+
+0x00
+...
+
+BR1 ::
+This command read GPIO 0-31 (bank 1) and returns the levels as a
+32-bit hexadecimal value.
+
+...
+$ pigs br1
+1001C1CF
+...
+
+BR2 ::
+This command read GPIO 32-53 (bank 2) and returns the levels as a
+32-bit hexadecimal value.
+
+...
+$ pigs br2
+003F0000
+...
+
+BS1 ::
+This command sets (sets high) the GPIO specified by [*bits*] in bank 1.
+Bank 1 consists of GPIO 0-31.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs bs1 16 # set GPIO 4 (1<<4)
+
+$ pigs bs1 1 # set GPIO 1 (1<<0)
+-42
+ERROR: no permission to update one or more GPIO
+...
+
+BS2 ::
+This command sets (sets high) the GPIO specified by [*bits*] in bank 2.
+Bank 2 consists of GPIO 32-53.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs bs2 0x40 # set GPIO 38 (enable high current mode A+/B+/Pi2/Pi3)
+
+$ pigs bs2 1 # set GPIO 32 (first in bank 2)
+-42
+ERROR: no permission to update one or more GPIO
+...
+
+BSCX ::
+
+This command performs a BSC I2C/SPI slave transfer as defined by
+[*bctl*] with data [*bvs*].
+
+This function provides a low-level interface to the SPI/I2C Slave
+peripheral on the BCM chip.
+
+This peripheral allows the Pi to act as a hardware slave device
+on an I2C or SPI bus.
+
+This is not a bit bang version and as such is OS timing
+independent. The bus timing is handled directly by the chip.
+
+The output process is simple. You simply append data to the FIFO
+buffer on the chip.  This works like a queue, you add data to the
+queue and the master removes it.
+
+The command sets the BSC mode and writes any data [*bvs*]
+to the BSC transmit FIFO.  It returns the data count (at least 1
+for the status word), the status word, followed by any data bytes
+read from the BSC receive FIFO.
+
+Note that the control word sets the BSC mode.  The BSC will stay in
+that mode until a different control word is sent.
+
+For I2C use a control word of (I2C address << 16) + 0x305.
+
+E.g. to talk as I2C slave with address 0x13 use 0x130305.
+
+GPIO used for models other than those based on the BCM2711.
+
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 18  @ 19  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 20   @ 19   @ 18   @ 21
+
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 10  @ 11  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 9    @ 11   @ 10   @ 8
+
+When a zero control word is received the used GPIO will be reset
+to INPUT mode.
+
+The control word consists of the following bits.
+
+. .
+22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ a  a  a  a  a  a  a  -  - IT HC TF IR RE TE BK EC ES PL PH I2 SP EN
+. .
+
+Bits 0-13 are copied unchanged to the BSC CR register.  See
+pages 163-165 of the Broadcom peripherals document for full
+details.
+
+aaaaaaa @ defines the I2C slave address (only relevant in I2C mode)
+IT      @ invert transmit status flags
+HC      @ enable host control
+TF      @ enable test FIFO
+IR      @ invert receive status flags
+RE      @ enable receive
+TE      @ enable transmit
+BK      @ abort operation and clear FIFOs
+EC      @ send control register as first I2C byte
+ES      @ send status register as first I2C byte
+PL      @ set SPI polarity high
+PH      @ set SPI phase high
+I2      @ enable I2C mode
+SP      @ enable SPI mode
+EN      @ enable BSC peripheral
+
+The returned status has the following format
+
+. .
+20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ S  S  S  S  S  R  R  R  R  R  T  T  T  T  T RB TE RF TF RE TB
+. .
+
+Bits 0-15 are copied unchanged from the BSC FR register.  See
+pages 165-166 of the Broadcom peripherals document for full
+details.
+
+SSSSS @ number of bytes successfully copied to transmit FIFO
+RRRRR @ number of bytes in receieve FIFO
+TTTTT @ number of bytes in transmit FIFO
+RB    @ receive busy
+TE    @ transmit FIFO empty
+RF    @ receive FIFO full
+TF    @ transmit FIFO full
+RE    @ receive FIFO empty
+TB    @ transmit busy
+
+This example assumes that GPIO 2/3 are connected to GPIO 18/19
+(GPIO 10/11 on the BCM2711).
+
+...
+$ pigs bscx 0x130305 # start BSC as I2C slave 0x13
+1 18
+
+$ i2cdetect -y 1
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- 13 -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+$ pigs i2co 1 0x13 0 # get handle for device 0x13 on bus 1
+0
+
+$ pigs i2cwd 0 90 87 51 9 23 # write 5 bytes
+
+$ pigs bscx 0x130305 # check for data
+6 18 90 87 51 9 23
+
+$ pigs bscx 0x130305 11 13 15 17 # check for data and send 4 bytes
+1 262338
+
+$ pigs i2crd 0 4 # read 4 bytes
+4 11 13 15 17
+
+$ pigs i2cwd 0 90 87 51 9 23 # write 5 bytes
+$ pigs bscx 0x130305 11 13 15 17 # check for data and send 4 bytes
+6 262338 90 87 51 9 23
+
+$ pigs i2crd 0 4
+4 11 13 15 17
+
+$ pigs bscx 0x130305 22 33 44 55 66
+1 327938
+$ pigs i2crd 0 5
+5 22 33 44 55 66
+...
+
+The BSC slave in SPI mode deserializes data from the MOSI pin into its receiver/
+FIFO when the LSB of the first byte is a 0.  No data is output on the MISO pin.
+When the LSB of the first byte on MOSI is a 1, the transmitter/FIFO data is
+serialized onto the MISO pin while all other data on the MOSI pin is ignored.
+
+The BK bit of the BSC control register is non-functional when in the SPI mode.
+The transmitter along with its FIFO can be dequeued by successively disabling
+and re-enabling the TE bit on the BSC control register while in SPI mode.
+
+This example demonstrates a SPI master talking to the BSC as SPI slave:
+Requires SPI master SCLK / MOSI / MISO / CE GPIO are connected to
+BSC peripheral GPIO 11   / 9    / 10   / 8 respectively, on a Pi4B (BCM2711).
+
+...
+$ pigs bspio 15 26 13 14 10000 0 # open bit-bang spi master on random gpio
+
+$ pigs bscx 0x303 # start BSC as SPI slave, both rx and tx enabled
+1 18
+
+$ pigs bspix 15 0 0xd 0xe 0xa 0xd # write 0xdead to BSC
+5 0 0 0 0 0
+
+$ pigs bscx 0x303 0xb 0xe 0xe 0xf # place 0xbeef in BSC tx FIFO, read rx FIFO
+5 262338 13 14 10 13
+
+$ pigs bspix 15 1 0 0 0 0 # read four bytes from BSC
+5 0 11 14 14 15
+...
+
+BSPIC ::
+
+This command stops bit banging SPI on a set of GPIO
+opened with [*BSPIO*].
+
+The set of GPIO is specifed by [*cs*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs bspic 10
+
+$ pigs bspic 10
+-142
+ERROR: no bit bang SPI in progress on GPIO
+...
+
+BSPIO ::
+
+This command starts bit banging SPI on a group of GPIO with slave
+select [*cs*], MISO [*miso*], MOSI [*mosi*], and clock [*sclk*].
+
+Data will be transferred at baud [*b*] bits per second (which may
+be set in the range 50-250000).
+
+The flags [*spf*] may be used to modify the default behaviour of
+mode 0, active low chip select.
+
+The flags consists of the least significant 22 bits.
+
+. .
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
+. .
+
+mm defines the SPI mode.
+
+. .
+Mode POL PHA
+ 0    0   0
+ 1    0   1
+ 2    1   0
+ 3    1   1
+. .
+
+p is 0 if CS is active low (default) and 1 for active high.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.
+
+The other bits in flags should be set to zero.
+
+Upon success 0 is returned.  On error a negative status code
+will be returned.
+
+If more than one device is connected to the SPI bus (defined by
+SCLK, MOSI, and MISO) each must have its own CS.
+
+...
+$ pigs bspio  9 11 12 13 50000 0
+
+$ pigs bspio 10 11 12 13 50000 0
+
+$ pigs bspio 29 19 20 21 50000 0 # GPIO 29 not avaialble on this Pi
+-41
+ERROR: no permission to update GPIO
+...
+
+BSPIX::
+
+This command writes bytes [*bvs*] to the bit bang SPI device
+associated with slave select [*cs*].  It returns the same
+number of bytes read from the device.
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs bspio 5 13 19 12 10000 0 # MCP4251 DAC
+$ pigs bspio 6 13 19 12 20000 3 # MCP3008 ADC
+
+$ pigs bspix 5 0 16             # set DAC to 16
+2 255 255
+
+$ pigs bspix 5 12 0             # read back DAC
+2 254 16
+
+$ pigs bspix 6 1 128 0          # read ADC input 0
+3 0 3 184                       # 952
+
+$ pigs bspix 5 0 240            # set DAC to 240
+2 255 255
+
+$ pigs bspix 5 12 0             # read back DAC
+2 254 240
+
+$ pigs bspix 6 1 128 0          # read ADC input 0
+3 0 0 63                        # 63
+
+$ pigs bspix 5 0 128            # set DAC to 128
+2 255 255
+
+$ pigs bspix 5 12 0             # read back DAC
+2 254 128
+
+$ pigs bspix 6 1 128 0          # read ADC input 0
+3 0 1 255                       # 511
+
+$ pigs bspic 5                  # close SPI CS 5
+$ pigs bspic 6                  # close SPI CS 6
+
+$ pigs bspic 5                  # try to close SPI CS 5 again
+-142
+ERROR: no bit bang SPI in progress on GPIO
+...
+
+
+CF1::
+
+This command calls a user customised function.  The meaning of
+any paramaters and the returned value is defined by the
+customiser.
+
+CF2::
+
+This command calls a user customised function.  The meaning of
+any paramaters and the returned value is defined by the
+customiser.
+
+CGI::
+This command returns the value of the internal library
+configuration settings.
+
+CSI::
+This command sets the value of the internal library
+configuration settings to [*v*].
+
+EVM ::
+This command starts event reporting on handle [*h*] (returned by
+a prior call to [*NO*]).
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The notification gets reports for each event specified by [*bits*].
+
+...
+$ pigs evm 0 -1 # Shorthand for events 0-31.
+$ pigs evm 0 0xf0 # Get notifications for events 4-7.
+
+$ pigs evm 1 0xf
+-25
+ERROR: unknown handle
+...
+
+EVT ::
+This command triggers event [*event*].
+
+One event, number 31, is predefined.  This event is
+auto generated on BSC slave activity.
+
+...
+$ pigs evt 12
+$ pigs evt 5
+
+$ pigs evt 32
+-143
+ERROR: bad event id
+...
+
+FC::
+This command closes a file handle [*h*] previously opened with [*FO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs fc 0 # First close okay.
+
+$ pigs fc 0 # Second fails.
+-25
+ERROR: unknown handle
+...
+
+FG ::
+
+Level changes on the GPIO [*u*] are not reported unless the level
+has been stable for at least [*stdy*] microseconds.  The
+level is then reported.  Level changes of less than [*stdy*]
+microseconds are ignored.
+
+The filter only affects callbacks (including pipe notifications).
+
+The [*R/READ*], [*BR1*], and [*BR2*] commands are not affected.
+
+Note, each (stable) edge will be timestamped [*stdy*] microseconds
+after it was first detected.
+
+...
+$ pigs fg 4 250
+
+$ pigs fg 4 1000000
+-125
+ERROR: bad filter parameter
+...
+
+FL ::
+This command returns a list of the files matching [*pat*]. Up
+to [*num*] bytes may be returned.
+
+Upon success the count of returned bytes followed by the matching
+files is returned.  On error a negative status code will be returned.
+
+A newline (0x0a) character separates each file name.
+
+Only files which have a matching entry in /opt/pigpio/access may
+be listed.
+
+Suppose /opt/pigpio/access contains
+
+/sys/bus/w1/devices/28*/w1_slave r
+
+...
+$ pigs -a fl "/sys/bus/w1/devices/28*/w1_slave" 5000
+90 /sys/bus/w1/devices/28-000005d34cd2/w1_slave
+/sys/bus/w1/devices/28-001414abbeff/w1_slave
+
+$ pigs -a fl "/sys/bus/*" 5000
+ERROR: no permission to access file
+-137
+...
+
+FN ::
+
+Level changes on the GPIO [*u*] are ignored until a level which has
+been stable for [*stdy*] microseconds is detected.  Level
+changes on the GPIO are then reported for [*actv*] microseconds
+after which the process repeats.
+
+The filter only affects callbacks (including pipe notifications).
+
+The [*R/READ*], [*BR1*], and [*BR2*] commands are not affected.
+
+Note, level changes before and after the active period may
+be reported.  Your software must be designed to cope with
+such reports.
+
+...
+$ pigs fn 7 250 1000
+
+$ pigs fn 7 2500000 1000
+-125
+ERROR: bad filter parameter
+...
+
+FO ::
+This function returns a handle to a file [*file*] opened
+in a specified mode [*mode*].
+
+Upon success a handle (>=0) is returned.  On error a negative status code
+will be returned.
+
+File
+
+A file may only be opened if permission is granted by an entry in
+/opt/pigpio/access.  This is intended to allow remote access to files
+in a more or less controlled manner.
+
+Each entry in /opt/pigpio/access takes the form of a file path
+which may contain wildcards followed by a single letter permission.
+The permission may be R for read, W for write, U for read/write,
+and N for no access.
+
+Where more than one entry matches a file the most specific rule
+applies.  If no entry matches a file then access is denied.
+
+Suppose /opt/pigpio/access contains the following entries
+
+. .
+/home/* n
+/home/pi/shared/dir_1/* w
+/home/pi/shared/dir_2/* r
+/home/pi/shared/dir_3/* u
+/home/pi/shared/dir_1/file.txt n
+. .
+
+Files may be written in directory dir_1 with the exception
+of file.txt.
+
+Files may be read in directory dir_2.
+
+Files may be read and written in directory dir_3.
+
+If a directory allows read, write, or read/write access then files may
+be created in that directory.
+
+In an attempt to prevent risky permissions the following paths are
+ignored in /opt/pigpio/access.
+
+. .
+a path containing ..
+a path containing only wildcards (*?)
+a path containing less than two non-wildcard parts
+. .
+
+Mode
+
+The mode may have the following values.
+
+      @ Value @ Meaning
+READ  @   1   @ open file for reading
+WRITE @   2   @ open file for writing
+RW    @   3   @ open file for reading and writing
+
+The following values may be or'd into the mode.
+
+       @ Value @ Meaning
+APPEND @   4   @ All writes append data to the end of the file
+CREATE @   8   @ The file is created if it doesn't exist
+TRUNC  @  16   @ The file is truncated
+
+Newly created files are owned by root with permissions owner read and write.
+
+...
+$ ls /ram/*.c
+/ram/command.c      /ram/pigpiod.c  /ram/pigs.c
+/ram/x_pigpiod_if.c /ram/pig2vcd.c  /ram/pigpiod_if2.c
+/ram/x_pigpio.c     /ram/x_repeat.c /ram/pigpio.c
+/ram/pigpiod_if.c   /ram/x_pigpiod_if2.c
+
+# assumes /opt/pigpio/access contains the following line
+# /ram/*.c r
+
+$ pigs fo /ram/pigpio.c 1
+0
+
+$ pigs fo /ram/new.c 1
+-128
+ERROR: file open failed
+
+$ pigs fo /ram/new.c 9
+1
+
+$ ls /ram/*.c -l
+-rw-r--r-- 1 joan joan  42923 Jul 10 11:22 /ram/command.c
+-rw------- 1 root root      0 Jul 10 16:54 /ram/new.c
+-rw-r--r-- 1 joan joan   2971 Jul 10 11:22 /ram/pig2vcd.c
+-rw------- 1 joan joan 296235 Jul 10 11:22 /ram/pigpio.c
+-rw-r--r-- 1 joan joan   9266 Jul 10 11:22 /ram/pigpiod.c
+-rw-r--r-- 1 joan joan  37331 Jul 10 11:22 /ram/pigpiod_if2.c
+-rw-r--r-- 1 joan joan  33088 Jul 10 11:22 /ram/pigpiod_if.c
+-rw-r--r-- 1 joan joan   7990 Jul 10 11:22 /ram/pigs.c
+-rw-r--r-- 1 joan joan  19970 Jul 10 11:22 /ram/x_pigpio.c
+-rw-r--r-- 1 joan joan  20804 Jul 10 11:22 /ram/x_pigpiod_if2.c
+-rw-r--r-- 1 joan joan  19844 Jul 10 11:22 /ram/x_pigpiod_if.c
+-rw-r--r-- 1 joan joan  19907 Jul 10 11:22 /ram/x_repeat.c
+...
+
+FR::
+This command returns up to [*num*] bytes of data read from the
+file associated with handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs fr 0 10
+5 48 49 128 144 255
+
+$ pigs fr 0 10
+0
+...
+
+FS ::
+This command seeks to a position within the file associated
+with handle [*h*].
+
+The number of bytes to move is [*num*].  Positive offsets
+move forward, negative offsets backwards.  The move start
+position is determined by [*from*] as follows.
+
+  @ From
+0 @ start
+1 @ current position
+2 @ end
+
+Upon success the new byte position within the file (>=0) is
+returned.  On error a negative status code will be returned.
+
+...
+$ pigs fs 0 200 0 # Seek to start of file plus 200
+200
+
+$ pigs fs 0 0 1 # Return current position
+200
+
+$ pigs fs 0 0 2 # Seek to end of file, return size
+296235
+...
+
+FW::
+This command writes bytes [*bvs*] to the file
+associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs fw 0 23 45 67 89
+...
+
+GDC ::
+
+This command returns the PWM dutycycle in use on GPIO [*u*].
+
+Upon success the dutycycle is returned.  On error a negative
+status code will be returned.
+
+For normal PWM the dutycycle will be out of the defined range
+for the GPIO (see [*PRG*]).
+
+If a hardware clock is active on the GPIO the reported
+dutycycle will be 500000 (500k) out of 1000000 (1M).
+
+If hardware PWM is active on the GPIO the reported dutycycle
+will be out of a 1000000 (1M).
+
+...
+$ pigs p 4 129
+$ pigs gdc 4
+129
+
+pigs gdc 5
+-92
+ERROR: GPIO is not in use for PWM
+...
+
+GPW ::
+
+This command returns the servo pulsewidth in use on GPIO [*u*].
+
+Upon success the servo pulsewidth is returned.  On error a negative
+status code will be returned.
+
+...
+$ pigs s 4 1235
+$ pigs gpw 4
+1235
+
+$ pigs gpw 9
+-93
+ERROR: GPIO is not in use for servo pulses
+...
+
+H/HELP ::
+This command displays a brief list of the commands and their parameters.
+
+...
+$ pigs h
+
+$ pigs help
+...
+
+HC ::
+This command sets the hardware clock associated with GPIO [*g*] to
+frequency [*cf*]. Frequencies above 30MHz are unlikely to work.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs hc 4 5000 # start a 5 KHz clock on GPIO 4 (clock 0)
+
+$ pigs hc 5 5000000 # start a 5 MHz clcok on GPIO 5 (clock 1)
+-99
+ERROR: need password to use hardware clock 1
+...
+
+The same clock is available on multiple GPIO.  The latest
+frequency setting will be used by all GPIO which share a clock.
+
+The GPIO must be one of the following.
+
+4  @clock 0 @All models
+5  @clock 1 @All models but A and B (reserved for system use)
+6  @clock 2 @All models but A and B
+20 @clock 0 @All models but A and B
+21 @clock 1 @All models but A and B Rev.2 (reserved for system use)
+
+32 @clock 0 @Compute module only
+34 @clock 0 @Compute module only
+42 @clock 1 @Compute module only (reserved for system use)
+43 @clock 2 @Compute module only
+44 @clock 1 @Compute module only (reserved for system use)
+
+Access to clock 1 is protected by a password as its use will
+likely crash the Pi.  The password is given by or'ing 0x5A000000
+with the GPIO number.
+
+HP ::
+This command sets the hardware PWM associated with GPIO [*g*] to
+frequency [*pf*] with dutycycle [*pdc*]. Frequencies above 30MHz
+are unlikely to work.
+
+NOTE: Any waveform started by [*WVTX*], [*WVTXR*], or [*WVCHA*]
+will be cancelled.
+
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden when the pigpio
+daemon is started (option -t).
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+. .
+$ pigs hp 18 100 800000 # 80% dutycycle
+
+$ pigs hp 19 100 200000 # 20% dutycycle
+
+$ pigs hp 19 400000000 100000
+-96
+ERROR: invalid hardware PWM frequency
+. .
+
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
+share a PWM channel.
+
+The GPIO must be one of the following.
+
+12 @PWM channel 0 @All models but A and B
+13 @PWM channel 1 @All models but A and B
+18 @PWM channel 0 @All models
+19 @PWM channel 1 @All models but A and B
+
+40 @PWM channel 0 @Compute module only
+41 @PWM channel 1 @Compute module only
+45 @PWM channel 1 @Compute module only
+52 @PWM channel 0 @Compute module only
+53 @PWM channel 1 @Compute module only
+
+The actual number of steps beween off and fully on is the
+integral part of 250M/[*pf*] (375M/[*pf*] for the BCM2711).
+
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
+
+There will only be a million steps for a [*pf*] of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  [*pdc*] is
+automatically scaled to take this into account.
+
+HWVER ::
+This command returns the hardware revision of the Pi.
+
+The hardware revision is found in the last 4 characters on the revision
+line of /proc/cpuinfo.
+
+If the hardware revision can not be found or is not a valid hexadecimal
+number the command returns 0.
+
+The revision number can be used to determine the assignment of GPIO
+to pins (see [*g*]).
+
+There are currently three types of board.
+
+Type 1 boards have hardware revision numbers of 2 and 3.
+
+Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
+
+Type 3 boards have hardware revision numbers of 16 or greater.
+
+for "Revision : 0002" the command returns 2.
+
+for "Revision : 000f" the command returns 15.
+
+for "Revision : 000g" the command returns 0.
+
+...
+$ pigs hwver # On a B+
+16
+...
+
+I2CC ::
+This command closes an I2C handle [*h*] previously opened with [*I2CO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cc 0 # First close okay.
+
+$ pigs i2cc 0 # Second fails.
+-25
+ERROR: unknown handle
+...
+
+I2CO ::
+This command returns a handle to access device [*id*] on I2C bus [*ib*].
+The device is opened with flags [*if*].
+
+Physically buses 0 and 1 are available on the Pi.  Higher
+numbered buses will be available if a kernel supported bus
+multiplexor is being used.
+
+The GPIO used are given in the following table.
+
+      @ SDA @ SCL
+I2C 0 @  0  @  1
+I2C 1 @  2  @  3
+
+No flags are currently defined.  The parameter [*if*] should be 0.
+
+Upon success the next free handle (>=0) is returned.  On error a
+negative status code will be returned.
+
+...
+$ pigs i2co 1 0x70 0 # Bus 1, device 0x70, flags 0.
+0
+
+$ pigs i2co 1 0x53 0 # Bus 1, device 0x53, flags 0.
+1
+...
+
+I2CPC ::
+This command writes [*wv*] to register [*r*] of the I2C device
+associated with handle [*h*] and returns a 16-bit word read from the
+device.
+
+Upon success a value between 0 and 65535 will be returned.  On error
+a negative status code will be returned.
+
+...
+$ pigs i2cpc 0 37 43210
+39933
+
+$ pigs i2cpc 0 256 43210
+ERROR: bad i2c/spi/ser parameter
+-81
+...
+
+I2CPK ::
+
+This command writes the data bytes [*bvs*] to register [*r*] of the I2C device
+associated with handle [*h*] and returns a device specific number of bytes.
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs i2cpk 0 0 0x11 0x12
+6 0 0 0 0 0 0
+...
+
+I2CRB ::
+
+This command returns a single byte read from register [*r*] of the I2C device
+associated with handle [*h*].
+
+Upon success a value between 0 and 255 will be returned.  On error
+a negative status code will be returned.
+
+...
+$ pigs i2crb 0 0
+6
+...
+
+I2CRD ::
+
+This command returns [*num*] bytes read from the I2C device associated with
+handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+This command operates on the raw I2C device.  The maximum value of the
+parameter [*num*] is dependent on the I2C drivers and the device
+itself. pigs imposes a limit of about 8000 bytes.
+
+...
+$ pigs i2crd 0 16
+16 6 24 0 0 0 0 0 0 0 0 0 0 0 0 32 78
+...
+
+I2CRI ::
+
+This command returns [*num*] bytes from register [*r*] of the I2C device
+associated with handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+The parameter [*num*] may be 1-32.
+
+...
+$ pigs i2cri 0 0 16
+16 237 155 155 155 155 155 155 155 155 155 155 155 155 155 155 155
+...
+
+I2CRK ::
+
+This command returns between 1 and 32 bytes read from register [*r*] of
+the I2C device associated with handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+The number of bytes of returned data is specific to the device and
+register.
+
+...
+$ pigs i2crk 0 0
+6 0 0 0 0 0 0
+
+$ pigs i2crk 0 1
+24 0 0 0 0 0 0 0 0 0 0 0 0 120 222 105 215 128 87 195 217 0 0 0 0
+...
+
+I2CRS ::
+
+This command returns a single byte read from the I2C device
+associated with handle [*h*].
+
+Upon success a value between 0 and 255 will be returned.  On error
+a negative status code will be returned.
+
+...
+$ pigs i2crs 0
+0
+...
+
+I2CRW ::
+
+This command returns a single 16 bit word read from register [*r*] of
+the I2C device associated with handle [*h*].
+
+Upon success a value between 0 and 65535 will be returned.  On error
+a negative status code will be returned.
+
+...
+$ pigs i2crw 0 0
+6150
+...
+
+I2CWB ::
+
+This command writes a single byte [*bv*] to register [*r*] of the
+I2C device associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cwb 0 10 0x54
+...
+
+I2CWD ::
+
+This command writes a block of bytes [*bvs*] to the I2C device
+associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The number of bytes which may be written in one transaction is
+dependent on the I2C drivers and the device itself.  pigs imposes
+a limit of about 500 bytes.
+
+This command operates on the raw I2C device.
+
+...
+$ pigs i2cwd 0 0x01 0x02 0x03 0x04
+...
+
+I2CWI ::
+
+This command writes between 1 and 32 bytes [*bvs*] to register [*r*] of
+the I2C device associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cwi 0 4 0x01 0x04 0xc0
+...
+
+I2CWK ::
+
+This command writes between 1 and 32 bytes [*bvs*] to register [*r*] of
+the I2C device associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+pigs i2cwk 0 4 0x01 0x04 0xc0
+...
+
+I2CWQ ::
+
+This command writes a single [*bit*] to the I2C device associated
+with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cwq 0 1
+...
+
+I2CWS ::
+
+This command writes a single byte [*bv*] to the I2C device associated
+with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cws 0 0x12
+
+$ pigs i2cws 0 0xff
+-82
+ERROR: I2C write failed
+...
+
+I2CWW ::
+
+This command writes a single 16 bit word [*wv*] to register [*r*] of
+the I2C device associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs i2cww 0 0 0xffff
+...
+
+I2CZ ::
+This command executes a sequence of I2C operations.  The
+operations to be performed are specified by the contents of [*bvs*]
+which contains the concatenated command codes and associated data.
+
+The following command codes are supported:
+
+Name    @ Cmd & Data @ Meaning
+End     @ 0          @ No more commands
+Escape  @ 1          @ Next P is two bytes
+On      @ 2          @ Switch combined flag on
+Off     @ 3          @ Switch combined flag off
+Address @ 4 P        @ Set I2C address to P
+Flags   @ 5 lsb msb  @ Set I2C flags to lsb + (msb << 8)
+Read    @ 6 P        @ Read P bytes of data
+Write   @ 7 P ...    @ Write P bytes of data
+
+The address, read, and write commands take a parameter P.
+Normally P is one byte (0-255).  If the command is preceded by
+the Escape command then P is two bytes (0-65535, least significant
+byte first).
+
+The address defaults to that associated with the handle [*h*].
+The flags default to 0.  The address and flags maintain their
+previous value until updated.
+
+...
+Set address 0x53, write 0x32, read 6 bytes
+Set address 0x1E, write 0x03, read 6 bytes
+Set address 0x68, write 0x1B, read 8 bytes
+End
+
+0x04 0x53   0x07 0x01 0x32   0x06 0x06
+0x04 0x1E   0x07 0x01 0x03   0x06 0x06
+0x04 0x68   0x07 0x01 0x1B   0x06 0x08
+0x00
+...
+
+
+M/MODES ::
+
+This command sets GPIO [*g*] to mode [*m*], typically input (read)
+or output (write).
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+Each GPIO can be configured to be in one of 8 different modes. The modes
+are named Input, Output, ALT0, ALT1, ALT2, ALT3, ALT4, and ALT5.
+
+To set the mode use the code for the mode.
+
+Mode @Input@Output@ALT0@ALT1@ALT2@ALT3@ALT4@ALT5
+Code @    R@     W@   0@   1@   2@   3@   4@   5
+
+...
+$ pigs m 4 r # Input (read)
+$ pigs m 4 w # Output (write)
+$ pigs m 4 0 # ALT 0
+$ pigs m 4 5 # ALT 5
+...
+
+MG/MODEG ::
+
+This command returns the current mode of GPIO [*g*].
+
+Upon success the value of the GPIO mode is returned.
+On error a negative status code will be returned.
+
+Value @    0@     1@   2@   3@   4@   5@   6@   7
+Mode  @Input@Output@ALT5@ALT4@ALT0@ALT1@ALT2@ALT3
+
+...
+$ pigs mg 4
+1
+...
+
+MICS ::
+This command delays execution for [*v*] microseconds.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The main use of this command is expected to be within [*Scripts*].
+
+...
+$ pigs mics 20 # Delay 20 microseconds.
+$ pigs mics 1000000 # Delay 1 second.
+
+$ pigs mics 2000000
+-64
+ERROR: bad MICS delay (too large)
+...
+
+MILS ::
+
+This command delays execution for [*v*] milliseconds.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs mils 2000 # Delay 2 seconds.
+
+$ pigs mils 61000
+-65
+ERROR: bad MILS delay (too large)
+...
+
+NB ::
+
+This command starts notifications on handle [*h*] returned by
+a prior call to [*NO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The notification gets state changes for each GPIO specified by [*bits*].
+
+...
+$ pigs nb 0 -1 # Shorthand for GPIO 0-31.
+$ pigs nb 0 0xf0 # Get notifications for GPIO 4-7.
+
+$ pigs nb 1 0xf
+-25
+ERROR: unknown handle
+...
+
+NC ::
+
+This command stops notifications on handle [*h*] returned by
+a prior call to [*NO*] and releases the handle for reuse.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs nc 0 # First call succeeds.
+
+$ pigs nc 1 # Second call fails.
+-25
+ERROR: unknown handle
+...
+
+NO ::
+
+This command requests a free notification handle.
+
+A notification is a method for being notified of GPIO state changes via a pipe.
+
+Upon success the command returns a handle greater than or equal to zero.
+On error a negative status code will be returned.
+
+Notifications for handle x will be available at the pipe named /dev/pigpiox
+(where x is the handle number).
+
+E.g. if the command returns 15 then the notifications must be read
+from /dev/pigpio15.
+
+...
+$ pigs no
+0
+...
+
+NP ::
+
+This command pauses notifications on handle [*h*] returned by
+a prior call to [*NO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+Notifications for the handle are suspended until a new [*NB*] command
+is given for the handle.
+
+...
+$ pigs np 0
+...
+
+P/PWM ::
+
+This command starts PWM on GPIO [*u*] with dutycycle [*v*].  The dutycycle
+varies from 0 (off) to range (fully on).  The range defaults to 255.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+This and the servo functionality use the DMA and PWM or PCM peripherals
+to control and schedule the pulsewidths and dutycycles.
+
+The [*PRS*] command may be used to change the default range of 255.
+
+...
+$ pigs p 4 64  # Start PWM on GPIO 4 with 25% dutycycle
+$ pigs p 4 128 # 50%
+$ pigs p 4 192 # 75%
+$ pigs p 4 255 # 100%
+...
+
+PADG ::
+
+This command gets the [*pad*] drive strength [*padma*] in mA.
+
+Returns the pad drive strength if OK.  On error a negative status code
+will be returned.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+$ pigs padg 0
+8
+$ pigs pads 0 16
+$ pigs padg 0
+16
+pigs padg 3
+-126
+ERROR: bad pad number
+...
+
+PADS::
+
+This command sets the [*pad*] drive strength [*padma*] in mA.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+$ pigs pads 0 16
+$ pigs padg 0
+16
+$ pigs pads 0 17
+-127
+ERROR: bad pad drive strength
+...
+
+PARSE ::
+
+Validates the text [*t*] of a script without storing the script.
+
+Upon success nothing is returned.  On error a list of detected
+script errors will be given.
+
+See [*Scripts*].
+
+This command may be used to find script syntax faults.
+
+...
+$ pigs parse tag 100 w 22 1 mils 200 w 22 0 mils 800 jmp 100
+
+$ pigs parse tag 0 w 22 1 mills 50 w 22 0 dcr p10 jp 99
+Unknown command: mills
+Unknown command: 50
+Bad parameter to dcr
+Can't resolve tag 99
+...
+
+PFG ::
+
+This command returns the PWM frequency in Hz used for GPIO [*u*].
+
+Upon success the PWM frequency is returned.  On error a negative
+status code will be returned.
+
+For normal PWM the frequency will be that defined for the GPIO
+by [*PFS*].
+
+If a hardware clock is active on the GPIO the reported frequency
+will be that set by [*HC*].
+
+If hardware PWM is active on the GPIO the reported frequency
+will be that set by [*HP*].
+
+...
+$ pigs pfg 4
+800
+
+$ pigs pfg 34
+ERROR: GPIO not 0-31
+-2
+...
+
+PFS ::
+This command sets the PWM frequency [*v*] to be used for GPIO [*u*].
+
+The numerically closest frequency to [*v*] will be selected.
+
+Upon success the new frequency is returned.  On error a negative status code
+will be returned.
+
+If PWM is currently active on the GPIO it will be
+switched off and then back on at the new frequency.
+
+Each GPIO can be independently set to one of 18 different PWM
+frequencies.
+
+The selectable frequencies depend upon the sample rate which
+may be 1, 2, 4, 5, 8, or 10 microseconds (default 5).  The
+sample rate is set when the pigpio daemon is started.
+
+The frequencies for each sample rate are:
+
+. .
+                       Hertz
+
+       1: 40000 20000 10000 8000 5000 4000 2500 2000 1600
+           1250  1000   800  500  400  250  200  100   50
+
+       2: 20000 10000  5000 4000 2500 2000 1250 1000  800
+            625   500   400  250  200  125  100   50   25
+
+       4: 10000  5000  2500 2000 1250 1000  625  500  400
+            313   250   200  125  100   63   50   25   13
+sample
+ rate
+ (us)  5:  8000  4000  2000 1600 1000  800  500  400  320
+            250   200   160  100   80   50   40   20   10
+
+       8:  5000  2500  1250 1000  625  500  313  250  200
+            156   125   100   63   50   31   25   13    6
+
+      10:  4000  2000  1000  800  500  400  250  200  160
+            125   100    80   50   40   25   20   10    5
+. .
+
+...
+pigs pfs 4 0 # 0 selects the lowest frequency.
+10
+
+$ pigs pfs 4 1000 # Set 1000Hz PWM.
+1000
+
+$ pigs pfs 4 100000 # Very big number selects the highest frequency.
+8000
+...
+
+PIGPV ::
+
+This command returns the pigpio library version.
+
+...
+$ pigs pigpv
+17
+...
+
+PRG ::
+
+This command returns the dutycycle range for GPIO [*u*].
+
+Upon success the range is returned.  On error a negative status code
+will be returned.
+
+If a hardware clock or hardware PWM is active on the GPIO the reported
+range will be 1000000 (1M).
+
+...
+$ pigs prg 4
+255
+...
+
+PROC ::
+
+This command stores a script [*t*] for later execution.
+
+If the script is valid a script id (>=0) is returned which is passed
+to the other script commands. On error a negative status code
+will be returned.
+
+See [*Scripts*].
+
+...
+$ pigs proc tag 123 w 4 0 mils 200 w 4 1 mils 300 dcr p0 jp 123
+0
+
+$ pigs proc tag 123 w 4 0 mils 5 w 4 1 mils 5 jmp 12
+ERROR: script has unresolved tag
+-63
+...
+
+PROCD ::
+
+This command deletes script [*sid*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+See [*Scripts*].
+
+...
+$ pigs procd 1
+
+$ pigs procd 1
+ERROR: unknown script id
+-48
+...
+
+PROCP ::
+
+This command returns the status of script [*sid*] as well as the
+current value of its 10 parameters.
+
+Upon success the script status and parameters are  returned.
+On error a negative status code will be returned.
+
+The script status may be one of
+
+0 @ being initialised
+1 @ halted
+2 @ running
+3 @ waiting
+4 @ failed
+
+See [*Scripts*].
+
+...
+$ pigs procp 0
+1 0 0 0 0 0 0 0 0 0 0
+...
+
+PROCR ::
+
+This command runs stored script [*sid*] passing it up to 10 optional
+parameters.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+See [*Scripts*].
+
+...
+$ pigs proc tag 123 w 4 0 mils 200 w 4 1 mils 300 dcr p0 jp 123
+0
+
+$ pigs procr 0 50 # Run script 0 with parameter 0 of 50.
+
+$ pigs procp 0
+2 44 0 0 0 0 0 0 0 0 0
+$ pigs procp 0
+2 37 0 0 0 0 0 0 0 0 0
+$ pigs procp 0
+2 10 0 0 0 0 0 0 0 0 0
+$ pigs procp 0
+2 5 0 0 0 0 0 0 0 0 0
+$ pigs procp 0
+2 2 0 0 0 0 0 0 0 0 0
+$ pigs procp 0
+1 -1 0 0 0 0 0 0 0 0 0
+...
+
+PROCS ::
+
+This command stops a running script [*sid*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+See [*Scripts*].
+
+...
+$ pigs procs 0
+
+$ pigs procs 1
+-48
+ERROR: unknown script id
+...
+
+PROCU ::
+
+This command sets the parameters of a stored script [*sid*] passing
+it up to 10 parameters.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+See [*Scripts*].
+
+...
+$ pigs proc tag 0 hp 18 p0 p1 mils 1000 jmp 0
+0
+$ pigs procu 0 50 500000
+$ pigs procr 0
+$ pigs procu 0 100
+$ pigs procu 0 200
+$ pigs procu 0 200 100000
+...
+
+PRRG ::
+
+This command returns the real underlying range used by GPIO [*u*].
+
+If a hardware clock is active on the GPIO the reported
+real range will be 1000000 (1M).
+
+If hardware PWM is active on the GPIO the reported real range
+will be approximately 250M divided by the set PWM frequency.
+
+On error a negative status code will be returned.
+
+See [*PRS*].
+
+...
+$ pigs prrg 17
+250
+
+$ pigs pfs 17 0
+10
+$ pigs prrg 17
+20000
+
+$ pigs pfs 17 100000
+8000
+$ pigs prrg 17
+25
+...
+
+PRS ::
+
+This command sets the dutycycle range [*v*] to be used for GPIO [*u*].
+Subsequent uses of command [*P/PWM*] will use a dutycycle between 0 (off)
+and [*v*] (fully on).
+
+Upon success the real underlying range used by the GPIO is returned.
+On error a negative status code will be returned.
+
+If PWM is currently active on the GPIO its dutycycle will be scaled to
+reflect the new range.
+
+The real range, the number of steps between fully off and fully on
+for each frequency, is given in the following table.
+
+ #1@  #2@  #3@  #4@  #5@  #6@  #7@   #8@   #9
+ 25@  50@ 100@ 125@ 200@ 250@ 400@  500@  625
+   @    @    @    @    @    @    @     @
+#10@ #11@ #12@ #13@ #14@ #15@ #16@  #17@  #18
+800@1000@1250@2000@2500@4000@5000@10000@20000
+
+The real value set by [*PRS*] is (dutycycle * real range) / range.
+
+See [*PRRG*]
+
+...
+$ pigs prs 18 1000
+250
+...
+
+PUD ::
+
+This command sets the internal pull/up down for GPIO [*g*] to mode [*p*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The mode may be pull-down (D), pull-up (U), or off (O).
+
+...
+$ pigs pud 4 d # Set pull-down on GPIO 4.
+$ pigs pud 4 u # Set pull-up on GPIO 4.
+$ pigs pud 4 o # No pull-up/down on GPIO 4.
+...
+
+R/READ ::
+
+This reads the current level of GPIO [*g*].
+
+Upon success the current level is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs r 17 # Get level of GPIO 17.
+0
+
+$ pigs r 4 # Get level of GPIO 4.
+1
+...
+
+S/SERVO ::
+
+This command starts servo pulses of [*v*] microseconds on GPIO [*u*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The servo pulsewidth may be 0 (off), 500 (most anti-clockwise)
+to 2500 (most clockwise).
+
+The range supported by servos varies and should probably be determined
+by experiment. Generally values between 1000-2000 should be safe.
+A value of 1500 should always be safe and represents
+the mid-point of rotation.
+
+You can DAMAGE a servo if you command it to move beyond its limits.
+
+...
+$ pigs SERVO 17 1500
+...
+
+This example causes an on pulse of 1500 microseconds duration to be
+transmitted on GPIO 17 at a rate of 50 times per second.
+
+This will command a servo connected to GPIO 17 to rotate to its mid-point.
+
+...
+pigs s 17 0 # Switch servo pulses off.
+...
+
+SERC ::
+
+This command closes a serial handle [*h*] previously opened with [*SERO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs serc 0 # First close okay.
+
+$ pigs serc 0 # Second close gives error.
+-25
+ERROR: unknown handle
+...
+
+SERDA ::
+
+This command returns the number of bytes of data available
+to be read from the serial device associated with handle [*h*].
+
+Upon success the count of bytes available to be read is
+returned (which may be 0).  On error a negative status code
+will be returned.
+
+...
+$ pigs serda 0
+0
+...
+
+SERO::
+
+This command opens the serial [*dev*] at [*b*] bits per second.
+
+No flags are currently defined.  [*sef*] should be set to zero.
+
+Upon success a handle (>=0) is returned.  On error a negative status code
+will be returned.
+
+The device name must start with /dev/tty or /dev/serial.
+
+
+The baud rate must be one of 50, 75, 110, 134, 150,
+200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200,
+38400, 57600, 115200, or 230400.
+
+...
+$ pigs sero /dev/ttyAMA0 9600 0
+0
+
+$ pigs sero /dev/tty1 38400 0
+1
+...
+
+SERR::
+
+This command returns up to [*num*] bytes of data read from the
+serial device associated with handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs serr 0 10
+5 48 49 128 144 255
+
+$ pigs serr 0 10
+0
+...
+
+SERRB::
+
+This command returns a byte of data read from the serial
+device associated with handle [*h*].
+
+Upon success a number between 0 and 255 is returned.
+On error a negative status code will be returned.
+
+...
+$ pigs serrb 0
+23
+$ pigs serrb 0
+45
+...
+
+SERW::
+
+This command writes bytes [*bvs*] to the serial device
+associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs serw 0 23 45 67 89
+...
+
+SERWB::
+
+This command writes a single byte [*bv*] to the serial device
+associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs serwb 0 23
+$ pigs serwb 0 0xf0
+...
+
+SHELL ::
+
+This command uses the system call to execute a shell script [*name*]
+with the given string [*str*] as its parameter.
+
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+[*name*] must exist in /opt/pigpio/cgi and must be executable.
+
+The returned exit status is normally 256 times that set
+by the shell script exit function.  If the script can't
+be found 32512 will be returned.
+
+The following table gives some example returned statuses.
+
+Script exit status @ Returned system call status
+1                  @ 256
+5                  @ 1280
+10                 @ 2560
+200                @ 51200
+script not found   @ 32512
+
+...
+# pass two parameters, hello and world
+$ pigs shell scr1 hello world
+256
+
+# pass three parameters, hello, string with spaces, and world
+$ pigs shell scr1 "hello 'string with spaces' world"
+256
+
+# pass one parameter, hello string with spaces world
+$ pigs shell scr1 "\"hello string with spaces world\""
+256
+
+# non-existent script
+$ pigs shell scr78 par1
+32512
+...
+
+SLR ::
+
+This command returns up to [*num*] bytes of bit bang serial data
+read from GPIO [*u*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+The GPIO [*u*] should have been initialised with the [*SLRO*] command.
+
+The bytes returned for each character depend upon the number of
+data bits [*db*] specified in the [*SLRO*] command.
+
+For [*db*] 1-8 there will be one byte per character. 
+For [*db*] 9-16 there will be two bytes per character. 
+For [*db*] 17-32 there will be four bytes per character.
+
+...
+$ pigs slr 15 20
+6 1 0 23 45 89 0
+...
+
+SLRC ::
+
+This command closes GPIO [*u*] for reading bit bang serial data.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs slrc 23
+
+$ pigs slrc 23
+-38
+ERROR: no serial read in progress on GPIO
+...
+
+SLRI ::
+
+This command sets the logic level for reading bit bang serial data
+on GPIO [*u*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The invert parameter [*v*] is 1 for inverted signal, 0 for normal.
+
+...
+$ pigs slri 17 1 # invert logic on GPIO 17
+
+$ pigs slri 23 0 # use normal logic on GPIO 23
+...
+
+SLRO ::
+
+This command opens GPIO [*u*] for reading bit bang serial data
+at [*b*] baud and [*db*] data bits.
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The baud rate may be between 50 and 250000 bits per second.
+
+The received data is held in a cyclic buffer.
+
+It is the user's responsibility to read the data (with [*SLR*])
+in a timely fashion.
+
+...
+$ pigs slro 23 19200 8
+
+$ pigs slro 23 19200 8
+-50
+ERROR: GPIO already in use
+...
+
+SPIC ::
+
+This command closes the SPI handle [*h*] returned by a prior
+call to [*SPIO*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs spic 1
+
+$ pigs spic 1
+-25
+ERROR: unknown handle
+...
+
+SPIO ::
+
+This command returns a handle to a SPI device on channel [*c*].
+
+Data will be transferred at [*b*] bits per second.  The flags [*spf*]
+may be used to modify the default behaviour of 4-wire operation,
+mode 0, active low chip select.
+
+Speeds between 32kbps and 125Mbps are allowed.  Speeds above 30Mbps
+are unlikely to work.
+
+The Pi has two SPI peripherals: main and auxiliary.
+
+The main SPI has two chip selects (channels), the auxiliary has
+three.
+
+The auxiliary SPI is available on all models but the A and B.
+
+The GPIO used are given in the following table.
+
+         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
+Main SPI @    9 @   10 @   11 @   8 @   7 @   -
+Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
+
+The flags consists of the least significant 22 bits.
+
+. .
+21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+. .
+
+mm defines the SPI mode.
+
+Warning:  modes 1 and 3 do not appear to work on the auxiliary SPI.
+
+. .
+Mode POL PHA
+ 0    0   0
+ 1    0   1
+ 2    1   0
+ 3    1   1
+. .
+
+px is 0 if CEx is active low (default) and 1 for active high.
+
+ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
+
+A is 0 for the main SPI, 1 for the auxiliary SPI.
+
+W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
+SPI only.
+
+nnnn defines the number of bytes (0-15) to write before switching
+the MOSI line to MISO to read data.  This field is ignored
+if W is not set.  Main SPI only.
+
+T is 1 if the least significant bit is transmitted on MOSI first, the
+default (0) shifts the most significant bit out first.  Auxiliary SPI
+only.
+
+R is 1 if the least significant bit is received on MISO first, the
+default (0) receives the most significant bit first.  Auxiliary SPI
+only.
+
+bbbbbb defines the word size in bits (0-32).  The default (0)
+sets 8 bits per word.  Auxiliary SPI only.
+
+The [*SPIR*], [*SPIW*], and [*SPIX*] commands transfer data
+packed into 1, 2, or 4 bytes according to the word size in bits.
+
+For bits 1-8 there will be one byte per character. 
+For bits 9-16 there will be two bytes per character. 
+For bits 17-32 there will be four bytes per character.
+
+Multi-byte transfers are made in least significant byte first order.
+
+E.g. to transfer 32 11-bit words 64 bytes need to be sent.
+
+E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
+by 0x1A.
+
+The other bits in flags should be set to zero.
+
+Upon success a handle (>=0) is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs spio 0 100000 3 # Open channel 0 at 100kbps in mode 3.
+0
+
+$ pigs spio 0 32000 256 # Open channel 0 of auxiliary spi at 32kbps.
+1
+...
+
+SPIR ::
+
+This command returns [*num*] bytes read from the SPI device
+associated with handle [*h*].
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs spir 0 10 # Read 10 bytes from the SPI device.
+10 0 0 0 0 0 0 0 0 0 0
+...
+
+SPIW ::
+
+This command writes bytes [*bvs*] to the SPI device
+associated with handle [*h*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs spiw 0 0x22 0x33 0xcc 0xff
+...
+
+SPIX::
+
+This command writes bytes [*bvs*] to the SPI device
+associated with handle [*h*].  It returns the same
+number of bytes read from the device.
+
+Upon success the count of returned bytes followed by the bytes themselves
+is returned.  On error a negative status code will be returned.
+
+...
+$ pigs spix 0 0x22 0x33 0xcc 0xff
+4 0 0 0 0
+...
+
+T/TICK ::
+
+This command returns the current system tick.
+
+Tick is the number of microseconds since system boot.
+
+As tick is an unsigned 32 bit quantity it wraps around after 2^32 microseconds,
+which is approximately 1 hour 12 minutes.
+
+...
+$ pigs t mils 1000 t
+3691823946
+3692833987
+...
+
+TRIG ::
+
+This command sends a trigger pulse of [*pl*] microseconds at level [*L*]
+to GPIO [*u*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The GPIO is set to not level at the end of the pulse.
+
+...
+$ pigs trig 4 10 1
+
+$ pigs trig 4 51 1
+-46
+ERROR: trigger pulse > 50 microseconds
+...
+
+W/WRITE ::
+
+This command sets GPIO [*g*] to level [*L*].  The level may be 0
+(low, off, clear) or 1 (high, on, set).
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs w 23 0
+$ pigs w 23 1
+
+$ pigs w 23 2
+-5
+ERROR: level not 0-1
+...
+
+WDOG ::
+
+This command sets a watchdog of [*v*] milliseconds on GPIO [*u*].
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+The watchdog is nominally in milliseconds.
+
+One watchdog may be registered per GPIO.
+
+The watchdog may be cancelled by setting timeout to 0.
+
+Once a watchdog has been started monitors of the GPIO
+will be triggered every timeout interval after the last
+GPIO activity.  The watchdog expiry will be indicated by
+a special TIMEOUT value.
+
+...
+$ pigs wdog 23 90000
+-15
+ERROR: timeout not 0-60000
+
+$ pigs wdog 23 9000
+...
+
+This example causes a report to be written to any notification pipes
+listening on GPIO 23 whenever GPIO 23 changes state or approximately
+every 9000 ms.
+
+WVAG ::
+
+This command adds 1 one or more triplets [*trips*] of GPIO on, GPIO off,
+delay to the existing waveform (if any).
+
+Upon success the total number of pulses in the waveform so far is
+returned.  On error a negative status code will be returned.
+
+The triplets will be added at the start of the existing waveform.  If
+they are to start offset from the start then the first triplet should
+consist solely of a delay i.e. 0 0 offset.
+
+...
+$ pigs wvag 0x10 0x80 1000 0x80 0x10 9000
+2
+
+$ pigs wvag 0 0 10000 0x10 0x80 1000 0x80 0x10 9000
+4
+...
+
+WVAS ::
+
+This command adds a waveform representing serial data [*bvs*] to
+GPIO [*u*] at [*b*] baud to the existing waveform (if any).
+The serial data starts [*o*] microseconds from the start of the
+waveform.
+
+Upon success the total number of pulses in the waveform so far is
+returned.  On error a negative status code will be returned.
+
+The serial data is formatted as one start bit, [*db*] data bits, and
+[*sb*]/2 stop bits.
+
+The baud rate may be between 50 and 1000000 bits per second.
+
+It is legal to add serial data streams with different baud rates to
+the same waveform.
+
+The bytes required for each character depend upon [*db*].
+
+For [*db*] 1-8 there will be one byte per character. 
+For [*db*] 9-16 there will be two bytes per character. 
+For [*db*] 17-32 there will be four bytes per character.
+
+...
+$ pigs wvas 4 9600 8 2 0 0x30 0x31 0x32 0x33
+23
+
+$ pigs wvas 7 38400 8 2 0 0x41 0x42
+35
+...
+
+WVTAT ::
+
+This command returns the id of the waveform currently
+being transmitted.  Chained waves are not supported.
+
+Returns the waveform id or one of the following special
+values:
+
+9998 - transmitted wave not found 
+9999 - no wave being transmitted
+
+...
+$ pigs wvtat
+9999
+...
+
+WVBSY ::
+
+This command checks to see if a waveform is currently being transmitted.
+
+Returns 1 if a waveform is currently being transmitted, otherwise 0.
+
+...
+$ pigs wvbsy
+0
+...
+
+WVCHA ::
+
+This command transmits a chain of waveforms.
+
+NOTE: Any hardware PWM started by [*HP*] will
+be cancelled.
+
+The waves to be transmitted are specified by the contents of
+[*bvs*] which contains an ordered list of wave_ids and optional
+command codes and related data.
+
+Upon success 0 is returned.  On error a negative status code
+will be returned.
+
+Each wave is transmitted in the order specified.  A wave may
+occur multiple times per chain.
+
+A blocks of waves may be transmitted multiple times by using
+the loop commands. The block is bracketed by loop start and
+end commands.  Loops may be nested.
+
+Delays between waves may be added with the delay command.
+
+The following command codes are supported:
+
+Name         @ Cmd & Data @ Meaning
+Loop Start   @ 255 0      @ Identify start of a wave block
+Loop Repeat  @ 255 1 x y  @ loop x + y*256 times
+Delay        @ 255 2 x y  @ delay x + y*256 microseconds
+Loop Forever @ 255 3      @ loop forever
+
+If present Loop Forever must be the last entry in the chain.
+
+The code is currently dimensioned to support a chain with roughly
+600 entries and 20 loop counters.
+
+...
+#!/bin/bash
+
+GPIO=4
+WAVES=5
+
+pigs m $GPIO w
+
+for ((i=0; i<$WAVES; i++))
+do
+   pigs wvag $((1<<GPIO)) 0 20 0 $((1<<GPIO)) $(((i+1)*200))
+   w[i]=$(pigs wvcre)
+done
+
+# transmit waves 4+3+2
+# loop start
+#    transmit waves 0+0+0
+#    loop start
+#       transmit waves 0+1
+#       delay 5000us
+#    loop end (repeat 30 times)
+#    loop start
+#       transmit waves 2+3+0
+#       transmit waves 3+1+2
+#    loop end (repeat 10 times)
+# loop end (repeat 5 times)
+# transmit waves 4+4+4
+# delay 20000us
+# transmit waves 0+0+0
+
+pigs wvcha \
+   ${w[4]} ${w[3]} ${w[2]} \
+   255 0 \
+      ${w[0]} ${w[0]} ${w[0]} \
+      255 0 \
+         ${w[0]} ${w[1]} \
+         255 2 0x88 0x13 \
+      255 1 30 0 \
+      255 0 \
+         ${w[2]} ${w[3]} ${w[0]} \
+         ${w[3]} ${w[1]} ${w[2]} \
+      255 1 10 0 \
+   255 1 5 0 \
+   ${w[4]} ${w[4]} ${w[4]} \
+   255 2 0x20 0x4E \
+   ${w[0]} ${w[0]} ${w[0]}
+
+while [[ $(pigs wvbsy) -eq 1 ]]; do sleep 0.1; done
+
+for ((i=0; i<$WAVES; i++)); do echo ${w[i]}; pigs wvdel ${w[i]}; done
+...
+
+WVCLR ::
+
+This command clears all waveforms.
+
+Nothing is returned.
+
+...
+$ pigs wvclr
+...
+
+WVCRE ::
+
+This command creates a waveform from the data provided by the prior
+calls to the [*WVAG*] and [*WVAS*] commands.
+
+Upon success a wave id (>=0) is returned.  On error a negative status
+code will be returned.
+
+The data provided by the [*WVAG*] and [*WVAS*] commands is
+consumed by this command.
+
+As many waveforms may be created as there is space available.
+The wave id is passed to [*WVTX*] or [*WVTXR*] to specify the
+waveform to transmit.
+
+Normal usage would be
+
+Step 1. [*WVCLR*] to clear all waveforms and added data.
+
+Step 2. [*WVAG*]/[*WVAS*] calls to supply the waveform data.
+
+Step 3. [*WVCRE*] to create the waveform and get a unique id.
+
+Repeat steps 2 and 3 as needed.
+
+Step 4. [*WVTX*] or [*WVTXR*] with the id of the waveform to transmit.
+
+A waveform comprises of one or more pulses.
+
+A pulse specifies
+
+1) the GPIO to be switched on at the start of the pulse. 
+2) the GPIO to be switched off at the start of the pulse. 
+3) the delay in microseconds before the next pulse.
+
+Any or all the fields can be zero.  It doesn't make any sense to
+set all the fields to zero (the pulse will be ignored).
+
+When a waveform is started each pulse is executed in order with
+the specified delay between the pulse and the next.
+
+...
+$ pigs wvas 4 9600 0 23 45 67 89 90
+37
+$ pigs wvcre
+0
+
+$ pigs wvcre
+-69
+ERROR: attempt to create an empty waveform
+...
+
+WVCAP ::
+
+Create a waveform of fixed size. Similar to [*WVCRE*], this command creates a waveform but pads the consumed resources to a fixed size, specified as a [*percent*] of the total resources. Padded waves of equal size can be re-cycled efficiently allowing newly created waves to re-use the resources of deleted waves of the same dimension.
+
+Upon success a wave id (>=0) is returned. On error a negative status code will be returned.
+
+The data provided by the [*WVAG*] and [*WVAS*] commands are consumed by this command.
+
+As many waveforms may be created as there is space available. The wave id is passed to [*WVTX*] or [*WVTXR*] to specify the waveform to transmit.
+
+Normal usage would be
+
+Step 1. [*WVCLR*] to clear all waveforms and added data.
+
+Step 2. [*WVAG*]/[*WVAS*] calls to supply the waveform data.
+
+Step 3. [*WVCAP*] to create a waveform of a uniform size.
+
+Step 4. [*WVTX*] or [*WVTXR*] with the id of the waveform to transmit.
+
+Repeat steps 2 - 4 as needed.
+
+Step 5. Any wave id can now be deleted and another wave of the same size can be created in its place.
+
+Example
+
+...
+# Create a wave that consumes 50% of the total resource:
+
+$ pigs wvag 16 0 5000000 0 16 5000000
+2
+$ pigs wvcap 50
+0
+$ pigs wvtx 0
+11918
+...
+
+WVDEL ::
+
+This command deletes the waveform with id [*wid*].
+
+The wave is flagged for deletion.  The resources used by the wave
+will only be reused when either of the following apply.
+
+- all waves with higher numbered wave ids have been deleted or have
+been flagged for deletion.
+
+- a new wave is created which uses exactly the same resources as
+the current wave (see the C source for gpioWaveCreate for details).
+
+Upon success nothing is returned.  On error a negative status code
+will be returned.
+
+...
+$ pigs wvdel 0
+
+$ pigs wvdel 0
+-66
+ERROR: non existent wave id
+...
+
+WVHLT ::
+
+This command aborts the transmission of the current waveform.
+
+Nothing is returned.
+
+This command is intended to stop a waveform started in the repeat mode.
+
+...
+$ pigs wvhlt
+...
+
+WVNEW ::
+
+This clears any existing waveform data ready for the creation of a new
+waveform.
+
+Nothing is returned.
+
+...
+$ pigs wvnew
+...
+
+WVSC ::
+
+The statistic requested by [*ws*] is returned.
+
+[*ws*] identifies the subcommand as follows.
+
+0 Get Cbs 
+1 Get High Cbs 
+2 Get Max Cbs
+
+...
+$ pigs wvas 4 9600 0 23 45 67 89 90
+37
+
+$ pigs wvsc 0
+74
+$ pigs wvsc 1
+74
+$ pigs wvsc 2
+25016
+...
+
+WVSM ::
+
+The statistic requested by [*ws*] is returned.
+
+[*ws*] identifies the subcommand as follows.
+
+0 Get Micros 
+1 Get High Micros 
+2 Get Max Micros
+
+...
+$ pigs wvsm 0
+5314
+$ pigs wvsm 1
+5314
+$ pigs wvsm 2
+1800000000
+...
+
+WVSP ::
+
+The statistic requested by [*ws*] is returned.
+
+[*ws*] identifies the subcommand as follows.
+
+0 Get Pulses 
+1 Get High Pulses 
+2 Get Max Pulses
+
+...
+$ pigs wvsp 0
+37
+$ pigs wvsp 1
+37
+$ pigs wvsp 2
+12000
+...
+
+WVTX ::
+
+This command transmits the waveform with id [*wid*] once.
+
+NOTE: Any hardware PWM started by [*HP*] will be cancelled.
+
+Upon success the number of DMA control blocks in the waveform is returned.
+On error a negative status code will be returned.
+
+...
+$ pigs wvtx 1
+75
+
+$ pigs wvtx 2
+-66
+ERROR: non existent wave id
+...
+
+WVTXM ::
+
+This command transmits the waveform with id [*wid*] using mode [*wmde*].
+
+The mode may be send once (0), send repeatedly (1), send once but
+first sync with previous wave (2), or send repeatedly but first
+sync with previous wave (3).
+
+WARNING: bad things may happen if you delete the previous
+waveform before it has been synced to the new waveform.
+
+NOTE: Any hardware PWM started by [*HP*] will be cancelled.
+
+Upon success the number of DMA control blocks in the waveform is returned.
+On error a negative status code will be returned.
+
+...
+$ pigs wvtxm 1 3
+75
+
+$ pigs wvtxm 2 0
+-66
+ERROR: non existent wave id
+...
+
+WVTXR ::
+
+This command transmits the waveform with id [*wid*] repeatedly.
+
+NOTE: Any hardware PWM started by [*HP*] will be cancelled.
+
+Upon success the number of DMA control blocks in the waveform is returned.
+On error a negative status code will be returned.
+
+...
+$ pigs wvtxr 1
+75
+
+$ pigs wvtxr 2
+-66
+ERROR: non existent wave id
+...
+
+PARAMETERS
+
+actv :: 0-1000000
+
+The number of microseconds level changes are reported for once
+a noise filter has been triggered (by [*stdy*] microseconds of
+a stable level).
+
+b :: baud
+The command expects the baud rate in bits per second for
+the transmission of serial data (I2C/SPI/serial link, waves).
+
+bctl :: BSC control word
+The command expects a BSC control word, see [*BSCX*].
+
+bit :: bit value (0-1)
+The command expects 0 or 1.
+
+bits :: a bit mask
+A mask is used to select one or more GPIO.  A GPIO is selected
+if bit (1<<GPIO) is set in the mask.
+
+E.g. a mask of 6 (binary 110) select GPIO 1 and 2, a mask of
+0x103 (binary 100000011) selects GPIO 0, 1, and 8.
+
+bv :: a byte value (0-255)
+The command expects a byte value.
+
+bvs :: byte values (0-255)
+The command expects one or more byte values.
+
+c :: SPI channel (0-1)
+The command expects a SPI channel.
+
+cf :: hardware clock frequency (4689-250M, 13184-375M for the BCM2711)
+The command expects a frequency.
+
+cs :: GPIO (0-31)
+The GPIO used for the slave select signal when bit banging SPI.
+
+db :: serial data bits (1-32)
+The command expects the number of data bits per serial character.
+
+dev :: a tty serial device (/dev/tty* or /dev/serial*)
+The command expects the name of a tty serial device, e.g.
+
+...
+/dev/ttyAMA0
+/dev/ttyUSB0
+/dev/tty0
+/dev/serial0
+...
+
+event :: 0-31
+An event is a signal used to inform one or more consumers
+to start an action.
+
+file :: a file name
+The file name must match an entry in /opt/pigpio/access.
+
+from :: 0-2
+Position to seek from [*FS*].
+
+  @ From
+0 @ start
+1 @ current position
+2 @ end
+
+g :: GPIO (0-53)
+The command expects a GPIO.
+
+There are 54 General Purpose Input Outputs (GPIO) named gpio0 through gpio53.
+
+They are split into two banks.  Bank 1 consists of gpio0 through gpio31.
+Bank 2 consists of gpio32 through gpio53.
+
+All the GPIO which are safe for the user to read and write are in bank 1.
+Not all GPIO in bank 1 are safe though. Type 1 boards have 17 safe GPIO.
+Type 2 boards have 21. Type 3 boards have 26.
+
+See [*HWVER*].
+
+The user GPIO are marked with an X in the following table.
+
+        @ 0@ 1@ 2@ 3@ 4@ 5@ 6@ 7@ 8@ 9@10@11@12@13@14@15
+Type 1  @ X@ X@ -@ -@ X@ -@ -@ X@ X@ X@ X@ X@ -@ -@ X@ X
+Type 2  @ -@ -@ X@ X@ X@ -@ -@ X@ X@ X@ X@ X@ -@ -@ X@ X
+Type 3  @  @  @ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X
+        @  @  @  @  @  @  @  @  @  @  @  @  @  @  @  @
+        @16@17@18@19@20@21@22@23@24@25@26@27@28@29@30@31
+Type 1  @ -@ X@ X@ -@ -@ X@ X@ X@ X@ X@ -@ -@ -@ -@ -@ -
+Type 2  @ -@ X@ X@ -@ -@ -@ X@ X@ X@ X@ -@ X@ X@ X@ X@ X
+Type 3  @ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ X@ -@ -@ -@ -
+
+You are not prevented from writing to unsafe GPIO.  The consequences
+of doing so range from no effect, to a crash, or corrupted data.
+
+h :: handle (>=0)
+The command expects a handle.
+
+A handle is a number referencing an object opened by one of [*FO*],
+[*I2CO*], [*NO*], [*SERO*], [*SPIO*].
+
+ib :: I2C bus (>=0)
+The command expects an I2C bus number.
+
+id :: I2C device (0-0x7F)
+The command expects the address of an I2C device.
+
+if :: I2C flags (0)
+The command expects an I2C flags value.  No flags are currently defined.
+
+L :: level (0-1)
+The command expects a GPIO level.
+
+m :: mode (RW540123)
+The command expects a mode character.
+
+Each GPIO can be configured to be in one of 8 different modes. The modes
+are named Input, Output, ALT0, ALT1, ALT2, ALT3, ALT4, and ALT5.
+
+To set the mode use the code for the mode.
+
+The value is returned by the mode get command.
+
+Mode  @ Input @ Output @ ALT0 @ ALT1 @ ALT2 @ ALT3 @ ALT4 @ ALT5
+Code  @   R   @    W   @   0  @   1  @   2  @   3  @   4  @   5
+Value @   0   @    1   @   4  @   5  @   6  @   7  @   3  @   2
+
+miso :: GPIO (0-31)
+The GPIO used for the MISO signal when bit banging SPI.
+
+mode :: file open mode
+One of the following values.
+
+      @ Value @ Meaning
+READ  @   1   @ open file for reading
+WRITE @   2   @ open file for writing
+RW    @   3   @ open file for reading and writing
+
+The following values can be or'd into the mode.
+
+       @ Value @ Meaning
+APPEND @ 4     @ All writes append data to the end of the file
+CREATE @ 8     @ The file is created if it doesn't exist
+TRUNC  @ 16    @ The file is truncated
+
+mosi :: GPIO (0-31)
+The GPIO used for the MOSI signal when bit banging SPI.
+
+name :: the name of a script
+Only alphanumeric characters, '-' and '_' are allowed in the name.
+
+num :: maximum number of bytes to return (1-)
+The command expects the maximum number of bytes to return.
+
+For the I2C and SPI commands the requested number of bytes will always
+be returned.
+
+For the serial and file commands the smaller of the number of
+bytes available to be read (which may be zero) and [*num*] bytes
+will be returned.
+
+o :: offset (>=0)
+Serial data is stored offset microseconds from the start of the waveform.
+
+p :: PUD (ODU)
+The command expects a PUD character.
+
+Each GPIO can be configured to use or not use an internal pull up or
+pull down resistor.  This is useful to provide a default state for inputs.
+
+A pull up will default the input to 1 (high).
+
+A pull down will default the input to 0 (low).
+
+To set the pull up down state use the command character for the state.
+
+Pull Up Down     @Off@Pull Down@Pull Up
+Command Character@  O@        D@      U
+
+There is no mechanism to read the pull up down state.
+
+pad :: 0-2
+A set of GPIO which share common drivers.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+padma:: 1-16
+The mA which may be drawn from each GPIO whilst still guaranteeing the
+high and low levels.
+
+pars :: script parameters
+The command expects 0 to 10 numbers as parameters to be passed to the script.
+
+pat :: a file name pattern
+A file path which may contain wildcards.  To be accessible the path
+must match an entry in /opt/pigpio/access.
+
+pdc :: hardware PWM dutycycle (0-1000000)
+The command expects a dutycycle.
+
+percent :: percent (1-100)
+The percent of wave resources to allocate to a wave.  It can be useful
+to create waves of fixed sizes to prevent wave fragmentation (where
+there are plenty of resources but not a large enough contiguous space).
+
+pf :: hardware PWM frequency (1-125M, 1-187.5M for the BCM2711)
+The command expects a frequency.
+
+pl :: pulse length (1-100)
+The command expects a pulse length in microseconds.
+
+r :: register (0-255)
+The command expects an I2C register number.
+
+sb :: serial stop (half) bits (2-8)
+The command expects the number of stop (half) bits per serial character.
+
+scl :: user GPIO (0-31)
+The command expects the number of the GPIO to be used for SCL
+when bit banging I2C.
+
+sclk :: user GPIO (0-31)
+The GPIO used for the SCLK signal when bit banging SPI.
+
+sda :: user GPIO (0-31)
+The command expects the number of the GPIO to be used for SDA
+when bit banging I2C.
+
+sef :: serial flags (32 bits)
+The command expects a flag value.  No serial flags are currently defined.
+
+sid :: script id (>= 0)
+The command expects a script id as returned by a call to [*PROC*].
+
+spf :: SPI flags (32 bits)
+See [*SPIO*] and [*BSPIO*].
+
+stdy :: 0-300000
+
+The number of microseconds level changes must be stable for
+before reporting the level changed ([*FG*]) or triggering
+the active part of a noise filter ([*FN*]).
+
+str :: a string
+The command expects a string.
+
+t :: a string
+The command expects a string.
+
+trips :: triplets
+The command expects 1 or more triplets of GPIO on, GPIO off, delay.
+
+E.g. 0x400000 0 100000 0 0x400000 900000 defines two pulses as follows
+
+     GPIO on      @    GPIO off      @    delay
+0x400000 (GPIO 22)@          0 (None)@100000 (1/10th s)
+          0 (None)@0x400000 (GPIO 22)@900000 (9/10th s)
+
+u :: user GPIO (0-31)
+The command expects the number of a user GPIO.
+
+A number of commands are restricted to GPIO in bank 1,
+in particular the PWM commands, the servo command,
+the watchdog command, and the notification command.
+
+It is your responsibility to ensure that the PWM and servo commands
+are only used on safe GPIO.
+
+See [*g*]
+
+uvs :: values
+The command expects an arbitrary number of >=0 values (possibly none).
+Any after the first two must be <= 255.
+
+v :: value
+The command expects a number.
+
+wid :: wave id (>=0)
+The command expects a wave id.
+
+When a waveform is created it is given an id (0, 1, 2, ...).
+
+wmde :: mode (0-3)
+The command expects a wave transmission mode.
+
+0 = send once 
+1 = send repeatedly 
+2 = send once but first sync with previous wave 
+3 = send repeatedly but first sync with previous wave 
+
+ws :: wave stats sucommand (0-2)
+The command expects a subcommand.
+
+0 = current value. 
+1 = highest value so far. 
+2 = maximum possible value.
+
+wv :: word value (0-65535)
+The command expects a word value.
+
+SCRIPTS
+
+Scripts are programs to be stored and executed by the pigpio daemon.
+They are intended to mitigate any performance problems associated with
+the pigpio daemon server/client model.
+
+*Example*
+
+A trivial example might be useful.  Suppose you want to toggle a GPIO
+on and off as fast as possible.
+
+From the command line you could write
+
+...
+for ((i=0; i<1000;i++)); do pigs w 22 1 w 22 0; done
+...
+
+Timing that you will see it takes about 14 seconds, or roughly
+70 toggles per second.
+
+Using the pigpio Python module you could use code such as
+
+...
+#!/usr/bin/env python
+
+import time
+
+import pigpio
+
+PIN=4
+
+TOGGLE=10000
+
+pi = pigpio.pi() # Connect to local Pi.
+
+s = time.time()
+
+for i in range(TOGGLE):
+   pi.write(PIN, 1)
+   pi.write(PIN, 0)
+
+e = time.time()
+
+print("pigpio did {} toggles per second".format(int(TOGGLE/(e-s))))
+
+pi.stop()
+...
+
+Timing that shows a speed improvement to roughly 800 toggles per second.
+
+Now let's use a script.
+
+...
+pigs proc tag 999 w 22 1 w 22 0 dcr p0 jp 999
+...
+
+Ignore the details for now.
+
+Let's time the script running.
+
+Again, ignore the details for now.
+
+...
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+ do sleep 0.2; done)
+...
+
+The script takes roughly 12 seconds to complete, or 800,000 toggles per second.
+
+That is the advantage of a stored script.
+
+Some details.
+
+...
+pigs proc tag 999 w 22 1 w 22 0 dcr p0 jp 999
+...
+
+proc introduces a script.  Everything after proc is part of the script. 
+tag 999 names the current position in the script. 
+w 22 1 writes 1 to GPIO 22. 
+w 22 0 writes 0 to GPIO 22. 
+dcr p0 decrements parameter 0. 
+jp 999 jumps to tag 999 if the result is positive.
+
+...
+time (pigs procr 0 10000000; while a=$(pigs procp 0); [[ ${a::1} -eq 2 ]];\
+ do sleep 0.2; done)
+...
+
+pigs procr 0 10000000 starts script 0 with parameter 0 of 10 million.
+
+The rest is bash apart from
+
+pigs procp 0 asks for the status and parameters of script 0.
+The status will be 2 while the script is running and 1 when it is complete.
+
+*Virtual machine*
+
+A script runs within a virtual machine with
+
+a 32 bit accumulator A. 
+a flags register F. 
+a program counter PC.
+
+Each script has
+
+10 parameters named 0 through 9. 
+150 variables named 0 through 149. 
+50 labels which are named by any unique number.
+
+*Commands*
+
+Many pigpio commands may be used within a script.  However
+some commands do not work within the script model as designed and
+are not permitted.
+
+The following commands are not permitted within a script:
+
+File - FL FO FR FW
+
+I2C - BI2CZ I2CPK I2CRD I2CRI I2CRK I2CWD I2CWI I2CWK I2CZ
+
+Misc - BSCX CF1 CF2 SHELL
+
+Script control - PARSE PROC PROCD PROCP PROCR PROCS PROCU
+
+Serial - SERO SERR SERW SLR
+
+SPI - BSPIO BSPIX SPIR SPIW SPIX
+
+Waves - WVAG WVAS WVCHA WVGO WVGOR
+
+The following commands are only permitted within a script:
+
+Command@Description                                  @Definition
+ADD x  @Add x to accumulator                         @A+=x; F=A
+AND x  @And x with accumulator                       @A&=x; F=A
+CALL L @Call subroutine at tag L                     @push(PC+1); PC=L
+CMP x  @Compare x with accumulator                   @F=A-x
+DCR y  @Decrement register                           @--*y; F=*y
+DCRA   @Decrement accumulator                        @--A; F=A
+DIV x  @Divide x into accumulator                    @A/=x; F=A
+EVTWT  @Wait for an event to occur                   @A=wait(x); F=A
+HALT   @Halt                                         @Halt
+INR y  @Increment register                           @++*y; F=*y
+INRA   @Increment accumulator                        @++A; F=A
+JM L   @Jump if minus to tag L                       @if (F<0) PC=L
+JMP L  @Jump to tag L                                @PC=L
+JNZ L  @Jump if non-zero to tag L                    @if (F) PC=L
+JP L   @Jump if positive to tag L                    @if (F>=0) PC=L
+JZ L   @Jump if zero to tag L                        @if (!F) PC=L
+LD y x @Load register with x                         @*y=x
+LDA x  @Load accumulator with x                      @A=x
+MLT x  @Multiply x with accumulator                  @A*=x; F=A
+MOD x  @Modulus x with accumulator                   @A%=x; F=A
+OR x   @Or x with accumulator                        @A|=x; F=A
+POP y  @Pop register                                 @y=pop()
+POPA   @Pop accumulator                              @A=pop()
+PUSH y @Push register                                @push(y)
+PUSHA  @Push accumulator                             @push(A)
+RET    @Return from subroutine                       @PC=pop()
+RL y x @Rotate left register x bits                  @*y<<=x; F=*y
+RLA x  @Rotate left accumulator x bits               @A<<=x; F=A
+RR y x @Rotate right register x bits                 @*y>>=x; F=*y
+RRA x  @Rotate right accumulator x bits              @A>>=x; F=A
+STA y  @Store accumulator in register                @y=A
+SUB x  @Subtract x from accumulator                  @A-=x; F=A
+SYS str@Run external script (/opt/pigpio/cgi/str)    @system(str); F=A
+TAG L  @Label the current script position            @N/A
+WAIT x @Wait for a GPIO in x to change state         @A=wait(x); F=A
+X y1 y2@Exchange contents of registers y1 and y2     @t=*y1;*y1=*y2;*y2=t
+XA y   @Exchange contents of accumulator and register@t=A;A=*y;*y=t
+XOR x  @Xor x with accumulator                       @A^=x; F=A
+
+x may be a constant, a parameter (p0-p9), or a variable (v0-v149).
+
+y may be a parameter (p0-p9), or a variable (v0-v149).  If p or v isn't
+specified y is assumed to be a variable.
+
+The EVTWT command parameter is a bit-mask with 1 set for events of interest.
+
+The WAIT command parameter is a bit-mask with 1 set for GPIO of interest.
+
+The SYS script receives two unsigned parameters: the accumulator A and
+the current GPIO levels.
+

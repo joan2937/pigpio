@@ -546,6 +546,8 @@ wave_add_serial            Adds serial data to the waveform
 .br
 wave_create                Creates a waveform from added data
 .br
+wave_create_and_pad        Creates a waveform of fixed size from added data
+.br
 wave_delete                Deletes one or more waveforms
 .br
 
@@ -714,7 +716,7 @@ No value is returned.
 .br
 The thread to be stopped should have been started with \fBstart_thread\fP.
 
-.IP "\fBint pigpio_start(char *addrStr, char *portStr)\fP"
+.IP "\fBint pigpio_start(const char *addrStr, const char *portStr)\fP"
 .IP "" 4
 Connect to the pigpio daemon.  Reserving command and
 notification streams.
@@ -947,7 +949,8 @@ user_gpio: 0-31.
 .br
 
 .br
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
+Returns current PWM dutycycle if OK,
+otherwise PI_BAD_USER_GPIO or PI_NOT_PWM_GPIO.
 
 .br
 
@@ -2391,6 +2394,87 @@ specified delay between the pulse and the next.
 Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 
+.IP "\fBint wave_create_and_pad(int pi, int percent)\fP"
+.IP "" 4
+This function creates a waveform like \fBwave_create\fP but pads the consumed
+resources. Where percent gives the percentage of the resources to use (in terms
+of the theoretical maximum, not the current amount free). This allows the reuse
+.br
+of deleted waves while a transmission is active.
+
+.br
+
+.br
+
+.EX
+pi: >=0 (as returned by \fBpigpio_start\fP).
+.br
+percent: 0-100, size of waveform as percentage of maximum available.
+.br
+
+.EE
+
+.br
+
+.br
+The data provided by the \fBwave_add_*\fP functions are consumed by this
+function.
+
+.br
+
+.br
+As many waveforms may be created as there is space available. The
+wave id is passed to \fBwave_send_*\fP to specify the waveform to transmit.
+
+.br
+
+.br
+A usage would be the creation of two waves where one is filled while the other
+is being transmitted. Each wave is assigned 50% of the resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+.br
+
+.br
+Normal usage:
+
+.br
+
+.br
+Step 1. \fBwave_clear\fP to clear all waveforms and added data.
+
+.br
+
+.br
+Step 2. \fBwave_add_*\fP calls to supply the waveform data.
+
+.br
+
+.br
+Step 3. \fBwave_create_and_pad\fP to create a waveform of uniform size.
+
+.br
+
+.br
+Step 4. \fBwave_send_*\fP with the id of the waveform to transmit.
+
+.br
+
+.br
+Repeat steps 2-4 as needed.
+
+.br
+
+.br
+Step 5. Any wave id can now be deleted and another wave of the same size
+        can be created in its place.
+
+.br
+
+.br
+Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
+PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
+
 .IP "\fBint wave_delete(int pi, unsigned wave_id)\fP"
 .IP "" 4
 This function deletes the waveform with id wave_id.
@@ -2746,7 +2830,7 @@ int main(int argc, char *argv[])
 .IP "\fBint wave_tx_at(int pi)\fP"
 .IP "" 4
 This function returns the id of the waveform currently being
-transmitted.
+transmitted by \fBwave_send*\fP.  Chained waves are not supported.
 
 .br
 
@@ -5920,6 +6004,66 @@ tick        32 bit   The number of microseconds since boot
 
 .EE
 
+.br
+
+.br
+The GPIO are sampled at a rate set when the pigpio daemon
+is started (default 5 us).
+
+.br
+
+.br
+The number of samples per second is given in the following table.
+
+.br
+
+.br
+
+.EX
+              samples
+.br
+              per sec
+.br
+
+.br
+         1  1,000,000
+.br
+         2    500,000
+.br
+sample   4    250,000
+.br
+rate     5    200,000
+.br
+(us)     8    125,000
+.br
+        10    100,000
+.br
+
+.EE
+
+.br
+
+.br
+GPIO level changes shorter than the sample rate may be missed.
+
+.br
+
+.br
+The daemon software which generates the callbacks is triggered
+1000 times per second.  The callbacks will be called once per
+level change since the last time they were called.
+i.e. The callbacks will get all level changes but there will
+be a latency.
+
+.br
+
+.br
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use \fBgpio_read\fP.
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
+
 .IP "\fBint callback_ex(int pi, unsigned user_gpio, unsigned edge, CBFuncEx_t f, void *userdata)\fP"
 .IP "" 4
 This function initialises a new callback.
@@ -6073,18 +6217,6 @@ queue and the master removes it.
 .br
 
 .br
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-.br
-
-.br
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
-.br
-
-.br
 The function sets the BSC mode, writes any data in
 the transmit buffer to the BSC transmit FIFO, and
 copies any data in the BSC receive FIFO to the
@@ -6160,14 +6292,37 @@ that mode until a different control word is sent.
 .br
 
 .br
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
 .br
 
 .br
-When a zero control word is received GPIO 18-21 will be reset
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   18    19    -      -      -      -
+.br
+SPI   -     -     20     19     18     21
+.br
+
+.br
+
+.br
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+.br
+
+.br
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   10    11    -      -      -      -
+.br
+SPI   -     -     9      11     10     8
+.br
+
+.br
+
+.br
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 .br
@@ -6257,7 +6412,7 @@ details.
 .br
 SSSSS   number of bytes successfully copied to transmit FIFO
 .br
-RRRRR   number of bytes in receieve FIFO
+RRRRR   number of bytes in receive FIFO
 .br
 TTTTT   number of bytes in transmit FIFO
 .br
@@ -6315,6 +6470,23 @@ if (status >= 0)
 .br
 
 .EE
+
+.br
+
+.br
+The BSC slave in SPI mode deserializes data from the MOSI pin into its
+receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+transmitter/FIFO data is serialized onto the MISO pin while all other data
+on the MOSI pin is ignored.
+
+.br
+
+.br
+The BK bit of the BSC control register is non-functional when in the SPI
+mode.  The transmitter along with its FIFO can be dequeued by successively
+disabling and re-enabling the TE bit on the BSC control register while in
+SPI mode.
 
 .IP "\fBint bsc_i2c(int pi, int i2c_addr, bsc_xfer_t *bscxfer)\fP"
 .IP "" 4
@@ -6390,8 +6562,7 @@ If there was an error the status will be less than zero
 
 .br
 Note that an i2c_address of 0 may be used to close
-the BSC device and reassign the used GPIO (18/19)
-as inputs.
+the BSC device and reassign the used GPIO as inputs.
 
 .IP "\fBint event_callback(int pi, unsigned event, evtCBFunc_t f)\fP"
 .IP "" 4
@@ -7335,6 +7506,13 @@ high and low levels.
 
 .IP "\fB*param\fP" 0
 An array of script parameters.
+
+.br
+
+.br
+
+.IP "\fBpercent\fP: 0-100" 0
+The size of waveform as percentage of maximum available.
 
 .br
 

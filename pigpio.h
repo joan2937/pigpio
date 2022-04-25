@@ -27,10 +27,11 @@ For more information, please refer to <http://unlicense.org/>
 #ifndef PIGPIO_H
 #define PIGPIO_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <pthread.h>
 
-#define PIGPIO_VERSION 74
+#define PIGPIO_VERSION 79
 
 /*TEXT
 
@@ -105,6 +106,16 @@ return error PI_NOT_INITIALISED.
 
 If the library is initialised the [*gpioCfg**] functions will return
 error PI_INITIALISED.
+
+If you intend to rely on signals sent to your application, you should
+turn off the internal signal handling as shown in this example:
+
+. .
+int cfg = gpioCfgGetInternals();
+cfg |= PI_CFG_NOSIGHANDLER;  // (1<<10)
+gpioCfgSetInternals(cfg);
+int status = gpioInitialise();
+. .
 
 TEXT*/
 
@@ -322,6 +333,7 @@ gpioWaveAddGeneric         Adds a series of pulses to the waveform
 gpioWaveAddSerial          Adds serial data to the waveform
 
 gpioWaveCreate             Creates a waveform from added data
+gpioWaveCreatePad          Creates a waveform of fixed size from added data
 gpioWaveDelete             Deletes a waveform
 
 gpioWaveTxSend             Transmits a waveform
@@ -376,7 +388,6 @@ gpioCfgSocketPort          Configure socket port
 gpioCfgMemAlloc            Configure DMA memory allocation mode
 gpioCfgNetAddr             Configure allowed network addresses
 
-gpioCfgInternals           Configure misc. internals (DEPRECATED)
 gpioCfgGetInternals        Get internal configuration settings
 gpioCfgSetInternals        Set internal configuration settings
 
@@ -792,10 +803,17 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* BSC GPIO */
 
-#define BSC_SDA_MOSI 18
+#define BSC_SDA      18
+#define BSC_MOSI     20
 #define BSC_SCL_SCLK 19
-#define BSC_MISO     20
+#define BSC_MISO     18
 #define BSC_CE_N     21
+
+#define BSC_SDA_2711      10
+#define BSC_MOSI_2711      9
+#define BSC_SCL_SCLK_2711 11
+#define BSC_MISO_2711     10
+#define BSC_CE_N_2711      8
 
 /* Longest busy delay */
 
@@ -1439,6 +1457,12 @@ once per level change since the last time the thread was activated.
 i.e. The active alert functions will get all level changes but there
 will be a latency.
 
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use [*gpioRead*].
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
+
 The tick value is the time stamp of the sample in microseconds, see
 [*gpioTick*] for more details.
 
@@ -1977,6 +2001,49 @@ D*/
 
 
 /*F*/
+int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL);
+/*D
+Similar to [*gpioWaveCreate*], this function creates a waveform but pads the consumed
+resources. Padded waves of equal dimension can be re-cycled efficiently allowing
+newly created waves to re-use the resources of deleted waves of the same dimension.
+
+. .
+pctCB: 0-100, the percent of all DMA control blocks to consume.
+pctBOOL: 0-100, percent On-Off-Level (OOL) buffer to consume for wave output.
+pctTOOL: 0-100, the percent of OOL buffer to consume for wave input (flags).
+. .
+
+Upon success a wave id greater than or equal to 0 is returned, otherwise
+PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+Waveform data provided by [*gpioWaveAdd**] and [*rawWaveAdd**] functions are
+consumed by this function.
+
+A usage would be the creation of two waves where one is filled while the other
+is being transmitted. Each wave is assigned 50% of the resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+...
+  // get firstWaveChunk, somehow
+  gpioWaveAddGeneric(firstWaveChunk);
+  wid = gpioWaveCreatePad(50, 50, 0);
+  gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
+  // get nextWaveChunk
+
+  while (nextWaveChunk) {
+     gpioWaveAddGeneric(nextWaveChunk);
+     nextWid = gpioWaveCreatePad(50, 50, 0);
+     gpioWaveTxSend(nextWid, PI_WAVE_MODE_ONE_SHOT_SYNC);
+     while(gpioWaveTxAt() == wid) time_sleep(0.1);
+     gpioWaveDelete(wid);
+     wid = nextWid;
+     // get nextWaveChunk
+  }
+...
+
+D*/
+
+/*F*/
 int gpioWaveDelete(unsigned wave_id);
 /*D
 This function deletes the waveform with id wave_id.
@@ -2135,7 +2202,7 @@ D*/
 int gpioWaveTxAt(void);
 /*D
 This function returns the id of the waveform currently being
-transmitted.
+transmitted using [*gpioWaveTxSend*].  Chained waves are not supported.
 
 Returns the waveform id or one of the following special values:
 
@@ -2922,12 +2989,6 @@ The output process is simple. You simply append data to the FIFO
 buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
 The function sets the BSC mode, writes any data in
 the transmit buffer to the BSC transmit FIFO, and
 copies any data in the BSC receive FIFO to the
@@ -2956,11 +3017,19 @@ in rxBuf.
 Note that the control word sets the BSC mode.  The BSC will stay in
 that mode until a different control word is sent.
 
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
-When a zero control word is received GPIO 18-21 will be reset
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 18  @ 19  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 20   @ 19   @ 18   @ 21
+
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+    @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+I2C @ 10  @ 11  @ -    @ -    @ -    @ -
+SPI @ -   @ -   @ 9    @ 11   @ 10   @ 8
+
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 The returned function value is the status of the transfer (see below).
@@ -3011,7 +3080,7 @@ pages 165-166 of the Broadcom peripherals document for full
 details.
 
 SSSSS @ number of bytes successfully copied to transmit FIFO
-RRRRR @ number of bytes in receieve FIFO
+RRRRR @ number of bytes in receive FIFO
 TTTTT @ number of bytes in transmit FIFO
 RB    @ receive busy
 TE    @ transmit FIFO empty
@@ -3038,6 +3107,17 @@ if (status >= 0)
    // process transfer
 }
 ...
+
+The BSC slave in SPI mode deserializes data from the MOSI pin into its
+receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+transmitter/FIFO data is serialized onto the MISO pin while all other data
+on the MOSI pin is ignored.
+
+The BK bit of the BSC control register is non-functional when in the SPI
+mode.  The transmitter along with its FIFO can be dequeued by successively
+disabling and re-enabling the TE bit on the BSC control register while in
+SPI mode.
 D*/
 
 /*F*/
@@ -3783,24 +3863,6 @@ The function returns a script id if the script is valid,
 otherwise PI_BAD_SCRIPT.
 D*/
 
-
-/*F*/
-int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
-/*D
-This function runs a stored script.
-
-. .
-script_id: >=0, as returned by [*gpioStoreScript*]
-   numPar: 0-10, the number of parameters
-    param: an array of parameters
-. .
-
-The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
-PI_TOO_MANY_PARAM.
-
-param is an array of up to 10 parameters which may be referenced in
-the script as p0 to p9.
-D*/
 
 /*F*/
 int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
@@ -4925,18 +4987,6 @@ D*/
 
 
 /*F*/
-int gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal);
-/*D
-Used to tune internal settings.
-
-. .
-cfgWhat: see source code
- cfgVal: see source code
-. .
-D*/
-
-
-/*F*/
 uint32_t gpioCfgGetInternals(void);
 /*D
 This function returns the current library internal configuration
@@ -4952,6 +5002,7 @@ settings.
 . .
 cfgVal: see source code
 . .
+
 D*/
 
 
@@ -5753,6 +5804,15 @@ high and low levels.
 *param::
 An array of script parameters.
 
+pctBOOL:: 0-100
+percent On-Off-Level (OOL) buffer to consume for wave output.
+
+pctCB:: 0-100
+the percent of all DMA control blocks to consume.
+
+pctTOOL:: 0-100
+the percent of OOL buffer to consume for wave input (flags).
+
 pi_i2c_msg_t::
 . .
 typedef struct
@@ -6264,6 +6324,7 @@ PARAMS*/
 #define PI_CMD_EVT   116
 
 #define PI_CMD_PROCU 117
+#define PI_CMD_WVCAP 118
 
 /*DEF_E*/
 

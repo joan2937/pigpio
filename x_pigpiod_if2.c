@@ -77,6 +77,10 @@ void t1(int pi)
    gpio_write(pi, GPIO, PI_HIGH);
    v = gpio_read(pi, GPIO);
    CHECK(1, 6, v, 1, 0, "write, read");
+
+   v = pigpio_start(PI_DEFAULT_SOCKET_ADDR_STR, PI_DEFAULT_SOCKET_PORT_STR);
+   CHECK(1, 7, v, 31, 100, "pigpio_start with non-default arguments");
+   pigpio_stop(v);
 }
 
 int t2_count=0;
@@ -432,6 +436,50 @@ To the lascivious pleasing of a lute.\n\
 
    c = wave_get_max_cbs(pi);
    CHECK(5, 21, c, 25016, 0, "wave get max cbs");
+
+   callback_cancel(id);
+
+   /* wave create and pad tests */
+   id = callback(pi, GPIO, FALLING_EDGE, t5cbf);
+   e = wave_clear(pi);
+
+   e = wave_add_generic(pi, 2, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000}
+         });
+   wid = wave_create_and_pad(pi, 50);
+   CHECK(5, 22, wid, 0, 0, "wave create pad, count==1, wid==");
+
+   e = wave_add_generic(pi, 4, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000}
+         });
+   wid = wave_create_and_pad(pi, 50);
+   CHECK(5, 23, wid, 1, 0, "wave create pad, count==2, wid==");
+
+   c = wave_delete(pi, 0);
+   CHECK(5, 24, c, 0, 0, "delete wid==0 success");
+
+   e = wave_add_generic(pi, 6, (gpioPulse_t[])
+         {  {1<<GPIO, 0,  10000},
+            {0, 1<<GPIO,  30000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000},
+            {1<<GPIO, 0,  60000},
+            {0, 1<<GPIO, 100000}
+         });
+   c = wave_create(pi);
+   CHECK(5, 25, c, -67, 0, "No more CBs using wave create");
+   wid = wave_create_and_pad(pi, 50);
+   CHECK(5, 26, wid, 0, 0, "wave create pad, count==3, wid==");
+
+   t5_count = 0;
+   e = wave_chain(pi, (char[]) {1,0}, 2);
+   CHECK(5, 27, e,  0, 0, "wave chain [1,0]");
+   while (wave_tx_busy(pi)) time_sleep(0.1);
+   CHECK(5, 28, t5_count, 5, 1, "callback count==");
 
    callback_cancel(id);
 }

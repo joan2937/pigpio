@@ -1,0 +1,47 @@
+#!/bin/bash
+
+mkdir -p tmp/pydoc
+mkdir -p tmp/body
+
+echo "*** making man pages ***"
+
+echo "pigs"
+bin/smakdoc.py             src/defs/pigs.def     man  >MAN/pigs.1
+
+echo "pigpiod"
+bin/cmakdoc.py pigpiod     src/defs/pigpiod.def  man  >MAN/pigpiod.1
+
+echo "pig2vcd"
+bin/cmakdoc.py pig2vcd     src/defs/pig2vcd.def  man  >MAN/pig2vcd.1
+
+echo "pigpio.h"
+bin/cmakdoc.py pigpio      ../pigpio.h           man  >MAN/pigpio.3
+
+echo "pigpiod_if.h"
+bin/cmakdoc.py pigpiod_if  ../pigpiod_if.h       man  >MAN/pigpiod_if.3
+
+echo "pigpiod_if2.h"
+bin/cmakdoc.py pigpiod_if2 ../pigpiod_if2.h      man  >MAN/pigpiod_if2.3
+
+# *** preparing HTML bodies ***
+
+bin/smakdoc.py             src/defs/pigs.def      >tmp/body/pigs.body 
+bin/cmakdoc.py pigpiod     src/defs/pigpiod.def   >tmp/body/pigpiod.body 
+bin/cmakdoc.py pig2vcd     src/defs/pig2vcd.def   >tmp/body/pig2vcd.body 
+bin/cmakdoc.py pigpio      ../pigpio.h            >tmp/body/cif.body 
+bin/cmakdoc.py pigpiod_if  ../pigpiod_if.h        >tmp/body/pdif.body 
+bin/cmakdoc.py pigpiod_if2 ../pigpiod_if2.h       >tmp/body/pdif2.body 
+pydoc                      ../pigpio.py           >tmp/pydoc/pigpio.pydoc
+bin/pymakdoc.py            tmp/pydoc/pigpio.pydoc >tmp/body/python.body
+bin/examples.py            src/defs/examples.def  >tmp/body/examples.body
+
+bin/body.py      # get bodies of manually generated pages
+bin/tidy.py      # tidy the bodies
+bin/backup.sh    # backup database
+bin/updatesql.py # update the database with the new bodies
+bin/purge.sh     # remove redundant datatbase copies
+
+echo "*** making web pages ***"
+
+bin/build_site.py # construct the web site
+

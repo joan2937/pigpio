@@ -190,6 +190,28 @@ error PI_INITIALISED.
 .br
 
 .br
+If you intend to rely on signals sent to your application, you should
+turn off the internal signal handling as shown in this example:
+
+.br
+
+.br
+
+.EX
+int cfg = gpioCfgGetInternals();
+.br
+cfg |= PI_CFG_NOSIGHANDLER;  // (1<<10)
+.br
+gpioCfgSetInternals(cfg);
+.br
+int status = gpioInitialise();
+.br
+
+.EE
+
+.br
+
+.br
 
 .SH OVERVIEW
 
@@ -584,6 +606,8 @@ gpioWaveAddSerial          Adds serial data to the waveform
 .br
 gpioWaveCreate             Creates a waveform from added data
 .br
+gpioWaveCreatePad          Creates a waveform of fixed size from added data
+.br
 gpioWaveDelete             Deletes a waveform
 .br
 
@@ -687,8 +711,6 @@ gpioCfgMemAlloc            Configure DMA memory allocation mode
 gpioCfgNetAddr             Configure allowed network addresses
 .br
 
-.br
-gpioCfgInternals           Configure misc. internals (DEPRECATED)
 .br
 gpioCfgGetInternals        Get internal configuration settings
 .br
@@ -1683,6 +1705,15 @@ will be a latency.
 .br
 
 .br
+If you want to track the level of more than one GPIO do so by
+maintaining the state in the callback.  Do not use \fBgpioRead\fP.
+Remember the event that triggered the callback may have
+happened several milliseconds before and the GPIO may have
+changed level many times since then.
+
+.br
+
+.br
 The tick value is the time stamp of the sample in microseconds, see
 \fBgpioTick\fP for more details.
 
@@ -2653,6 +2684,89 @@ specified delay between the pulse and the next.
 Returns the new waveform id if OK, otherwise PI_EMPTY_WAVEFORM,
 PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 
+.IP "\fBint gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL)\fP"
+.IP "" 4
+Similar to \fBgpioWaveCreate\fP, this function creates a waveform but pads the consumed
+resources. Padded waves of equal dimension can be re-cycled efficiently allowing
+newly created waves to re-use the resources of deleted waves of the same dimension.
+
+.br
+
+.br
+
+.EX
+pctCB: 0-100, the percent of all DMA control blocks to consume.
+.br
+pctBOOL: 0-100, percent On-Off-Level (OOL) buffer to consume for wave output.
+.br
+pctTOOL: 0-100, the percent of OOL buffer to consume for wave input (flags).
+.br
+
+.EE
+
+.br
+
+.br
+Upon success a wave id greater than or equal to 0 is returned, otherwise
+PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+.br
+
+.br
+Waveform data provided by \fBgpioWaveAdd*\fP and \fBrawWaveAdd*\fP functions are
+consumed by this function.
+
+.br
+
+.br
+A usage would be the creation of two waves where one is filled while the other
+is being transmitted. Each wave is assigned 50% of the resources.
+This buffer structure allows the transmission of infinite wave sequences.
+
+.br
+
+.br
+\fBExample\fP
+.br
+
+.EX
+  // get firstWaveChunk, somehow
+.br
+  gpioWaveAddGeneric(firstWaveChunk);
+.br
+  wid = gpioWaveCreatePad(50, 50, 0);
+.br
+  gpioWaveTxSend(wid, PI_WAVE_MODE_ONE_SHOT);
+.br
+  // get nextWaveChunk
+.br
+
+.br
+  while (nextWaveChunk) {
+.br
+     gpioWaveAddGeneric(nextWaveChunk);
+.br
+     nextWid = gpioWaveCreatePad(50, 50, 0);
+.br
+     gpioWaveTxSend(nextWid, PI_WAVE_MODE_ONE_SHOT_SYNC);
+.br
+     while(gpioWaveTxAt() == wid) time_sleep(0.1);
+.br
+     gpioWaveDelete(wid);
+.br
+     wid = nextWid;
+.br
+     // get nextWaveChunk
+.br
+  }
+.br
+
+.EE
+
+.br
+
+.br
+
 .IP "\fBint gpioWaveDelete(unsigned wave_id)\fP"
 .IP "" 4
 This function deletes the waveform with id wave_id.
@@ -2932,7 +3046,7 @@ int main(int argc, char *argv[])
 .IP "\fBint gpioWaveTxAt(void)\fP"
 .IP "" 4
 This function returns the id of the waveform currently being
-transmitted.
+transmitted using \fBgpioWaveTxSend\fP.  Chained waves are not supported.
 
 .br
 
@@ -4182,18 +4296,6 @@ queue and the master removes it.
 .br
 
 .br
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-.br
-
-.br
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
-.br
-
-.br
 The function sets the BSC mode, writes any data in
 the transmit buffer to the BSC transmit FIFO, and
 copies any data in the BSC receive FIFO to the
@@ -4249,14 +4351,37 @@ that mode until a different control word is sent.
 .br
 
 .br
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
 .br
 
 .br
-When a zero control word is received GPIO 18-21 will be reset
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   18    19    -      -      -      -
+.br
+SPI   -     -     20     19     18     21
+.br
+
+.br
+
+.br
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+.br
+
+.br
+      SDA   SCL   MOSI   SCLK   MISO   CE
+.br
+I2C   10    11    -      -      -      -
+.br
+SPI   -     -     9      11     10     8
+.br
+
+.br
+
+.br
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 .br
@@ -4364,7 +4489,7 @@ details.
 .br
 SSSSS   number of bytes successfully copied to transmit FIFO
 .br
-RRRRR   number of bytes in receieve FIFO
+RRRRR   number of bytes in receive FIFO
 .br
 TTTTT   number of bytes in transmit FIFO
 .br
@@ -4422,6 +4547,23 @@ if (status >= 0)
 .br
 
 .EE
+
+.br
+
+.br
+The BSC slave in SPI mode deserializes data from the MOSI pin into its
+receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+transmitter/FIFO data is serialized onto the MISO pin while all other data
+on the MOSI pin is ignored.
+
+.br
+
+.br
+The BK bit of the BSC control register is non-functional when in the SPI
+mode.  The transmitter along with its FIFO can be dequeued by successively
+disabling and re-enabling the TE bit on the BSC control register while in
+SPI mode.
 
 .IP "\fBint bbSPIOpen(unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags)\fP"
 .IP "" 4
@@ -5746,36 +5888,6 @@ script: the text of the script
 .br
 The function returns a script id if the script is valid,
 otherwise PI_BAD_SCRIPT.
-
-.IP "\fBint gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param)\fP"
-.IP "" 4
-This function runs a stored script.
-
-.br
-
-.br
-
-.EX
-script_id: >=0, as returned by \fBgpioStoreScript\fP
-.br
-   numPar: 0-10, the number of parameters
-.br
-    param: an array of parameters
-.br
-
-.EE
-
-.br
-
-.br
-The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
-PI_TOO_MANY_PARAM.
-
-.br
-
-.br
-param is an array of up to 10 parameters which may be referenced in
-the script as p0 to p9.
 
 .IP "\fBint gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param)\fP"
 .IP "" 4
@@ -7785,22 +7897,6 @@ numSockAddr: 0-256 (0 means all addresses allowed)
 
 .EE
 
-.IP "\fBint gpioCfgInternals(unsigned cfgWhat, unsigned cfgVal)\fP"
-.IP "" 4
-Used to tune internal settings.
-
-.br
-
-.br
-
-.EX
-cfgWhat: see source code
-.br
- cfgVal: see source code
-.br
-
-.EE
-
 .IP "\fBuint32_t gpioCfgGetInternals(void)\fP"
 .IP "" 4
 This function returns the current library internal configuration
@@ -7820,6 +7916,10 @@ cfgVal: see source code
 .br
 
 .EE
+
+.br
+
+.br
 
 .IP "\fBint gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned argc)\fP"
 .IP "" 4
@@ -9458,6 +9558,27 @@ An array of script parameters.
 
 .br
 
+.IP "\fBpctBOOL\fP: 0-100" 0
+percent On-Off-Level (OOL) buffer to consume for wave output.
+
+.br
+
+.br
+
+.IP "\fBpctCB\fP: 0-100" 0
+the percent of all DMA control blocks to consume.
+
+.br
+
+.br
+
+.IP "\fBpctTOOL\fP: 0-100" 0
+the percent of OOL buffer to consume for wave input (flags).
+
+.br
+
+.br
+
 .IP "\fBpi_i2c_msg_t\fP" 0
 
 .EX
@@ -10609,6 +10730,8 @@ A 16-bit word value.
 
 .br
 #define PI_CMD_PROCU 117
+.br
+#define PI_CMD_WVCAP 118
 .br
 
 .br

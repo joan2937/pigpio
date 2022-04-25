@@ -288,6 +288,7 @@ wave_add_generic          Adds a series of pulses to the waveform
 wave_add_serial           Adds serial data to the waveform
 
 wave_create               Creates a waveform from added data
+wave_create_and_pad       Creates a waveform of fixed size from added data
 wave_delete               Deletes a waveform
 
 wave_send_once            Transmits a waveform once
@@ -330,7 +331,7 @@ import threading
 import os
 import atexit
 
-VERSION = "1.45"
+VERSION = "1.78"  # sync minor number to pigpio library version
 
 exceptions = True
 
@@ -571,6 +572,7 @@ _PI_CMD_EVM  =115
 _PI_CMD_EVT  =116
 
 _PI_CMD_PROCU=117
+_PI_CMD_WVCAP=118
 
 # pigpio error numbers
 
@@ -2304,6 +2306,51 @@ class pi():
       """
       return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCRE, 0, 0))
 
+   def wave_create_and_pad(self, percent):
+      """
+      This function creates a waveform like [*wave_create*] but pads the consumed
+      resources. Where percent gives the percentage of the resources to use
+      (in terms of the theoretical maximum, not the current amount free).
+      This allows the reuse of deleted waves while a transmission is active.
+
+      Upon success a wave id greater than or equal to 0 is returned, otherwise
+      PI_EMPTY_WAVEFORM, PI_TOO_MANY_CBS, PI_TOO_MANY_OOL, or PI_NO_WAVEFORM_ID.
+
+      . .
+      percent: 0-100, size of waveform as percentage of maximum available.
+      . .
+
+      The data provided by the [*wave_add_**] functions are consumed by this
+      function.
+
+      As many waveforms may be created as there is space available. The
+      wave id is passed to [*wave_send_**] to specify the waveform to transmit.
+
+      A usage would be the creation of two waves where one is filled while the
+      other is being transmitted.  Each wave is assigned 50% of the resources.
+      This buffer structure allows the transmission of infinite wave sequences.
+
+      Normal usage:
+
+      Step 1. [*wave_clear*] to clear all waveforms and added data.
+
+      Step 2. [*wave_add_**] calls to supply the waveform data.
+
+      Step 3. [*wave_create_and_pad*] to create a waveform of uniform size.
+
+      Step 4. [*wave_send_**] with the id of the waveform to transmit.
+
+      Repeat steps 2-4 as needed.
+
+      Step 5. Any wave id can now be deleted and another wave of the same size
+              can be created in its place.
+
+      ...
+      wid = pi.wave_create_and_pad(50)
+      ...
+      """
+      return _u2i(_pigpio_command(self.sl, _PI_CMD_WVCAP, percent, 0))
+
    def wave_delete(self, wave_id):
       """
       This function deletes the waveform with id wave_id.
@@ -2419,7 +2466,7 @@ class pi():
    def wave_tx_at(self):
       """
       Returns the id of the waveform currently being
-      transmitted.
+      transmitted using [*wave_send**].  Chained waves are not supported.
 
       Returns the waveform id or one of the following special
       values:
@@ -3557,13 +3604,6 @@ class pi():
       buffer on the chip.  This works like a queue, you add data to the
       queue and the master removes it.
 
-      This function is not available on the BCM2711 (e.g. as
-      used in the Pi4B).
-
-      I can't get SPI to work properly.  I tried with a
-      control word of 0x303 and swapped MISO and MOSI.
-
-
       The function sets the BSC mode, writes any data in
       the transmit buffer to the BSC transmit FIFO, and
       copies any data in the BSC receive FIFO to the
@@ -3580,12 +3620,19 @@ class pi():
       Note that the control word sets the BSC mode.  The BSC will
       stay in that mode until a different control word is sent.
 
-      The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL)
-      in I2C mode and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO),
-      and 21 (CE) in SPI mode.  You need to swap MISO/MOSI
-      between master and slave.
+      GPIO used for models other than those based on the BCM2711.
 
-      When a zero control word is received GPIO 18-21 will be reset
+          @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+      I2C @ 18  @ 19  @ -    @ -    @ -    @ -
+      SPI @ -   @ -   @ 20   @ 19   @ 18   @ 21
+
+      GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+          @ SDA @ SCL @ MOSI @ SCLK @ MISO @ CE
+      I2C @ 10  @ 11  @ -    @ -    @ -    @ -
+      SPI @ -   @ -   @ 9    @ 11   @ 10   @ 8
+
+      When a zero control word is received the used GPIO will be reset
       to INPUT mode.
 
       bsc_control consists of the following bits:
@@ -3627,7 +3674,7 @@ class pi():
       details.
 
       SSSSS @ number of bytes successfully copied to transmit FIFO
-      RRRRR @ number of bytes in receieve FIFO
+      RRRRR @ number of bytes in receive FIFO
       TTTTT @ number of bytes in transmit FIFO
       RB    @ receive busy
       TE    @ transmit FIFO empty
@@ -3638,6 +3685,50 @@ class pi():
 
       ...
       (status, count, data) = pi.bsc_xfer(0x330305, "Hello!")
+      ...
+
+      The BSC slave in SPI mode deserializes data from the MOSI pin into its
+      receiver/FIFO when the LSB of the first byte is a 0.  No data is output on
+      the MISO pin.  When the LSB of the first byte on MOSI is a 1, the
+      transmitter/FIFO data is serialized onto the MISO pin while all other data
+      on the MOSI pin is ignored.
+
+      The BK bit of the BSC control register is non-functional when in the SPI
+      mode.  The transmitter along with its FIFO can be dequeued by successively
+      disabling and re-enabling the TE bit on the BSC control register while in
+      SPI mode.
+
+      This example demonstrates a SPI master talking to the BSC as SPI slave:
+      Requires SPI master SCLK / MOSI / MISO / CE GPIO are connected to
+      BSC peripheral GPIO 11   / 9    / 10   / 8 respectively, on a Pi4B (BCM2711).
+
+      ...
+      #!/usr/bin/env python
+
+      import pigpio
+
+      # Choose some random GPIO for the bit-bang SPI master
+      CE=15
+      MISO=26
+      MOSI=13
+      SCLK=14
+
+      pi = pigpio.pi()
+      if not pi.connected:
+         exit()
+
+      pi.bb_spi_open(CE, MISO, MOSI, SCLK, 10000, 0) # open SPI master
+      pi.bsc_xfer(0x303, []) # start BSC as SPI slave
+      pi.bb_spi_xfer(CE, '\0' + 'hello') # write 'hello' to BSC
+      status, count, bsc_data = pi.bsc_xfer(0x303, 'world')
+      print bsc_data # hello
+      count, spi_data = pi.bb_spi_xfer(CE, [1,0,0,0,0,0])
+      print spi_data # world
+
+      pi.bsc_xfer(0, [])
+      pi.bb_spi_close(CE)
+
+      pi.stop()
       ...
       """
       # I p1 control
@@ -3666,9 +3757,6 @@ class pi():
       """
       This function allows the Pi to act as a slave I2C device.
 
-      This function is not available on the BCM2711 (e.g. as
-      used in the Pi4B).
-
       The data bytes (if any) are written to the BSC transmit
       FIFO and the bytes in the BSC receive FIFO are returned.
 
@@ -3684,10 +3772,10 @@ class pi():
       (and will contain the error code).
 
       Note that an i2c_address of 0 may be used to close
-      the BSC device and reassign the used GPIO (18/19)
-      as inputs.
+      the BSC device and reassign the used GPIO as inputs.
 
-      This example assumes GPIO 2/3 are connected to GPIO 18/19.
+      This example assumes GPIO 2/3 are connected to GPIO 18/19
+      (GPIO 10/11 on the BCM2711).
 
       ...
       #!/usr/bin/env python
@@ -4939,6 +5027,37 @@ class pi():
       A GPIO may have multiple callbacks (although I can't think of
       a reason to do so).
 
+      The GPIO are sampled at a rate set when the pigpio daemon
+      is started (default 5 us).
+
+      The number of samples per second is given in the following table.
+
+      . .
+                    samples
+                    per sec
+
+               1  1,000,000
+               2    500,000
+      sample   4    250,000
+      rate     5    200,000
+      (us)     8    125,000
+              10    100,000
+      . .
+
+      GPIO level changes shorter than the sample rate may be missed.
+
+      The daemon software which generates the callbacks is triggered
+      1000 times per second.  The callbacks will be called once per
+      level change since the last time they were called.
+      i.e. The callbacks will get all level changes but there will
+      be a latency.
+
+      If you want to track the level of more than one GPIO do so by
+      maintaining the state in the callback.  Do not use [*read*].
+      Remember the event that triggered the callback may have
+      happened several milliseconds before and the GPIO may have
+      changed level many times since then.
+
       ...
       def cbf(gpio, level, tick):
          print(gpio, level, tick)
@@ -4974,7 +5093,7 @@ class pi():
       by calling the tally function.  The count may be reset to zero
       by calling the reset_tally function.
 
-      The callback may be cancelled by calling the event_cancel function.
+      The callback may be canceled by calling the cancel function.
 
       An event may have multiple callbacks (although I can't think of
       a reason to do so).
@@ -4991,7 +5110,7 @@ class pi():
 
       cb2.reset_tally()
 
-      cb1.event_cancel() # To cancel callback cb1.
+      cb1.cancel() # To cancel callback cb1.
       ...
       """
 
@@ -5548,6 +5667,9 @@ def xref():
    When scripts are started they can receive up to 10 parameters
    to define their operation.
 
+   percent:: 0-100
+   The size of waveform as percentage of maximum available.
+   
    port:
    The port used by the pigpio daemon, defaults to 8888.
 

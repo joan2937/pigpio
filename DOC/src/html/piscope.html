@@ -1,0 +1,216 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content=
+"HTML Tidy for HTML5 for Linux version 5.6.0">
+<meta content="text/html; charset=utf-8" http-equiv="content-type">
+<title>piscope</title>
+</head>
+<body>
+<h2>Introduction<br></h2>
+<a href="piscope.tar">piscope</a> is a logic analyser (digital
+waveform viewer) for the Raspberry.&nbsp; It shows the state (high
+or low) of selected GPIO in real-time.<br>
+<br>
+See <a href="http://youtu.be/2apqOiLHEzs">video</a>.<br>
+<br>
+piscope uses the services of the pigpio <a href=
+"download.html">library</a>.&nbsp; pigpio needs to be running on
+the Pi whose GPIO are to be monitored.<br>
+<br>
+The pigpio library may be started as a daemon (background process)
+by the following command.<br>
+<br>
+<code>sudo pigpiod<br></code><br>
+piscope may be invoked in several different ways<br>
+<br>
+<table summary="" style=
+"text-align: left; width: 90%; height: 246px;" cellspacing="2"
+cellpadding="2" border="1">
+<tbody>
+<tr>
+<td style="width: 15%;"><small>Pi<br></small></td>
+<td style="vertical-align: top; width: 55%;"><small><span style=
+"font-style: italic;">pi_host</span> ~ $ piscope
+&amp;<br></small></td>
+<td style="vertical-align: top; width: 30%;"><small>Pi captures
+data<br>
+Pi processes data<br>
+Pi displays data<br></small></td>
+</tr>
+<tr>
+<td style="vertical-align: top;"><small>Pi plus Linux PC<br>
+<br>
+(with the<br>
+display on a remote<br>
+&nbsp; Linux PC)<br></small></td>
+<td style="vertical-align: top;"><small><span style=
+"font-style: italic;">remote_host</span> ~ $ ssh -X <span style=
+"font-style: italic;">pi_host</span><br></small><small><span style=
+"font-style: italic;">pi_host</span> ~ $ piscope
+&amp;</small><small><br></small></td>
+<td style="vertical-align: top;"><small>Pi captures data<br>
+Pi processes data<br>
+Remote Linux PC displays data<br></small></td>
+</tr>
+<tr>
+<td style="vertical-align: top;"><small>Pi plus Windows PC<br>
+<br>
+(with the<br>
+display on a remote<br>
+&nbsp; Windows PC)</small></td>
+<td style="vertical-align: top;"><small>You need to install an SSH
+client (putty suggested) and a X11 server (xming suggested).<br>
+<br>
+Run Program Files -&gt; Xming -&gt; XLaunch and accept the
+defaults.<br>
+<br>
+Run putty and enter the Pi's host name or IP address.&nbsp; Click
+on SSH X11 and tick Enable X11 forwarding and then select
+Open.</small><br>
+<small><br></small> <small><span style=
+"font-style: italic;">pi_host</span> ~ $ piscope
+&amp;</small><br></td>
+<td style="vertical-align: top;"><small>Pi captures data<br>
+Pi processes data<br>
+Remote Windows PC displays data</small></td>
+</tr>
+<tr>
+<td style="vertical-align: top;"><small>Pi plus Linux PC<br>
+<br>
+(with the display and processing on a remote Linux
+PC)<br></small></td>
+<td style="vertical-align: top;"><small><span style=
+"font-style: italic;">remote_host</span> ~ $ export
+PIGPIO_ADDR=<span style="font-style: italic;">pi_host</span><br>
+<span style="font-style: italic;">remote_host</span> ~ $ piscope
+&amp;<br></small></td>
+<td style="vertical-align: top;"><small>Pi captures data<br>
+Remote processes data<br>
+Remote displays data<br></small></td>
+</tr>
+</tbody>
+</table>
+<br>
+piscope operates in one of three modes<br>
+<br>
+<table summary="" style="text-align: left; width: 90%;"
+cellspacing="2" cellpadding="2" border="1">
+<tbody>
+<tr>
+<td style="vertical-align: top;">Live<br></td>
+<td style="vertical-align: top;">The latest GPIO samples are
+displayed.<br>
+<br>
+The mode will automatically change to Pause if a sampling trigger
+is detected.<br>
+<br>
+There are four triggers.&nbsp; Each trigger is made up of a
+combination of GPIO states (one of don't care, low, high, edge,
+falling, or rising per GPIO).&nbsp; Triggers are always
+counted.&nbsp; In addition a trigger may be sample to, sample
+around, or sample from, a so called sampling trigger.<br></td>
+<td style="vertical-align: top;">New samples are added to the
+sample buffer.<br>
+<br>
+Once the sample buffer is full the <span style=
+"font-weight: bold;">oldest</span> samples are discarded.</td>
+</tr>
+<tr>
+<td style="vertical-align: top;">Play<br></td>
+<td style="vertical-align: top;">Recorded GPIO samples are
+displayed.<br>
+<br>
+The play speed may be varied between 64 times real-time to 1/32768
+of real-time.<br>
+<br>
+The page up key increases the play speed by a factor of 2.&nbsp;
+The page down key decreases the play speed by a factor of 2.&nbsp;
+The home key sets the play speed to 1X.<br></td>
+<td style="vertical-align: top;">New samples are added to the
+sample buffer.<br>
+<br>
+Once the sample buffer is full <span style=
+"font-weight: bold;">new</span> samples are discarded.</td>
+</tr>
+<tr>
+<td style="vertical-align: top;">Pause<br></td>
+<td style="vertical-align: top;">Recorded GPIO samples are
+displayed.<br>
+<br>
+The left and right cursor keys move the blue marker to the previous
+or next edge.&nbsp; By default all GPIO edges are considered.&nbsp;
+Clicking on a GPIO name will limit edge searches to the highlighted
+GPIO only.<br>
+<br>
+The left and right square bracket keys move the blue marker to the
+previous or next trigger.<br>
+<br>
+The time between the blue and gold markers is displayed.&nbsp; The
+gold marker is set to the blue marker by a press of the 'g'
+key.<br></td>
+<td style="vertical-align: top;">New samples are added to the
+sample buffer.<br>
+<br>
+Once the sample buffer is full <span style=
+"font-weight: bold;">new</span> samples are discarded.</td>
+</tr>
+</tbody>
+</table>
+<br>
+In all modes the down and up cursor keys zoom the time scale in and
+out.<br>
+<br>
+Samples can be saved with File Save All Samples or File Save
+Selected Samples.
+<p>To select samples enter pause mode. Press 1 to specify the start
+of the samples (green marker) and 2 to specify the end of the
+samples (red marker).</p>
+<p>The samples may be saved in the native piscope format or in VCD
+format.</p>
+<p>Data saved in VCD format may be viewed and further processed
+with GTKWave.</p>
+<p>Data saved in the native piscope format may be restored later
+with File Restore Saved Data.</p>
+<h2>Installation</h2>
+<p>To download and install piscope.</p>
+<h3>Pi (pre-built image)</h3>
+<code>wget abyz.me.uk/rpi/pigpio/piscope.tar<br>
+tar xvf piscope.tar<br>
+cd PISCOPE<br>
+make hf<br>
+make install</code><span style="font-weight: bold;"><br></span>
+<h3>Linux 64 bit X86/AMD (pre-built image)</h3>
+<code>wget abyz.me.uk/rpi/pigpio/piscope.tar<br>
+tar xvf piscope.tar<br>
+cd PISCOPE<br>
+make x86_64<br>
+make install<br></code>
+<h3>All machines (building from source)</h3>
+You only need to perform this step if you want to build the
+executable from the source files.&nbsp; This is not needed if you
+use a pre-built image.<br>
+<span style="font-weight: bold;"><br>
+WARNING</span>: Installing gtk+-3.0 uses a lot of SD card
+space.<br>
+<br>
+Most of the space used by gtk+-3.0 is taken up by unneeded *-dbg
+packages.<br>
+<br>
+With *-dbg packages an additional 3753MB SD space is required.<br>
+<br>
+If you edit the list of packages to be downloaded and remove the
+*-dbg packages only 134MB of additional SD space is needed (as at
+the time of writing).<br>
+<br>
+<code>#<br></code> <code># *** This may take a lot of time and use
+a lot of SD card space ***<br></code> <code>#<br>
+sudo apt-get install gtk+-3.0<br></code> <code>#<br></code>
+<code>wget abyz.me.uk/rpi/pigpio/piscope.tar<br>
+tar xvf piscope.tar<br>
+cd PISCOPE<br>
+make<br>
+make install<br></code><br>
+</body>
+</html>

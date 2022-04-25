@@ -548,6 +548,9 @@ Add serial data to waveform
 .B WVCRE  
 Create a waveform   
 .P
+.B WVCAP percent 
+Create a waveform of fixed size 
+.P
 .B WVDEL wid 
 Delete selected waveform 
 .P
@@ -926,14 +929,6 @@ buffer on the chip.  This works like a queue, you add data to the
 queue and the master removes it.
 
 .br
-This function is not available on the BCM2711 (e.g. as
-used in the Pi4B).
-
-.br
-I can't get SPI to work properly.  I tried with a
-control word of 0x303 and swapped MISO and MOSI.
-
-.br
 The command sets the BSC mode and writes any data \fBbvs\fP
 to the BSC transmit FIFO.  It returns the data count (at least 1
 for the status word), the status word, followed by any data bytes
@@ -950,12 +945,31 @@ For I2C use a control word of (I2C address << 16) + 0x305.
 E.g. to talk as I2C slave with address 0x13 use 0x130305.
 
 .br
-The BSC peripheral uses GPIO 18 (SDA) and 19 (SCL) in I2C mode
-and GPIO 18 (MOSI), 19 (SCLK), 20 (MISO), and 21 (CE) in SPI mode.  You
-need to swap MISO/MOSI between master and slave.
+GPIO used for models other than those based on the BCM2711.
 
 .br
-When a zero control word is received GPIO 18-21 will be reset
+
+.EX
+      SDA   SCL   MOSI   SCLK   MISO   CE
+I2C   18    19    -      -      -      -
+SPI   -     -     20     19     18     21
+
+.EE
+
+.br
+GPIO used for models based on the BCM2711 (e.g. the Pi4B).
+
+.br
+
+.EX
+      SDA   SCL   MOSI   SCLK   MISO   CE
+I2C   10    11    -      -      -      -
+SPI   -     -     9      11     10     8
+
+.EE
+
+.br
+When a zero control word is received the used GPIO will be reset
 to INPUT mode.
 
 .br
@@ -1031,7 +1045,8 @@ TB      transmit busy
 .EE
 
 .br
-This example assumes that GPIO 2/3 are connected to GPIO 18/19.
+This example assumes that GPIO 2/3 are connected to GPIO 18/19
+(GPIO 10/11 on the BCM2711).
 
 .br
 
@@ -1116,6 +1131,57 @@ $ pigs bscx 0x130305 22 33 44 55 66
 $ pigs i2crd 0 5
 .br
 5 22 33 44 55 66
+.br
+
+.EE
+
+.br
+The BSC slave in SPI mode deserializes data from the MOSI pin into its receiver/
+FIFO when the LSB of the first byte is a 0.  No data is output on the MISO pin.
+When the LSB of the first byte on MOSI is a 1, the transmitter/FIFO data is
+serialized onto the MISO pin while all other data on the MOSI pin is ignored.
+
+.br
+The BK bit of the BSC control register is non-functional when in the SPI mode.
+The transmitter along with its FIFO can be dequeued by successively disabling
+and re-enabling the TE bit on the BSC control register while in SPI mode.
+
+.br
+This example demonstrates a SPI master talking to the BSC as SPI slave:
+Requires SPI master SCLK / MOSI / MISO / CE GPIO are connected to
+BSC peripheral GPIO 11   / 9    / 10   / 8 respectively, on a Pi4B (BCM2711).
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs bspio 15 26 13 14 10000 0 # open bit-bang spi master on random gpio
+.br
+
+.br
+$ pigs bscx 0x303 # start BSC as SPI slave, both rx and tx enabled
+.br
+1 18
+.br
+
+.br
+$ pigs bspix 15 0 0xd 0xe 0xa 0xd # write 0xdead to BSC
+.br
+5 0 0 0 0 0
+.br
+
+.br
+$ pigs bscx 0x303 0xb 0xe 0xe 0xf # place 0xbeef in BSC tx FIFO, read rx FIFO
+.br
+5 262338 13 14 10 13
+.br
+
+.br
+$ pigs bspix 15 1 0 0 0 0 # read four bytes from BSC
+.br
+5 0 11 14 14 15
 .br
 
 .EE
@@ -4804,7 +4870,7 @@ $ pigs wvas 7 38400 8 2 0 0x41 0x42
 
 .br
 This command returns the id of the waveform currently
-being transmitted.
+being transmitted.  Chained waves are not supported.
 
 .br
 Returns the waveform id or one of the following special
@@ -5117,6 +5183,72 @@ $ pigs wvcre
 -69
 .br
 ERROR: attempt to create an empty waveform
+.br
+
+.EE
+
+.br
+
+.IP "\fBWVCAP percent\fP - Create a waveform of fixed size"
+.IP "" 4
+
+.br
+Create a waveform of fixed size. Similar to \fBWVCRE\fP, this command creates a waveform but pads the consumed resources to a fixed size, specified as a \fBpercent\fP of the total resources. Padded waves of equal size can be re-cycled efficiently allowing newly created waves to re-use the resources of deleted waves of the same dimension.
+
+.br
+Upon success a wave id (>=0) is returned. On error a negative status code will be returned.
+
+.br
+The data provided by the \fBWVAG\fP and \fBWVAS\fP commands are consumed by this command.
+
+.br
+As many waveforms may be created as there is space available. The wave id is passed to \fBWVTX\fP or \fBWVTXR\fP to specify the waveform to transmit.
+
+.br
+Normal usage would be
+
+.br
+Step 1. \fBWVCLR\fP to clear all waveforms and added data.
+
+.br
+Step 2. \fBWVAG\fP/\fBWVAS\fP calls to supply the waveform data.
+
+.br
+Step 3. \fBWVCAP\fP to create a waveform of a uniform size.
+
+.br
+Step 4. \fBWVTX\fP or \fBWVTXR\fP with the id of the waveform to transmit.
+
+.br
+Repeat steps 2 - 4 as needed.
+
+.br
+Step 5. Any wave id can now be deleted and another wave of the same size can be created in its place.
+
+.br
+Example
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+# Create a wave that consumes 50% of the total resource:
+.br
+
+.br
+$ pigs wvag 16 0 5000000 0 16 5000000
+.br
+2
+.br
+$ pigs wvcap 50
+.br
+0
+.br
+$ pigs wvtx 0
+.br
+11918
 .br
 
 .EE
@@ -5788,6 +5920,13 @@ must match an entry in /opt/pigpio/access.
 
 .IP "\fBpdc\fP - hardware PWM dutycycle (0-1000000)" 0
 The command expects a dutycycle.
+
+.br
+
+.IP "\fBpercent\fP - percent (1-100)" 0
+The percent of wave resources to allocate to a wave.  It can be useful
+to create waves of fixed sizes to prevent wave fragmentation (where
+there are plenty of resources but not a large enough contiguous space).
 
 .br
 
