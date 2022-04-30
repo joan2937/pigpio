@@ -15,7 +15,15 @@ Enter the following two commands (in this order)
 make
 sudo make install
 
-This will install
+
+Optionally, enter following command(s) after 'make'
+
+sudo make test
+sudo make test-really
+
+
+
+The first two commands will install
 
 o the library (libpigpio.so) in /usr/local/lib
 o the library (libpigpiod_if.so) in /usr/local/lib
@@ -43,8 +51,9 @@ TEST (optional)
 * many failures in a group of tests indicate a problem.    *
 ************************************************************
 
-To test the library do
+To test the installed library do
 
+sudo ./x_pigpio_clock
 sudo ./x_pigpio
 
 To test the pigpio daemon do
