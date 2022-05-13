@@ -67,6 +67,9 @@ static uint32_t cfgInternals           = PI_DEFAULT_CFG_INTERNALS;
 static int updateMaskSet = 0;
 
 static FILE * errFifo;
+volatile sig_atomic_t hupFlag = 0;
+volatile sig_atomic_t termFlag = 0;
+volatile sig_atomic_t contFlag = 0;
 
 static uint32_t sockNetAddr[MAX_CONNECT_ADDRESSES];
 
@@ -286,13 +289,15 @@ static void initOpts(int argc, char *argv[])
     }
 }
 
-void terminate(int signum)
+void terminate()
 {
-   /* only registered for SIGHUP/SIGTERM */
+   /* only registered for SIGHUP/SIGTERM/SIGCONT */
 
    gpioTerminate();
 
-   fprintf(errFifo, "SIGHUP/SIGTERM received\n");
+   if (hupFlag) fprintf(stderr, "SIGHUP received %d times\n", hupFlag);
+   if (termFlag) fprintf(stderr, "SIGTERM received %d times\n", termFlag);
+   if (contFlag) fprintf(stderr, "SIGCONT received %d times\n", contFlag);
 
    fflush(NULL);
 
@@ -303,6 +308,16 @@ void terminate(int signum)
    exit(0);
 }
 
+void mySigHandler(int signum)
+{
+   /* Catch multiple signals - ie systemd issues SIGTERM and SIGCONT */
+   switch (signum)
+   {
+      case SIGHUP: hupFlag++; break;
+      case SIGTERM: termFlag++; break;
+      case SIGCONT: contFlag++; break;
+   }
+}
 
 int main(int argc, char **argv)
 {
@@ -313,7 +328,18 @@ int main(int argc, char **argv)
 
    initOpts(argc, argv);
 
-   if (!foreground) {
+   /* create pipe for error reporting & communicate child init is complete */
+
+   unlink(PI_ERRFIFO);
+
+   mkfifo(PI_ERRFIFO, 0664);
+
+   if (chmod(PI_ERRFIFO, 0664) < 0)
+      fatal("chmod %s failed (%m)", PI_ERRFIFO);
+
+
+   if (!foreground)
+   {
       /* Fork off the parent process */
 
       pid = fork();
@@ -322,7 +348,16 @@ int main(int argc, char **argv)
 
       /* If we got a good PID, then we can exit the parent process. */
 
-      if (pid > 0) { exit(EXIT_SUCCESS); }
+      if (pid > 0)
+      {
+         FILE *fdFifo = fopen(PI_ERRFIFO, "r"); // block until daemon init'ed
+
+         if (fdFifo == NULL) {
+            perror("parent could not open pipe");
+            exit(EXIT_FAILURE);
+         }
+         else exit(EXIT_SUCCESS);
+      }
 
       /* Change the file mode mask */
 
@@ -370,16 +405,15 @@ int main(int argc, char **argv)
 
    if (gpioInitialise()< 0) fatal("Can't initialise pigpio library");
 
-   /* create pipe for error reporting */
+   /* open errFifo */
 
-   unlink(PI_ERRFIFO);
+   // daemon logs messages to errFifo (normal)
+   if (getenv("PIGPIO_ENV_LOG_STDERR") == NULL)
+      errFifo = freopen(PI_ERRFIFO, "w+", stderr);
 
-   mkfifo(PI_ERRFIFO, 0664);
-
-   if (chmod(PI_ERRFIFO, 0664) < 0)
-      fatal("chmod %s failed (%m)", PI_ERRFIFO);
-
-   errFifo = freopen(PI_ERRFIFO, "w+", stderr);
+   // daemon logs to stderr
+   else
+      errFifo = fopen(PI_ERRFIFO, "w+");
 
    if (errFifo)
    {
@@ -388,21 +422,20 @@ int main(int argc, char **argv)
       flags = fcntl(fileno(errFifo), F_GETFL, 0);
       fcntl(fileno(errFifo), F_SETFL, flags | O_NONBLOCK);
 
-      /* request SIGHUP/SIGTERM from libarary for termination */
+      /* install handlers for safe exit on SIGHUP/SIGTERM/SIGCONT */
 
-      gpioSetSignalFunc(SIGHUP, terminate);
-      gpioSetSignalFunc(SIGTERM, terminate);
+      gpioSetSignalFunc(SIGHUP, mySigHandler);
+      gpioSetSignalFunc(SIGTERM, mySigHandler);
+      gpioSetSignalFunc(SIGCONT, mySigHandler); //systemd along w/SIGTERM
 
-      /* sleep forever */
+      /* sleep until signaled */
 
-      while (1)
+      while (hupFlag==0 && termFlag==0 && contFlag==0)
       {
-         /* cat /dev/pigerr to view daemon errors */
-
          sleep(5);
-
          fflush(errFifo);
       }
+      terminate();
    }
    else
    {
