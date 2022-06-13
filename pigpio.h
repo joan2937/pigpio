@@ -817,7 +817,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 /* Longest busy delay */
 
-#define PI_MAX_BUSY_DELAY 100
+#define PI_MAX_BUSY_DELAY 200
 
 /* timeout: 0-60000 */
 
