@@ -13,12 +13,28 @@ add_compile_options(-Wall)
 
 # libpigpio.(so|a)
 add_library(pigpio pigpio.c command.c custom.cext)
+add_library(pigpio::core ALIAS pigpio)
+target_include_directories(
+  pigpio
+  INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
 
 # libpigpiod_if.(so|a)
 add_library(pigpiod_if pigpiod_if.c command.c)
+add_library(pigpiod::if ALIAS pigpiod_if)
+target_include_directories(
+  pigpiod_if
+  INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # libpigpiod_if2.(so|a)
 add_library(pigpiod_if2 pigpiod_if2.c command.c)
+add_library(pigpiod::if2 ALIAS pigpiod_if2)
+target_include_directories(
+  pigpiod_if2
+  INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # x_pigpio
 add_executable(x_pigpio x_pigpio.c)
