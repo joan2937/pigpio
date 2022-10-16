@@ -9,41 +9,87 @@ find_package(RT REQUIRED)
 
 option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 option(MAN_PAGES "Create manual pages" OFF)
+option(SOCKET_INTERFACE "Build socket interface" ON)
+option(TESTS "Build tests" OFF)
 
 add_compile_options(-Wall)
 
 # libpigpio.(so|a)
 add_library(pigpio pigpio.c command.c custom.cext)
 
-# libpigpiod_if.(so|a)
-add_library(pigpiod_if pigpiod_if.c command.c)
+install(TARGETS pigpio
+	EXPORT ${PROJECT_NAME}Targets
+	LIBRARY  DESTINATION lib${LIB_SUFFIX}
+	ARCHIVE  DESTINATION lib${LIB_SUFFIX}
+	RUNTIME  DESTINATION bin
+	INCLUDES DESTINATION include
+)
 
-# libpigpiod_if2.(so|a)
-add_library(pigpiod_if2 pigpiod_if2.c command.c)
+install(FILES pigpio.h
+	DESTINATION include
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		GROUP_READ
+		WORLD_READ
+)
 
-# x_pigpio
-add_executable(x_pigpio x_pigpio.c)
-target_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)
+if(TESTS)
+	# x_pigpio
+	add_executable(x_pigpio x_pigpio.c)
+	target_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)
+endif()
 
-# x_pigpiod_if
-add_executable(x_pigpiod_if x_pigpiod_if.c)
-target_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)
+if(SOCKET_INTERFACE)
+	# libpigpiod_if.(so|a)
+	add_library(pigpiod_if pigpiod_if.c command.c)
 
-# x_pigpiod_if2
-add_executable(x_pigpiod_if2 x_pigpiod_if2.c)
-target_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)
+	# libpigpiod_if2.(so|a)
+	add_library(pigpiod_if2 pigpiod_if2.c command.c)
 
-# pigpiod
-add_executable(pigpiod pigpiod.c)
-target_link_libraries(pigpiod pigpio RT::RT Threads::Threads)
+	# pigpiod
+	add_executable(pigpiod pigpiod.c)
+	target_link_libraries(pigpiod pigpio RT::RT Threads::Threads)
 
-# pigs
-add_executable(pigs pigs.c command.c)
-target_link_libraries(pigs Threads::Threads)
+	# pigs
+	add_executable(pigs pigs.c command.c)
+	target_link_libraries(pigs Threads::Threads)
+
+	install(TARGETS pigpiod_if pigpiod_if2 pigpiod pigs
+		EXPORT ${PROJECT_NAME}Targets
+		LIBRARY  DESTINATION lib${LIB_SUFFIX}
+		ARCHIVE  DESTINATION lib${LIB_SUFFIX}
+		RUNTIME  DESTINATION bin
+		INCLUDES DESTINATION include
+	)
+
+	install(FILES pigpiod_if.h pigpiod_if2.h
+		DESTINATION include
+		PERMISSIONS OWNER_READ OWNER_WRITE
+			GROUP_READ
+			WORLD_READ
+	)
+
+	if(TESTS)
+		# x_pigpiod_if
+		add_executable(x_pigpiod_if x_pigpiod_if.c)
+		target_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)
+
+		# x_pigpiod_if2
+		add_executable(x_pigpiod_if2 x_pigpiod_if2.c)
+		target_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)
+	endif()
+endif()
 
 # pig2vcd
 add_executable(pig2vcd pig2vcd.c command.c)
 target_link_libraries(pig2vcd Threads::Threads)
+
+install(TARGETS pig2vcd
+	EXPORT ${PROJECT_NAME}Targets
+	LIBRARY  DESTINATION lib${LIB_SUFFIX}
+	ARCHIVE  DESTINATION lib${LIB_SUFFIX}
+	RUNTIME  DESTINATION bin
+	INCLUDES DESTINATION include
+)
 
 # Configure and install project
 
@@ -51,14 +97,6 @@ include (GenerateExportHeader)
 include (CMakePackageConfigHelpers)
 
 generate_export_header(${PROJECT_NAME})
-
-install(TARGETS pigpio pigpiod_if pigpiod_if2 pig2vcd pigpiod pigs
-	EXPORT ${PROJECT_NAME}Targets
-	LIBRARY  DESTINATION lib${LIB_SUFFIX}
-	ARCHIVE  DESTINATION lib${LIB_SUFFIX}
-	RUNTIME  DESTINATION bin
-	INCLUDES DESTINATION include
-)
 
 write_basic_package_version_file(
 	"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
@@ -87,13 +125,6 @@ install(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION
     ${ConfigPackageLocation}
-)
-
-install(FILES pigpio.h pigpiod_if.h pigpiod_if2.h
-	DESTINATION include
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		GROUP_READ
-		WORLD_READ
 )
 
 if (MAN_PAGES)
