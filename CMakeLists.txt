@@ -115,11 +115,7 @@ install(FILES ${man_3_SRC}
 find_package(Python COMPONENTS Interpreter QUIET)
 
 if(Python_FOUND)
-	configure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/setup.py.in
-		${CMAKE_CURRENT_BINARY_DIR}/setup.py
-	)
-
-	install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install)")
+	install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/setup.py install)")
 endif()
 
 # package project
