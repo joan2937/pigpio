@@ -8,6 +8,7 @@ find_package(Threads REQUIRED)
 find_package(RT REQUIRED)
 
 option(BUILD_SHARED_LIBS "Create shared libraries" ON)
+option(MAN_PAGES "Create manual pages" OFF)
 
 add_compile_options(-Wall)
 
@@ -95,21 +96,23 @@ install(FILES pigpio.h pigpiod_if.h pigpiod_if2.h
 		WORLD_READ
 )
 
-file(GLOB man_1_SRC "*.1")
-install(FILES ${man_1_SRC}
-	DESTINATION man/man1
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		GROUP_READ
-		WORLD_READ
-)
+if (MAN_PAGES)
+	file(GLOB man_1_SRC "*.1")
+	install(FILES ${man_1_SRC}
+		DESTINATION man/man1
+		PERMISSIONS OWNER_READ OWNER_WRITE
+			GROUP_READ
+			WORLD_READ
+	)
 
-file(GLOB man_3_SRC "*.3")
-install(FILES ${man_3_SRC}
-	DESTINATION man/man3
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		GROUP_READ
-		WORLD_READ
-)
+	file(GLOB man_3_SRC "*.3")
+	install(FILES ${man_3_SRC}
+		DESTINATION man/man3
+		PERMISSIONS OWNER_READ OWNER_WRITE
+			GROUP_READ
+			WORLD_READ
+	)
+endif()
 
 # Install python modules.
 find_package(Python COMPONENTS Interpreter QUIET)
