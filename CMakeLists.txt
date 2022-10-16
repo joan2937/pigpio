@@ -12,6 +12,7 @@ option(MAN_PAGES "Create manual pages" OFF)
 option(SOCKET_INTERFACE "Build socket interface" ON)
 option(TESTS "Build tests" OFF)
 option(PIG2VCD "Build VCD format converter" OFF)
+option(PYTHON_MODULE "Build Python module" OFF)
 
 add_compile_options(-Wall)
 
@@ -151,7 +152,7 @@ endif()
 # Install python modules.
 find_package(Python COMPONENTS Interpreter QUIET)
 
-if(Python_FOUND)
+if(Python_FOUND AND PYTHON_MODULE AND SOCKET_INTERFACE)
 	install(CODE "execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/setup.py install --prefix=${CMAKE_INSTALL_PREFIX})")
 endif()
 
