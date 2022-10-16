@@ -11,6 +11,7 @@ option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 option(MAN_PAGES "Create manual pages" OFF)
 option(SOCKET_INTERFACE "Build socket interface" ON)
 option(TESTS "Build tests" OFF)
+option(PIG2VCD "Build VCD format converter" OFF)
 
 add_compile_options(-Wall)
 
@@ -79,17 +80,19 @@ if(SOCKET_INTERFACE)
 	endif()
 endif()
 
-# pig2vcd
-add_executable(pig2vcd pig2vcd.c command.c)
-target_link_libraries(pig2vcd Threads::Threads)
+if(PIG2VCD)
+	# pig2vcd
+	add_executable(pig2vcd pig2vcd.c command.c)
+	target_link_libraries(pig2vcd Threads::Threads)
 
-install(TARGETS pig2vcd
-	EXPORT ${PROJECT_NAME}Targets
-	LIBRARY  DESTINATION lib${LIB_SUFFIX}
-	ARCHIVE  DESTINATION lib${LIB_SUFFIX}
-	RUNTIME  DESTINATION bin
-	INCLUDES DESTINATION include
-)
+	install(TARGETS pig2vcd
+		EXPORT ${PROJECT_NAME}Targets
+		LIBRARY  DESTINATION lib${LIB_SUFFIX}
+		ARCHIVE  DESTINATION lib${LIB_SUFFIX}
+		RUNTIME  DESTINATION bin
+		INCLUDES DESTINATION include
+	)
+endif()
 
 # Configure and install project
 
