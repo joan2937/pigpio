@@ -52,7 +52,7 @@ include (CMakePackageConfigHelpers)
 generate_export_header(${PROJECT_NAME})
 
 install(TARGETS pigpio pigpiod_if pigpiod_if2 pig2vcd pigpiod pigs
-    EXPORT ${PROJECT_NAME}Targets
+	EXPORT ${PROJECT_NAME}Targets
 	LIBRARY  DESTINATION lib${LIB_SUFFIX}
 	ARCHIVE  DESTINATION lib${LIB_SUFFIX}
 	RUNTIME  DESTINATION bin
