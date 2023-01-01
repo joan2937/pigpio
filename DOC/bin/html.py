@@ -38,7 +38,7 @@ sitemap = ""
 
 header = '<a href="index.html"><img src="images/pigpio-logo.gif" border="0" /></a>pigpio library'
 
-footer1 = "<small>&copy; 2012-2021</small>";
+footer1 = "<small>&copy; 2012-2023</small>";
 footer2 = "e-mail: pigpio @ abyz.me.uk";
 footer3 = "<small>Updated: " + time.strftime("%d/%m/%Y") + "</small>";
 

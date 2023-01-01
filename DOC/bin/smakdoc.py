@@ -55,7 +55,7 @@ if man:
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH pigs 1 2012-2021 Linux "pigpio archive"
+.TH pigs 1 2012-2023 Linux "pigpio archive"
 .SH NAME
 pigs - command line socket access to the pigpio daemon.\n
 /dev/pigpio - command line pipe access to the pigpio daemon.\n

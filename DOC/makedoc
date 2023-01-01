@@ -31,7 +31,7 @@ bin/cmakdoc.py pig2vcd     src/defs/pig2vcd.def   >tmp/body/pig2vcd.body
 bin/cmakdoc.py pigpio      ../pigpio.h            >tmp/body/cif.body 
 bin/cmakdoc.py pigpiod_if  ../pigpiod_if.h        >tmp/body/pdif.body 
 bin/cmakdoc.py pigpiod_if2 ../pigpiod_if2.h       >tmp/body/pdif2.body 
-pydoc                      ../pigpio.py           >tmp/pydoc/pigpio.pydoc
+python -m pydoc            ../pigpio.py           >tmp/pydoc/pigpio.pydoc
 bin/pymakdoc.py            tmp/pydoc/pigpio.pydoc >tmp/body/python.body
 bin/examples.py            src/defs/examples.def  >tmp/body/examples.body
 
