@@ -886,6 +886,9 @@ uint32_t get_current_tick(int pi)
 uint32_t get_hardware_revision(int pi)
    {return pigpio_command(pi, PI_CMD_HWVER, 0, 0, 1);}
 
+uint32_t get_hardware_serial_number(int pi)
+   {return pigpio_command(pi, PI_CMD_SERNM, 0, 0, 1);}
+
 uint32_t get_pigpio_version(int pi)
    {return pigpio_command(pi, PI_CMD_PIGPV, 0, 0, 1);}
 

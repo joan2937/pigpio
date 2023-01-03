@@ -50,6 +50,8 @@ void t0()
    printf("pigpio version %d.\n", gpioVersion());
 
    printf("Hardware revision %d.\n", gpioHardwareRevision());
+   
+   printf("Hardware serialnumber %u.\n", gpioHardwareSerialNumber());
 }
 
 void t1()

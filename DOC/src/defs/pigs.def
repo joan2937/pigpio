@@ -343,6 +343,7 @@ UTILITIES
 
 H/HELP  :: Display command help        ::
 HWVER   :: Get hardware version        :: gpioHardwareRevision
+SERNM   :: Get hardware serial number  :: gpioHardwareSerialNumber
 MICS v  :: Microseconds delay          :: gpioDelay
 MILS v  :: Milliseconds delay          :: gpioDelay
 PIGPV   :: Get pigpio library version  :: gpioVersion
@@ -1257,6 +1258,19 @@ for "Revision : 000g" the command returns 0.
 ...
 $ pigs hwver # On a B+
 16
+...
+
+SERNM ::
+This command returns the hardware serial number of the Pi.
+
+The hardware serial number is found on the serial line of /proc/cpuinfo.
+
+If the hardware revision can not be found or is not a valid hexadecimal
+number the command returns 0.
+
+...
+$ pigs sernm
+571858502
 ...
 
 I2CC ::

@@ -589,7 +589,10 @@ Get waveform pulse stats
 Display command help        
 .P
 .B HWVER  
-Get hardware version        
+Get hardware version
+.P
+.B SERNM
+Get hardware serial number
 .P
 .B MICS v 
 Microseconds delay          
@@ -2254,6 +2257,32 @@ $ pigs hwver # On a B+
 .br
 16
 .br
+
+.br
+
+.IP "\fBSERNM \fP - Get hardware serial number"
+.IP "" 4
+This command returns the hardware serial number of the Pi.
+
+.br
+The hardware serial number is found on the serial line of /proc/cpuinfo.
+
+
+.br
+If the hardware serial number can not be found or is not a valid hexadecimal
+number the command returns 0.
+
+.br
+
+\fBExample\fP
+.br
+
+.EX
+$ pigs sernm
+.br
+571858502
+.br
+
 
 .EE
 

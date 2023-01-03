@@ -4298,6 +4298,7 @@ for "Revision       : 000f" the function returns 15.
 for "Revision       : 000g" the function returns 0.
 D*/
 
+unsigned int gpioHardwareSerialNumber(void);
 
 /*F*/
 unsigned gpioVersion(void);
@@ -6317,6 +6318,7 @@ PARAMS*/
 #define PI_CMD_PROCU 117
 #define PI_CMD_WVCAP 118
 
+#define PI_CMD_SERNM 119
 /*DEF_E*/
 
 /*
