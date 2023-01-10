@@ -22,6 +22,7 @@ sudo ./x_pigpio
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
 
 #include "pigpio.h"
 
@@ -900,6 +901,114 @@ void tc()
    CHECK(12, 99, e, 0, 0, "spiClose");
 }
 
+int signum;
+enum signalType {Invalid, Default, Ignore, Catch};
+typedef struct
+{
+   enum signalType type;
+   struct sigaction action;
+} sigArr_t;
+sigArr_t sigArr[PI_MAX_SIGNUM+1];
+struct sigaction query, preset;
+void voidHandler(int signum) {}
+
+void td(void)
+{
+   /* Categorize all handlers */
+
+   for (signum = 0; signum<=PI_MAX_SIGNUM; signum++)
+   {
+      if (sigaction(signum, NULL, &sigArr[signum].action) < 0)
+         sigArr[signum].type = Invalid;
+
+      else if (sigArr[signum].action.sa_handler == SIG_DFL)
+         sigArr[signum].type = Default;
+
+      else if (sigArr[signum].action.sa_handler == SIG_IGN)
+         sigArr[signum].type = Ignore;
+
+      else sigArr[signum].type = Catch; // Preset, Set or Dfl
+   }
+   
+   /* Check signals affected by default installer. */
+
+   CHECK(13,1, sigArr[SIGCHLD].type, Ignore, 0, "SIGCHLD ignored");
+   CHECK(13,2, sigArr[SIGPIPE].type, Ignore, 0, "SIGPIPE Ignored");
+   CHECK(13,3, sigArr[SIGWINCH].type, Ignore, 0, "SIGWINCH ignored");
+   CHECK(13,4, sigArr[SIGUSR1].type, Catch, 0, "SIGUSR1 installed");
+   CHECK(13,5, sigArr[SIGUSR2].type, Catch, 0, "SIGUSR2 installed");
+
+   /* Set and restore handler on cancellation. */   
+
+   CHECK(13,6, gpioSetSignalFunc(SIGSEGV, voidHandler), 0, 0, "set signal");
+   CHECK(13,7, gpioSetSignalFunc(SIGSEGV, NULL), 0, 0, "cancel signal");
+   CHECK(13,8, sigaction(SIGSEGV, NULL, &query), 0, 0, "query sigaction");
+   CHECK(13,9, (intptr_t)query.sa_handler, (intptr_t)sigArr[SIGSEGV].action.sa_handler, 0, "gpioSetSignalFunc");
+
+
+   /* check custom handler function */
+
+   raise(SIGUSR2); // increment dgbLevel
+   time_sleep(0.1);
+   CHECK(13,10, gpioCfgGetInternals() & 0x0f, 1, 0, "SIGUSR2");
+
+   raise(SIGUSR1); // decrement dgbLevel
+   time_sleep(0.1);
+   CHECK(13,11, gpioCfgGetInternals() & 0x0f, 0, 0, "SIGUSR1");
+
+
+   /* check gpioTermination restores all signal handlers to their pre-initialise state. */
+   
+   gpioTerminate();
+
+   unsigned catchNotRestored = 0;
+   unsigned ignoreNotRestored = 0;
+   for (signum = 0; signum<=PI_MAX_SIGNUM; signum++)
+   {
+      if (sigArr[signum].type == Catch)
+      if (sigaction(signum, NULL, &query) == 0)
+      if (query.sa_handler != SIG_DFL)
+         {
+            fprintf(stderr, "signal %d not restored\n", signum);
+            catchNotRestored++;
+         }
+
+      if (sigArr[signum].type == Ignore)
+      if (sigaction(signum, NULL, &query) == 0)
+      if (query.sa_handler != SIG_DFL)
+         {
+            fprintf(stderr, "signal %d not restored\n", signum);
+            ignoreNotRestored++;
+         }
+   }
+   CHECK(13,12, catchNotRestored, 0, 0, "caught signals not restored");
+   CHECK(13,13, ignoreNotRestored, 0, 0, "ignored signals not restored");
+
+   /* check handlers prior to gpioInitialise are preserved */
+
+   preset = sigArr[SIGINT].action;
+   memset(&preset, 0, sizeof(preset));
+   preset.sa_handler = voidHandler;
+   CHECK(13,14, sigaction(SIGINT, &preset, &query), 0, 0, "preset action");
+
+   CHECK(13,15, gpioInitialise(), 79, 0, "gpioInitialise"); // FIX version dependency
+   CHECK(13,16, gpioSetSignalFunc(SIGINT, voidHandler), PI_SIG_SKIPPED, 0, "preset override");
+
+   // can not set ignored signals
+   CHECK(13,17, gpioSetSignalFunc(SIGPIPE, voidHandler), PI_SIG_SKIPPED, 0, "set ignore");
+
+
+   /* Test signal handlers disabled */
+
+   gpioTerminate();
+   gpioCfgSetInternals(gpioCfgGetInternals() | PI_CFG_NOSIGHANDLER);
+   gpioInitialise();
+
+   sigaction(SIGHUP, NULL, &query);
+   CHECK(13,18, (intptr_t)query.sa_handler, (intptr_t)SIG_DFL, 0, "default disabled");
+   CHECK(13,19, gpioSetSignalFunc(SIGHUP, NULL), PI_NOSIGHANDLER, 0, "set disabled");
+}
+
 int main(int argc, char *argv[])
 {
    int i, t, c, status;
@@ -944,6 +1053,7 @@ int main(int argc, char *argv[])
    if (strchr(test, 'a')) ta();
    if (strchr(test, 'b')) tb();
    if (strchr(test, 'c')) tc();
+   if (strchr(test, 'd')) td();
 
    gpioTerminate();
 

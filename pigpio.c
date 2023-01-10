@@ -984,6 +984,10 @@ typedef struct
    callbk_t func;
    unsigned ex;
    void *userdata;
+   struct sigaction old;
+   unsigned set;
+   unsigned dfl;
+   unsigned skip; // preset || SIG_IGN
 } gpioSignal_t;
 
 typedef struct
@@ -1232,6 +1236,7 @@ static volatile uint32_t hw_clk_max_freq = PI_HW_CLK_MAX_FREQ;
 
 static int libInitialised = 0;
 
+
 /* initialise every gpioInitialise */
 
 static struct timespec libStarted;
@@ -1313,6 +1318,7 @@ static spiInfo_t        spiInfo    [PI_SPI_SLOTS];
 static gpioScript_t     gpioScript [PI_MAX_SCRIPTS];
 
 static gpioSignal_t     gpioSignal [PI_MAX_SIGNUM+1];
+static struct sigaction defaultSigaction;
 
 static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 
@@ -1515,6 +1521,12 @@ int gpioWaveTxStart(unsigned wave_mode); /* deprecated */
 
 static void closeOrphanedNotifications(int slot, int fd);
 
+static void signalInstaller(void);
+static int setSignalInstaller(unsigned signum);
+static void defaultSigHandler(int signum);
+static void customSigHandler(int signum);
+
+static void initKillDMA(volatile uint32_t *dmaAddr);
 
 /* ======================================================================= */
 
@@ -5582,6 +5594,40 @@ static void dmaInitCbs(void)
 
 /* ======================================================================= */
 
+static void defaultSigHandler(int signum)
+{   
+   /* kill DMA channels & unlink pid file */
+   if (dmaReg != MAP_FAILED)
+   {
+      initKillDMA(dmaIn);
+      initKillDMA(dmaOut);
+      dmaReg = MAP_FAILED; // OS will munmap on termination
+   }
+
+   if (fdLock != -1)
+   {
+      close(fdLock);
+      unlink(PI_LOCKFILE);
+      fdLock = -1;
+   }
+
+   /* raise signal again, this time using *system* default action */
+   sigaction(signum, &gpioSignal[signum].old, NULL);
+   raise(signum);
+}
+
+static void customSigHandler(int signum)
+{
+   if (signum == SIGUSR1)
+      gpioCfg.dbgLevel = (gpioCfg.dbgLevel > DBG_MIN_LEVEL) ?
+         --gpioCfg.dbgLevel :
+         DBG_MIN_LEVEL;
+
+   if (signum == SIGUSR2)
+      gpioCfg.dbgLevel = (gpioCfg.dbgLevel < DBG_MAX_LEVEL) ?
+         ++gpioCfg.dbgLevel :
+         DBG_MAX_LEVEL;
+}
 
 static void sigHandler(int signum)
 {
@@ -5643,21 +5689,105 @@ static void sigHandler(int signum)
 
 /* ----------------------------------------------------------------------- */
 
-static void sigSetHandler(void)
+static void signalInstaller(void)
 {
-   int i;
-   struct sigaction new;
+   int signum;
+   struct sigaction new, tmp;
+   gpioSignal_t *sig;
 
-   for (i=PI_MIN_SIGNUM; i<=PI_MAX_SIGNUM; i++)
+   if (gpioCfg.internals & PI_CFG_NOSIGHANDLER)
    {
+      DBG(DBG_USER, "Signal installer disabled, PI_CFG_NOSIGHANDLER")
+      return;
+   }
 
-      memset(&new, 0, sizeof(new));
-      new.sa_handler = sigHandler;
+   sigemptyset(&new.sa_mask);
+   new.sa_flags = 0;
 
-      sigaction(i, &new, NULL);
+   for (signum=PI_MIN_SIGNUM; signum<=PI_MAX_SIGNUM; signum++)
+   {
+      sig = &gpioSignal[signum];
+
+      /*  skip if invalid */
+      if (sigaction(signum, NULL, &tmp) < 0)
+      {
+         sig->skip = 1;
+         DBG(DBG_INTERNAL, "Signal %d: invalid\n", signum);
+         continue;
+      }
+
+      /*  skip if not system default handler */
+      if (tmp.sa_handler != SIG_DFL)
+      {
+         sig->skip = 1;
+         DBG(DBG_INTERNAL, "Signal %d: !SIG_DFL\n", signum);
+         continue;
+      }
+
+      switch(signum)
+      {
+         /* job control signals - allow gpioSetSignalFunc*/
+         case SIGCONT:
+         case SIGTSTP:
+         case SIGTTIN:
+         case SIGTTOU:
+            break;
+
+         /* ignore signals - skip gpioSetSignalFunc */
+         case SIGPIPE:
+         case SIGWINCH:
+         case SIGCHLD:
+            new.sa_handler = SIG_IGN;
+            sigaction(signum, &new, &sig->old);
+            sig->set = 1;
+            sig->skip = 1; // protect from cancellation
+            DBG(DBG_INTERNAL, "Signal %d: skip=1, ignored\n", signum);
+            break;
+
+         /* install custom handler */
+         case SIGUSR1:
+         case SIGUSR2:
+            sigaddset(&new.sa_mask, SIGUSR1);
+            sigaddset(&new.sa_mask, SIGUSR2);
+            new.sa_handler = customSigHandler;
+            sigaction(signum, &new, &sig->old);
+            sig->set = 1;
+
+            // restore defaultSigaction if canceled
+            sig->dfl = 1;
+
+            DBG(DBG_INTERNAL, "Signal %d: set=1, customSigHandler installed\n", signum);
+            break;
+
+         default:
+            sigaction(signum, &defaultSigaction, &sig->old);
+            sig->dfl = 1;
+            DBG(DBG_INTERNAL, "Signal %d: dfl=1, defaultSigHandler installed\n", signum);
+      }
    }
 }
 
+
+void signalUninstaller(void)
+{
+   int signum;
+   gpioSignal_t *sig;
+
+   for (signum=PI_MIN_SIGNUM; signum<=PI_MAX_SIGNUM; signum++)
+   {
+      sig = &gpioSignal[signum];
+
+      if (sig->set || sig->dfl)
+      {
+         sigaction(signum, &sig->old, NULL);
+         sig->set = 0;
+         sig->dfl = 0;
+         DBG(DBG_INTERNAL, "Signal %d: Restored, system default handler\n", signum);
+      }
+   }
+}
+
+/* ----------------------------------------------------------------------- */
 /*
    freq mics  net
  0 1000 1000  900
@@ -8021,7 +8151,14 @@ static void initClearGlobals(void)
       gpioSignal[i].func     = NULL;
       gpioSignal[i].ex       = 0;
       gpioSignal[i].userdata = NULL;
+      gpioSignal[i].set      = 0;
+      gpioSignal[i].dfl      = 0;
+      memset(&gpioSignal[i].old, 0, sizeof(gpioSignal[i].old));
    }
+
+   defaultSigaction.sa_handler = defaultSigHandler;
+   defaultSigaction.sa_flags = 0;
+   sigfillset(&defaultSigaction.sa_mask);
 
    for (i=0; i<=PI_MAX_TIMER; i++)
    {
@@ -8324,7 +8461,7 @@ int initInitialise(void)
 
 #ifndef EMBEDDED_IN_VM
    if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
-      sigSetHandler();
+      signalInstaller();
 #endif
 
    if (initPeripherals() < 0) return PI_INIT_FAILED;
@@ -8767,8 +8904,10 @@ void gpioTerminate(void)
       fprintf(stderr,
          "\n#####################################################\n\n\n");
    }
-
 #endif
+
+   signalUninstaller();
+
    initReleaseResources();
 
    fflush(NULL);
@@ -12845,24 +12984,79 @@ int gpioDeleteScript(unsigned script_id)
 }
 
 
+/* ----------------------------------------------------------------------- */
+static int setSignalInstaller(unsigned signum)
+{
+   gpioSignal_t *sig = &gpioSignal[signum];
+   struct sigaction new;
+
+   if (sig->skip)
+      return PI_SIG_SKIPPED;
+
+   /* set: save old signal action and set new */
+
+   if (sig->func)
+   {
+      if (sig->set == 0)
+      {
+         DBG(DBG_INTERNAL, "Set new handler for signal %d" ,signum);
+         memset(&new, 0, sizeof(new));
+         new.sa_handler = sigHandler;
+         sigfillset(&new.sa_mask);
+         sig->set = 1;
+
+         if (sig->dfl == 0)
+            return sigaction(signum, &new, &sig->old);
+
+         else
+            return sigaction(signum, &new, NULL);
+      }
+
+      return PI_SIGNUM_SET;
+   }
+
+   /* cancel and restore old signal action */
+   else
+   {
+      if (sig->set)
+      {
+         DBG(DBG_INTERNAL, "Cancel and restore handler for signal %d" ,signum);
+         sig->set = 0;
+
+         if (sig->dfl == 0)
+            return sigaction(signum, &sig->old, NULL);
+
+         else
+            return sigaction(signum, &defaultSigaction, NULL);
+      }
+   }
+
+   return PI_SIG_UNK_ACTION;
+}
+
 
 /* ----------------------------------------------------------------------- */
 
 int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f)
 {
+   int rv;
+
    DBG(DBG_USER, "signum=%d function=%08"PRIXPTR, signum, (uintptr_t)f);
 
    CHECK_INITED;
+
+   if (gpioCfg.internals & PI_CFG_NOSIGHANDLER)
+      return PI_NOSIGHANDLER;
 
    if (signum > PI_MAX_SIGNUM)
       SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
 
    gpioSignal[signum].ex = 0;
    gpioSignal[signum].userdata = NULL;
-
    gpioSignal[signum].func = f;
 
-   return 0;
+   rv = setSignalInstaller(signum); 
+   return (rv == -1) ? PI_SIG_UNK_ACTION : rv;
 }
 
 
@@ -12871,20 +13065,25 @@ int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f)
 int gpioSetSignalFuncEx(unsigned signum, gpioSignalFuncEx_t f,
                         void *userdata)
 {
+   int rv;
+
    DBG(DBG_USER, "signum=%d function=%08"PRIXPTR" userdata=%08"PRIXPTR,
       signum, (uintptr_t)f, (uintptr_t)userdata);
 
    CHECK_INITED;
+
+   if (gpioCfg.internals & PI_CFG_NOSIGHANDLER)
+      return PI_NOSIGHANDLER;
 
    if (signum > PI_MAX_SIGNUM)
       SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
 
    gpioSignal[signum].ex = 1;
    gpioSignal[signum].userdata = userdata;
-
    gpioSignal[signum].func = f;
 
-   return 0;
+   rv = setSignalInstaller(signum); 
+   return (rv == -1) ? PI_SIG_UNK_ACTION : rv;
 }
 
 
@@ -14025,7 +14224,9 @@ int gpioCfgNetAddr(int numSockAddr, uint32_t *sockAddr)
 
 uint32_t gpioCfgGetInternals(void)
 {
-   return gpioCfg.internals;
+   return ((gpioCfg.internals & 0xffffff00)
+         | gpioCfg.alertFreq << 4
+         | gpioCfg.dbgLevel);
 }
 
 int gpioCfgSetInternals(uint32_t cfgVal)
@@ -14041,4 +14242,3 @@ int gpioCfgSetInternals(uint32_t cfgVal)
 /* include any user customisations */
 
 #include "custom.cext"
-

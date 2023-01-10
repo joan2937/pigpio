@@ -6528,6 +6528,11 @@ after this command is issued.
 #define PI_CMD_INTERRUPTED -144 // Used by Python
 #define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
 #define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
+#define PI_NOSIGHANDLER    -147 // signal handling is disabled (gpioCfg.internals)
+#define PI_SIGNUM_INVALID  -148 // invalid signal number requested (signal.h)
+#define PI_SIGNUM_SET      -149 // handler for signal is already installed
+#define PI_SIG_UNK_ACTION  -150 // default signal handler is not installed
+#define PI_SIG_SKIPPED     -151 // set/cancel signal handler is not allowed
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
