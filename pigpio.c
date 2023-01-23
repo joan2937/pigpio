@@ -2108,6 +2108,8 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
          break;
 
       case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
+      
+      case PI_CMD_SERNM: res = gpioHardwareSerialNumber(); break;
 
 
 
@@ -14044,6 +14046,41 @@ unsigned gpioHardwareRevision(void)
    return rev;
 }
 
+
+unsigned int gpioHardwareSerialNumber(void)
+{
+   static unsigned serial = 0;
+
+   FILE * filp;
+   char buf[512];
+   char term;
+
+   DBG(DBG_USER, "");
+
+   if (serial) return serial;
+
+   filp = fopen ("/proc/cpuinfo", "r");
+
+
+   if (filp != NULL)
+   {
+      while (fgets(buf, sizeof(buf), filp) != NULL)
+      {
+         if (!strncasecmp("serial\t\t: ", buf, 10))
+         {
+            if (sscanf(buf+10, "%x%c", &serial, &term) == 2)
+            {
+               if (term != '\n') serial = 0;
+            }
+         }
+      }
+      fclose(filp);
+   }
+
+   DBG(DBG_USER, "serial number=%x", serial);
+
+   return serial;
+}
 
 /* ----------------------------------------------------------------------- */
 

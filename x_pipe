@@ -76,6 +76,10 @@ echo "hwver" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
 
+echo "sernm" >/dev/pigpio
+read -t 1 s </dev/pigout
+if [[ $s -ne 0 ]]; then echo "SERNM ok"; else echo "SERNM fail ($s)"; fi
+
 echo "mics 1000" >/dev/pigpio
 read -t 1 s </dev/pigout
 if [[ $s = 0 ]]; then echo "MICS ok"; else echo "MICS fail ($s)"; fi

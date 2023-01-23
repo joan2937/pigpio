@@ -94,6 +94,7 @@ cmdInfo_t cmdInfo[]=
    {PI_CMD_HP,    "HP",    131, 0, 1}, // gpioHardwarePWM
 
    {PI_CMD_HWVER, "HWVER", 101, 4, 1}, // gpioHardwareRevision
+   {PI_CMD_SERNM, "SERNM", 101, 4, 1}, // gpioHardwareSerialNumber
 
    {PI_CMD_I2CC,  "I2CC",  112, 0, 1}, // i2cClose
    {PI_CMD_I2CO,  "I2CO",  131, 2, 1}, // i2cOpen
@@ -307,6 +308,7 @@ H/HELP           Display command help\n\
 HC g f           Set hardware clock frequency\n\
 HP g f dc        Set hardware PWM frequency and dutycycle\n\
 HWVER            Get hardware version\n\
+SERNM            Get hardware serial number\n\
 \n\
 I2CC h           Close I2C handle\n\
 I2CO bus device flags | Open I2C bus and device with flags\n\
@@ -671,7 +673,7 @@ int cmdParse(
       case 101: /* BR1  BR2  CGI  H  HELP  HWVER
                    DCRA  HALT  INRA  NO
                    PIGPV  POPA  PUSHA  RET  T  TICK  WVBSY  WVCLR
-                   WVCRE  WVGO  WVGOR  WVHLT  WVNEW
+                   WVCRE  WVGO  WVGOR  WVHLT  WVNEW SERNM
 
                    No parameters, always valid.
                 */

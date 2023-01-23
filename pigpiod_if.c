@@ -668,6 +668,9 @@ uint32_t get_current_tick(void)
 uint32_t get_hardware_revision(void)
    {return pigpio_command(gPigCommand, PI_CMD_HWVER, 0, 0, 1);}
 
+uint32_t get_hardware_sernum(void)
+   {return pigpio_command(gPigCommand, PI_CMD_SERNM, 0, 0, 1);}
+
 uint32_t get_pigpio_version(void)
    {return pigpio_command(gPigCommand, PI_CMD_PIGPV, 0, 0, 1);}
 

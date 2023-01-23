@@ -317,6 +317,7 @@ UTILITIES
 get_current_tick          Get current tick (microseconds)
 
 get_hardware_revision     Get hardware revision
+get_hardware_serial_number     Get hardware serial number
 get_pigpio_version        Get the pigpio version
 
 pigpio.error_text         Gets error text from error number
@@ -573,6 +574,7 @@ _PI_CMD_EVT  =116
 
 _PI_CMD_PROCU=117
 _PI_CMD_WVCAP=118
+_PI_CMD_SERNM=119
 
 # pigpio error numbers
 
@@ -2088,6 +2090,29 @@ class pi():
       ...
       """
       return _pigpio_command(self.sl, _PI_CMD_HWVER, 0, 0)
+
+   def get_hardware_serial_number(self):
+      """
+      Returns the Pi's hardware serial number in decimal base.
+
+      The hardware serial number is the last few characters on the
+      Serial line of /proc/cpuinfo.
+
+      If the hardware revision can not be found or is not a valid
+      hexadecimal number the function returns 0.
+
+      ...
+      print(pi.get_hardware_serial_number())
+      571858502
+      ...
+
+      To get the hexadecimal value as displayed in /proc/cpuinfo:
+      ...
+      print("0x{:016x}".format(pi.get_hardware_serial_number()))
+      0x000000002215de46
+      """
+      return _pigpio_command(self.sl, _PI_CMD_SERNM, 0, 0)
+
 
    def get_pigpio_version(self):
       """
@@ -5669,7 +5694,7 @@ def xref():
 
    percent:: 0-100
    The size of waveform as percentage of maximum available.
-   
+
    port:
    The port used by the pigpio daemon, defaults to 8888.
 

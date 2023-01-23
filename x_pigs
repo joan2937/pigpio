@@ -55,6 +55,9 @@ if [[ ${#s} = 5423 ]]; then echo "HELP ok"; else echo "HELP fail (${#s})"; fi
 s=$(pigs hwver)
 if [[ $s -ne 0 ]]; then echo "HWVER ok"; else echo "HWVER fail ($s)"; fi
 
+s=$(pigs sernm)
+if [[ $s -ne 0 ]]; then echo "SERNM ok"; else echo "SERNM fail ($s)"; fi
+
 s=$(pigs mics 1000)
 if [[ $s = "" ]]; then echo "MICS ok"; else echo "MICS fail ($s)"; fi
 
