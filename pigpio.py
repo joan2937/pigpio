@@ -1194,8 +1194,10 @@ class _callback_thread(threading.Thread):
       while self.go:
 
          buf += self.sl.s.recv(RECV_SIZ)
-         offset = 0
+         if len(buf) == 0:
+             self.stop()
 
+         offset = 0
          while self.go and (len(buf) - offset) >= MSG_SIZ:
             msgbuf = buf[offset:offset + MSG_SIZ]
             offset += MSG_SIZ
