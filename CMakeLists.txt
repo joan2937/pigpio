@@ -4,6 +4,10 @@ project(pigpio LANGUAGES C VERSION 0.71)
 
 list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+if (WIN32)
+	find_file( WINPTHREAD libwinpthread-1.dll )
+endif()
+
 find_package(Threads REQUIRED)
 find_package(RT REQUIRED)
 
@@ -21,6 +25,7 @@ add_library(pigpiod_if pigpiod_if.c command.c)
 add_library(pigpiod_if2 pigpiod_if2.c command.c)
 if (WIN32)
 	target_link_libraries(pigpiod_if2 ws2_32)
+	file( COPY "${WINPTHREAD}" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}" )
 endif()
 
 
