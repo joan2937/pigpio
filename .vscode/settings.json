@@ -1,0 +1,10 @@
+{
+    "makefile.makePath": "mingw32-make",
+    "cmake.cmakePath": "cmake",
+    "files.associations": {
+        "stdlib.h": "c",
+        "types.h": "c",
+        "unistd.h": "c",
+        "pigpiod_if2.h": "c"
+    }
+}

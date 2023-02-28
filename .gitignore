@@ -10,6 +10,8 @@ x_pigpiod_if
 x_pigpiod_if2
 __pycache__
 build
+cmake-build-debug
+cmake-build-release
 dist
 *.egg-info
 

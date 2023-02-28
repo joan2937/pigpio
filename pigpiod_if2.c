@@ -35,17 +35,34 @@ For more information, please refer to <http://unlicense.org/>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <netdb.h>
-#include <pthread.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
+#include <pthread.h>
+
+#if WIN32
+#include <winsock.h>
+#include <windows.h>
+#include <ws2def.h>
+#include <ws2tcpip.h>
+
+#define MSG_WAITALL 0x8
+
+#undef WINVER
+#undef _WIN32_WINNT
+
+#define WINVER 0x0A00
+#define _WIN32_WINNT 0x0A00
+
+#else
+#include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <sys/select.h>
-
 #include <arpa/inet.h>
+#endif
 
 #include "pigpio.h"
 #include "command.h"
@@ -244,6 +261,15 @@ static int pigpioOpenSocket(const char *addrStr, const char *portStr)
    hints.ai_family   = PF_UNSPEC;
    hints.ai_socktype = SOCK_STREAM;
    hints.ai_flags   |= AI_CANONNAME;
+
+#if WIN32
+    WORD wsVersionRequested = MAKEWORD(2, 2);
+    WSADATA wsaData;
+
+    err = WSAStartup(wsVersionRequested, &wsaData);
+    if (err) return pigif_socket_startup;
+
+#endif
 
    err = getaddrinfo (addrStr, portStr, &hints, &res);
 

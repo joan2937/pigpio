@@ -35,10 +35,27 @@ This version is for pigpio version 69+
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <sys/types.h>
+
+#if WIN32
+#include <winsock.h>
+#include <windows.h>
+#include <ws2def.h>
+#include <ws2tcpip.h>
+
+#define MSG_WAITALL 0x8
+
+#undef WINVER
+#undef _WIN32_WINNT
+
+#define WINVER 0x0A00
+#define _WIN32_WINNT 0x0A00
+
+#else
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#endif
 
 #include "pigpio.h"
 #include "command.h"
@@ -107,25 +124,33 @@ static int initOpts(int argc, char *argv[])
    return args;
 }
 
-static int openSocket(void)
-{
-   int sock, err;
-   struct addrinfo hints, *res, *rp;
-   const char *addrStr, *portStr;
+static int openSocket(void) {
+    int sock, err;
+    struct addrinfo hints, *res, *rp;
+    const char *addrStr, *portStr;
 
-   portStr = getenv(PI_ENVPORT);
+    portStr = getenv(PI_ENVPORT);
 
-   if (!portStr) portStr = PI_DEFAULT_SOCKET_PORT_STR;
+    if (!portStr) portStr = PI_DEFAULT_SOCKET_PORT_STR;
 
-   addrStr = getenv(PI_ENVADDR);
+    addrStr = getenv(PI_ENVADDR);
 
-   if (!addrStr) addrStr = PI_DEFAULT_SOCKET_ADDR_STR;
+    if (!addrStr) addrStr = PI_DEFAULT_SOCKET_ADDR_STR;
 
-   memset (&hints, 0, sizeof (hints));
+    memset(&hints, 0, sizeof(hints));
 
-   hints.ai_family   = PF_UNSPEC;
-   hints.ai_socktype = SOCK_STREAM;
-   hints.ai_flags   |= AI_CANONNAME;
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags |= AI_CANONNAME;
+
+#if WIN32
+    WORD wsVersionRequested = MAKEWORD(2, 2);
+    WSADATA wsaData;
+
+    err = WSAStartup(wsVersionRequested, &wsaData);
+    if (err) return SOCKET_OPEN_FAILED;
+
+#endif
 
    err = getaddrinfo(addrStr, portStr, &hints, &res);
 
@@ -388,6 +413,10 @@ int main(int argc , char *argv[])
    }
 
    if (sock >= 0) close(sock);
+
+#if WIN32
+    WSACleanup();
+#endif
 
    return status;
 }

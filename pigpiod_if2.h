@@ -32,6 +32,7 @@ For more information, please refer to <http://unlicense.org/>
 
 #define PIGPIOD_IF2_VERSION 17
 
+
 /*TEXT
 
 pigpiod_if2 is a C library for the Raspberry which allows control
@@ -4376,6 +4377,10 @@ typedef enum
    pigif_callback_not_found = -2010,
    pigif_unconnected_pi     = -2011,
    pigif_too_many_pis       = -2012,
+#if WIN32
+    pigif_socket_startup    = -2013
+#endif
+
 } pigifError_t;
 
 /*DEF_E*/

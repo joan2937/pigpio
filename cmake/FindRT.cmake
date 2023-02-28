@@ -16,24 +16,26 @@ find_path (RT_INCLUDE_DIR NAMES time.h
   PATH_SUFFIXES
 )
 
-find_library(RT_LIBRARIES NAMES rt
-  PATHS
-  /usr
-  /usr/local
-  /opt
-)
-
-include(FindPackageHandleStandardArgs)
-
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(rt DEFAULT_MSG RT_LIBRARIES RT_INCLUDE_DIR)
-
-mark_as_advanced(RT_INCLUDE_DIR RT_LIBRARIES)
-
-if (NOT TARGET RT::RT)
-  add_library(RT::RT INTERFACE IMPORTED)
-
-  set_target_properties(RT::RT PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${RT_INCLUDE_DIR}
-    INTERFACE_LINK_LIBRARIES ${RT_LIBRARIES}
+if (!WIN32)
+  find_library(RT_LIBRARIES NAMES rt
+    PATHS
+    /usr
+    /usr/local
+    /opt
   )
+
+  include(FindPackageHandleStandardArgs)
+
+  FIND_PACKAGE_HANDLE_STANDARD_ARGS(RT DEFAULT_MSG RT_LIBRARIES RT_INCLUDE_DIR)
+
+  mark_as_advanced(RT_INCLUDE_DIR RT_LIBRARIES)
+
+  if (NOT TARGET RT::RT)
+    add_library(RT::RT INTERFACE IMPORTED)
+
+    set_target_properties(RT::RT PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES ${RT_INCLUDE_DIR}
+      INTERFACE_LINK_LIBRARIES ${RT_LIBRARIES}
+    )
+  endif()
 endif()
