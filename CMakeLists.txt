@@ -9,7 +9,7 @@ if (WIN32)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(RT REQUIRED)
+# find_package(RT REQUIRED)
 
 option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 
@@ -31,45 +31,24 @@ endif()
 
 # x_pigpio
 add_executable(x_pigpio x_pigpio.c)
-if (!WIN32)
-	target_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)
-else()
-	target_link_libraries(x_pigpio pigpio Threads::Threads)
-endif()
+target_link_libraries(x_pigpio pigpio Threads::Threads)
 
 # x_pigpiod_if
 add_executable(x_pigpiod_if x_pigpiod_if.c)
-if (WIN32)
-	target_link_libraries(x_pigpiod_if pigpiod_if Threads::Threads)
-else()
-	target_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)
-endif()
+target_link_libraries(x_pigpiod_if pigpiod_if Threads::Threads)
 
 
 # x_pigpiod_if2
 add_executable(x_pigpiod_if2 x_pigpiod_if2.c)
-if (WIN32)
-	target_link_libraries(x_pigpiod_if2 pigpiod_if2 Threads::Threads)
-else()
-	target_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)
-endif()
+target_link_libraries(x_pigpiod_if2 pigpiod_if2 Threads::Threads)
 
 # pigpiod
 add_executable(pigpiod pigpiod.c)
-if (WIN32)
-	target_link_libraries(pigpiod pigpio Threads::Threads)
-else()
-	target_link_libraries(pigpiod pigpio RT::RT Threads::Threads)
-endif()
+target_link_libraries(pigpiod pigpio Threads::Threads)
 
 # pigs
 add_executable(pigs pigs.c command.c)
-if (WIN32)
-	target_link_libraries(pigs Threads::Threads ws2_32)
-else()
-	target_link_libraries(pigs Threads::Threads)
-endif()
-
+target_link_libraries(pigs Threads::Threads)
 
 # pig2vcd
 add_executable(pig2vcd pig2vcd.c command.c)
