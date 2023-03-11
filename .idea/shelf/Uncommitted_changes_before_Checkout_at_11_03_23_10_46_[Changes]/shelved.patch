@@ -1,0 +1,70 @@
+Index: CMakeLists.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>cmake_minimum_required(VERSION 3.0)\n\nproject(pigpio LANGUAGES C VERSION 0.71)\n\nlist (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)\n\nfind_package(Threads REQUIRED)\nfind_package(RT REQUIRED)\n\noption(BUILD_SHARED_LIBS \"Create shared libraries\" ON)\n\nadd_compile_options(-Wall)\n\n# libpigpio.(so|a)\nadd_library(pigpio pigpio.c command.c custom.cext)\n\n# libpigpiod_if.(so|a)\nadd_library(pigpiod_if pigpiod_if.c command.c)\n\n# libpigpiod_if2.(so|a)\nadd_library(pigpiod_if2 pigpiod_if2.c command.c)\nif (WIN32)\n\ttarget_link_libraries(pigpiod_if2 ws2_32)\nendif()\n\n\n# x_pigpio\nadd_executable(x_pigpio x_pigpio.c)\nif (!WIN32)\n\ttarget_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)\nelse()\n\ttarget_link_libraries(x_pigpio pigpio Threads::Threads)\nendif()\n\n# x_pigpiod_if\nadd_executable(x_pigpiod_if x_pigpiod_if.c)\nif (WIN32)\n\ttarget_link_libraries(x_pigpiod_if pigpiod_if Threads::Threads)\nelse()\n\ttarget_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)\nendif()\n\n\n# x_pigpiod_if2\nadd_executable(x_pigpiod_if2 x_pigpiod_if2.c)\nif (WIN32)\n\ttarget_link_libraries(x_pigpiod_if2 pigpiod_if2 Threads::Threads)\nelse()\n\ttarget_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)\nendif()\n\n# pigpiod\nadd_executable(pigpiod pigpiod.c)\nif (WIN32)\n\ttarget_link_libraries(pigpiod pigpio Threads::Threads)\nelse()\n\ttarget_link_libraries(pigpiod pigpio RT::RT Threads::Threads)\nendif()\n\n# pigs\nadd_executable(pigs pigs.c command.c)\nif (WIN32)\n\ttarget_link_libraries(pigs Threads::Threads ws2_32)\nelse()\n\ttarget_link_libraries(pigs Threads::Threads)\nendif()\n\n\n# pig2vcd\nadd_executable(pig2vcd pig2vcd.c command.c)\ntarget_link_libraries(pig2vcd Threads::Threads)\n\n# Configure and install project\n\ninclude (GenerateExportHeader)\ninclude (CMakePackageConfigHelpers)\n\ngenerate_export_header(${PROJECT_NAME})\n\ninstall(TARGETS pigpio pigpiod_if pigpiod_if2 pig2vcd pigpiod pigs\n    EXPORT ${PROJECT_NAME}Targets\n\tLIBRARY  DESTINATION lib\n\tARCHIVE  DESTINATION lib\n\tRUNTIME  DESTINATION bin\n\tINCLUDES DESTINATION include\n)\n\nwrite_basic_package_version_file(\n\t\"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake\"\n\tVERSION ${${PROJECT_NAME}_VERSION}\n\tCOMPATIBILITY AnyNewerVersion\n)\n\nexport(EXPORT ${PROJECT_NAME}Targets\n  FILE \"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake\"\n  NAMESPACE pigpio::\n)\n\nset(ConfigPackageLocation lib/cmake/${PROJECT_NAME})\ninstall(EXPORT ${PROJECT_NAME}Targets\n  FILE\n    ${PROJECT_NAME}Targets.cmake\n  NAMESPACE\n    pigpio::\n  DESTINATION\n    ${ConfigPackageLocation}\n)\n\ninstall(\n  FILES\n    ${CMAKE_CURRENT_LIST_DIR}/cmake/${PROJECT_NAME}Config.cmake\n    \"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake\"\n  DESTINATION\n    ${ConfigPackageLocation}\n)\n\ninstall(FILES pigpio.h pigpiod_if.h pigpiod_if2.h\n\tDESTINATION include\n\tPERMISSIONS OWNER_READ OWNER_WRITE\n\t\tGROUP_READ\n\t\tWORLD_READ\n)\n\nfile(GLOB man_1_SRC \"*.1\")\ninstall(FILES ${man_1_SRC}\n\tDESTINATION man/man1\n\tPERMISSIONS OWNER_READ OWNER_WRITE\n\t\tGROUP_READ\n\t\tWORLD_READ\n)\n\nfile(GLOB man_3_SRC \"*.3\")\ninstall(FILES ${man_3_SRC}\n\tDESTINATION man/man3\n\tPERMISSIONS OWNER_READ OWNER_WRITE\n\t\tGROUP_READ\n\t\tWORLD_READ\n)\n\n# Install python modules.\nfind_package(Python COMPONENTS Interpreter QUIET)\n\nif(Python_FOUND)\n\tconfigure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/setup.py.in\n\t\t${CMAKE_CURRENT_BINARY_DIR}/setup.py\n\t)\n\n\tinstall(CODE \"execute_process(COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install)\")\nendif()\n\n# package project\n\ninclude (CPack)
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	(revision cea68f2fdff631d488072468ad5f4bd539263c60)
++++ b/CMakeLists.txt	(date 1678531468876)
+@@ -5,7 +5,7 @@
+ list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+ 
+ find_package(Threads REQUIRED)
+-find_package(RT REQUIRED)
++# find_package(RT REQUIRED)
+ 
+ option(BUILD_SHARED_LIBS "Create shared libraries" ON)
+ 
+@@ -26,45 +26,24 @@
+ 
+ # x_pigpio
+ add_executable(x_pigpio x_pigpio.c)
+-if (!WIN32)
+-	target_link_libraries(x_pigpio pigpio RT::RT Threads::Threads)
+-else()
+-	target_link_libraries(x_pigpio pigpio Threads::Threads)
+-endif()
++target_link_libraries(x_pigpio pigpio Threads::Threads)
+ 
+ # x_pigpiod_if
+ add_executable(x_pigpiod_if x_pigpiod_if.c)
+-if (WIN32)
+-	target_link_libraries(x_pigpiod_if pigpiod_if Threads::Threads)
+-else()
+-	target_link_libraries(x_pigpiod_if pigpiod_if RT::RT Threads::Threads)
+-endif()
++target_link_libraries(x_pigpiod_if pigpiod_if Threads::Threads)
+ 
+ 
+ # x_pigpiod_if2
+ add_executable(x_pigpiod_if2 x_pigpiod_if2.c)
+-if (WIN32)
+-	target_link_libraries(x_pigpiod_if2 pigpiod_if2 Threads::Threads)
+-else()
+-	target_link_libraries(x_pigpiod_if2 pigpiod_if2 RT::RT Threads::Threads)
+-endif()
++target_link_libraries(x_pigpiod_if2 pigpiod_if2 Threads::Threads)
+ 
+ # pigpiod
+ add_executable(pigpiod pigpiod.c)
+-if (WIN32)
+-	target_link_libraries(pigpiod pigpio Threads::Threads)
+-else()
+-	target_link_libraries(pigpiod pigpio RT::RT Threads::Threads)
+-endif()
++target_link_libraries(pigpiod pigpio Threads::Threads)
+ 
+ # pigs
+ add_executable(pigs pigs.c command.c)
+-if (WIN32)
+-	target_link_libraries(pigs Threads::Threads ws2_32)
+-else()
+-	target_link_libraries(pigs Threads::Threads)
+-endif()
+-
++target_link_libraries(pigs Threads::Threads)
+ 
+ # pig2vcd
+ add_executable(pig2vcd pig2vcd.c command.c)
