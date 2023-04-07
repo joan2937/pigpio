@@ -33,7 +33,8 @@ LL2      = -L. -lpigpiod_if -pthread -lrt
 
 LL3      = -L. -lpigpiod_if2 -pthread -lrt
 
-prefix = /usr/local
+# Set prefix=/usr to overwrite distributed version
+prefix ?= /usr/local
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 includedir = $(prefix)/include
