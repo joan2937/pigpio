@@ -893,6 +893,8 @@ Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
 
 #define PI_MAX_PATH 512
 
+#define SAVED_CLK_NUMBER 5
+
 /* typedef ------------------------------------------------------- */
 
 typedef void (*callbk_t) ();
@@ -1218,6 +1220,37 @@ typedef struct
    unsigned  size;          /* in bytes */
 } DMAMem_t;
 
+typedef struct {
+	// PWM: https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf#page=141
+	uint32_t pwm_state_saved;
+	uint32_t pwm_ctl;
+	uint32_t pwm_sta;
+	uint32_t pwm_rng1;
+	uint32_t pwm_dmac;
+
+	// PCM: https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf#page=125
+	uint32_t pcm_state_saved;
+	uint32_t pcm_cs;
+	uint32_t pcm_fifo;
+	uint32_t pcm_mode;
+	uint32_t pcm_rxc;
+	uint32_t pcm_txc;
+	uint32_t pcm_dreq;
+	uint32_t pcm_inten;
+	uint32_t pcm_intstc;
+	uint32_t pcm_gray;
+
+	// Clocks: https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf#page=107
+	struct {
+	   uint32_t state_saved;
+	   uint32_t ctl_addr;
+	   uint32_t div_addr;
+	   uint32_t ctl;
+	   uint32_t div;
+	} clk[SAVED_CLK_NUMBER];
+} pulse_modulation_state_t;
+
+
 /* global -------------------------------------------------------- */
 
 /* initialise once then preserve */
@@ -1412,7 +1445,10 @@ static unsigned old_mode_amosi;
 static uint32_t old_spi_cntl0;
 static uint32_t old_spi_cntl1;
 
+static pulse_modulation_state_t old_pms;
+
 static uint32_t bscFR;
+
 
 /* const --------------------------------------------------------- */
 
@@ -1883,6 +1919,7 @@ static int myDoCommand(uintptr_t *p, unsigned bufSize, char *buf)
    int masked;
    res = 0;
 
+   DBG(DBG_USER, "cmd=%d", p[0]);
    switch (p[0])
    {
       case PI_CMD_BC1:
@@ -7884,6 +7921,16 @@ static void initPWM(unsigned bits)
 {
    DBG(DBG_STARTUP, "bits=%d", bits);
 
+   if (!old_pms.pwm_state_saved)
+   {
+      DBG(DBG_USER, "Save PWM state");
+      old_pms.pwm_ctl = pwmReg[PWM_CTL];
+      old_pms.pwm_sta = pwmReg[PWM_STA];
+      old_pms.pwm_rng1 = pwmReg[PWM_RNG1];
+      old_pms.pwm_dmac = pwmReg[PWM_DMAC];
+      old_pms.pwm_state_saved = 1;
+   }
+
    /* reset PWM */
 
    pwmReg[PWM_CTL] = 0;
@@ -7923,9 +7970,74 @@ static void initPWM(unsigned bits)
 
 /* ----------------------------------------------------------------------- */
 
+static void restorePulseModulationState(void)
+{
+   DBG(DBG_USER, "Restore state");
+   if (old_pms.pwm_state_saved)
+   {
+      DBG(DBG_USER, "Restore PWM state");
+      pwmReg[PWM_CTL] = 0; // Reset
+      pwmReg[PWM_STA] = old_pms.pwm_sta;
+      pwmReg[PWM_RNG1] = old_pms.pwm_rng1;
+      pwmReg[PWM_DMAC] = old_pms.pwm_dmac;
+      pwmReg[PWM_CTL] = PWM_CTL_CLRF1; // Clear FIFO
+      pwmReg[PWM_CTL] = old_pms.pwm_ctl;
+   }
+
+   if (old_pms.pcm_state_saved)
+   {
+      DBG(DBG_USER, "Restore PCM state");
+      pcmReg[PCM_CS] = 0; // Disable to modify
+      pcmReg[PCM_FIFO] = old_pms.pcm_fifo;
+      pcmReg[PCM_MODE] = old_pms.pcm_mode;
+      pcmReg[PCM_RXC] = old_pms.pcm_rxc;
+      pcmReg[PCM_TXC] = old_pms.pcm_txc;
+      pcmReg[PCM_DREQ] = old_pms.pcm_dreq;
+      pcmReg[PCM_INTEN] = old_pms.pcm_inten;
+      pcmReg[PCM_INTSTC] = old_pms.pcm_intstc;
+      pcmReg[PCM_GRAY] = old_pms.pcm_gray;
+      pcmReg[PCM_CS] = old_pms.pcm_cs; // Enable original state
+   }
+
+   for (int clock = 0; clock < SAVED_CLK_NUMBER; clock++)
+      if (old_pms.clk[clock].state_saved)
+      {
+	 DBG(DBG_USER, "Restore clock %d state", clock);
+	 clkReg[old_pms.clk[clock].div_addr] = (BCM_PASSWD | old_pms.clk[clock].div);
+
+	 usleep(10);
+
+	 clkReg[old_pms.clk[clock].ctl_addr] = (BCM_PASSWD | old_pms.clk[clock].ctl);
+
+	 usleep(10);
+
+	 clkReg[old_pms.clk[clock].ctl_addr] |= (BCM_PASSWD | CLK_CTL_ENAB);
+      }
+
+   waveClockInited = 0;
+   PWMClockInited = 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static void initPCM(unsigned bits)
 {
    DBG(DBG_STARTUP, "bits=%d", bits);
+
+   if (!old_pms.pcm_state_saved)
+   {
+      DBG(DBG_USER, "Save PCM state");
+      old_pms.pcm_fifo = pcmReg[PCM_FIFO];
+      old_pms.pcm_mode = pcmReg[PCM_MODE];
+      old_pms.pcm_rxc = pcmReg[PCM_RXC];
+      old_pms.pcm_txc = pcmReg[PCM_TXC];
+      old_pms.pcm_dreq = pcmReg[PCM_DREQ];
+      old_pms.pcm_inten = pcmReg[PCM_INTEN];
+      old_pms.pcm_intstc = pcmReg[PCM_INTSTC];
+      old_pms.pcm_gray = pcmReg[PCM_GRAY];
+      old_pms.pcm_cs = pcmReg[PCM_CS];
+      old_pms.pcm_state_saved = 1;
+   }
 
    /* disable PCM so we can modify the regs */
 
@@ -7975,11 +8087,38 @@ static void initPCM(unsigned bits)
 
 /* ----------------------------------------------------------------------- */
 
+static int getClkIndex(int clkCtl)
+{
+   switch (clkCtl)
+   {
+      case CLK_GP0_CTL: return 0;
+      case CLK_GP1_CTL: return 1;
+      case CLK_GP2_CTL: return 2;
+      case CLK_PWMCTL: return 3;
+      case CLK_PCMCTL: return 4;
+   }
+   return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static void initHWClk
    (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH)
 {
    DBG(DBG_INTERNAL, "ctl=%d div=%d src=%d /I=%d /f=%d M=%d",
       clkCtl, clkDiv, clkSrc, divI, divF, MASH);
+
+   int clock = getClkIndex(clkCtl);
+   if (!old_pms.clk[clock].state_saved)
+   {
+      DBG(DBG_USER, "Save clock %d state", clock);
+      old_pms.clk[clock].ctl_addr = clkCtl;
+      old_pms.clk[clock].div_addr = clkDiv;
+      // Keep MASH, FLIP, and SRC
+      old_pms.clk[clock].ctl = (clkReg[clkCtl] & 0b11100001111);
+      old_pms.clk[clock].div = clkReg[clkDiv];
+      old_pms.clk[clock].state_saved = 1;
+   }
 
    /* kill the clock if busy, anything else isn't reliable */
 
@@ -8080,6 +8219,12 @@ static void initDMAgo(volatile uint32_t  *dmaAddr, uint32_t cbAddr)
                      DMA_PANIC_PRIORITY(8) |
                      DMA_PRIORITY(8)       |
                      DMA_ACTIVE;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void gpioInternalRestorePulseModulationState(void)
+{
 }
 
 /* ----------------------------------------------------------------------- */
@@ -8908,6 +9053,7 @@ void gpioTerminate(void)
 
    signalUninstaller();
 
+   restorePulseModulationState();
    initReleaseResources();
 
    fflush(NULL);
@@ -12388,6 +12534,7 @@ int gpioNotifyClose(unsigned handle)
    gpioNotify[handle].state = PI_NOTIFY_CLOSING;
 
    intNotifyBits();
+   restorePulseModulationState();
 
    if (gpioCfg.ifFlags & PI_DISABLE_ALERT)
    {
@@ -14236,6 +14383,49 @@ int gpioCfgSetInternals(uint32_t cfgVal)
    gpioCfg.dbgLevel = cfgVal & 0xF;
    gpioCfg.alertFreq = (cfgVal>>4) & 0xF;
    return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+
+uint32_t gpioInternalGetReg(int regId)
+{
+   DBG(DBG_USER, "");
+
+   switch (regId)
+   {
+      case 0: return pwmReg[PWM_CTL];
+      case 1: return pwmReg[PWM_STA];
+      case 2: return pwmReg[PWM_RNG1];
+      case 3: return pwmReg[PWM_DMAC];
+
+      case 10: return pcmReg[PCM_CS];
+      case 11: return pcmReg[PCM_FIFO];
+      case 12: return pcmReg[PCM_MODE];
+      case 13: return pcmReg[PCM_RXC];
+      case 14: return pcmReg[PCM_TXC];
+      case 15: return pcmReg[PCM_DREQ];
+      case 16: return pcmReg[PCM_INTEN];
+      case 17: return pcmReg[PCM_INTSTC];
+      case 18: return pcmReg[PCM_GRAY];
+
+      case 20: return clkReg[CLK_GP0_CTL];
+      case 21: return clkReg[CLK_GP0_DIV];
+
+      case 30: return clkReg[CLK_GP1_CTL];
+      case 31: return clkReg[CLK_GP1_DIV];
+
+      case 40: return clkReg[CLK_GP2_CTL];
+      case 41: return clkReg[CLK_GP2_DIV];
+
+      case 50: return clkReg[CLK_PWMCTL];
+      case 51: return clkReg[CLK_PWMDIV];
+
+      case 60: return clkReg[CLK_PCMCTL];
+      case 61: return clkReg[CLK_PCMDIV];
+      default:
+	 SOFT_ERROR(PI_BAD_PARAM, "bad register id (%d)", regId);
+	 return -1;
+   }
 }
 
 

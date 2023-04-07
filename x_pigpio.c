@@ -382,6 +382,39 @@ To the lascivious pleasing of a lute.\n\
 
    t5_count = 0;
 
+   // Save current register values
+   extern uint32_t gpioInternalGetReg(int regId);
+
+   uint32_t old_pwm_ctl = gpioInternalGetReg(0);
+   uint32_t old_pwm_sta = gpioInternalGetReg(1);
+   uint32_t old_pwm_rng = gpioInternalGetReg(2);
+   uint32_t old_pwm_dmac = gpioInternalGetReg(3);
+
+   uint32_t old_pcm_cs = gpioInternalGetReg(10);
+   uint32_t old_pcm_fifo = gpioInternalGetReg(11);
+   uint32_t old_pcm_mode = gpioInternalGetReg(12);
+   uint32_t old_pcm_rxc = gpioInternalGetReg(13);
+   uint32_t old_pcm_txc = gpioInternalGetReg(14);
+   uint32_t old_pcm_dreq = gpioInternalGetReg(15);
+   uint32_t old_pcm_inten = gpioInternalGetReg(16);
+   uint32_t old_pcm_intstc = gpioInternalGetReg(17);
+   uint32_t old_pcm_gray = gpioInternalGetReg(18);
+
+   uint32_t old_pwm_clk_gp0_ctl = gpioInternalGetReg(20);
+   uint32_t old_pwm_clk_gp0_div = gpioInternalGetReg(21);
+
+   uint32_t old_pwm_clk_gp1_ctl = gpioInternalGetReg(30);
+   uint32_t old_pwm_clk_gp1_div = gpioInternalGetReg(31);
+
+   uint32_t old_pwm_clk_gp2_ctl = gpioInternalGetReg(40);
+   uint32_t old_pwm_clk_gp2_div = gpioInternalGetReg(41);
+
+   uint32_t old_pwm_clk_ctl = gpioInternalGetReg(50);
+   uint32_t old_pwm_clk_div = gpioInternalGetReg(51);
+
+   uint32_t old_pcm_clk_ctl = gpioInternalGetReg(60);
+   uint32_t old_pcm_clk_div = gpioInternalGetReg(61);
+
    gpioSetAlertFunc(GPIO, t5cbf);
 
    gpioSetMode(GPIO, PI_OUTPUT);
@@ -505,6 +538,42 @@ To the lascivious pleasing of a lute.\n\
    CHECK(5, 28, t5_count, 5, 1, "callback count==");
 
    gpioSetAlertFunc(GPIO, NULL);
+
+   extern void gpioInternalRestorePulseModulationState(void);
+
+   gpioInternalRestorePulseModulationState();
+   // Check register values
+   CHECK(5, 29, gpioInternalGetReg(0), old_pwm_ctl, 0, "PWM CTL=");
+   const uint32_t pwm_sta_mask = ~0b1111111100;
+   CHECK(5, 30, gpioInternalGetReg(1) & pwm_sta_mask, old_pwm_sta & pwm_sta_mask, 0, "PWM STA=");
+   CHECK(5, 31, gpioInternalGetReg(2), old_pwm_rng, 0, "PWM RNG=");
+   CHECK(5, 32, gpioInternalGetReg(3), old_pwm_dmac, 0, "PWM DMAC=");
+
+   const uint32_t pcm_cs_mask = ~0b1001110000000000;
+   CHECK(5, 33, gpioInternalGetReg(10) & pcm_cs_mask, old_pcm_cs & pcm_cs_mask, 0, "PCM CS=");
+   CHECK(5, 34, gpioInternalGetReg(11), old_pcm_fifo, 0, "PCM FIFO=");
+   CHECK(5, 35, gpioInternalGetReg(12), old_pcm_mode, 0, "PCM MODE=");
+   CHECK(5, 36, gpioInternalGetReg(13), old_pcm_rxc, 0, "PCM RXC=");
+   CHECK(5, 37, gpioInternalGetReg(14), old_pcm_txc, 0, "PCM TXC=");
+   CHECK(5, 38, gpioInternalGetReg(15), old_pcm_dreq, 0, "PCM DREQ=");
+   CHECK(5, 39, gpioInternalGetReg(16), old_pcm_inten, 0, "PCM INTEN=");
+   CHECK(5, 40, gpioInternalGetReg(17), old_pcm_intstc, 0, "PCM INTSTC=");
+   CHECK(5, 41, gpioInternalGetReg(18), old_pcm_gray, 0, "PCM GRAY=");
+
+   CHECK(5, 42, gpioInternalGetReg(20), old_pwm_clk_gp0_ctl , 0, "GP0 CLK CTL=");
+   CHECK(5, 43, gpioInternalGetReg(21), old_pwm_clk_gp0_div , 0, "GP0 CLK DIV=");
+
+   CHECK(5, 44, gpioInternalGetReg(30), old_pwm_clk_gp1_ctl , 0, "GP1 CLK CTL=");
+   CHECK(5, 45, gpioInternalGetReg(31), old_pwm_clk_gp1_div , 0, "GP1 CLK DIV=");
+
+   CHECK(5, 46, gpioInternalGetReg(40), old_pwm_clk_gp2_ctl , 0, "GP2 CLK CTL=");
+   CHECK(5, 47, gpioInternalGetReg(41), old_pwm_clk_gp2_div , 0, "GP2 CLK DIV=");
+
+   CHECK(5, 48, gpioInternalGetReg(50), old_pwm_clk_ctl , 0, "PWM CLK CTL=");
+   CHECK(5, 49, gpioInternalGetReg(51), old_pwm_clk_div , 0, "PWM CLK DIV=");
+
+   CHECK(5, 50, gpioInternalGetReg(60), old_pcm_clk_ctl , 0, "PCM CLK CTL=");
+   CHECK(5, 51, gpioInternalGetReg(61), old_pcm_clk_div , 0, "PCM CLK DIV=");
 }
 
 int t6_count;
