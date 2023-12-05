@@ -706,6 +706,8 @@ gpioCfgInterfaces          Configure user interfaces
 .br
 gpioCfgSocketPort          Configure socket port
 .br
+gpioCfgSocketPath          Configure socket path
+.br
 gpioCfgMemAlloc            Configure DMA memory allocation mode
 .br
 gpioCfgNetAddr             Configure allowed network addresses
@@ -7802,6 +7804,30 @@ port: 1024-32000
 .br
 The default setting is to use port 8888.
 
+.IP "\fBint gpioCfgSocketPath(const char*)\fP"
+.IP "" 4
+Configures pigpio to use the specified Unix socket.
+
+.br
+
+.br
+This function is only effective if called before \fBgpioInitialise\fP.
+
+.br
+
+.br
+
+.EX
+path: path to the socket.
+.br
+
+.EE
+
+.br
+
+.br
+The default is "/var/run/pigpio.sock".
+
 .IP "\fBint gpioCfgInterfaces(unsigned ifFlags)\fP"
 .IP "" 4
 Configures pigpio support of the fifo and socket interfaces.
@@ -8944,6 +8970,8 @@ These functions are only effective if called before \fBgpioInitialise\fP.
 \fBgpioCfgInterfaces\fP
 .br
 \fBgpioCfgSocketPort\fP
+.br
+\fBgpioCfgSocketPath\fP
 .br
 \fBgpioCfgMemAlloc\fP
 
@@ -11039,6 +11067,8 @@ A 16-bit word value.
 #define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
 .br
 #define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
+.br
+#define PI_BAD_SOCKET_PORT -153 // socket path empty
 .br
 
 .br

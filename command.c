@@ -567,6 +567,7 @@ static errInfo_t errInfo[]=
    {PI_CMD_INTERRUPTED  , "command interrupted, Python"},
    {PI_NOT_ON_BCM2711   , "not available on BCM2711"},
    {PI_ONLY_ON_BCM2711  , "only available on BCM2711"},
+   {PI_BAD_SOCKET_PATH  , "socket path empty"},
 
 };
 

@@ -723,6 +723,7 @@ PI_BAD_EVENT_ID     =-143
 PI_CMD_INTERRUPTED  =-144
 PI_NOT_ON_BCM2711   =-145
 PI_ONLY_ON_BCM2711  =-146
+_PI_BAD_SOCKET_PATH =-152
 
 # pigpio error text
 
@@ -871,6 +872,7 @@ _errors=[
    [PI_CMD_INTERRUPTED   , "pigpio command interrupted"],
    [PI_NOT_ON_BCM2711    , "not available on BCM2711"],
    [PI_ONLY_ON_BCM2711   , "only available on BCM2711"],
+   [_PI_BAD_SOCKET_PATH  , "socket path empty"],
 ]
 
 _except_a = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n{}"
@@ -1119,10 +1121,10 @@ class _callback_ADT:
 
 class _callback_thread(threading.Thread):
    """A class to encapsulate pigpio notification callbacks."""
-   def __init__(self, control, host, port):
+   def __init__(self, main):
       """Initialises notifications."""
       threading.Thread.__init__(self)
-      self.control = control
+      self.control = main.sl
       self.sl = _socklock()
       self.go = False
       self.daemon = True
@@ -1130,7 +1132,11 @@ class _callback_thread(threading.Thread):
       self.event_bits = 0
       self.callbacks = []
       self.events = []
-      self.sl.s = socket.create_connection((host, port), None)
+      if main._sock:
+         self.sl.s = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+         self.sl.s.connect(main._sock)
+      else:
+         self.sl.s = socket.create_connection((main._host, main._port), None)
       self.lastLevel = _pigpio_command(self.sl,  _PI_CMD_BR1, 0, 0)
       self.handle = _u2i(_pigpio_command(self.sl, _PI_CMD_NOIB, 0, 0))
       self.go = True
@@ -5177,6 +5183,7 @@ class pi():
    def __init__(self,
                 host = os.getenv("PIGPIO_ADDR", 'localhost'),
                 port = os.getenv("PIGPIO_PORT", 8888),
+                sock = os.getenv("PIGPIO_SOCKET", None),
                 show_errors = True):
       """
       Grants access to a Pi's GPIO.
@@ -5201,6 +5208,7 @@ class pi():
       pi = pigio.pi()              # use defaults
       pi = pigpio.pi('mypi')       # specify host, default port
       pi = pigpio.pi('mypi', 7777) # specify host and port
+      pi = pigpio.pi(sock='/run/pigpio.sock') # specify a Unix socket
 
       pi = pigpio.pi()             # exit script if no connection
       if not pi.connected:
@@ -5212,21 +5220,26 @@ class pi():
       self.sl = _socklock()
       self._notify  = None
 
-      port = int(port)
-
-      if host == '':
-         host = "localhost"
-
-      self._host = host
-      self._port = port
-
+      self._sock = sock
       try:
-         self.sl.s = socket.create_connection((host, port), None)
+         if sock:
+            self.sl.s = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+            self.sl.s.connect(sock)
+         else:
+            port = int(port)
 
-         # Disable the Nagle algorithm.
-         self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            if host == '':
+               host = "localhost"
 
-         self._notify = _callback_thread(self.sl, host, port)
+            self._host = host
+            self._port = port
+
+            self.sl.s = socket.create_connection((host, port), None)
+
+            # Disable the Nagle algorithm.
+            self.sl.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+         self._notify = _callback_thread(self)
 
       except socket.error:
          exception = 1
@@ -5264,7 +5277,9 @@ class pi():
             print(_except_z)
 
    def __repr__(self):
-      return "<pipio.pi host={} port={}>".format(self._host, self._port)
+      if self._sock is None:
+         return "<pipio.pi host={} port={}>".format(self._host, self._port)
+      return "<pipio.pi sock={}>".format(self._sock)
 
    def stop(self):
       """Release pigpio resources.

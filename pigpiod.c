@@ -59,6 +59,7 @@ static int      foreground             = PI_DEFAULT_FOREGROUND;
 static unsigned DMAprimaryChannel      = PI_DEFAULT_DMA_NOT_SET;
 static unsigned DMAsecondaryChannel    = PI_DEFAULT_DMA_NOT_SET;
 static unsigned socketPort             = PI_DEFAULT_SOCKET_PORT;
+static char *   socketPath             = PI_DEFAULT_SOCKET_PATH;
 static unsigned memAllocMode           = PI_DEFAULT_MEM_ALLOC_MODE;
 static uint64_t updateMask             = -1;
 
@@ -109,6 +110,7 @@ void usage()
       "   -n IP addr, allow address, name or dotted,     default allow all\n" \
       "   -p value,   socket port, 1024-32000,           default 8888\n" \
       "   -s value,   sample rate, 1, 2, 4, 5, 8, or 10, default 5\n" \
+      "   -S path,    Unix socket file,                  default /var/run/pigpio.sock\n" \
       "   -t value,   clock peripheral, 0=PWM 1=PCM,     default PCM\n" \
       "   -v, -V,     display pigpio version and exit\n" \
       "   -x mask,    GPIO which may be updated,         default board GPIO\n" \
@@ -166,7 +168,7 @@ static void initOpts(int argc, char *argv[])
    uint32_t addr;
    int64_t mask;
 
-   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:mp:s:t:x:vV")) != -1)
+   while ((opt = getopt(argc, argv, "a:b:c:d:e:fgkln:mp:s:S:t:x:vV")) != -1)
    {
       switch (opt)
       {
@@ -257,6 +259,12 @@ static void initOpts(int argc, char *argv[])
                   fatal("invalid -s option (%d)", i);
                   break;
             }
+            break;
+
+         case 'S':
+            if (!*optarg)
+               fatal("invalid -S option (empty string)");
+            socketPath = optarg;
             break;
 
          case 't':
@@ -392,6 +400,8 @@ int main(int argc, char **argv)
    gpioCfgDMAchannels(DMAprimaryChannel, DMAsecondaryChannel);
 
    gpioCfgSocketPort(socketPort);
+
+   gpioCfgSocketPath(socketPath);
 
    gpioCfgMemAlloc(memAllocMode);
 
