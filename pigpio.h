@@ -385,6 +385,7 @@ gpioCfgDMAchannels         Configure the DMA channels
 gpioCfgPermissions         Configure the GPIO access permissions
 gpioCfgInterfaces          Configure user interfaces
 gpioCfgSocketPort          Configure socket port
+gpioCfgSocketPath          Configure Unix socket path
 gpioCfgMemAlloc            Configure DMA memory allocation mode
 gpioCfgNetAddr             Configure allowed network addresses
 
@@ -415,6 +416,7 @@ OVERVIEW*/
 
 #define PI_ENVPORT "PIGPIO_PORT"
 #define PI_ENVADDR "PIGPIO_ADDR"
+#define PI_ENVSOCK "PIGPIO_SOCKET"
 
 #define PI_LOCKFILE "/var/run/pigpio.pid"
 
@@ -890,6 +892,7 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_DISABLE_SOCK_IF   2
 #define PI_LOCALHOST_SOCK_IF 4
 #define PI_DISABLE_ALERT     8
+#define PI_DISABLE_UNIX_IF   16
 
 /* memAllocMode */
 
@@ -4920,6 +4923,21 @@ D*/
 
 
 /*F*/
+int gpioCfgSocketPath(const char * path);
+/*D
+Configures pigpio to use the specified Unix socket.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+port: path to the socket file.
+. .
+
+The default is "/var/run/pigpio.sock".
+D*/
+
+
+/*F*/
 int gpioCfgInterfaces(unsigned ifFlags);
 /*D
 Configures pigpio support of the fifo and socket interfaces.
@@ -5538,6 +5556,7 @@ These functions are only effective if called before [*gpioInitialise*].
 [*gpioCfgPermissions*] 
 [*gpioCfgInterfaces*] 
 [*gpioCfgSocketPort*] 
+[*gpioCfgSocketPath*] 
 [*gpioCfgMemAlloc*]
 
 gpioGetSamplesFunc_t::
@@ -6528,6 +6547,7 @@ after this command is issued.
 #define PI_CMD_INTERRUPTED -144 // Used by Python
 #define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
 #define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
+#define PI_BAD_SOCKET_PATH -147 // socket path empty
 
 #define PI_PIGIF_ERR_0    -2000
 #define PI_PIGIF_ERR_99   -2099
@@ -6550,6 +6570,7 @@ after this command is issued.
 #define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
 #define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
 #define PI_DEFAULT_DMA_NOT_SET             15
+#define PI_DEFAULT_SOCKET_PATH             "/var/run/pigpio.sock"
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "localhost"
