@@ -58,6 +58,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/socket.h>
 #include <sys/sysmacros.h>
 #include <netinet/tcp.h>
+#include <sys/un.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
 #include <fnmatch.h>
@@ -1096,6 +1097,7 @@ typedef struct
    unsigned DMAprimaryChannel;
    unsigned DMAsecondaryChannel;
    unsigned socketPort;
+   const char * socketPath;
    unsigned ifFlags;
    unsigned memAllocMode;
    unsigned dbgLevel;
@@ -1292,6 +1294,7 @@ static volatile int runState = PI_STARTING;
 static int pthAlertRunning  = PI_THREAD_NONE;
 static int pthFifoRunning   = PI_THREAD_NONE;
 static int pthSocketRunning = PI_THREAD_NONE;
+static int pthUnixRunning   = PI_THREAD_NONE;
 
 static gpioAlert_t      gpioAlert  [PI_MAX_USER_GPIO+1];
 
@@ -1328,6 +1331,7 @@ static FILE * outFifo = NULL;
 static int fdLock       = -1;
 static int fdMem        = -1;
 static int fdSock       = -1;
+static int fdUnix       = -1;
 static int fdPmap       = -1;
 static int fdMbox       = -1;
 
@@ -1369,6 +1373,7 @@ static volatile gpioCfg_t gpioCfg =
    PI_DEFAULT_DMA_NOT_SET, /* primary DMA */
    PI_DEFAULT_DMA_NOT_SET, /* secondary DMA */
    PI_DEFAULT_SOCKET_PORT,
+   PI_DEFAULT_SOCKET_PATH,
    PI_DEFAULT_IF_FLAGS,
    PI_DEFAULT_MEM_ALLOC_MODE,
    0, /* dbgLevel */
@@ -1384,6 +1389,7 @@ static unsigned bufferCycles; /* number of cycles */
 static pthread_t pthAlert;
 static pthread_t pthFifo;
 static pthread_t pthSocket;
+static pthread_t pthUnix;
 
 static uint32_t spi_dummy;
 
@@ -7260,6 +7266,61 @@ static void * pthSocketThread(void *x)
    return 0;
 }
 
+static void * pthUnixThread(void *x)
+{
+   int fdC=0, c, *sock;
+   struct sockaddr_storage client;
+   pthread_attr_t attr;
+
+   if (pthread_attr_init(&attr))
+      SOFT_ERROR((void*)PI_INIT_FAILED,
+         "pthread_attr_init failed (%m)");
+
+   if (pthread_attr_setstacksize(&attr, STACK_SIZE))
+      SOFT_ERROR((void*)PI_INIT_FAILED,
+         "pthread_attr_setstacksize failed (%m)");
+
+   if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
+      SOFT_ERROR((void*)PI_INIT_FAILED,
+         "pthread_attr_setdetachstate failed (%m)");
+
+   /* fdUnix opened in gpioInitialise so that we can treat
+      failure to bind as fatal. */
+
+   listen(fdUnix, 100);
+
+   c = sizeof(client);
+
+   /* don't start until DMA started */
+
+   spinWhileStarting();
+
+   while (fdC >= 0)
+   {
+      pthread_t thr;
+
+      fdC = accept(fdUnix, (struct sockaddr *)&client, (socklen_t*)&c);
+
+      closeOrphanedNotifications(-1, fdC);
+
+      DBG(DBG_USER, "Connection accepted on socket %d", fdC);
+
+      sock = malloc(sizeof(int));
+
+      *sock = fdC;
+
+      if (pthread_create
+         (&thr, &attr, pthSocketThreadHandler, (void*) sock) < 0)
+         SOFT_ERROR((void*)PI_INIT_FAILED,
+            "socket pthread_create failed (%m)");
+   }
+
+   if (fdC < 0)
+      SOFT_ERROR((void*)PI_INIT_FAILED, "accept failed (%m)");
+
+   return 0;
+}
+
 /* ======================================================================= */
 
 static void initCheckLockFile(void)
@@ -7969,6 +8030,7 @@ static void initClearGlobals(void)
    pthAlertRunning  = PI_THREAD_NONE;
    pthFifoRunning   = PI_THREAD_NONE;
    pthSocketRunning = PI_THREAD_NONE;
+   pthUnixRunning   = PI_THREAD_NONE;
 
    wfc[0] = 0;
    wfc[1] = 0;
@@ -8051,6 +8113,7 @@ static void initClearGlobals(void)
    fdLock       = -1;
    fdMem        = -1;
    fdSock       = -1;
+   fdUnix       = -1;
 
    dmaMboxBlk = MAP_FAILED;
    dmaPMapBlk = MAP_FAILED;
@@ -8118,6 +8181,13 @@ static void initReleaseResources(void)
       pthread_cancel(pthSocket);
       pthread_join(pthSocket, NULL);
       pthSocketRunning = PI_THREAD_NONE;
+   }
+
+   if (pthUnixRunning != PI_THREAD_NONE)
+   {
+      pthread_cancel(pthUnix);
+      pthread_join(pthUnix, NULL);
+      pthUnixRunning = PI_THREAD_NONE;
    }
 
    /* release mmap'd memory */
@@ -8224,6 +8294,12 @@ static void initReleaseResources(void)
       fdSock = -1;
    }
 
+   if (fdUnix != -1)
+   {
+      close(fdUnix);
+      fdUnix = -1;
+   }
+
    if (fdPmap != -1)
    {
       close(fdPmap);
@@ -8248,7 +8324,9 @@ int initInitialise(void)
    unsigned rev, model;
    struct sockaddr_in server;
    struct sockaddr_in6 server6;
+   struct sockaddr_un serverU;
    char * portStr;
+   const char * sockStr;
    unsigned port;
    struct sched_param param;
    pthread_attr_t pthAttr;
@@ -8366,6 +8444,29 @@ int initInitialise(void)
          SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
 
       pthFifoRunning = PI_THREAD_STARTED;
+   }
+
+   if (!(gpioCfg.ifFlags & PI_DISABLE_UNIX_IF))
+   {
+      sockStr = getenv(PI_ENVSOCK);
+      if (! sockStr) sockStr = gpioCfg.socketPath;
+
+      fdUnix = socket(AF_UNIX, SOCK_STREAM , 0);
+
+      if (fdUnix != -1)
+      {
+         bzero((char *)&serverU, sizeof(serverU));
+         serverU.sun_family = AF_UNIX;
+         strncpy (serverU.sun_path, sockStr, sizeof (serverU.sun_path) - 1);
+
+         if (bind(fdUnix,(struct sockaddr *)&serverU, sizeof(serverU)) < 0)
+            SOFT_ERROR(PI_INIT_FAILED, "bind to socket '%s' failed (%m)", sockStr);
+      }
+
+      if (pthread_create(&pthUnix, &pthAttr, pthUnixThread, &i))
+         SOFT_ERROR(PI_INIT_FAILED, "pthread_create unix failed (%m)");
+
+      pthUnixRunning = PI_THREAD_STARTED;
    }
 
    if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
@@ -13967,6 +14068,21 @@ int gpioCfgSocketPort(unsigned port)
       SOFT_ERROR(PI_BAD_SOCKET_PORT, "bad port (%d)", port);
 
    gpioCfg.socketPort = port;
+
+   return 0;
+}
+
+
+int gpioCfgSocketPath(const char *path)
+{
+   DBG(DBG_USER, "path=%s", path);
+
+   CHECK_NOT_INITED;
+
+   if (!path || !*path)
+      SOFT_ERROR(PI_BAD_SOCKET_PATH, "bad path");
+
+   gpioCfg.socketPath = path;
 
    return 0;
 }

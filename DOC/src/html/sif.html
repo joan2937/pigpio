@@ -25,6 +25,12 @@ default may be overridden when pigpio starts by the <a href=
 call.&nbsp; The pigpio daemon uses this function to provide an
 option to change the port number.<br>
 <br>
+pigpio also listens for connections on "/var/run/pigpio.sock" by
+default.&nbsp; This default may be overridden when pigpio starts
+by the <a href= "cif.html#gpioCfgSocketPath">gpioCfgSocketPath</a>
+function call.&nbsp; The pigpio daemon uses this function to provide an
+option to change the socket file name.<br>
+<br>
 The pigs utility is an example of using the socket interface from
 C.<span style="font-weight: bold;"><br></span>
 <h3><a name="Request" id="Request"></a>Request</h3>
